@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+*.tsbuildinfo
+verification-*.png
+playwright-report/
+test-results/
+tests/e2e/.auth/

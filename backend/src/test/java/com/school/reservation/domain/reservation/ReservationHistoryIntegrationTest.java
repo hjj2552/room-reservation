@@ -56,6 +56,54 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void adminCanFilterReservationHistoriesByServerSideConditions() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        OffsetDateTime fromAt = OffsetDateTime.now().minusMinutes(1);
+        UUID firstReservationId = createReservation(session, firstRoomId(), nextWeekdayAt(10, 0), "Audit first room");
+        UUID secondReservationId = createReservation(session, secondRoomId(), nextWeekdayAt(11, 0), "Audit second room");
+        OffsetDateTime toAt = OffsetDateTime.now().plusMinutes(1);
+
+        mockMvc.perform(get("/api/admin/audit/reservation-histories")
+                .session(session)
+                .param("roomId", firstRoomId().toString())
+                .param("action", "CREATED_BY_ADMIN")
+                .param("from", fromAt.toString())
+                .param("to", toAt.toString())
+                .param("page", "0")
+                .param("size", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalItems").value(1))
+            .andExpect(jsonPath("$.items[0].reservationId").value(firstReservationId.toString()))
+            .andExpect(jsonPath("$.items[0].action").value("CREATED_BY_ADMIN"));
+
+        mockMvc.perform(get("/api/admin/audit/reservation-histories")
+                .session(session)
+                .param("reservationId", secondReservationId.toString())
+                .param("page", "0")
+                .param("size", "10"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalItems").value(1))
+            .andExpect(jsonPath("$.items[0].reservationId").value(secondReservationId.toString()));
+
+        mockMvc.perform(get("/api/admin/audit/reservation-histories")
+                .session(session)
+                .param("action", "CREATED_BY_ADMIN")
+                .param("page", "0")
+                .param("size", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalItems").value(2))
+            .andExpect(jsonPath("$.totalPages").value(2))
+            .andExpect(jsonPath("$.page").value(0))
+            .andExpect(jsonPath("$.size").value(1));
+
+        mockMvc.perform(get("/api/admin/audit/reservation-histories")
+                .session(session)
+                .param("from", OffsetDateTime.now().plusDays(1).toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalItems").value(0));
+    }
+
+    @Test
     void reservationHistoryActionsArePersistedAsFixedEnumValues() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime startAt = nextWeekdayAt(10, 0);
@@ -120,6 +168,10 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
     }
 
     private UUID createReservation(MockHttpSession session, OffsetDateTime startAt, String purpose) throws Exception {
+        return createReservation(session, firstRoomId(), startAt, purpose);
+    }
+
+    private UUID createReservation(MockHttpSession session, UUID roomId, OffsetDateTime startAt, String purpose) throws Exception {
         String response = mockMvc.perform(post("/api/admin/reservations")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -134,13 +186,20 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "status": "REQUESTED"
                     }
-                    """.formatted(firstRoomId(), purpose, startAt, startAt.plusHours(1))))
+                    """.formatted(roomId, purpose, startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()
             .getContentAsString();
         JsonNode json = objectMapper.readTree(response);
         return UUID.fromString(json.get("id").asText());
+    }
+
+    private UUID secondRoomId() {
+        return jdbcTemplate.queryForObject(
+            "select id from rooms where name = 'Seminar Room 201' and enabled = true and deleted_at is null",
+            UUID.class
+        );
     }
 
     private MockHttpSession loginAsAdmin() throws Exception {

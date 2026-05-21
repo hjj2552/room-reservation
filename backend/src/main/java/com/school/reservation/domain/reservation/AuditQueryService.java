@@ -2,8 +2,10 @@ package com.school.reservation.domain.reservation;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +25,52 @@ public class AuditQueryService {
 
     @Transactional(readOnly = true)
     public Page<ReservationHistory> searchHistories(UUID reservationId, Pageable pageable) {
-        if (reservationId == null) {
-            return reservationHistoryRepository.findAllByOrderByCreatedAtDesc(pageable);
-        }
-        return reservationHistoryRepository.findByReservationIdOrderByCreatedAtDesc(reservationId, pageable);
+        return searchHistories(reservationId, null, null, null, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ReservationHistory> searchHistories(
+        UUID reservationId,
+        UUID roomId,
+        ReservationHistory.Action action,
+        OffsetDateTime fromAt,
+        OffsetDateTime toAt,
+        Pageable pageable
+    ) {
+        return reservationHistoryRepository.findAll(
+            historySpec(reservationId, roomId, action, fromAt, toAt),
+            pageable
+        );
+    }
+
+    private Specification<ReservationHistory> historySpec(
+        UUID reservationId,
+        UUID roomId,
+        ReservationHistory.Action action,
+        OffsetDateTime fromAt,
+        OffsetDateTime toAt
+    ) {
+        return (root, query, criteriaBuilder) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            var reservation = root.join("reservation");
+
+            if (reservationId != null) {
+                predicates.add(criteriaBuilder.equal(reservation.get("id"), reservationId));
+            }
+            if (roomId != null) {
+                predicates.add(criteriaBuilder.equal(reservation.get("room").get("id"), roomId));
+            }
+            if (action != null) {
+                predicates.add(criteriaBuilder.equal(root.get("action"), action));
+            }
+            if (fromAt != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), fromAt));
+            }
+            if (toAt != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), toAt));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
     }
 }
