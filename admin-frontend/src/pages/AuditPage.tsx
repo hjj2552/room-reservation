@@ -78,6 +78,7 @@ export function AuditPage() {
         <label>
           예약 ID
           <input
+            data-testid="audit-reservation-id-input"
             value={reservationId}
             placeholder="특정 예약 ID"
             onChange={(event) => setParam('reservationId', event.target.value)}
@@ -85,7 +86,11 @@ export function AuditPage() {
         </label>
         <label>
           강의실
-          <select value={roomId} onChange={(event) => setParam('roomId', event.target.value)}>
+          <select
+            data-testid="audit-room-select"
+            value={roomId}
+            onChange={(event) => setParam('roomId', event.target.value)}
+          >
             <option value="">전체</option>
             {rooms.data?.items.map((room) => (
               <option key={room.id} value={room.id}>
@@ -96,7 +101,11 @@ export function AuditPage() {
         </label>
         <label>
           처리 유형
-          <select value={action} onChange={(event) => setParam('action', event.target.value)}>
+          <select
+            data-testid="audit-action-select"
+            value={action}
+            onChange={(event) => setParam('action', event.target.value)}
+          >
             <option value="">전체</option>
             {actions.map((item) => (
               <option key={item} value={item}>
@@ -113,7 +122,7 @@ export function AuditPage() {
           종료일
           <input type="date" value={toDate} onChange={(event) => setParam('toDate', event.target.value)} />
         </label>
-        <button type="submit" className="secondary-button">조회</button>
+        <button type="submit" className="secondary-button" data-testid="audit-search-button">조회</button>
       </form>
 
       {audit.isLoading ? <LoadingState /> : null}
@@ -122,7 +131,7 @@ export function AuditPage() {
       {audit.data && audit.data.items.length > 0 ? (
         <>
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table" data-testid="audit-table">
               <caption className="sr-only">예약 처리 이력</caption>
               <thead>
                 <tr>

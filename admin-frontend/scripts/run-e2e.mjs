@@ -155,7 +155,7 @@ function stopBackend() {
   if (process.platform === 'win32') {
     spawnSync('taskkill', ['/PID', String(backendProcess.pid), '/T', '/F'], { stdio: 'ignore' });
   } else {
-    backendProcess.kill('SIGTERM');
+    killProcessGroup(backendProcess);
   }
 
   closeBackendLogs();
@@ -170,7 +170,7 @@ function stopFrontend() {
   if (process.platform === 'win32') {
     spawnSync('taskkill', ['/PID', String(frontendProcess.pid), '/T', '/F'], { stdio: 'ignore' });
   } else {
-    frontendProcess.kill('SIGTERM');
+    killProcessGroup(frontendProcess);
   }
 
   closeFrontendLogs();
@@ -195,6 +195,14 @@ function closeFrontendLogs() {
   }
   frontendOutFd = null;
   frontendErrFd = null;
+}
+
+function killProcessGroup(processRef) {
+  try {
+    process.kill(-processRef.pid, 'SIGTERM');
+  } catch {
+    processRef.kill('SIGTERM');
+  }
 }
 
 process.on('exit', () => {

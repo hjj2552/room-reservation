@@ -43,7 +43,25 @@ npm.cmd run e2e
 
 `npm run e2e` starts a backend only when `E2E_BACKEND_URL` is not reachable. The started backend uses `SPRING_PROFILES_ACTIVE=e2e` by default. It also starts the Vite dev server when `PLAYWRIGHT_BASE_URL` is not reachable.
 
-## CI Run
+## GitHub Actions CI
+
+The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull requests and pushes to `main`.
+
+Jobs:
+
+- `backend-test`: starts a PostgreSQL 16 service on host port `5433` and runs `backend/./gradlew test` with the backend test profile.
+- `admin-frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the admin frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
+
+The E2E job reuses `admin-frontend/scripts/run-e2e.mjs`. In CI, that runner starts the backend jar with the `e2e` profile and starts the Vite dev server if they are not already reachable.
+
+Artifacts:
+
+- `admin-playwright-report`: Playwright HTML report from `admin-frontend/playwright-report`.
+- `admin-e2e-test-results`: Playwright traces, screenshots, error contexts, and backend/frontend logs from `admin-frontend/test-results`.
+
+Artifacts are uploaded with `if: always()`, so failed E2E runs should still leave debugging output.
+
+## Manual CI-Shaped Run
 
 Recommended CI shape:
 
