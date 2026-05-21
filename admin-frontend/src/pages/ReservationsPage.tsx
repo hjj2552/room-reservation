@@ -90,7 +90,11 @@ export function ReservationsPage() {
       <form className="filter-bar" onSubmit={handleSubmit}>
         <label>
           상태
-          <select value={status} onChange={(event) => setParam('status', event.target.value)}>
+          <select
+            data-testid="reservation-status-filter"
+            value={status}
+            onChange={(event) => setParam('status', event.target.value)}
+          >
             <option value="">전체</option>
             {Object.entries(statusLabels).map(([value, label]) => (
               <option key={value} value={value}>
@@ -112,7 +116,12 @@ export function ReservationsPage() {
         </label>
         <label>
           시작일
-          <input type="date" value={fromDate} onChange={(event) => setParam('fromDate', event.target.value)} />
+          <input
+            data-testid="reservation-from-date-filter"
+            type="date"
+            value={fromDate}
+            onChange={(event) => setParam('fromDate', event.target.value)}
+          />
         </label>
         <label>
           종료일
@@ -121,13 +130,14 @@ export function ReservationsPage() {
         <label>
           검색어
           <input
+            data-testid="reservation-keyword-filter"
             type="search"
             placeholder="신청자, 목적"
             value={keyword}
             onChange={(event) => setParam('keyword', event.target.value)}
           />
         </label>
-        <button type="submit" className="secondary-button">
+        <button type="submit" className="secondary-button" data-testid="reservation-search-button">
           <Search size={16} aria-hidden="true" />
           조회
         </button>

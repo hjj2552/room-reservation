@@ -123,18 +123,18 @@ export function uniqueE2eName(label: string) {
   return `E2E ${label} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function nextWeekdayAtLocalInput(hour: number, minute: number) {
-  const date = nextWeekdayDate();
+export function nextWeekdayAtLocalInput(hour: number, minute: number, daysAhead = 14) {
+  const date = nextWeekdayDate(daysAhead);
   return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-export function nextWeekdayAtOffset(hour: number, minute: number) {
-  return `${nextWeekdayAtLocalInput(hour, minute)}:00+09:00`;
+export function nextWeekdayAtOffset(hour: number, minute: number, daysAhead = 14) {
+  return `${nextWeekdayAtLocalInput(hour, minute, daysAhead)}:00+09:00`;
 }
 
-function nextWeekdayDate() {
+function nextWeekdayDate(daysAhead: number) {
   const date = new Date();
-  date.setDate(date.getDate() + 14);
+  date.setDate(date.getDate() + daysAhead);
   while (date.getDay() === 0 || date.getDay() === 6) {
     date.setDate(date.getDate() + 1);
   }
