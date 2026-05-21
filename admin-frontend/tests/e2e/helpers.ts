@@ -123,8 +123,23 @@ export function uniqueE2eName(label: string) {
   return `E2E ${label} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function nextWeekdayReservationLocalInputs({
+  daysAhead = 21,
+  startHour = 13,
+  endHour = 14,
+  minute = 0,
+} = {}) {
+  const date = nextWeekdayDateInKst(daysAhead);
+  const time = (hour: number) => `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  return {
+    date,
+    startAt: `${date}T${time(startHour)}`,
+    endAt: `${date}T${time(endHour)}`,
+  };
+}
+
 export function nextWeekdayAtLocalInput(hour: number, minute: number, daysAhead = 14) {
-  const date = nextWeekdayDate(daysAhead);
+  const date = nextWeekdayDateInKst(daysAhead);
   return `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
@@ -132,13 +147,28 @@ export function nextWeekdayAtOffset(hour: number, minute: number, daysAhead = 14
   return `${nextWeekdayAtLocalInput(hour, minute, daysAhead)}:00+09:00`;
 }
 
-function nextWeekdayDate(daysAhead: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + daysAhead);
-  while (date.getDay() === 0 || date.getDay() === 6) {
-    date.setDate(date.getDate() + 1);
+function nextWeekdayDateInKst(daysAhead: number) {
+  const today = kstDateParts(new Date());
+  const date = new Date(Date.UTC(today.year, today.month - 1, today.day + daysAhead));
+  while (date.getUTCDay() === 0 || date.getUTCDay() === 6) {
+    date.setUTCDate(date.getUTCDate() + 1);
   }
   return date.toISOString().slice(0, 10);
+}
+
+function kstDateParts(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const part = (type: string) => Number(parts.find((item) => item.type === type)?.value);
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+  };
 }
 
 function addHours(offsetDateTime: string, hours: number) {

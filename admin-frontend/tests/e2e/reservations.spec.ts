@@ -6,6 +6,7 @@ import {
   deleteRoomByApi,
   loginByApi,
   nextWeekdayAtLocalInput,
+  nextWeekdayReservationLocalInputs,
   uniqueE2eName,
 } from './helpers';
 
@@ -64,6 +65,7 @@ test('admin can create a reservation and see it on detail and list pages', async
   await loginByApi(request);
   const room = await createRoomByApi(request, uniqueE2eName('Reservation Create Room'));
   const purpose = uniqueE2eName('reservation create');
+  const reservationTime = nextWeekdayReservationLocalInputs();
   let createdReservationId: string | undefined;
 
   try {
@@ -73,12 +75,14 @@ test('admin can create a reservation and see it on detail and list pages', async
     await page.getByTestId('reservation-email-input').fill(`reservation-${Date.now()}@example.com`);
     await page.getByTestId('reservation-phone-input').fill('010-1111-2222');
     await page.getByTestId('reservation-purpose-input').fill(purpose);
-    await page.getByTestId('reservation-start-input').fill(nextWeekdayAtLocalInput(14, 0, 21));
-    await page.getByTestId('reservation-end-input').fill(nextWeekdayAtLocalInput(15, 0, 21));
+    await page.getByTestId('reservation-start-input').fill(reservationTime.startAt);
+    await page.getByTestId('reservation-end-input').fill(reservationTime.endAt);
     await page.getByTestId('reservation-memo-input').fill('E2E create verification');
 
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('reservation-purpose-input')).toHaveValue(purpose);
+    await expect(page.getByTestId('reservation-start-input')).toHaveValue(reservationTime.startAt);
+    await expect(page.getByTestId('reservation-end-input')).toHaveValue(reservationTime.endAt);
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/reservations') &&
