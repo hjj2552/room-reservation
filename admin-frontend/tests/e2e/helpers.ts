@@ -105,6 +105,13 @@ export async function cancelReservationByApi(request: APIRequestContext, reserva
   expect([200, 404, 409]).toContain(response.status());
 }
 
+export async function cancelRecurrenceByApi(request: APIRequestContext, recurrenceId: string, memo?: string) {
+  const response = await request.post(`/api/admin/recurrences/${recurrenceId}/cancel`, {
+    data: memo ? { memo } : undefined,
+  });
+  expect([204, 404, 409]).toContain(response.status());
+}
+
 export async function getSettingsByApi(request: APIRequestContext) {
   const response = await request.get('/api/admin/settings');
   expect(response.ok()).toBeTruthy();
@@ -135,6 +142,21 @@ export function nextWeekdayReservationLocalInputs({
     date,
     startAt: `${date}T${time(startHour)}`,
     endAt: `${date}T${time(endHour)}`,
+  };
+}
+
+export function nextWeekdayRecurrenceInputs({
+  daysAhead = 28,
+  startHour = 13,
+  endHour = 14,
+} = {}) {
+  const date = nextWeekdayDateInKst(daysAhead);
+  return {
+    startDate: date,
+    endDate: date,
+    dayOfWeek: weekdayCode(date),
+    startTime: `${String(startHour).padStart(2, '0')}:00`,
+    endTime: `${String(endHour).padStart(2, '0')}:00`,
   };
 }
 
@@ -169,6 +191,11 @@ function kstDateParts(value: Date) {
     month: part('month'),
     day: part('day'),
   };
+}
+
+function weekdayCode(date: string) {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][day];
 }
 
 function addHours(offsetDateTime: string, hours: number) {

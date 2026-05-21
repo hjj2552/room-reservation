@@ -54,22 +54,25 @@ export function RecurrenceDetailPage() {
         <section className="panel" aria-labelledby="recurrence-basic-title">
           <div className="panel-header">
             <h2 id="recurrence-basic-title">기본 정보</h2>
-            <span className={`plain-badge ${detail.deleted ? 'muted-badge' : 'good'}`}>
+            <span
+              className={`plain-badge ${detail.deleted ? 'muted-badge' : 'good'}`}
+              data-testid="recurrence-detail-status"
+            >
               {detail.deleted ? '취소됨' : '운영 중'}
             </span>
           </div>
           <dl className="description-list">
             <div>
               <dt>강의실</dt>
-              <dd>{detail.room.name} {detail.room.location ? `(${detail.room.location})` : ''}</dd>
+              <dd data-testid="recurrence-detail-room">{detail.room.name} {detail.room.location ? `(${detail.room.location})` : ''}</dd>
             </div>
             <div>
               <dt>기간</dt>
-              <dd>{formatDate(detail.startDate)} ~ {formatDate(detail.endDate)}</dd>
+              <dd data-testid="recurrence-detail-period">{formatDate(detail.startDate)} ~ {formatDate(detail.endDate)}</dd>
             </div>
             <div>
               <dt>요일/시간</dt>
-              <dd>{detail.daysOfWeek} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
+              <dd data-testid="recurrence-detail-schedule">{detail.daysOfWeek} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
             </div>
             <div>
               <dt>생성 정책</dt>
@@ -96,6 +99,7 @@ export function RecurrenceDetailPage() {
             <label>
               취소 메모
               <textarea
+                data-testid="recurrence-detail-cancel-memo-input"
                 rows={4}
                 value={memo}
                 disabled={detail.deleted}
@@ -104,7 +108,12 @@ export function RecurrenceDetailPage() {
               />
             </label>
             {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
-            <button type="submit" className="danger-button" disabled={detail.deleted || cancel.isPending}>
+            <button
+              type="submit"
+              className="danger-button"
+              data-testid="recurrence-detail-cancel-button"
+              disabled={detail.deleted || cancel.isPending}
+            >
               {detail.deleted ? '이미 취소됨' : cancel.isPending ? '취소 중...' : '반복 예약 취소'}
             </button>
           </form>
