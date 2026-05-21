@@ -53,6 +53,10 @@ async function startBackend() {
   backendErrFd = openSync(path.join(logDir, 'backend.err.log'), 'a');
   const processRef = spawn('java', ['-jar', 'build/libs/room-reservation-backend-0.0.1-SNAPSHOT.jar'], {
     cwd: backendRoot,
+    env: {
+      ...process.env,
+      SPRING_PROFILES_ACTIVE: process.env.SPRING_PROFILES_ACTIVE || process.env.E2E_BACKEND_PROFILE || 'e2e',
+    },
     stdio: ['ignore', backendOutFd, backendErrFd],
     windowsHide: true,
     detached: true,
@@ -83,8 +87,11 @@ async function startFrontend() {
 
   frontendOutFd = openSync(path.join(logDir, 'frontend.out.log'), 'a');
   frontendErrFd = openSync(path.join(logDir, 'frontend.err.log'), 'a');
-  const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const processRef = spawn(command, ['run', 'dev', '--', '--host', '127.0.0.1'], {
+  const command = process.platform === 'win32' ? 'cmd.exe' : 'npm';
+  const args = process.platform === 'win32'
+    ? ['/d', '/s', '/c', 'npm.cmd', 'run', 'dev', '--', '--host', '127.0.0.1']
+    : ['run', 'dev', '--', '--host', '127.0.0.1'];
+  const processRef = spawn(command, args, {
     cwd: adminRoot,
     stdio: ['ignore', frontendOutFd, frontendErrFd],
     windowsHide: true,

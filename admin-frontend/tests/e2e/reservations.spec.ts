@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { createRoomByApi, loginByApi, nextWeekdayAtLocalInput } from './helpers';
+import {
+  cancelReservationByApi,
+  createReservationByApi,
+  createRoomByApi,
+  deleteRoomByApi,
+  loginByApi,
+  nextWeekdayAtLocalInput,
+  uniqueE2eName,
+} from './helpers';
 
 test('예약 목록 필터는 URL query에 반영되고 새로고침 후 유지된다', async ({ page }) => {
   await page.goto('/reservations');
@@ -21,6 +29,35 @@ test('예약 목록 필터는 URL query에 반영되고 새로고침 후 유지�
   await expect(page.getByLabel('상태')).toHaveValue('CONFIRMED');
   await expect(page.getByLabel('검색어')).toHaveValue('E2E');
   await expect(page.getByLabel('시작일')).toHaveValue('2026-05-01');
+});
+
+test('reservation edit: saved changes are visible on detail and list', async ({ page, request }) => {
+  await loginByApi(request);
+  const room = await createRoomByApi(request, uniqueE2eName('Reservation Edit Room'));
+  const reservation = await createReservationByApi(request, room.id, uniqueE2eName('reservation edit seed'));
+  const updatedPurpose = uniqueE2eName('reservation edit updated');
+
+  try {
+    await page.goto(`/reservations/${reservation.id}`);
+    await page.getByTestId('reservation-edit-link').click();
+
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
+    await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
+    await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
+    await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
+    await page.getByTestId('reservation-memo-input').fill('E2E reservation edit smoke');
+    await page.getByTestId('reservation-save-button').click();
+
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+    await expect(page.getByTestId('reservation-purpose')).toHaveText(updatedPurpose);
+
+    await page.goto(`/reservations?keyword=${encodeURIComponent(updatedPurpose)}`);
+    await expect(page.getByTestId('reservations-table')).toContainText(updatedPurpose);
+    await expect(page.getByTestId('reservations-table')).toContainText(room.name);
+  } finally {
+    await cancelReservationByApi(request, reservation.id, 'E2E cleanup');
+    await deleteRoomByApi(request, room.id);
+  }
 });
 
 test('관리자가 예약을 생성하면 상세와 목록에서 확인할 수 있다', async ({ page, request }) => {

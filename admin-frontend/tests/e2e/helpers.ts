@@ -1,5 +1,40 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
+export interface E2eRoom {
+  id: string;
+  name: string;
+  location?: string | null;
+  capacity?: number | null;
+  description?: string | null;
+  enabled?: boolean;
+}
+
+export interface E2eReservation {
+  id: string;
+  purpose?: string;
+}
+
+export interface E2eSettings {
+  organizationName: string;
+  publicNotice: string | null;
+  reservationEnabled: boolean;
+  reservationDisabledMessage: string | null;
+  semesterStartDate: string;
+  semesterEndDate: string;
+  openTime: string;
+  closeTime: string;
+  slotMinutes: number;
+  availableDaysOfWeek: string[];
+  minReservationMinutes: number;
+  maxReservationMinutes: number;
+  requirePhone: boolean;
+  adminContactName: string | null;
+  adminContactEmail: string | null;
+  adminContactPhone: string | null;
+  completionMessage: string | null;
+  version: number;
+}
+
 export const adminCredentials = {
   username: process.env.ADMIN_USERNAME || 'admin',
   password: process.env.ADMIN_PASSWORD || 'admin1234',
@@ -32,7 +67,12 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
     },
   });
   expect(response.ok()).toBeTruthy();
-  return response.json() as Promise<{ id: string; name: string }>;
+  return response.json() as Promise<E2eRoom>;
+}
+
+export async function deleteRoomByApi(request: APIRequestContext, roomId: string) {
+  const response = await request.delete(`/api/admin/rooms/${roomId}`);
+  expect([204, 404]).toContain(response.status());
 }
 
 export async function createReservationByApi(
@@ -55,7 +95,32 @@ export async function createReservationByApi(
     },
   });
   expect(response.ok()).toBeTruthy();
-  return response.json() as Promise<{ id: string }>;
+  return response.json() as Promise<E2eReservation>;
+}
+
+export async function cancelReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
+  const response = await request.post(`/api/admin/reservations/${reservationId}/cancel`, {
+    data: memo ? { memo } : undefined,
+  });
+  expect([200, 404, 409]).toContain(response.status());
+}
+
+export async function getSettingsByApi(request: APIRequestContext) {
+  const response = await request.get('/api/admin/settings');
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<E2eSettings>;
+}
+
+export async function updateSettingsByApi(request: APIRequestContext, settings: E2eSettings) {
+  const response = await request.put('/api/admin/settings', {
+    data: settings,
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<E2eSettings>;
+}
+
+export function uniqueE2eName(label: string) {
+  return `E2E ${label} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function nextWeekdayAtLocalInput(hour: number, minute: number) {

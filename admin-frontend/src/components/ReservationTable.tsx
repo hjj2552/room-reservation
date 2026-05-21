@@ -13,7 +13,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
 
   return (
     <div className="table-wrap">
-      <table className="data-table">
+      <table className="data-table" data-testid="reservations-table">
         <caption className="sr-only">예약 목록</caption>
         <thead>
           <tr>
