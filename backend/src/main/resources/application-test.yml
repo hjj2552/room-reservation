@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/room_reservation_test
+    username: room_reservation
+    password: room_reservation
+  flyway:
+    enabled: true
+    clean-disabled: false
+  jpa:
+    show-sql: false
+
+app:
+  admin:
+    username: admin
+    password: admin1234
