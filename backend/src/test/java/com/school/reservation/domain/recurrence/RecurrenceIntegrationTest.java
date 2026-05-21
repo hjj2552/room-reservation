@@ -62,22 +62,38 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         LocalDate secondDate = firstDate.plusDays(7);
         createBlockingReservation(session, firstDate);
 
-        mockMvc.perform(post("/api/admin/recurrences")
+        mockMvc.perform(post("/api/admin/recurrences/preview")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(previewBody(firstDate, secondDate)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalCandidates").value(2))
+            .andExpect(jsonPath("$.availableCount").value(1))
+            .andExpect(jsonPath("$.conflictCount").value(1))
+            .andExpect(jsonPath("$.items[0].available").value(false))
+            .andExpect(jsonPath("$.items[0].reason").value("TIME_SLOT_CONFLICT"))
+            .andExpect(jsonPath("$.items[1].available").value(true));
+
+        String response = mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(firstDate, secondDate, "SKIP_CONFLICTS")))
             .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.recurrenceId").isNotEmpty())
             .andExpect(jsonPath("$.createdCount").value(1))
             .andExpect(jsonPath("$.skippedCount").value(1))
+            .andExpect(jsonPath("$.failedCount").value(0))
             .andExpect(jsonPath("$.items[0].status").value("SKIPPED"))
             .andExpect(jsonPath("$.items[0].reason").value("TIME_SLOT_CONFLICT"))
-            .andExpect(jsonPath("$.items[1].status").value("CREATED"));
+            .andExpect(jsonPath("$.items[1].status").value("CREATED"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
 
-        Integer generatedCount = jdbcTemplate.queryForObject(
-            "select count(*) from reservations where source = 'RECURRING_GENERATED'",
-            Integer.class
-        );
-        assertThat(generatedCount).isEqualTo(1);
+        assertThat(generatedReservationCount()).isEqualTo(1);
+        assertThat(generatedReservationCount(recurrenceId)).isEqualTo(1);
+        assertThat(activeRecurrenceCount()).isEqualTo(1);
     }
 
     @Test
@@ -87,21 +103,26 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         LocalDate secondDate = firstDate.plusDays(7);
         createBlockingReservation(session, firstDate);
 
-        mockMvc.perform(post("/api/admin/recurrences")
+        String response = mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(firstDate, secondDate, "CREATE_AVAILABLE_ONLY")))
             .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.recurrenceId").isNotEmpty())
             .andExpect(jsonPath("$.createdCount").value(1))
             .andExpect(jsonPath("$.skippedCount").value(1))
+            .andExpect(jsonPath("$.failedCount").value(0))
             .andExpect(jsonPath("$.items[0].status").value("SKIPPED"))
-            .andExpect(jsonPath("$.items[1].status").value("CREATED"));
+            .andExpect(jsonPath("$.items[0].reason").value("TIME_SLOT_CONFLICT"))
+            .andExpect(jsonPath("$.items[1].status").value("CREATED"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
 
-        Integer generatedCount = jdbcTemplate.queryForObject(
-            "select count(*) from reservations where source = 'RECURRING_GENERATED'",
-            Integer.class
-        );
-        assertThat(generatedCount).isEqualTo(1);
+        assertThat(generatedReservationCount()).isEqualTo(1);
+        assertThat(generatedReservationCount(recurrenceId)).isEqualTo(1);
+        assertThat(activeRecurrenceCount()).isEqualTo(1);
     }
 
     @Test
@@ -111,27 +132,29 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         LocalDate secondDate = firstDate.plusDays(7);
         createBlockingReservation(session, firstDate);
 
+        mockMvc.perform(post("/api/admin/recurrences/preview")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(previewBody(firstDate, secondDate)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.totalCandidates").value(2))
+            .andExpect(jsonPath("$.availableCount").value(1))
+            .andExpect(jsonPath("$.conflictCount").value(1));
+
         mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(firstDate, secondDate, "FAIL_ALL")))
             .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("RECURRENCE_CONFLICT"));
+            .andExpect(jsonPath("$.code").value("RECURRENCE_CONFLICT"))
+            .andExpect(jsonPath("$.details.failedCount").value(1));
 
         mockMvc.perform(get("/api/admin/recurrences").session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalItems").value(0));
 
-        Integer recurrenceCount = jdbcTemplate.queryForObject(
-            "select count(*) from reservation_recurrences",
-            Integer.class
-        );
-        Integer generatedCount = jdbcTemplate.queryForObject(
-            "select count(*) from reservations where source = 'RECURRING_GENERATED'",
-            Integer.class
-        );
-        assertThat(recurrenceCount).isZero();
-        assertThat(generatedCount).isZero();
+        assertThat(activeRecurrenceCount()).isZero();
+        assertThat(generatedReservationCount()).isZero();
     }
 
     @Test
@@ -228,5 +251,30 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
             startAt.plusHours(1),
             "Existing reservation"
         );
+    }
+
+    private int activeRecurrenceCount() {
+        Integer count = jdbcTemplate.queryForObject(
+            "select count(*) from reservation_recurrences where deleted_at is null",
+            Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int generatedReservationCount() {
+        Integer count = jdbcTemplate.queryForObject(
+            "select count(*) from reservations where source = 'RECURRING_GENERATED'",
+            Integer.class
+        );
+        return count == null ? 0 : count;
+    }
+
+    private int generatedReservationCount(UUID recurrenceId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "select count(*) from reservations where source = 'RECURRING_GENERATED' and recurrence_id = ?",
+            Integer.class,
+            recurrenceId
+        );
+        return count == null ? 0 : count;
     }
 }

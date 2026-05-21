@@ -79,8 +79,9 @@ export async function createReservationByApi(
   request: APIRequestContext,
   roomId: string,
   purpose: string,
+  options: { startAt?: string; endAt?: string; memo?: string } = {},
 ) {
-  const startAt = nextWeekdayAtOffset(12, 0);
+  const startAt = options.startAt || nextWeekdayAtOffset(12, 0);
   const response = await request.post('/api/admin/reservations', {
     data: {
       roomId,
@@ -89,9 +90,9 @@ export async function createReservationByApi(
       applicantPhone: '010-1000-2000',
       purpose,
       startAt,
-      endAt: addHours(startAt, 1),
+      endAt: options.endAt || addHours(startAt, 1),
       status: 'CONFIRMED',
-      memo: 'E2E audit seed',
+      memo: options.memo || 'E2E audit seed',
     },
   });
   expect(response.ok()).toBeTruthy();
@@ -149,14 +150,18 @@ export function nextWeekdayRecurrenceInputs({
   daysAhead = 28,
   startHour = 13,
   endHour = 14,
+  weeks = 0,
 } = {}) {
   const date = nextWeekdayDateInKst(daysAhead);
+  const endDate = addDays(date, weeks * 7);
   return {
     startDate: date,
-    endDate: date,
+    endDate,
     dayOfWeek: weekdayCode(date),
     startTime: `${String(startHour).padStart(2, '0')}:00`,
     endTime: `${String(endHour).padStart(2, '0')}:00`,
+    firstStartAt: `${date}T${String(startHour).padStart(2, '0')}:00:00+09:00`,
+    firstEndAt: `${date}T${String(endHour).padStart(2, '0')}:00:00+09:00`,
   };
 }
 
@@ -196,6 +201,12 @@ function kstDateParts(value: Date) {
 function weekdayCode(date: string) {
   const day = new Date(`${date}T00:00:00Z`).getUTCDay();
   return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][day];
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
 }
 
 function addHours(offsetDateTime: string, hours: number) {
