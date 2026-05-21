@@ -66,10 +66,11 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <form className="panel form-grid" onSubmit={handleSubmit}>
+      <form className="panel form-grid" data-testid="settings-form" onSubmit={handleSubmit}>
         <label>
           기관명
           <input
+            data-testid="settings-organization-input"
             value={form.organizationName}
             onChange={(event) => updateField('organizationName', event.target.value)}
             required
@@ -86,6 +87,7 @@ export function SettingsPage() {
         <label className="full-span">
           공개 안내
           <textarea
+            data-testid="settings-public-notice-input"
             rows={3}
             value={form.publicNotice || ''}
             onChange={(event) => updateField('publicNotice', event.target.value)}
@@ -226,7 +228,12 @@ export function SettingsPage() {
         ) : null}
         <div className="button-row full-span">
           <span className="muted">현재 버전 {form.version}</span>
-          <button type="submit" className="primary-button" disabled={updateSettings.isPending}>
+          <button
+            type="submit"
+            className="primary-button"
+            data-testid="settings-save-button"
+            disabled={updateSettings.isPending}
+          >
             {updateSettings.isPending ? '저장 중...' : '설정 저장'}
           </button>
         </div>

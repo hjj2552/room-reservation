@@ -117,7 +117,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
       <form className="panel form-grid" onSubmit={handleSubmit(onSubmit)}>
         <label>
           강의실
-          <select {...register('roomId', { required: '강의실을 선택하세요.' })}>
+          <select data-testid="reservation-room-select" {...register('roomId', { required: '강의실을 선택하세요.' })}>
             <option value="">선택</option>
             {rooms.data?.items.map((room) => (
               <option key={room.id} value={room.id}>
@@ -129,7 +129,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </label>
         <label>
           상태
-          <select {...register('status', { required: true })}>
+          <select data-testid="reservation-status-select" {...register('status', { required: true })}>
             {Object.entries(statusLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
@@ -139,12 +139,16 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </label>
         <label>
           신청자 이름
-          <input {...register('applicantName', { required: '신청자 이름을 입력하세요.' })} />
+          <input
+            data-testid="reservation-applicant-name-input"
+            {...register('applicantName', { required: '신청자 이름을 입력하세요.' })}
+          />
           {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
         </label>
         <label>
           이메일
           <input
+            data-testid="reservation-email-input"
             type="email"
             {...register('applicantEmail', { required: '이메일을 입력하세요.' })}
           />
@@ -152,16 +156,20 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </label>
         <label>
           전화번호
-          <input {...register('applicantPhone')} />
+          <input data-testid="reservation-phone-input" {...register('applicantPhone')} />
         </label>
         <label>
           예약 목적
-          <input {...register('purpose', { required: '예약 목적을 입력하세요.' })} />
+          <input
+            data-testid="reservation-purpose-input"
+            {...register('purpose', { required: '예약 목적을 입력하세요.' })}
+          />
           {errors.purpose ? <span className="field-error">{errors.purpose.message}</span> : null}
         </label>
         <label>
           시작 시간
           <input
+            data-testid="reservation-start-input"
             type="datetime-local"
             {...register('startAt', { required: '시작 시간을 입력하세요.' })}
           />
@@ -170,6 +178,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         <label>
           종료 시간
           <input
+            data-testid="reservation-end-input"
             type="datetime-local"
             {...register('endAt', { required: '종료 시간을 입력하세요.' })}
           />
@@ -177,14 +186,24 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </label>
         <label className="full-span">
           처리 메모
-          <textarea rows={4} {...register('memo')} placeholder="생성 또는 수정 사유를 남깁니다." />
+          <textarea
+            data-testid="reservation-memo-input"
+            rows={4}
+            {...register('memo')}
+            placeholder="생성 또는 수정 사유를 남깁니다."
+          />
         </label>
         {mutationError ? <div className="inline-error full-span" role="alert">{errorMessage(mutationError)}</div> : null}
         <div className="button-row full-span">
           <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
             취소
           </button>
-          <button type="submit" className="primary-button" disabled={isPending}>
+          <button
+            type="submit"
+            className="primary-button"
+            data-testid="reservation-save-button"
+            disabled={isPending}
+          >
             {isPending ? '저장 중...' : '저장'}
           </button>
         </div>

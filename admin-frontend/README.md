@@ -28,3 +28,11 @@ npm.cmd run e2e
 ```
 
 관리자 계정은 기본값으로 `admin` / `admin1234`를 사용합니다. 다른 계정을 사용하려면 실행 전에 환경 변수 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 지정합니다.
+
+## Admin E2E profile
+
+CI/local E2E prerequisites, environment variables, and cleanup strategy are documented in:
+
+```text
+../docs/admin-e2e.md
+```

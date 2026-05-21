@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${E2E_DB_URL:jdbc:postgresql://localhost:5433/room_reservation_test}
+    username: ${E2E_DB_USERNAME:room_reservation}
+    password: ${E2E_DB_PASSWORD:room_reservation}
+  flyway:
+    enabled: true
+    clean-disabled: false
+  jpa:
+    show-sql: false
+
+app:
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:admin1234}

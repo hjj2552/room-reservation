@@ -115,7 +115,7 @@ export function RoomsPage() {
           {rooms.data?.items.length === 0 ? <EmptyState message="등록된 강의실이 없습니다." /> : null}
           {rooms.data?.items.length ? (
             <div className="table-wrap">
-              <table className="data-table">
+              <table className="data-table" data-testid="rooms-table">
                 <caption className="sr-only">강의실 목록</caption>
                 <thead>
                   <tr>
@@ -143,7 +143,12 @@ export function RoomsPage() {
                       <td>{formatDateTime(room.updatedAt)}</td>
                       <td>
                         <div className="button-row table-actions">
-                          <button type="button" className="ghost-button" onClick={() => setEditingRoom(room)}>
+                          <button
+                            type="button"
+                            className="ghost-button"
+                            data-testid="room-edit-button"
+                            onClick={() => setEditingRoom(room)}
+                          >
                             수정
                           </button>
                           <button
@@ -173,10 +178,11 @@ export function RoomsPage() {
               </button>
             ) : null}
           </div>
-          <form className="form-stack" onSubmit={handleSubmit}>
+          <form className="form-stack" data-testid="room-form" onSubmit={handleSubmit}>
             <label>
               강의실명
               <input
+                data-testid="room-name-input"
                 value={form.name}
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                 required
@@ -185,6 +191,7 @@ export function RoomsPage() {
             <label>
               위치
               <input
+                data-testid="room-location-input"
                 value={form.location}
                 onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
               />
@@ -192,6 +199,7 @@ export function RoomsPage() {
             <label>
               정원
               <input
+                data-testid="room-capacity-input"
                 type="number"
                 min="0"
                 value={form.capacity}
@@ -210,13 +218,19 @@ export function RoomsPage() {
             <label>
               설명
               <textarea
+                data-testid="room-description-input"
                 rows={4}
                 value={form.description}
                 onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
               />
             </label>
             {mutationError ? <div className="inline-error" role="alert">{errorMessage(mutationError)}</div> : null}
-            <button type="submit" className="primary-button" disabled={createRoom.isPending || updateRoom.isPending}>
+            <button
+              type="submit"
+              className="primary-button"
+              data-testid="room-save-button"
+              disabled={createRoom.isPending || updateRoom.isPending}
+            >
               {editingRoom ? '수정 저장' : '강의실 생성'}
             </button>
           </form>

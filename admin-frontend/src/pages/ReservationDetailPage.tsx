@@ -47,7 +47,11 @@ export function ReservationDetailPage() {
           <button type="button" className="ghost-button" onClick={() => navigate('/reservations')}>
             목록으로
           </button>
-          <Link className="secondary-button" to={`/reservations/${detail.id}/edit`}>
+          <Link
+            className="secondary-button"
+            data-testid="reservation-edit-link"
+            to={`/reservations/${detail.id}/edit`}
+          >
             <PenLine size={16} aria-hidden="true" />
             예약 수정
           </Link>
@@ -79,7 +83,7 @@ export function ReservationDetailPage() {
             </div>
             <div>
               <dt>목적</dt>
-              <dd>{detail.purpose}</dd>
+              <dd data-testid="reservation-purpose">{detail.purpose}</dd>
             </div>
             <div>
               <dt>신청 경로</dt>
