@@ -14,8 +14,10 @@ backend/build/
 
 node_modules/
 dist/
+playwright-report/
+test-results/
+tests/e2e/.auth/
 
 .idea/
 .vscode/
 *.iml
-
