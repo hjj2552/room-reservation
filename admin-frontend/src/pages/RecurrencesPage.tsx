@@ -101,11 +101,12 @@ export function RecurrencesPage() {
       </div>
 
       <div className="detail-grid">
-        <form className="panel form-grid" onSubmit={handlePreview}>
+        <form className="panel form-grid" data-testid="recurrence-form" onSubmit={handlePreview}>
           <h2 className="full-span">반복 예약 입력</h2>
           <label>
             강의실
             <select
+              data-testid="recurrence-room-select"
               name="roomId"
               value={form.roomId}
               onChange={(event) => setForm((prev) => ({ ...prev, roomId: event.target.value }))}
@@ -120,6 +121,7 @@ export function RecurrencesPage() {
           <label>
             신청자 이름
             <input
+              data-testid="recurrence-applicant-name-input"
               name="applicantName"
               value={form.applicantName}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantName: event.target.value }))}
@@ -129,6 +131,7 @@ export function RecurrencesPage() {
           <label>
             이메일
             <input
+              data-testid="recurrence-email-input"
               name="applicantEmail"
               type="email"
               value={form.applicantEmail}
@@ -139,6 +142,7 @@ export function RecurrencesPage() {
           <label>
             전화번호
             <input
+              data-testid="recurrence-phone-input"
               name="applicantPhone"
               value={form.applicantPhone}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
@@ -147,6 +151,7 @@ export function RecurrencesPage() {
           <label className="full-span">
             예약 목적
             <input
+              data-testid="recurrence-purpose-input"
               name="purpose"
               value={form.purpose}
               onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
@@ -156,6 +161,7 @@ export function RecurrencesPage() {
           <label>
             시작일
             <input
+              data-testid="recurrence-start-date-input"
               name="startDate"
               type="date"
               value={form.startDate}
@@ -166,6 +172,7 @@ export function RecurrencesPage() {
           <label>
             종료일
             <input
+              data-testid="recurrence-end-date-input"
               name="endDate"
               type="date"
               value={form.endDate}
@@ -176,6 +183,7 @@ export function RecurrencesPage() {
           <label>
             시작 시간
             <input
+              data-testid="recurrence-start-time-input"
               name="startTime"
               type="time"
               value={form.startTime}
@@ -186,6 +194,7 @@ export function RecurrencesPage() {
           <label>
             종료 시간
             <input
+              data-testid="recurrence-end-time-input"
               name="endTime"
               type="time"
               value={form.endTime}
@@ -198,6 +207,7 @@ export function RecurrencesPage() {
             {days.map((day) => (
               <label key={day}>
                 <input
+                  data-testid={`recurrence-day-${day}`}
                   type="checkbox"
                   checked={form.daysOfWeek.includes(day)}
                   onChange={() => toggleDay(day)}
@@ -209,6 +219,7 @@ export function RecurrencesPage() {
           <label className="full-span">
             생성 정책
             <select
+              data-testid="recurrence-conflict-policy-select"
               name="conflictPolicy"
               value={form.conflictPolicy}
               onChange={(event) => setForm((prev) => ({ ...prev, conflictPolicy: event.target.value as ConflictPolicy }))}
@@ -226,13 +237,19 @@ export function RecurrencesPage() {
             </div>
           ) : null}
           <div className="button-row full-span">
-            <button type="submit" className="secondary-button" disabled={preview.isPending}>
+            <button
+              type="submit"
+              className="secondary-button"
+              data-testid="recurrence-preview-button"
+              disabled={preview.isPending}
+            >
               <RefreshCw size={16} aria-hidden="true" />
               {preview.isPending ? '미리보기 중...' : '미리보기'}
             </button>
             <button
               type="button"
               className="primary-button"
+              data-testid="recurrence-create-button"
               disabled={!preview.data || create.isPending}
               onClick={handleCreate}
             >
@@ -248,13 +265,13 @@ export function RecurrencesPage() {
           ) : null}
           {preview.data ? (
             <>
-              <div className="summary-cards">
+              <div className="summary-cards" data-testid="recurrence-preview-summary">
                 <div><strong>{preview.data.totalCandidates}</strong><span>전체 후보</span></div>
                 <div><strong>{preview.data.availableCount}</strong><span>가능</span></div>
                 <div><strong>{preview.data.conflictCount}</strong><span>충돌</span></div>
               </div>
               <div className="table-wrap compact">
-                <table className="data-table">
+                <table className="data-table" data-testid="recurrence-preview-table">
                   <caption className="sr-only">반복 예약 미리보기 결과</caption>
                   <thead>
                     <tr>
@@ -291,7 +308,7 @@ export function RecurrencesPage() {
         {recurrences.data?.items.length === 0 ? <EmptyState message="등록된 반복 예약이 없습니다." /> : null}
         {recurrences.data?.items.length ? (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table" data-testid="recurrences-table">
               <caption className="sr-only">반복 예약 목록</caption>
               <thead>
                 <tr>
@@ -320,6 +337,7 @@ export function RecurrencesPage() {
                         type="button"
                         className="ghost-button"
                         disabled={item.deleted}
+                        data-testid="recurrence-list-cancel-entry-button"
                         onClick={() => setCancelTarget(item.id)}
                       >
                         취소 진입
@@ -339,6 +357,7 @@ export function RecurrencesPage() {
           <label>
             취소 메모
             <textarea
+              data-testid="recurrence-list-cancel-memo-input"
               rows={3}
               value={cancelMemo}
               onChange={(event) => setCancelMemo(event.target.value)}
@@ -351,6 +370,7 @@ export function RecurrencesPage() {
             <button
               type="button"
               className="danger-button"
+              data-testid="recurrence-list-cancel-confirm-button"
               disabled={cancel.isPending}
               onClick={() =>
                 cancel.mutate(
