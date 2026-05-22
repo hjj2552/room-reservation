@@ -1,5 +1,5 @@
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Download, List, Search } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../api/http';
 import { exportReservationsCsv } from '../api/reservations';
@@ -72,9 +72,14 @@ function activeRooms(rooms: AdminRoom[] = [], selectedRoomId: string) {
 
 export function ReservationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [csvError, setCsvError] = useState('');
   const rooms = useRooms();
   const settings = useSettings();
+
+  useEffect(() => {
+    searchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
 
   const viewMode = isReservationViewMode(searchParams.get('view')) ? searchParams.get('view') : 'list';
   const status = (searchParams.get('status') || '') as '' | ReservationStatus;
@@ -136,47 +141,46 @@ export function ReservationsPage() {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
 
+  function updateSearchParams(updater: (next: URLSearchParams) => void) {
+    const next = new URLSearchParams(searchParamsRef.current);
+    updater(next);
+    searchParamsRef.current = next;
+    setSearchParams(new URLSearchParams(next));
+  }
+
   function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    updateSearchParams((next) => {
       if (value) next.set(name, value);
       else next.delete(name);
       if (options.resetPage !== false) next.set('page', '0');
-      return next;
     });
   }
 
   function setViewMode(nextMode: ReservationViewMode) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    updateSearchParams((next) => {
       next.set('view', nextMode);
       next.set('page', '0');
       if (nextMode === 'room') {
         if (!next.get('weekStart')) next.set('weekStart', selectedWeekStart);
         if (!next.get('roomViewRoomId') && roomViewRooms[0]) next.set('roomViewRoomId', roomViewRooms[0].id);
       }
-      return next;
     });
   }
 
   function setRoomViewRoomId(nextRoomId: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    updateSearchParams((next) => {
       next.set('view', 'room');
       if (nextRoomId) next.set('roomViewRoomId', nextRoomId);
       else next.delete('roomViewRoomId');
       next.set('page', '0');
-      return next;
     });
   }
 
   function setWeekStart(nextDate: string) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    updateSearchParams((next) => {
       next.set('view', 'room');
       next.set('weekStart', startOfWeekInputValue(nextDate));
       next.set('page', '0');
-      return next;
     });
   }
 
