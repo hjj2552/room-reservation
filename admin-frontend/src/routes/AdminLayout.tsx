@@ -7,6 +7,7 @@ import {
   Plus,
   Repeat,
   SlidersHorizontal,
+  Table2,
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminSession, useLogout } from '../hooks/useAuth';
@@ -27,6 +28,10 @@ export function AdminLayout() {
           <NavLink to="/reservations" end>
             <CalendarDays size={18} aria-hidden="true" />
             예약 목록
+          </NavLink>
+          <NavLink to="/timetable">
+            <Table2 size={18} aria-hidden="true" />
+            시간표
           </NavLink>
           <NavLink to="/reservations/new">
             <Plus size={18} aria-hidden="true" />
