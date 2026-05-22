@@ -171,7 +171,7 @@ export function RoomsPage() {
 
         <section className="panel" aria-labelledby="room-form-title">
           <div className="panel-header">
-            <h2 id="room-form-title">{editingRoom ? '강의실 수정' : '강의실 생성'}</h2>
+            <h2 id="room-form-title">{editingRoom ? '강의실 수정' : '강의실 등록'}</h2>
             {editingRoom ? (
               <button type="button" className="ghost-button" onClick={() => setEditingRoom(null)}>
                 새 강의실 입력
@@ -231,7 +231,7 @@ export function RoomsPage() {
               data-testid="room-save-button"
               disabled={createRoom.isPending || updateRoom.isPending}
             >
-              {editingRoom ? '수정 저장' : '강의실 생성'}
+              {editingRoom ? '수정 저장' : '강의실 등록'}
             </button>
           </form>
         </section>

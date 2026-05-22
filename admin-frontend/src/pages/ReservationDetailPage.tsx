@@ -140,8 +140,8 @@ export function ReservationDetailPage() {
       </div>
 
       <section className="panel" aria-labelledby="history-title">
-        <h2 id="history-title">처리 이력</h2>
-        {histories.isLoading ? <LoadingState message="이력을 불러오는 중입니다." /> : null}
+        <h2 id="history-title">감사 이력</h2>
+        {histories.isLoading ? <LoadingState message="감사 이력을 불러오는 중입니다." /> : null}
         {histories.isError ? <ErrorState error={histories.error} /> : null}
         {histories.data?.length ? (
           <ol className="timeline">

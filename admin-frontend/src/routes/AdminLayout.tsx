@@ -50,7 +50,7 @@ export function AdminLayout() {
           </NavLink>
           <a href="/api/admin/exports/reservations.csv">
             <FileText size={18} aria-hidden="true" />
-            CSV 다운로드
+            CSV 내보내기
           </a>
         </nav>
         <div className="sidebar-footer">
