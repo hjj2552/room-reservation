@@ -428,6 +428,28 @@ button:disabled {
   min-width: 180px;
 }
 
+.compact-room-picker {
+  min-width: 220px;
+}
+
+.room-week-controls,
+.week-navigation {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
+.room-week-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.icon-button {
+  width: 42px;
+  min-width: 42px;
+  padding: 8px;
+}
+
 .timetable-card {
   display: grid;
   gap: 12px;
@@ -480,7 +502,8 @@ button:disabled {
   font-weight: 750;
 }
 
-.timetable-room-header {
+.timetable-room-header,
+.timetable-day-header {
   display: grid;
   align-content: center;
   gap: 3px;
@@ -488,18 +511,29 @@ button:disabled {
   padding: 9px 12px;
 }
 
-.timetable-room-header strong {
+.timetable-room-header strong,
+.timetable-day-header strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.timetable-room-header span {
+.timetable-room-header span,
+.timetable-day-header span {
   overflow: hidden;
   color: #687484;
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.timetable-day-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  min-height: 58px;
+  border-bottom: 1px solid #cfd8e3;
+  background: #f1f5f8;
 }
 
 .timetable-time-column,
@@ -969,6 +1003,16 @@ button:disabled {
   .timetable-scroll {
     max-height: 640px;
   }
+
+  .room-week-controls {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .compact-room-picker,
+  .week-navigation {
+    flex: 1;
+  }
 }
 
 @media (max-width: 680px) {
@@ -1006,5 +1050,15 @@ button:disabled {
   .timetable-summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .room-week-controls,
+  .week-navigation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .icon-button {
+    width: 100%;
   }
 }

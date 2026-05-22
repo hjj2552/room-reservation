@@ -4,7 +4,7 @@ import type { AdminRoom, ReservationListItem } from '../api/types';
 import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
-const MINUTE_HEIGHT = 1.35;
+export const TIMETABLE_MINUTE_HEIGHT = 1.35;
 const fallbackOpenTime = '09:00';
 const fallbackCloseTime = '18:00';
 const timetableTimeZone = 'Asia/Seoul';
@@ -18,12 +18,12 @@ interface ReservationDateTimetableProps {
   slotMinutes?: number;
 }
 
-function clockToMinutes(value?: string) {
+export function clockToMinutes(value?: string) {
   const [hour = '0', minute = '0'] = (value || '').slice(0, 5).split(':');
   return Number(hour) * 60 + Number(minute);
 }
 
-function dateTimeToClockMinutes(value: string) {
+export function dateTimeToClockMinutes(value: string) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: timetableTimeZone,
     hour: '2-digit',
@@ -35,13 +35,13 @@ function dateTimeToClockMinutes(value: string) {
   return hour * 60 + minute;
 }
 
-function formatClock(totalMinutes: number) {
+export function formatClock(totalMinutes: number) {
   const hour = Math.floor(totalMinutes / 60);
   const minute = totalMinutes % 60;
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-function buildSlots(openMinutes: number, closeMinutes: number, slotMinutes: number) {
+export function buildSlots(openMinutes: number, closeMinutes: number, slotMinutes: number) {
   const slots: number[] = [];
   for (let minutes = openMinutes; minutes <= closeMinutes; minutes += slotMinutes) {
     slots.push(minutes);
@@ -52,15 +52,15 @@ function buildSlots(openMinutes: number, closeMinutes: number, slotMinutes: numb
   return slots;
 }
 
-function clippedBlockPosition(reservation: ReservationListItem, openMinutes: number, closeMinutes: number) {
+export function clippedBlockPosition(reservation: ReservationListItem, openMinutes: number, closeMinutes: number) {
   const startMinutes = dateTimeToClockMinutes(reservation.startAt);
   const endMinutes = dateTimeToClockMinutes(reservation.endAt);
   const visibleStart = Math.max(startMinutes, openMinutes);
   const visibleEnd = Math.min(endMinutes, closeMinutes);
 
   return {
-    top: (visibleStart - openMinutes) * MINUTE_HEIGHT,
-    height: Math.max((visibleEnd - visibleStart) * MINUTE_HEIGHT, 34),
+    top: (visibleStart - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
+    height: Math.max((visibleEnd - visibleStart) * TIMETABLE_MINUTE_HEIGHT, 34),
     visible: visibleEnd > visibleStart,
     startLabel: formatClock(startMinutes),
     endLabel: formatClock(endMinutes),
@@ -83,7 +83,7 @@ export function ReservationDateTimetable({
     () => buildSlots(openMinutes, closeMinutes, normalizedSlotMinutes),
     [openMinutes, closeMinutes, normalizedSlotMinutes],
   );
-  const bodyHeight = (closeMinutes - openMinutes) * MINUTE_HEIGHT;
+  const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const roomIds = useMemo(() => new Set(rooms.map((room) => room.id)), [rooms]);
   const reservationsByRoom = useMemo(() => {
     const grouped = new Map<string, ReservationListItem[]>();
@@ -123,7 +123,11 @@ export function ReservationDateTimetable({
           ))}
           <div className="timetable-time-column" style={{ height: bodyHeight }}>
             {slots.map((slot) => (
-              <div key={slot} className="timetable-time-label" style={{ top: (slot - openMinutes) * MINUTE_HEIGHT }}>
+              <div
+                key={slot}
+                className="timetable-time-label"
+                style={{ top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT }}
+              >
                 {formatClock(slot)}
               </div>
             ))}
@@ -131,7 +135,11 @@ export function ReservationDateTimetable({
           {rooms.map((room) => (
             <div key={room.id} className="timetable-room-column" style={{ height: bodyHeight }}>
               {slots.map((slot) => (
-                <div key={slot} className="timetable-grid-line" style={{ top: (slot - openMinutes) * MINUTE_HEIGHT }} />
+                <div
+                  key={slot}
+                  className="timetable-grid-line"
+                  style={{ top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT }}
+                />
               ))}
               {(reservationsByRoom.get(room.id) || []).map((reservation) => {
                 const position = clippedBlockPosition(reservation, openMinutes, closeMinutes);

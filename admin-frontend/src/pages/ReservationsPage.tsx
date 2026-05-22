@@ -1,4 +1,4 @@
-import { CalendarDays, DoorOpen, Download, List, Search } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Download, List, Search } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../api/http';
@@ -6,7 +6,7 @@ import { exportReservationsCsv } from '../api/reservations';
 import type { AdminRoom, ReservationFilters, ReservationStatus } from '../api/types';
 import { Pagination } from '../components/Pagination';
 import { ReservationDateTimetable } from '../components/ReservationDateTimetable';
-import { ReservationRoomTimetablePlaceholder } from '../components/ReservationRoomTimetablePlaceholder';
+import { ReservationRoomTimetable } from '../components/ReservationRoomTimetable';
 import { ReservationTable } from '../components/ReservationTable';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
 import { useReservations } from '../hooks/useReservations';
@@ -32,6 +32,25 @@ function todayInputValue() {
   return local.toISOString().slice(0, 10);
 }
 
+function isDateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function addDaysInputValue(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfWeekInputValue(value: string) {
+  const base = isDateInputValue(value) ? value : todayInputValue();
+  const date = new Date(`${base}T00:00:00Z`);
+  const day = date.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
 function isReservationViewMode(value: string | null): value is ReservationViewMode {
   return viewModes.includes(value as ReservationViewMode);
 }
@@ -42,9 +61,13 @@ function ViewModeIcon({ mode }: { mode: ReservationViewMode }) {
   return <List size={16} aria-hidden="true" />;
 }
 
+function enabledActiveRooms(rooms: AdminRoom[] = []) {
+  return rooms.filter((room) => room.enabled && !room.deleted);
+}
+
 function activeRooms(rooms: AdminRoom[] = [], selectedRoomId: string) {
-  const enabledRooms = rooms.filter((room) => room.enabled && !room.deleted);
-  return selectedRoomId ? enabledRooms.filter((room) => room.id === selectedRoomId) : enabledRooms;
+  const active = enabledActiveRooms(rooms);
+  return selectedRoomId ? active.filter((room) => room.id === selectedRoomId) : active;
 }
 
 export function ReservationsPage() {
@@ -59,6 +82,7 @@ export function ReservationsPage() {
   const fromDate = searchParams.get('fromDate') || '';
   const toDate = searchParams.get('toDate') || '';
   const selectedDate = searchParams.get('date') || todayInputValue();
+  const selectedWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || todayInputValue());
   const keyword = searchParams.get('keyword') || '';
   const page = numberParam(searchParams.get('page'), 0);
 
@@ -90,6 +114,27 @@ export function ReservationsPage() {
   );
   const timetableReservations = useReservations(timetableFilters, { enabled: viewMode === 'date' });
   const timetableRooms = useMemo(() => activeRooms(rooms.data?.items, roomId), [rooms.data?.items, roomId]);
+  const roomViewRooms = useMemo(() => enabledActiveRooms(rooms.data?.items), [rooms.data?.items]);
+  const roomViewRoomIdParam = searchParams.get('roomViewRoomId') || '';
+  const selectedRoomViewRoomId = roomViewRooms.some((room) => room.id === roomViewRoomIdParam)
+    ? roomViewRoomIdParam
+    : roomViewRooms[0]?.id || '';
+  const selectedRoomViewRoom = roomViewRooms.find((room) => room.id === selectedRoomViewRoomId);
+  const roomTimetableFilters = useMemo<ReservationFilters>(
+    () => ({
+      status,
+      roomId: selectedRoomViewRoomId,
+      keyword,
+      from: toStartOfDayOffset(selectedWeekStart),
+      to: toEndOfDayOffset(addDaysInputValue(selectedWeekStart, 6)),
+      page: 0,
+      size: timetablePageSize,
+    }),
+    [status, selectedRoomViewRoomId, keyword, selectedWeekStart],
+  );
+  const roomTimetableReservations = useReservations(roomTimetableFilters, {
+    enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
+  });
 
   function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
     setSearchParams((prev) => {
@@ -105,6 +150,31 @@ export function ReservationsPage() {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('view', nextMode);
+      next.set('page', '0');
+      if (nextMode === 'room') {
+        if (!next.get('weekStart')) next.set('weekStart', selectedWeekStart);
+        if (!next.get('roomViewRoomId') && roomViewRooms[0]) next.set('roomViewRoomId', roomViewRooms[0].id);
+      }
+      return next;
+    });
+  }
+
+  function setRoomViewRoomId(nextRoomId: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('view', 'room');
+      if (nextRoomId) next.set('roomViewRoomId', nextRoomId);
+      else next.delete('roomViewRoomId');
+      next.set('page', '0');
+      return next;
+    });
+  }
+
+  function setWeekStart(nextDate: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('view', 'room');
+      next.set('weekStart', startOfWeekInputValue(nextDate));
       next.set('page', '0');
       return next;
     });
@@ -178,8 +248,13 @@ export function ReservationsPage() {
         </label>
         <label>
           강의실
-          <select value={roomId} onChange={(event) => setParam('roomId', event.target.value)}>
-            <option value="">전체</option>
+          <select
+            value={viewMode === 'room' ? selectedRoomViewRoomId : roomId}
+            onChange={(event) =>
+              viewMode === 'room' ? setRoomViewRoomId(event.target.value) : setParam('roomId', event.target.value)
+            }
+          >
+            <option value="">{viewMode === 'room' ? '선택' : '전체'}</option>
             {rooms.data?.items.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.name}
@@ -284,7 +359,82 @@ export function ReservationsPage() {
         </section>
       ) : null}
 
-      {viewMode === 'room' ? <ReservationRoomTimetablePlaceholder rooms={rooms.data?.items || []} selectedRoomId={roomId} /> : null}
+      {viewMode === 'room' ? (
+        <section className="panel timetable-panel" aria-labelledby="room-timetable-title">
+          <div className="panel-header">
+            <div>
+              <h2 id="room-timetable-title">강의실별 주간 시간표</h2>
+              <p className="muted">선택한 강의실의 월요일부터 일요일까지 예약 흐름을 확인합니다.</p>
+            </div>
+            <div className="room-week-controls">
+              <label className="compact-room-picker">
+                강의실
+                <select
+                  value={selectedRoomViewRoomId}
+                  onChange={(event) => setRoomViewRoomId(event.target.value)}
+                  data-testid="reservation-room-view-room-select"
+                >
+                  {roomViewRooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="week-navigation">
+                <button
+                  type="button"
+                  className="secondary-button icon-button"
+                  onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, -7))}
+                  aria-label="이전 주"
+                  data-testid="reservation-room-view-prev-week"
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                </button>
+                <label className="compact-date-picker">
+                  주 시작일
+                  <input
+                    type="date"
+                    value={selectedWeekStart}
+                    onChange={(event) => setWeekStart(event.target.value)}
+                    data-testid="reservation-room-view-week-input"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary-button icon-button"
+                  onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, 7))}
+                  aria-label="다음 주"
+                  data-testid="reservation-room-view-next-week"
+                >
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {rooms.isLoading || settings.isLoading || roomTimetableReservations.isLoading ? <LoadingState /> : null}
+          {rooms.isError ? <ErrorState error={rooms.error} /> : null}
+          {settings.isError ? <ErrorState error={settings.error} /> : null}
+          {roomTimetableReservations.isError ? <ErrorState error={roomTimetableReservations.error} /> : null}
+          {rooms.data && roomViewRooms.length === 0 ? <EmptyState message="표시할 활성 강의실이 없습니다." /> : null}
+          {settings.data && selectedRoomViewRoom && roomTimetableReservations.data ? (
+            <ReservationRoomTimetable
+              room={selectedRoomViewRoom}
+              reservations={roomTimetableReservations.data.items}
+              weekStart={selectedWeekStart}
+              openTime={settings.data.openTime}
+              closeTime={settings.data.closeTime}
+              slotMinutes={settings.data.slotMinutes}
+            />
+          ) : null}
+          {roomTimetableReservations.data && roomTimetableReservations.data.totalPages > 1 ? (
+            <p className="compact-note muted">
+              이 주의 예약이 많아 일부만 표시될 수 있습니다. 검색어 또는 상태 필터로 범위를 좁혀 확인하세요.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
     </section>
   );
 }
