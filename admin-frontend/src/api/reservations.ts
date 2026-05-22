@@ -67,7 +67,7 @@ export async function exportReservationsCsv(filters: ReservationFilters = {}) {
   );
 
   if (!response.ok) {
-    throw new Error('CSV 파일을 내려받지 못했습니다.');
+    throw new Error('CSV 파일을 내보내지 못했습니다.');
   }
 
   const blob = await response.blob();

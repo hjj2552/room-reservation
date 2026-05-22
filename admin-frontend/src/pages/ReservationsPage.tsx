@@ -64,7 +64,7 @@ export function ReservationsPage() {
     try {
       await exportReservationsCsv(filters);
     } catch (error) {
-      setCsvError(error instanceof Error ? error.message : 'CSV 다운로드에 실패했습니다.');
+      setCsvError(error instanceof Error ? error.message : 'CSV 내보내기에 실패했습니다.');
     }
   }
 
@@ -79,7 +79,7 @@ export function ReservationsPage() {
         <div className="header-actions">
           <button type="button" className="secondary-button" onClick={handleCsvDownload}>
             <Download size={16} aria-hidden="true" />
-            현재 조건 CSV
+            CSV 내보내기
           </button>
           <Link className="primary-button" to="/reservations/new">
             예약 등록

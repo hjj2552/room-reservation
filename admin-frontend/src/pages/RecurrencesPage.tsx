@@ -95,8 +95,8 @@ export function RecurrencesPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">반복 예약</p>
-          <h1 id="recurrences-title">반복 예약 생성과 취소</h1>
-          <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 생성 정책을 선택합니다.</p>
+          <h1 id="recurrences-title">반복 예약 등록과 취소</h1>
+          <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 등록 정책을 선택합니다.</p>
         </div>
       </div>
 
@@ -217,7 +217,7 @@ export function RecurrencesPage() {
             ))}
           </fieldset>
           <label className="full-span">
-            생성 정책
+            등록 정책
             <select
               data-testid="recurrence-conflict-policy-select"
               name="conflictPolicy"
@@ -233,7 +233,7 @@ export function RecurrencesPage() {
           {create.isError ? <div className="inline-error full-span" role="alert">{errorMessage(create.error)}</div> : null}
           {create.data ? (
             <div className="success-box full-span" role="status">
-              생성 완료: 생성 {create.data.createdCount}건, 건너뜀 {create.data.skippedCount}건, 실패 {create.data.failedCount}건
+              등록 완료: 등록 {create.data.createdCount}건, 건너뜀 {create.data.skippedCount}건, 실패 {create.data.failedCount}건
             </div>
           ) : null}
           <div className="button-row full-span">
@@ -253,7 +253,7 @@ export function RecurrencesPage() {
               disabled={!preview.data || create.isPending}
               onClick={handleCreate}
             >
-              {create.isPending ? '생성 중...' : '선택 정책으로 생성'}
+              {create.isPending ? '등록 중...' : '반복 예약 등록'}
             </button>
           </div>
         </form>
@@ -340,7 +340,7 @@ export function RecurrencesPage() {
                         data-testid="recurrence-list-cancel-entry-button"
                         onClick={() => setCancelTarget(item.id)}
                       >
-                        취소 진입
+                        취소
                       </button>
                     </td>
                   </tr>

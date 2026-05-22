@@ -190,7 +190,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
             data-testid="reservation-memo-input"
             rows={4}
             {...register('memo')}
-            placeholder="생성 또는 수정 사유를 남깁니다."
+            placeholder="등록 또는 수정 사유를 남깁니다."
           />
         </label>
         {mutationError ? <div className="inline-error full-span" role="alert">{errorMessage(mutationError)}</div> : null}

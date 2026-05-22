@@ -45,7 +45,7 @@ export function RecurrenceDetailPage() {
             목록으로
           </button>
           <Link className="secondary-button" to="/reservations">
-            생성된 예약 보기
+            예약 목록 보기
           </Link>
         </div>
       </div>
@@ -75,7 +75,7 @@ export function RecurrenceDetailPage() {
               <dd data-testid="recurrence-detail-schedule">{detail.daysOfWeek} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
             </div>
             <div>
-              <dt>생성 정책</dt>
+              <dt>등록 정책</dt>
               <dd>{conflictPolicyLabels[detail.conflictPolicy]}</dd>
             </div>
             <div>
@@ -87,7 +87,7 @@ export function RecurrenceDetailPage() {
               <dd>{detail.applicantEmail} / {detail.applicantPhone || '-'}</dd>
             </div>
             <div>
-              <dt>생성일</dt>
+              <dt>등록일</dt>
               <dd>{formatDateTime(detail.createdAt)}</dd>
             </div>
           </dl>
