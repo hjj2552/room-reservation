@@ -10,6 +10,7 @@ import { ReservationsPage } from '../pages/ReservationsPage';
 import { RecurrencesPage } from '../pages/RecurrencesPage';
 import { RoomsPage } from '../pages/RoomsPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { TimetablePage } from '../pages/TimetablePage';
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Navigate to="/reservations" replace /> },
           { path: '/reservations', element: <ReservationsPage /> },
+          { path: '/timetable', element: <TimetablePage /> },
           { path: '/reservations/new', element: <ReservationFormPage mode="create" /> },
           { path: '/reservations/:reservationId', element: <ReservationDetailPage /> },
           { path: '/reservations/:reservationId/edit', element: <ReservationFormPage mode="edit" /> },

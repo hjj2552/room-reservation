@@ -10,7 +10,8 @@ import {
   uniqueE2eName,
 } from './helpers';
 
-test('reservation list filters are reflected in URL query and survive reload', async ({ page }) => {
+test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
+  await loginByApi(request);
   await page.goto('/reservations');
 
   await page.getByTestId('reservation-status-filter').selectOption('CONFIRMED');
@@ -44,12 +45,11 @@ test('reservation date view shows a timetable block and opens the detail page', 
   });
 
   try {
-    await page.goto('/reservations');
-    await page.getByTestId('reservation-view-date').click();
-    await expect(page).toHaveURL(/view=date/);
+    await page.goto('/timetable');
+    await expect(page.getByRole('heading', { name: '시간표', exact: true })).toBeVisible();
 
-    await page.getByTestId('reservation-date-view-date-input').fill(reservationDay);
-    await page.getByLabel('강의실').selectOption(room.id);
+    await page.getByTestId('timetable-date-input').fill(reservationDay);
+    await page.getByTestId('timetable-date-room-select').selectOption(room.id);
 
     await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
     await expect(page.getByTestId('reservation-date-timetable')).toBeVisible();
@@ -77,12 +77,12 @@ test('reservation room view shows a weekly timetable block and opens the detail 
   });
 
   try {
-    await page.goto('/reservations');
-    await page.getByTestId('reservation-view-room').click();
+    await page.goto('/timetable');
+    await page.getByTestId('timetable-view-room').click();
     await expect(page).toHaveURL(/view=room/);
 
-    await page.getByTestId('reservation-room-view-room-select').selectOption(room.id);
-    await page.getByTestId('reservation-room-view-week-input').fill(weekStart);
+    await page.getByTestId('timetable-room-select').selectOption(room.id);
+    await page.getByTestId('timetable-week-input').fill(weekStart);
 
     await expect(page).toHaveURL(new RegExp(`roomViewRoomId=${room.id}`));
     await expect(page).toHaveURL(new RegExp(`weekStart=${weekStart}`));
