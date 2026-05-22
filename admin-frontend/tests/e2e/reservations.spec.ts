@@ -32,6 +32,38 @@ test('reservation list filters are reflected in URL query and survive reload', a
   await expect(page.getByTestId('reservation-from-date-filter')).toHaveValue('2026-05-01');
 });
 
+test('reservation date view shows a timetable block and opens the detail page', async ({ page, request }) => {
+  await loginByApi(request);
+  const room = await createRoomByApi(request, uniqueE2eName('Date Timetable Room'));
+  const purpose = uniqueE2eName('date timetable');
+  const reservationDay = nextWeekdayReservationLocalInputs({ daysAhead: 21, startHour: 10, endHour: 11 }).date;
+  const reservation = await createReservationByApi(request, room.id, purpose, {
+    startAt: `${reservationDay}T10:00:00+09:00`,
+    endAt: `${reservationDay}T11:00:00+09:00`,
+    memo: 'E2E date timetable seed',
+  });
+
+  try {
+    await page.goto('/reservations');
+    await page.getByTestId('reservation-view-date').click();
+    await expect(page).toHaveURL(/view=date/);
+
+    await page.getByTestId('reservation-date-view-date-input').fill(reservationDay);
+    await page.getByLabel('강의실').selectOption(room.id);
+
+    await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
+    await expect(page.getByTestId('reservation-date-timetable')).toBeVisible();
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(room.name);
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
+
+    await page.getByTestId('reservation-timetable-block').click();
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+  } finally {
+    await cancelReservationByApi(request, reservation.id, 'E2E cleanup');
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
 test('reservation edit: saved changes are visible on detail and list', async ({ page, request }) => {
   await loginByApi(request);
   const room = await createRoomByApi(request, uniqueE2eName('Reservation Edit Room'));

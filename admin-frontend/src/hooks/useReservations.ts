@@ -17,10 +17,11 @@ export const reservationKeys = {
   histories: (id: string) => ['reservations', 'histories', id] as const,
 };
 
-export function useReservations(filters: ReservationFilters) {
+export function useReservations(filters: ReservationFilters, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: reservationKeys.list(filters),
     queryFn: () => listReservations(filters),
+    enabled: options.enabled ?? true,
   });
 }
 
