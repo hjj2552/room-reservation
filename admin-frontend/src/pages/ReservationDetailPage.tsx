@@ -1,4 +1,4 @@
-import { Check, PenLine, X } from 'lucide-react';
+import { CalendarDays, Check, PenLine, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../api/http';
@@ -11,6 +11,7 @@ import {
 } from '../hooks/useReservations';
 import { formatDateTime } from '../utils/date';
 import { historyActionLabel, sourceLabels, statusLabels } from '../utils/labels';
+import { timetableReservationUrl } from '../utils/timetable';
 
 export function ReservationDetailPage() {
   const { reservationId = '' } = useParams();
@@ -47,6 +48,14 @@ export function ReservationDetailPage() {
           <button type="button" className="ghost-button" onClick={() => navigate('/reservations')}>
             목록으로
           </button>
+          <Link
+            className="secondary-button"
+            to={timetableReservationUrl({ startAt: detail.startAt, roomId: detail.room.id })}
+            data-testid="reservation-detail-timetable-link"
+          >
+            <CalendarDays size={16} aria-hidden="true" />
+            시간표에서 보기
+          </Link>
           <Link
             className="secondary-button"
             data-testid="reservation-edit-link"
