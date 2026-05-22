@@ -16,6 +16,9 @@ interface ReservationDateTimetableProps {
   openTime?: string;
   closeTime?: string;
   slotMinutes?: number;
+  selectedRoomId?: string;
+  highlightedReservationId?: string | null;
+  onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
 }
 
 export function clockToMinutes(value?: string) {
@@ -74,6 +77,9 @@ export function ReservationDateTimetable({
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
   slotMinutes = 60,
+  selectedRoomId = '',
+  highlightedReservationId,
+  onEmptySlotClick,
 }: ReservationDateTimetableProps) {
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
@@ -134,6 +140,30 @@ export function ReservationDateTimetable({
           </div>
           {rooms.map((room) => (
             <div key={room.id} className="timetable-room-column" style={{ height: bodyHeight }}>
+              {slots.slice(0, -1).map((slot, index) => {
+                const nextSlot = slots[index + 1];
+                return (
+                  <button
+                    key={`empty-${slot}`}
+                    type="button"
+                    className="timetable-empty-slot"
+                    style={{
+                      top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
+                      height: (nextSlot - slot) * TIMETABLE_MINUTE_HEIGHT,
+                    }}
+                    onClick={() =>
+                      onEmptySlotClick?.({
+                        date: selectedDate,
+                        startMinutes: slot,
+                        endMinutes: nextSlot,
+                        roomId: selectedRoomId ? room.id : '',
+                      })
+                    }
+                    aria-label={`${room.name} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 등록`}
+                    data-testid="timetable-empty-slot"
+                  />
+                );
+              })}
               {slots.map((slot) => (
                 <div
                   key={slot}
@@ -149,7 +179,9 @@ export function ReservationDateTimetable({
                   <button
                     key={reservation.id}
                     type="button"
-                    className={`reservation-block reservation-block-${reservation.status.toLowerCase()}`}
+                    className={`reservation-block reservation-block-${reservation.status.toLowerCase()}${
+                      reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''
+                    }`}
                     style={{ top: position.top, height: position.height }}
                     onClick={() => navigate(`/reservations/${reservation.id}`)}
                     aria-label={`${room.name} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabels[reservation.status]}`}

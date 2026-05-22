@@ -571,6 +571,25 @@ button:disabled {
   left: 0;
   height: 1px;
   background: #edf1f5;
+  pointer-events: none;
+}
+
+.timetable-empty-slot {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  cursor: copy;
+}
+
+.timetable-empty-slot:hover,
+.timetable-empty-slot:focus-visible {
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.22);
 }
 
 .reservation-block {
@@ -594,6 +613,10 @@ button:disabled {
 
 .reservation-block:hover {
   box-shadow: 0 3px 10px rgba(16, 24, 40, 0.14);
+}
+
+.reservation-block-highlighted {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.28), 0 3px 10px rgba(16, 24, 40, 0.14);
 }
 
 .reservation-block-requested {
@@ -655,6 +678,47 @@ button:disabled {
 .reservation-block .status-dot {
   width: 6px;
   height: 6px;
+}
+
+.quick-add-panel {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  z-index: 15;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(460px, calc(100vw - 48px));
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
+}
+
+.quick-add-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-add-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.quick-add-header p:last-child {
+  margin-bottom: 0;
+}
+
+.quick-add-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .detail-grid {
@@ -1060,5 +1124,19 @@ button:disabled {
 
   .icon-button {
     width: 100%;
+  }
+
+  .quick-add-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: 88vh;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .quick-add-form {
+    grid-template-columns: 1fr;
   }
 }

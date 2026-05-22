@@ -23,6 +23,8 @@ interface ReservationRoomTimetableProps {
   openTime?: string;
   closeTime?: string;
   slotMinutes?: number;
+  highlightedReservationId?: string | null;
+  onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
 }
 
 function addDays(date: string, days: number) {
@@ -53,6 +55,8 @@ export function ReservationRoomTimetable({
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
   slotMinutes = 60,
+  highlightedReservationId,
+  onEmptySlotClick,
 }: ReservationRoomTimetableProps) {
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
@@ -112,6 +116,30 @@ export function ReservationRoomTimetable({
           </div>
           {days.map((day) => (
             <div key={day.date} className="timetable-room-column" style={{ height: bodyHeight }}>
+              {slots.slice(0, -1).map((slot, index) => {
+                const nextSlot = slots[index + 1];
+                return (
+                  <button
+                    key={`empty-${slot}`}
+                    type="button"
+                    className="timetable-empty-slot"
+                    style={{
+                      top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
+                      height: (nextSlot - slot) * TIMETABLE_MINUTE_HEIGHT,
+                    }}
+                    onClick={() =>
+                      onEmptySlotClick?.({
+                        date: day.date,
+                        startMinutes: slot,
+                        endMinutes: nextSlot,
+                        roomId: room.id,
+                      })
+                    }
+                    aria-label={`${room.name} ${day.label} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 등록`}
+                    data-testid="timetable-empty-slot"
+                  />
+                );
+              })}
               {slots.map((slot) => (
                 <div
                   key={slot}
@@ -127,7 +155,9 @@ export function ReservationRoomTimetable({
                   <button
                     key={reservation.id}
                     type="button"
-                    className={`reservation-block reservation-block-${reservation.status.toLowerCase()}`}
+                    className={`reservation-block reservation-block-${reservation.status.toLowerCase()}${
+                      reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''
+                    }`}
                     style={{ top: position.top, height: position.height }}
                     onClick={() => navigate(`/reservations/${reservation.id}`)}
                     aria-label={`${room.name} ${day.label} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabels[reservation.status]}`}
