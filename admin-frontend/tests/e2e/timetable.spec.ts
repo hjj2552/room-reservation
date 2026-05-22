@@ -74,6 +74,94 @@ test('room view shows a weekly timetable block and opens the reservation detail 
   }
 });
 
+test('date view can create a reservation from an empty slot', async ({ page, request }) => {
+  await loginByApi(request);
+  const room = await createRoomByApi(request, uniqueE2eName('Date Quick Add Room'));
+  const purpose = uniqueE2eName('date quick add');
+  const reservationDay = nextWeekdayReservationLocalInputs({ daysAhead: 35 }).date;
+  let createdReservationId: string | undefined;
+
+  try {
+    await page.goto('/timetable');
+    await page.getByTestId('timetable-date-input').fill(reservationDay);
+    await page.getByTestId('timetable-date-room-select').selectOption(room.id);
+
+    await page.getByLabel(`${room.name} 12:00-12:30 예약 등록`).click();
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
+
+    await page.getByTestId('quick-add-applicant-name-input').fill('E2E Admin');
+    await page.getByTestId('quick-add-email-input').fill(`quick-add-${Date.now()}@example.com`);
+    await page.getByTestId('quick-add-phone-input').fill('010-3333-4444');
+    await page.getByTestId('quick-add-purpose-input').fill(purpose);
+
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/reservations') &&
+      response.request().method() === 'POST',
+    );
+    await page.getByTestId('quick-add-save-button').click();
+    const createResponse = await createResponsePromise;
+    const createResponseBody = await createResponse.text();
+    expect(createResponse.ok(), createResponseBody).toBeTruthy();
+    createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
+
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
+  } finally {
+    if (createdReservationId) {
+      await cancelReservationByApi(request, createdReservationId, 'E2E cleanup');
+    }
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
+test('room view can create a reservation from an empty weekly slot', async ({ page, request }) => {
+  await loginByApi(request);
+  const room = await createRoomByApi(request, uniqueE2eName('Room Quick Add Room'));
+  const purpose = uniqueE2eName('room quick add');
+  const reservationDay = nextWeekdayReservationLocalInputs({ daysAhead: 42 }).date;
+  const weekStart = mondayOf(reservationDay);
+  let createdReservationId: string | undefined;
+
+  try {
+    await page.goto('/timetable');
+    await page.getByTestId('timetable-view-room').click();
+    await page.getByTestId('timetable-room-select').selectOption(room.id);
+    await page.getByTestId('timetable-week-input').fill(weekStart);
+
+    await page.getByTestId('timetable-empty-slot').nth(0).click();
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${weekStart}T09:00`);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${weekStart}T09:30`);
+
+    await page.getByTestId('quick-add-applicant-name-input').fill('E2E Admin');
+    await page.getByTestId('quick-add-email-input').fill(`quick-add-room-${Date.now()}@example.com`);
+    await page.getByTestId('quick-add-phone-input').fill('010-5555-6666');
+    await page.getByTestId('quick-add-purpose-input').fill(purpose);
+
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/reservations') &&
+      response.request().method() === 'POST',
+    );
+    await page.getByTestId('quick-add-save-button').click();
+    const createResponse = await createResponsePromise;
+    const createResponseBody = await createResponse.text();
+    expect(createResponse.ok(), createResponseBody).toBeTruthy();
+    createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
+
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+    await expect(page.getByTestId('reservation-room-timetable')).toContainText(purpose);
+  } finally {
+    if (createdReservationId) {
+      await cancelReservationByApi(request, createdReservationId, 'E2E cleanup');
+    }
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
 function mondayOf(dateString: string) {
   const date = new Date(`${dateString}T00:00:00Z`);
   const day = date.getUTCDay();

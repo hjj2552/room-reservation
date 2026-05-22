@@ -1,10 +1,11 @@
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { AdminRoom, ReservationFilters, ReservationStatus } from '../api/types';
 import { ReservationDateTimetable } from '../components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../components/ReservationRoomTimetable';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
+import { TimetableQuickAddPanel, type TimetableSlotSelection } from '../components/TimetableQuickAddPanel';
 import { useReservations } from '../hooks/useReservations';
 import { useRooms } from '../hooks/useRooms';
 import { useSettings } from '../hooks/useSettings';
@@ -29,6 +30,21 @@ function addDaysInputValue(value: string, days: number) {
   const date = new Date(`${value}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function minutesToTimeInput(minutes: number) {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function slotToSelection(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+  return {
+    roomId: slot.roomId,
+    date: slot.date,
+    startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
+    endAt: `${slot.date}T${minutesToTimeInput(slot.endMinutes)}`,
+  };
 }
 
 function startOfWeekInputValue(value: string) {
@@ -61,6 +77,8 @@ function activeRooms(rooms: AdminRoom[] = [], selectedRoomId: string) {
 export function TimetablePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
+  const [quickAddSelection, setQuickAddSelection] = useState<TimetableSlotSelection | null>(null);
+  const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const rooms = useRooms();
   const settings = useSettings();
 
@@ -112,6 +130,12 @@ export function TimetablePage() {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
 
+  useEffect(() => {
+    if (!highlightedReservationId) return;
+    const timer = window.setTimeout(() => setHighlightedReservationId(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedReservationId]);
+
   function updateSearchParams(updater: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(searchParamsRef.current);
     updater(next);
@@ -149,6 +173,15 @@ export function TimetablePage() {
       next.set('view', 'room');
       next.set('weekStart', startOfWeekInputValue(nextDate));
     });
+  }
+
+  function handleEmptySlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+    setQuickAddSelection(slotToSelection(slot));
+  }
+
+  function handleQuickAddCreated(reservationId: string) {
+    setHighlightedReservationId(reservationId);
+    setQuickAddSelection(null);
   }
 
   return (
@@ -225,6 +258,9 @@ export function TimetablePage() {
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
               slotMinutes={settings.data.slotMinutes}
+              selectedRoomId={roomId}
+              highlightedReservationId={highlightedReservationId}
+              onEmptySlotClick={handleEmptySlotClick}
             />
           ) : null}
           {dateTimetableReservations.data && dateTimetableReservations.data.totalPages > 1 ? (
@@ -302,6 +338,8 @@ export function TimetablePage() {
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
               slotMinutes={settings.data.slotMinutes}
+              highlightedReservationId={highlightedReservationId}
+              onEmptySlotClick={handleEmptySlotClick}
             />
           ) : null}
           {roomTimetableReservations.data && roomTimetableReservations.data.totalPages > 1 ? (
@@ -310,6 +348,14 @@ export function TimetablePage() {
             </p>
           ) : null}
         </section>
+      ) : null}
+      {quickAddSelection ? (
+        <TimetableQuickAddPanel
+          rooms={roomViewRooms}
+          selection={quickAddSelection}
+          onClose={() => setQuickAddSelection(null)}
+          onCreated={handleQuickAddCreated}
+        />
       ) : null}
     </section>
   );
