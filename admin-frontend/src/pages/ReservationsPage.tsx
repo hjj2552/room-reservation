@@ -1,6 +1,7 @@
 import { Download, Search } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { errorMessage } from '../api/http';
 import { exportReservationsCsv } from '../api/reservations';
 import type { ReservationFilters, ReservationStatus } from '../api/types';
 import { Pagination } from '../components/Pagination';
@@ -64,7 +65,7 @@ export function ReservationsPage() {
     try {
       await exportReservationsCsv(filters);
     } catch (error) {
-      setCsvError(error instanceof Error ? error.message : 'CSV 내보내기에 실패했습니다.');
+      setCsvError(errorMessage(error));
     }
   }
 

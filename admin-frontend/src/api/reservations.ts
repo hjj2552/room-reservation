@@ -1,5 +1,6 @@
-import { apiRequest, buildQuery } from './http';
+import { ApiError, apiRequest, buildQuery } from './http';
 import type {
+  ApiErrorResponse,
   PagedResponse,
   ReservationDetail,
   ReservationFilters,
@@ -67,7 +68,13 @@ export async function exportReservationsCsv(filters: ReservationFilters = {}) {
   );
 
   if (!response.ok) {
-    throw new Error('CSV 파일을 내보내지 못했습니다.');
+    let body: ApiErrorResponse | undefined;
+    try {
+      body = await response.json();
+    } catch {
+      body = undefined;
+    }
+    throw new ApiError(response.status, body);
   }
 
   const blob = await response.blob();
