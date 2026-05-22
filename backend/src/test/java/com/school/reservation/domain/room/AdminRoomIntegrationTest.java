@@ -1,5 +1,8 @@
 package com.school.reservation.domain.room;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -28,7 +31,7 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
     ObjectMapper objectMapper;
 
     @Test
-    void adminCanCreateUpdateToggleAndSoftDeleteRoom() throws Exception {
+    void adminCanCreateUpdateToggleAndHardDeleteRoom() throws Exception {
         MockHttpSession session = loginAsAdmin();
         UUID roomId = createRoom(session, "Room Test A");
 
@@ -59,15 +62,147 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.enabled").value(false));
 
+        mockMvc.perform(get("/api/admin/rooms/{roomId}/deletion-check", roomId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.deletable").value(true))
+            .andExpect(jsonPath("$.blockers.length()").value(0));
+
         mockMvc.perform(delete("/api/admin/rooms/{roomId}", roomId).session(session))
             .andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/admin/rooms/{roomId}", roomId).session(session))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/public/rooms"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.deleted").value(true))
-            .andExpect(jsonPath("$.enabled").value(false));
+            .andExpect(jsonPath("$[*].id").value(not(hasItem(roomId.toString()))));
+
+        mockMvc.perform(get("/api/public/rooms/{roomId}", roomId))
+            .andExpect(status().isNotFound());
 
         createRoom(session, "Room Test A Updated");
+    }
+
+    @Test
+    void referencedRoomDeletionPreservesReservationAndMovesReferenceToSentinel() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        String roomName = "Room Deleted With Reservation";
+        UUID roomId = createRoom(session, roomName);
+        createAdminReservation(
+            session,
+            roomId,
+            "Deletion Blocker",
+            "delete-blocker@example.com",
+            nextWeekdayAt(10, 0).plusDays(7),
+            nextWeekdayAt(11, 0).plusDays(7),
+            "Deletion blocker"
+        );
+
+        mockMvc.perform(get("/api/admin/rooms/{roomId}/deletion-check", roomId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.deletable").value(true))
+            .andExpect(jsonPath("$.checks[*].code").value(hasItem("RESERVATION_REFERENCES_REASSIGNED")));
+
+        mockMvc.perform(delete("/api/admin/rooms/{roomId}", roomId).session(session))
+            .andExpect(status().isNoContent());
+
+        UUID sentinelRoomId = sentinelRoomId();
+        UUID reservationRoomId = jdbcTemplate.queryForObject(
+            "select room_id from reservations where applicant_email = 'delete-blocker@example.com'",
+            UUID.class
+        );
+        String originalRoomName = jdbcTemplate.queryForObject(
+            "select original_room_name from reservations where applicant_email = 'delete-blocker@example.com'",
+            String.class
+        );
+        assertThat(reservationRoomId).isEqualTo(sentinelRoomId);
+        assertThat(originalRoomName).isEqualTo(roomName);
+
+        mockMvc.perform(get("/api/admin/reservations")
+                .session(session)
+                .param("roomId", sentinelRoomId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].roomName").value(roomName + " (삭제됨)"));
+    }
+
+    @Test
+    void referencedRoomDeletionPreservesRecurrenceAndMovesReferenceToSentinel() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        String roomName = "Room Deleted With Recurrence";
+        UUID roomId = createRoom(session, roomName);
+        jdbcTemplate.update("""
+            insert into reservation_recurrences (
+              room_id,
+              applicant_name,
+              applicant_email,
+              applicant_phone,
+              purpose,
+              start_date,
+              end_date,
+              days_of_week,
+              start_time,
+              end_time,
+              conflict_policy
+            )
+            values (
+              ?,
+              'Recurring User',
+              'recurring-delete-blocker@example.com',
+              '010-0000-0000',
+              'Recurring blocker',
+              current_date,
+              current_date + interval '14 days',
+              'MON',
+              '10:00',
+              '11:00',
+              'SKIP_CONFLICTS'::recurrence_conflict_policy
+            )
+            """, roomId);
+
+        mockMvc.perform(delete("/api/admin/rooms/{roomId}", roomId).session(session))
+            .andExpect(status().isNoContent());
+
+        UUID sentinelRoomId = sentinelRoomId();
+        UUID recurrenceRoomId = jdbcTemplate.queryForObject(
+            "select room_id from reservation_recurrences where applicant_email = 'recurring-delete-blocker@example.com'",
+            UUID.class
+        );
+        String originalRoomName = jdbcTemplate.queryForObject(
+            "select original_room_name from reservation_recurrences where applicant_email = 'recurring-delete-blocker@example.com'",
+            String.class
+        );
+        assertThat(recurrenceRoomId).isEqualTo(sentinelRoomId);
+        assertThat(originalRoomName).isEqualTo(roomName);
+
+        mockMvc.perform(get("/api/admin/recurrences")
+                .session(session)
+                .param("includeDeleted", "true"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].roomName").value(roomName + " (삭제됨)"));
+    }
+
+    @Test
+    void sentinelRoomIsHiddenAndProtected() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        UUID sentinelRoomId = sentinelRoomId();
+
+        mockMvc.perform(get("/api/admin/rooms").session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[*].id").value(not(hasItem(sentinelRoomId.toString()))));
+
+        mockMvc.perform(get("/api/public/rooms"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[*].id").value(not(hasItem(sentinelRoomId.toString()))));
+
+        mockMvc.perform(get("/api/admin/rooms/{roomId}/deletion-check", sentinelRoomId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.deletable").value(false))
+            .andExpect(jsonPath("$.blockers[*].code").value(hasItem("SENTINEL_ROOM_PROTECTED")));
+
+        mockMvc.perform(delete("/api/admin/rooms/{roomId}", sentinelRoomId).session(session))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("ROOM_DELETE_BLOCKED"))
+            .andExpect(jsonPath("$.details.blockers[*].code").value(hasItem("SENTINEL_ROOM_PROTECTED")));
     }
 
     @Test
@@ -111,6 +246,13 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
             .getContentAsString();
         JsonNode json = objectMapper.readTree(response);
         return UUID.fromString(json.get("id").asText());
+    }
+
+    private UUID sentinelRoomId() {
+        return jdbcTemplate.queryForObject(
+            "select id from rooms where system_reserved = true and deleted_at is null",
+            UUID.class
+        );
     }
 
     private MockHttpSession loginAsAdmin() throws Exception {

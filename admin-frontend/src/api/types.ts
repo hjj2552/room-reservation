@@ -36,6 +36,24 @@ export interface AdminRoom {
   deletedAt: string | null;
 }
 
+export interface RoomDeletionCheck {
+  roomId: string;
+  roomName: string;
+  deletable: boolean;
+  checks: Array<{
+    code: string;
+    label: string;
+    description: string;
+    passed: boolean;
+    count: number;
+  }>;
+  blockers: Array<{
+    code: string;
+    message: string;
+    count: number;
+  }>;
+}
+
 export interface RoomPayload {
   name: string;
   location?: string;

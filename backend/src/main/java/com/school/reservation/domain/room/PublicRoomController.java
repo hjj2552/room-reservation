@@ -20,14 +20,14 @@ public class PublicRoomController {
 
     @GetMapping
     public List<PublicRoomResponse> getRooms() {
-        return roomRepository.findByEnabledTrueAndDeletedAtIsNullOrderByNameAsc().stream()
+        return roomRepository.findByEnabledTrueAndDeletedAtIsNullAndSystemReservedFalseOrderByNameAsc().stream()
             .map(PublicRoomResponse::from)
             .toList();
     }
 
     @GetMapping("/{roomId}")
     public PublicRoomDetailResponse getRoom(@PathVariable java.util.UUID roomId) {
-        Room room = roomRepository.findByIdAndEnabledTrueAndDeletedAtIsNull(roomId)
+        Room room = roomRepository.findByIdAndEnabledTrueAndDeletedAtIsNullAndSystemReservedFalse(roomId)
             .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Room not found."));
         return PublicRoomDetailResponse.from(room);
     }

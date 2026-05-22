@@ -22,7 +22,7 @@ public record AdminReservationListItemResponse(
         return new AdminReservationListItemResponse(
             reservation.getId(),
             reservation.getRoom().getId(),
-            reservation.getRoom().getName(),
+            reservation.getDisplayRoomName(),
             reservation.getApplicantName(),
             reservation.getApplicantEmail(),
             reservation.getApplicantPhone(),
@@ -35,4 +35,3 @@ public record AdminReservationListItemResponse(
         );
     }
 }
-

@@ -25,7 +25,7 @@ public record RecurrenceDetailResponse(
     public static RecurrenceDetailResponse from(ReservationRecurrence recurrence) {
         return new RecurrenceDetailResponse(
             recurrence.getId(),
-            new RoomSummary(recurrence.getRoom().getId(), recurrence.getRoom().getName(), recurrence.getRoom().getLocation()),
+            new RoomSummary(recurrence.getRoom().getId(), recurrence.getDisplayRoomName(), recurrence.getRoom().getLocation()),
             recurrence.getApplicantName(),
             recurrence.getApplicantEmail(),
             recurrence.getApplicantPhone(),
@@ -44,4 +44,3 @@ public record RecurrenceDetailResponse(
     public record RoomSummary(UUID id, String name, String location) {
     }
 }
-

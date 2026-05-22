@@ -8,10 +8,26 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReservationRepository extends JpaRepository<Reservation, UUID>, JpaSpecificationExecutor<Reservation> {
+
+    long countByRoom_Id(UUID roomId);
+
+    @Modifying
+    @Query("""
+        update Reservation r
+        set r.originalRoomName = coalesce(r.originalRoomName, :originalRoomName),
+            r.room = :sentinelRoom
+        where r.room.id = :roomId
+        """)
+    int moveRoomReferencesToSentinel(
+        @Param("roomId") UUID roomId,
+        @Param("sentinelRoom") com.school.reservation.domain.room.Room sentinelRoom,
+        @Param("originalRoomName") String originalRoomName
+    );
 
     @Query("""
         select count(r) > 0
@@ -107,5 +123,18 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
     List<Reservation> findActiveReservationsByRecurrenceId(
         @Param("recurrenceId") UUID recurrenceId,
         @Param("statuses") List<Reservation.ReservationStatus> statuses
+    );
+
+    @Query("""
+        select count(r)
+        from Reservation r
+        where r.room.id = :roomId
+          and r.status in :statuses
+          and r.endAt > :now
+        """)
+    long countCurrentOrFutureActiveReservations(
+        @Param("roomId") UUID roomId,
+        @Param("statuses") List<Reservation.ReservationStatus> statuses,
+        @Param("now") OffsetDateTime now
     );
 }

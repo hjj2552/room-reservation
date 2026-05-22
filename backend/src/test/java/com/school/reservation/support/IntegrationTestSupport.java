@@ -36,7 +36,7 @@ public abstract class IntegrationTestSupport {
         jdbcTemplate.update("delete from reservation_histories");
         jdbcTemplate.update("delete from reservations");
         jdbcTemplate.update("delete from reservation_recurrences");
-        jdbcTemplate.update("delete from rooms where name not in ('Room 101', 'Seminar Room 201')");
+        jdbcTemplate.update("delete from rooms where name not in ('Room 101', 'Seminar Room 201') and system_reserved = false");
         Integer roomCount = jdbcTemplate.queryForObject("select count(*) from rooms", Integer.class);
         if (roomCount != null && roomCount == 0) {
             jdbcTemplate.update("""
@@ -49,8 +49,16 @@ public abstract class IntegrationTestSupport {
         jdbcTemplate.update("""
             update rooms
             set enabled = true,
-                deleted_at = null
+                deleted_at = null,
+                system_reserved = false
             where name in ('Room 101', 'Seminar Room 201')
+            """);
+        jdbcTemplate.update("""
+            insert into rooms (name, location, capacity, description, enabled, system_reserved)
+            select '(삭제된 강의실)', 'SYSTEM', 0, 'System sentinel room for preserved reservation records.', false, true
+            where not exists (
+              select 1 from rooms where system_reserved = true and deleted_at is null
+            )
             """);
         jdbcTemplate.update("""
             update operation_settings

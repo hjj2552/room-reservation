@@ -47,6 +47,9 @@ public class Reservation {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
+    @Column(name = "original_room_name", length = 100)
+    private String originalRoomName;
+
     @Column(name = "recurrence_id")
     private UUID recurrenceId;
 
@@ -180,6 +183,20 @@ public class Reservation {
 
     public Room getRoom() {
         return room;
+    }
+
+    public String getDisplayRoomName() {
+        if (room != null && room.isSystemReserved()) {
+            if (originalRoomName != null && !originalRoomName.isBlank()) {
+                return originalRoomName + " (삭제됨)";
+            }
+            return Room.DELETED_ROOM_DISPLAY_NAME;
+        }
+        return room == null ? Room.DELETED_ROOM_DISPLAY_NAME : room.getName();
+    }
+
+    public String getOriginalRoomName() {
+        return originalRoomName;
     }
 
     public String getApplicantName() {

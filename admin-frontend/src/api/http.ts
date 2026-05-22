@@ -113,6 +113,7 @@ function messageByCode(code: string, error: ApiError) {
     INVALID_DURATION: '예약 시간이 허용된 최소/최대 예약 시간을 벗어났습니다.',
     INVALID_SLOT_UNIT: '예약 시간이 설정된 예약 단위와 맞지 않습니다.',
     ROOM_NAME_DUPLICATED: '같은 이름의 강의실이 이미 있습니다.',
+    ROOM_DELETE_BLOCKED: '강의실 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
     DATA_INTEGRITY_VIOLATION: '입력한 내용이 시스템 제약 조건과 맞지 않습니다. 값을 다시 확인해 주세요.',
   };
 

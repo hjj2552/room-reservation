@@ -39,6 +39,9 @@ public class ReservationRecurrence {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
+    @Column(name = "original_room_name", length = 100)
+    private String originalRoomName;
+
     @Column(name = "applicant_name", nullable = false, length = 100)
     private String applicantName;
 
@@ -141,6 +144,20 @@ public class ReservationRecurrence {
         return room;
     }
 
+    public String getDisplayRoomName() {
+        if (room != null && room.isSystemReserved()) {
+            if (originalRoomName != null && !originalRoomName.isBlank()) {
+                return originalRoomName + " (삭제됨)";
+            }
+            return Room.DELETED_ROOM_DISPLAY_NAME;
+        }
+        return room == null ? Room.DELETED_ROOM_DISPLAY_NAME : room.getName();
+    }
+
+    public String getOriginalRoomName() {
+        return originalRoomName;
+    }
+
     public String getApplicantName() {
         return applicantName;
     }
@@ -189,4 +206,3 @@ public class ReservationRecurrence {
         return deletedAt;
     }
 }
-
