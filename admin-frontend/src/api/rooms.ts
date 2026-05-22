@@ -1,5 +1,5 @@
 import { apiRequest, buildQuery } from './http';
-import type { AdminRoom, PagedResponse, RoomPayload } from './types';
+import type { AdminRoom, PagedResponse, RoomDeletionCheck, RoomPayload } from './types';
 
 export interface RoomListFilters {
   enabled?: boolean;
@@ -25,6 +25,10 @@ export function getRoom(roomId: string) {
   return apiRequest<AdminRoom>(`/api/admin/rooms/${roomId}`);
 }
 
+export function getRoomDeletionCheck(roomId: string) {
+  return apiRequest<RoomDeletionCheck>(`/api/admin/rooms/${roomId}/deletion-check`);
+}
+
 export function createRoom(payload: RoomPayload) {
   return apiRequest<AdminRoom>('/api/admin/rooms', {
     method: 'POST',
@@ -43,5 +47,11 @@ export function updateRoomEnabled(roomId: string, enabled: boolean) {
   return apiRequest<AdminRoom>(`/api/admin/rooms/${roomId}/enabled`, {
     method: 'PATCH',
     body: { enabled },
+  });
+}
+
+export function deleteRoom(roomId: string) {
+  return apiRequest<void>(`/api/admin/rooms/${roomId}`, {
+    method: 'DELETE',
   });
 }

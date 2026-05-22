@@ -279,6 +279,16 @@ textarea {
   background: #912018;
 }
 
+.danger-text {
+  color: #b42318;
+}
+
+.danger-copy {
+  margin: 0;
+  color: #7a271a;
+  font-weight: 650;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
@@ -444,6 +454,80 @@ button:disabled {
   border: 1px solid #9bd9bf;
   background: #e6f6ef;
   color: #126045;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(17, 24, 39, 0.48);
+}
+
+.modal-panel {
+  display: grid;
+  gap: 16px;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  padding: 22px;
+  background: #ffffff;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.24);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.check-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list li {
+  display: grid;
+  gap: 3px;
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+
+.check-list span {
+  color: #687484;
+  font-size: 13px;
+}
+
+.check-passed {
+  border-color: #9bd9bf;
+  background: #f2fbf6;
+  color: #126045;
+}
+
+.check-failed {
+  border-color: #efb0aa;
+  background: #fff7f6;
+  color: #912018;
 }
 
 .field-error {

@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createRoom,
+  deleteRoom,
   getRoom,
+  getRoomDeletionCheck,
   listRooms,
   type RoomListFilters,
   updateRoom,
@@ -14,6 +16,7 @@ export const roomKeys = {
   all: ['rooms'] as const,
   list: (filters: RoomListFilters) => ['rooms', 'list', filters] as const,
   detail: (id: string) => ['rooms', 'detail', id] as const,
+  deletionCheck: (id: string) => ['rooms', 'deletion-check', id] as const,
 };
 
 export function useRooms(filters: RoomListFilters = { enabled: true, includeDeleted: false, size: 100 }) {
@@ -27,6 +30,14 @@ export function useRoom(id?: string) {
   return useQuery({
     queryKey: roomKeys.detail(id || ''),
     queryFn: () => getRoom(id || ''),
+    enabled: Boolean(id),
+  });
+}
+
+export function useRoomDeletionCheck(id?: string) {
+  return useQuery({
+    queryKey: roomKeys.deletionCheck(id || ''),
+    queryFn: () => getRoomDeletionCheck(id || ''),
     enabled: Boolean(id),
   });
 }
@@ -60,6 +71,16 @@ export function useUpdateRoomEnabled() {
     onSuccess: (room) => {
       queryClient.invalidateQueries({ queryKey: roomKeys.all });
       queryClient.setQueryData(roomKeys.detail(room.id), room);
+    },
+  });
+}
+
+export function useDeleteRoom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteRoom,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: roomKeys.all });
     },
   });
 }

@@ -72,7 +72,7 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
 
 export async function deleteRoomByApi(request: APIRequestContext, roomId: string) {
   const response = await request.delete(`/api/admin/rooms/${roomId}`);
-  expect([204, 404]).toContain(response.status());
+  expect([204, 404, 409]).toContain(response.status());
 }
 
 export async function createReservationByApi(

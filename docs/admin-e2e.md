@@ -9,7 +9,7 @@ This document describes the Playwright E2E profile for the admin frontend.
 - Audit query persistence.
 - Admin reservation create and detail/list reflection.
 - Admin reservation edit and detail/list reflection.
-- Rooms smoke: list render and one successful update.
+- Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
 - Settings smoke: settings load, save, and success feedback.
 
 The suite intentionally does not cover the public frontend, CSV download, or full CRUD matrices for rooms/settings yet.
@@ -93,7 +93,7 @@ Useful environment variables:
 
 - Playwright still uses browser context isolation per test.
 - Admin authentication is reused through `tests/e2e/.auth/admin.json`, but data is created per test with an `E2E ...` unique name.
-- API-created rooms are soft-deleted in `finally` blocks when the test owns them.
+- API-created rooms are hard-deleted in `finally` blocks. When reservations or recurrences reference the room, those rows are preserved and their room reference is moved to the deleted-room sentinel row.
 - API-created reservations are cancelled in `finally` blocks where the flow owns them. There is no reservation delete API, so cancellation plus unique future-dated data is the cleanup boundary.
 - Settings are global state. The settings smoke test reads the original payload first and restores it in a `finally` block.
 - The `e2e` backend profile points at the tmpfs-backed `postgres-test` database by default, so CI can start from a disposable database without adding a heavy seed/reset command.

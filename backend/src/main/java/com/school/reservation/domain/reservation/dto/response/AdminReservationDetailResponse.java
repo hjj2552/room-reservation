@@ -41,10 +41,9 @@ public record AdminReservationDetailResponse(
         static RoomSummary from(Reservation reservation) {
             return new RoomSummary(
                 reservation.getRoom().getId(),
-                reservation.getRoom().getName(),
+                reservation.getDisplayRoomName(),
                 reservation.getRoom().getLocation()
             );
         }
     }
 }
-

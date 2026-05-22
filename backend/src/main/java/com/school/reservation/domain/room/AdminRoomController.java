@@ -4,6 +4,7 @@ import com.school.reservation.domain.room.dto.request.CreateRoomRequest;
 import com.school.reservation.domain.room.dto.request.UpdateRoomEnabledRequest;
 import com.school.reservation.domain.room.dto.request.UpdateRoomRequest;
 import com.school.reservation.domain.room.dto.response.AdminRoomResponse;
+import com.school.reservation.domain.room.dto.response.RoomDeletionCheckResponse;
 import com.school.reservation.global.dto.PagedResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -51,6 +52,11 @@ public class AdminRoomController {
         return AdminRoomResponse.from(roomService.getAdminRoom(roomId));
     }
 
+    @GetMapping("/{roomId}/deletion-check")
+    public RoomDeletionCheckResponse getDeletionCheck(@PathVariable UUID roomId) {
+        return roomService.getDeletionCheck(roomId);
+    }
+
     @PostMapping
     public ResponseEntity<AdminRoomResponse> createRoom(@Valid @RequestBody CreateRoomRequest request) {
         Room room = roomService.create(request, null);
@@ -77,7 +83,7 @@ public class AdminRoomController {
 
     @DeleteMapping("/{roomId}")
     public ResponseEntity<Void> deleteRoom(@PathVariable UUID roomId) {
-        roomService.softDelete(roomId, null);
+        roomService.hardDelete(roomId);
         return ResponseEntity.noContent().build();
     }
 
@@ -90,4 +96,3 @@ public class AdminRoomController {
         return Sort.by(direction, property);
     }
 }
-

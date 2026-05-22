@@ -12,6 +12,8 @@ import java.util.UUID;
 @Table(name = "rooms")
 public class Room {
 
+    public static final String DELETED_ROOM_DISPLAY_NAME = "삭제된 강의실";
+
     @Id
     @GeneratedValue
     private UUID id;
@@ -30,6 +32,9 @@ public class Room {
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    @Column(name = "system_reserved", nullable = false)
+    private boolean systemReserved = false;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -85,7 +90,11 @@ public class Room {
     }
 
     public boolean isUsable() {
-        return enabled && deletedAt == null;
+        return enabled && deletedAt == null && !systemReserved;
+    }
+
+    public boolean isSystemReserved() {
+        return systemReserved;
     }
 
     public UUID getId() {

@@ -24,7 +24,7 @@ public record RecurrenceListItemResponse(
         return new RecurrenceListItemResponse(
             recurrence.getId(),
             recurrence.getRoom().getId(),
-            recurrence.getRoom().getName(),
+            recurrence.getDisplayRoomName(),
             recurrence.getPurpose(),
             recurrence.getStartDate(),
             recurrence.getEndDate(),
@@ -37,4 +37,3 @@ public record RecurrenceListItemResponse(
         );
     }
 }
-
