@@ -1,7 +1,8 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { ReservationListItem } from '../api/types';
 import { formatDateTime } from '../utils/date';
 import { sourceLabels } from '../utils/labels';
+import { timetableReservationUrl } from '../utils/timetable';
 import { StatusBadge } from './StatusBadge';
 
 interface ReservationTableProps {
@@ -23,6 +24,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
             <th scope="col">신청자</th>
             <th scope="col">목적</th>
             <th scope="col">신청 경로</th>
+            <th scope="col">시간표</th>
           </tr>
         </thead>
         <tbody>
@@ -33,6 +35,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               className="clickable-row"
               onClick={() => navigate(`/reservations/${reservation.id}`)}
               onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
                 if (event.key === 'Enter') navigate(`/reservations/${reservation.id}`);
               }}
             >
@@ -52,6 +55,16 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               </td>
               <td className="purpose-cell">{reservation.purpose}</td>
               <td>{sourceLabels[reservation.source]}</td>
+              <td>
+                <Link
+                  className="text-link"
+                  to={timetableReservationUrl({ startAt: reservation.startAt, roomId: reservation.roomId })}
+                  onClick={(event) => event.stopPropagation()}
+                  data-testid="reservation-row-timetable-link"
+                >
+                  시간표에서 보기
+                </Link>
+              </td>
             </tr>
           ))}
         </tbody>
