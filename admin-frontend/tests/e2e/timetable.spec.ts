@@ -117,6 +117,48 @@ test('date view can create a reservation from an empty slot', async ({ page, req
   }
 });
 
+test('date view can create a reservation after choosing room inside quick add panel', async ({ page, request }) => {
+  await loginByApi(request);
+  const room = await createRoomByApi(request, uniqueE2eName('Date Quick Add Select Room'));
+  const purpose = uniqueE2eName('date quick add select room');
+  const reservationDay = nextWeekdayReservationLocalInputs({ daysAhead: 49 }).date;
+  let createdReservationId: string | undefined;
+
+  try {
+    await page.goto('/timetable');
+    await page.getByTestId('timetable-date-input').fill(reservationDay);
+
+    await page.getByTestId('timetable-empty-slot').nth(0).click();
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue('');
+    await page.getByTestId('quick-add-room-select').selectOption(room.id);
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
+
+    await page.getByTestId('quick-add-applicant-name-input').fill('E2E Admin');
+    await page.getByTestId('quick-add-email-input').fill(`quick-add-select-room-${Date.now()}@example.com`);
+    await page.getByTestId('quick-add-phone-input').fill('010-7777-8888');
+    await page.getByTestId('quick-add-purpose-input').fill(purpose);
+
+    const createResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/reservations') &&
+      response.request().method() === 'POST',
+    );
+    await page.getByTestId('quick-add-save-button').click();
+    const createResponse = await createResponsePromise;
+    const createResponseBody = await createResponse.text();
+    expect(createResponse.ok(), createResponseBody).toBeTruthy();
+    createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
+
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
+  } finally {
+    if (createdReservationId) {
+      await cancelReservationByApi(request, createdReservationId, 'E2E cleanup');
+    }
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
 test('room view can create a reservation from an empty weekly slot', async ({ page, request }) => {
   await loginByApi(request);
   const room = await createRoomByApi(request, uniqueE2eName('Room Quick Add Room'));
