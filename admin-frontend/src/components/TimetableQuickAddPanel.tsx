@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import type { AdminRoom, ReservationPayload, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { useCreateReservation } from '../hooks/useReservations';
@@ -38,6 +38,7 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -68,7 +69,7 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
       memo: '',
     });
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-  }, [reset, selection]);
+  }, [reset, selection.date, selection.endAt, selection.roomId, selection.startAt]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -121,17 +122,21 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
       <form className="quick-add-form" onSubmit={handleSubmit(onSubmit)}>
         <label>
           강의실
-          <select
-            data-testid="quick-add-room-select"
-            {...register('roomId', { required: '강의실을 선택하세요.' })}
-          >
-            <option value="">선택</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            name="roomId"
+            control={control}
+            rules={{ required: '강의실을 선택하세요.' }}
+            render={({ field }) => (
+              <select data-testid="quick-add-room-select" value={field.value} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref}>
+                <option value="">선택</option>
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          />
           {errors.roomId ? <span className="field-error">{errors.roomId.message}</span> : null}
         </label>
         <label>
