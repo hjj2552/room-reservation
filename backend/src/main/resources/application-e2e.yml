@@ -13,3 +13,5 @@ app:
   admin:
     username: ${ADMIN_USERNAME:admin}
     password: ${ADMIN_PASSWORD:admin1234}
+  e2e-cleanup:
+    enabled: ${E2E_CLEANUP_ENABLED:true}

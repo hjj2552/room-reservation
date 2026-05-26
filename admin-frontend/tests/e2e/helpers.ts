@@ -14,6 +14,12 @@ export interface E2eReservation {
   purpose?: string;
 }
 
+export interface E2eRecurrence {
+  recurrenceId: string;
+  createdCount: number;
+  skippedCount?: number;
+}
+
 export interface E2eSettings {
   organizationName: string;
   publicNotice: string | null;
@@ -40,6 +46,8 @@ export const adminCredentials = {
   password: process.env.ADMIN_PASSWORD || 'admin1234',
 };
 
+export const E2E_TEST_DATA_PREFIX = 'e2e-';
+
 export async function loginByUi(page: Page) {
   await page.goto('/login');
   await page.getByLabel('아이디').fill(adminCredentials.username);
@@ -60,9 +68,9 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
   const response = await request.post('/api/admin/rooms', {
     data: {
       name,
-      location: 'E2E Test Building',
+      location: `${E2E_TEST_DATA_PREFIX}test-building`,
       capacity: 12,
-      description: 'Created by admin frontend E2E',
+      description: `${E2E_TEST_DATA_PREFIX}created-by-admin-frontend-e2e`,
       enabled: true,
     },
   });
@@ -85,14 +93,14 @@ export async function createReservationByApi(
   const response = await request.post('/api/admin/reservations', {
     data: {
       roomId,
-      applicantName: 'E2E 감사',
-      applicantEmail: `audit-${Date.now()}@example.com`,
+      applicantName: `${E2E_TEST_DATA_PREFIX}admin`,
+      applicantEmail: `${E2E_TEST_DATA_PREFIX}reservation-${Date.now()}@example.test`,
       applicantPhone: '010-1000-2000',
       purpose,
       startAt,
       endAt: options.endAt || addHours(startAt, 1),
       status: 'CONFIRMED',
-      memo: options.memo || 'E2E audit seed',
+      memo: options.memo || `${E2E_TEST_DATA_PREFIX}audit-seed`,
     },
   });
   expect(response.ok()).toBeTruthy();
@@ -113,6 +121,45 @@ export async function cancelRecurrenceByApi(request: APIRequestContext, recurren
   expect([204, 404, 409]).toContain(response.status());
 }
 
+export async function createRecurrenceByApi(
+  request: APIRequestContext,
+  roomId: string,
+  purpose: string,
+  options: {
+    startDate?: string;
+    endDate?: string;
+    dayOfWeek?: string;
+    startTime?: string;
+    endTime?: string;
+    conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL' | 'CREATE_AVAILABLE_ONLY';
+  } = {},
+) {
+  const recurrenceTime = nextWeekdayRecurrenceInputs();
+  const response = await request.post('/api/admin/recurrences', {
+    data: {
+      roomId,
+      applicantName: `${E2E_TEST_DATA_PREFIX}recurring-admin`,
+      applicantEmail: `${E2E_TEST_DATA_PREFIX}recurring-${Date.now()}@example.test`,
+      applicantPhone: '010-2222-3333',
+      purpose,
+      startDate: options.startDate || recurrenceTime.startDate,
+      endDate: options.endDate || recurrenceTime.endDate,
+      daysOfWeek: [options.dayOfWeek || recurrenceTime.dayOfWeek],
+      startTime: options.startTime || recurrenceTime.startTime,
+      endTime: options.endTime || recurrenceTime.endTime,
+      conflictPolicy: options.conflictPolicy || 'FAIL_ALL',
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<E2eRecurrence>;
+}
+
+export async function cleanupE2eDataByApi(request: APIRequestContext) {
+  const response = await request.delete(`/api/admin/test-data/e2e?prefix=${encodeURIComponent(E2E_TEST_DATA_PREFIX)}`);
+  expect([200, 404]).toContain(response.status());
+  return response.status() === 200 ? response.json() : null;
+}
+
 export async function getSettingsByApi(request: APIRequestContext) {
   const response = await request.get('/api/admin/settings');
   expect(response.ok()).toBeTruthy();
@@ -128,7 +175,12 @@ export async function updateSettingsByApi(request: APIRequestContext, settings: 
 }
 
 export function uniqueE2eName(label: string) {
-  return `E2E ${label} ${Date.now()} ${Math.random().toString(36).slice(2, 8)}`;
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return `${E2E_TEST_DATA_PREFIX}${slug}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function nextWeekdayReservationLocalInputs({

@@ -12,4 +12,5 @@ app:
   admin:
     username: ${ADMIN_USERNAME}
     password: ${ADMIN_PASSWORD}
-
+  e2e-cleanup:
+    enabled: ${E2E_CLEANUP_ENABLED:false}

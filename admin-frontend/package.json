@@ -7,6 +7,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "e2e": "node scripts/run-e2e.mjs",
+    "e2e:cleanup": "node scripts/cleanup-e2e-data.mjs",
+    "e2e:cleanup:preview": "node scripts/cleanup-e2e-data.mjs --preview",
+    "e2e:cleanup:legacy": "node scripts/cleanup-e2e-data.mjs --include-legacy",
+    "e2e:cleanup:legacy:preview": "node scripts/cleanup-e2e-data.mjs --preview --include-legacy",
     "e2e:ci": "node scripts/run-e2e.mjs",
     "e2e:ui": "playwright test --ui",
     "preview": "vite preview"
