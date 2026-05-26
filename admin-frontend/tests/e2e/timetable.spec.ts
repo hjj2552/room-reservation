@@ -104,6 +104,8 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await page.getByTestId('quick-add-save-button').click();
     const createResponse = await createResponsePromise;
     const createResponseBody = await createResponse.text();
+    const createRequestBody = JSON.parse(createResponse.request().postData() || '{}') as { roomId?: string };
+    expect(createRequestBody.roomId).toBe(room.id);
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
     createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
 
@@ -146,6 +148,8 @@ test('date view can create a reservation after choosing room inside quick add pa
     await page.getByTestId('quick-add-save-button').click();
     const createResponse = await createResponsePromise;
     const createResponseBody = await createResponse.text();
+    const createRequestBody = JSON.parse(createResponse.request().postData() || '{}') as { roomId?: string };
+    expect(createRequestBody.roomId).toBe(room.id);
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
     createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
 
