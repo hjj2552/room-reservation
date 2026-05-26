@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { AdminRoom, ReservationListItem } from '../api/types';
+import type { ReservationStatus } from '../api/types';
 import { statusLabels } from '../utils/labels';
 import {
   TIMETABLE_MINUTE_HEIGHT,
+  type TimetableReservation,
+  type TimetableRoom,
   buildSlots,
   clippedBlockPosition,
   clockToMinutes,
@@ -17,14 +19,16 @@ const timetableTimeZone = 'Asia/Seoul';
 const dayLabels = ['월', '화', '수', '목', '금', '토', '일'];
 
 interface ReservationRoomTimetableProps {
-  room?: AdminRoom;
-  reservations: ReservationListItem[];
+  room?: TimetableRoom;
+  reservations: TimetableReservation[];
   weekStart: string;
   openTime?: string;
   closeTime?: string;
   slotMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
+  onReservationClick?: (reservation: TimetableReservation) => void;
+  statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
 }
 
 function addDays(date: string, days: number) {
@@ -57,6 +61,8 @@ export function ReservationRoomTimetable({
   slotMinutes = 60,
   highlightedReservationId,
   onEmptySlotClick,
+  onReservationClick,
+  statusLabelOverride,
 }: ReservationRoomTimetableProps) {
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
@@ -72,7 +78,7 @@ export function ReservationRoomTimetable({
   );
   const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const reservationsByDate = useMemo(() => {
-    const grouped = new Map<string, ReservationListItem[]>();
+    const grouped = new Map<string, TimetableReservation[]>();
     reservations.forEach((reservation) => {
       const date = dateTimeToDate(reservation.startAt);
       grouped.set(date, [...(grouped.get(date) || []), reservation]);
@@ -159,8 +165,10 @@ export function ReservationRoomTimetable({
                       reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''
                     }`}
                     style={{ top: position.top, height: position.height }}
-                    onClick={() => navigate(`/reservations/${reservation.id}`)}
-                    aria-label={`${room.name} ${day.label} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabels[reservation.status]}`}
+                    onClick={() =>
+                      onReservationClick ? onReservationClick(reservation) : navigate(`/reservations/${reservation.id}`)
+                    }
+                    aria-label={`${room.name} ${day.label} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabelOverride?.[reservation.status] || statusLabels[reservation.status]}`}
                     data-testid="reservation-room-timetable-block"
                   >
                     <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
@@ -169,7 +177,7 @@ export function ReservationRoomTimetable({
                     </span>
                     <span className="reservation-block-footer">
                       <span>{reservation.applicantName}</span>
-                      <StatusBadge status={reservation.status} />
+                      <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                     </span>
                   </button>
                 );

@@ -2,6 +2,7 @@ package com.school.reservation.global.exception;
 
 import com.school.reservation.domain.reservation.ReservationConflictService;
 import com.school.reservation.domain.reservation.ReservationPolicyService;
+import com.school.reservation.domain.reservation.ReservationService;
 import com.school.reservation.global.exception.dto.ApiErrorResponse;
 import com.school.reservation.global.exception.dto.FieldErrorResponse;
 import jakarta.persistence.EntityNotFoundException;
@@ -34,6 +35,20 @@ public class GlobalExceptionHandler {
                 "startAt", exception.getStartAt(),
                 "endAt", exception.getEndAt()
             ),
+            List.of(),
+            request.getRequestURI()
+        ));
+    }
+
+    @ExceptionHandler(ReservationService.PublicCancelPasswordMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handlePublicCancelPasswordMismatch(
+        ReservationService.PublicCancelPasswordMismatchException exception,
+        HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiErrorResponse.of(
+            "PUBLIC_CANCEL_PASSWORD_MISMATCH",
+            exception.getMessage(),
+            Map.of(),
             List.of(),
             request.getRequestURI()
         ));

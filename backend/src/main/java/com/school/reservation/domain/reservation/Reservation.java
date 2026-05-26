@@ -103,6 +103,9 @@ public class Reservation {
     @Column(name = "updated_by_actor_id", length = 100)
     private String updatedByActorId;
 
+    @Column(name = "cancel_password_hash", length = 255)
+    private String cancelPasswordHash;
+
     protected Reservation() {
     }
 
@@ -132,6 +135,10 @@ public class Reservation {
         this.createdByActorId = actorId;
         this.createdAt = OffsetDateTime.now();
         this.updatedAt = this.createdAt;
+    }
+
+    public void setCancelPasswordHash(String cancelPasswordHash) {
+        this.cancelPasswordHash = cancelPasswordHash;
     }
 
     public void cancel(ActorType actorType, String actorId) {
@@ -241,5 +248,9 @@ public class Reservation {
 
     public UUID getRecurrenceId() {
         return recurrenceId;
+    }
+
+    public String getCancelPasswordHash() {
+        return cancelPasswordHash;
     }
 }

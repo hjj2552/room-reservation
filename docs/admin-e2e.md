@@ -9,10 +9,11 @@ This document describes the Playwright E2E profile for the admin frontend.
 - Audit query persistence.
 - Admin reservation create and detail/list reflection.
 - Admin reservation edit and detail/list reflection.
+- Public reservation timetable request, detail, and cancel-password cancellation.
 - Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
 - Settings smoke: settings load, save, and success feedback.
 
-The suite intentionally does not cover the public frontend, CSV download, or full CRUD matrices for rooms/settings yet.
+The suite intentionally does not cover CSV download or full CRUD matrices for rooms/settings yet.
 
 ## Local Run
 
@@ -97,6 +98,7 @@ Useful environment variables:
 - Playwright still uses browser context isolation per test.
 - Admin authentication is reused through `tests/e2e/.auth/admin.json`, but E2E-owned rooms, reservations, recurrences, applicant names, emails, memos, and purposes use the `e2e-` prefix.
 - Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence` over direct setup calls.
+- Public UI-created reservations use `e2e-` applicant names, emails, and purposes, then register returned ids for cleanup.
 - Data-creating specs use a Playwright fixture registry for created room, reservation, and recurrence ids. Fixture teardown tries best-effort API cancellation/deletion by id.
 - `npm run e2e` also runs cleanup before and after the full suite through `admin-frontend/scripts/run-e2e.mjs`.
 - The cleanup endpoint can preview or hard-delete rows identified by the `e2e-` prefix:

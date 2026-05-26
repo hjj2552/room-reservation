@@ -29,7 +29,8 @@ class ReservationConflictServiceTest extends IntegrationTestSupport {
               "applicantPhone": "010-0000-0000",
               "purpose": "Study",
               "startAt": "%s",
-              "endAt": "%s"
+              "endAt": "%s",
+              "cancelPassword": "test-password"
             }
             """.formatted(firstRoomId(), startAt, endAt);
 
