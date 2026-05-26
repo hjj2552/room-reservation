@@ -9,7 +9,7 @@ import {
   uniqueE2eName,
 } from './helpers';
 
-test('date view shows a timetable block and opens the reservation detail page', async ({ page, request }) => {
+test('date view reads URL context and opens the reservation detail page', async ({ page, request }) => {
   await loginByApi(request);
   const room = await createRoomByApi(request, uniqueE2eName('Date Timetable Room'));
   const purpose = uniqueE2eName('date timetable');
@@ -21,13 +21,14 @@ test('date view shows a timetable block and opens the reservation detail page', 
   });
 
   try {
-    await page.goto('/timetable');
+    await page.goto(`/timetable?view=date&date=${reservationDay}&roomId=${room.id}`);
     await expect(page.getByRole('heading', { name: '시간표', exact: true })).toBeVisible();
 
-    await page.getByTestId('timetable-date-input').fill(reservationDay);
-    await page.getByTestId('timetable-date-room-select').selectOption(room.id);
-
+    await expect(page.getByTestId('timetable-date-input')).toHaveValue(reservationDay);
+    await expect(page.getByTestId('timetable-date-room-select')).toHaveValue(room.id);
+    await expect(page).toHaveURL(/view=date/);
     await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
+    await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
     await expect(page.getByTestId('reservation-date-timetable')).toBeVisible();
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(room.name);
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
