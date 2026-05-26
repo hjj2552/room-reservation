@@ -258,7 +258,6 @@ export function TimetablePage() {
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
               slotMinutes={settings.data.slotMinutes}
-              selectedRoomId={roomId}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
             />

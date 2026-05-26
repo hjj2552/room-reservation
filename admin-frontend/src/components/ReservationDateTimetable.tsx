@@ -16,7 +16,6 @@ interface ReservationDateTimetableProps {
   openTime?: string;
   closeTime?: string;
   slotMinutes?: number;
-  selectedRoomId?: string;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
 }
@@ -77,7 +76,6 @@ export function ReservationDateTimetable({
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
   slotMinutes = 60,
-  selectedRoomId = '',
   highlightedReservationId,
   onEmptySlotClick,
 }: ReservationDateTimetableProps) {
@@ -156,7 +154,7 @@ export function ReservationDateTimetable({
                         date: selectedDate,
                         startMinutes: slot,
                         endMinutes: nextSlot,
-                        roomId: selectedRoomId ? room.id : '',
+                        roomId: room.id,
                       })
                     }
                     aria-label={`${room.name} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 등록`}
