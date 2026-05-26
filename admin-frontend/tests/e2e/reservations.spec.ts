@@ -1,12 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
   cancelReservationByApi,
-  createReservationByApi,
-  createRoomByApi,
   deleteRoomByApi,
   loginByApi,
   nextWeekdayReservationLocalInputs,
-  uniqueE2eName,
 } from './helpers';
 
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
@@ -15,33 +12,33 @@ test('reservation list filters are reflected in URL query and survive reload', a
 
   await page.getByTestId('reservation-status-filter').selectOption('CONFIRMED');
   await expect(page).toHaveURL(/status=CONFIRMED/);
-  await page.getByTestId('reservation-keyword-filter').fill('E2E');
-  await expect(page).toHaveURL(/keyword=E2E/);
+  await page.getByTestId('reservation-keyword-filter').fill('e2e-');
+  await expect(page).toHaveURL(/keyword=e2e-/);
   await page.getByTestId('reservation-from-date-filter').fill('2026-05-01');
   await page.getByTestId('reservation-search-button').click();
 
   await expect(page).toHaveURL(/status=CONFIRMED/);
-  await expect(page).toHaveURL(/keyword=E2E/);
+  await expect(page).toHaveURL(/keyword=e2e-/);
   await expect(page).toHaveURL(/fromDate=2026-05-01/);
   await expect(page).toHaveURL(/page=0/);
 
   await page.reload();
 
   await expect(page.getByTestId('reservation-status-filter')).toHaveValue('CONFIRMED');
-  await expect(page.getByTestId('reservation-keyword-filter')).toHaveValue('E2E');
+  await expect(page.getByTestId('reservation-keyword-filter')).toHaveValue('e2e-');
   await expect(page.getByTestId('reservation-from-date-filter')).toHaveValue('2026-05-01');
 });
 
-test('reservation list and detail expose timetable links with reservation date and room context', async ({ page, request }) => {
+test('reservation list and detail expose timetable links with reservation date and room context', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Timetable Link Room'));
-  const purpose = uniqueE2eName('timetable link');
+  const room = await e2eData.createTestRoom('timetable-link-room');
   const reservationDay = nextWeekdayReservationLocalInputs({ daysAhead: 21, startHour: 10, endHour: 11 }).date;
-  const reservation = await createReservationByApi(request, room.id, purpose, {
+  const reservation = await e2eData.createTestReservation(room.id, 'timetable-link', {
     startAt: `${reservationDay}T10:00:00+09:00`,
     endAt: `${reservationDay}T11:00:00+09:00`,
-    memo: 'E2E timetable link seed',
+    memo: 'e2e-timetable-link-seed',
   });
+  const purpose = reservation.purpose || '';
 
   try {
     await page.goto(`/reservations?keyword=${encodeURIComponent(purpose)}`);
@@ -60,16 +57,16 @@ test('reservation list and detail expose timetable links with reservation date a
     await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
     await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
   } finally {
-    await cancelReservationByApi(request, reservation.id, 'E2E cleanup');
+    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });
 
-test('reservation edit: saved changes are visible on detail and list', async ({ page, request }) => {
+test('reservation edit: saved changes are visible on detail and list', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Reservation Edit Room'));
-  const reservation = await createReservationByApi(request, room.id, uniqueE2eName('reservation edit seed'));
-  const updatedPurpose = uniqueE2eName('reservation edit updated');
+  const room = await e2eData.createTestRoom('reservation-edit-room');
+  const reservation = await e2eData.createTestReservation(room.id, 'reservation-edit-seed');
+  const updatedPurpose = e2eData.name('reservation-edit-updated');
 
   try {
     await page.goto(`/reservations/${reservation.id}`);
@@ -79,7 +76,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
-    await page.getByTestId('reservation-memo-input').fill('E2E reservation edit smoke');
+    await page.getByTestId('reservation-memo-input').fill('e2e-reservation-edit-smoke');
     await page.getByTestId('reservation-save-button').click();
 
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
@@ -89,28 +86,28 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await expect(page.getByTestId('reservations-table')).toContainText(updatedPurpose);
     await expect(page.getByTestId('reservations-table')).toContainText(room.name);
   } finally {
-    await cancelReservationByApi(request, reservation.id, 'E2E cleanup');
+    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });
 
-test('admin can create a reservation and see it on detail and list pages', async ({ page, request }) => {
+test('admin can create a reservation and see it on detail and list pages', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Reservation Create Room'));
-  const purpose = uniqueE2eName('reservation create');
+  const room = await e2eData.createTestRoom('reservation-create-room');
+  const purpose = e2eData.name('reservation-create');
   const reservationTime = nextWeekdayReservationLocalInputs();
   let createdReservationId: string | undefined;
 
   try {
     await page.goto('/reservations/new');
     await page.getByTestId('reservation-room-select').selectOption(room.id);
-    await page.getByTestId('reservation-applicant-name-input').fill('E2E Admin');
-    await page.getByTestId('reservation-email-input').fill(`reservation-${Date.now()}@example.com`);
+    await page.getByTestId('reservation-applicant-name-input').fill('e2e-admin');
+    await page.getByTestId('reservation-email-input').fill(`e2e-reservation-${Date.now()}@example.test`);
     await page.getByTestId('reservation-phone-input').fill('010-1111-2222');
     await page.getByTestId('reservation-purpose-input').fill(purpose);
     await page.getByTestId('reservation-start-input').fill(reservationTime.startAt);
     await page.getByTestId('reservation-end-input').fill(reservationTime.endAt);
-    await page.getByTestId('reservation-memo-input').fill('E2E create verification');
+    await page.getByTestId('reservation-memo-input').fill('e2e-create-verification');
 
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('reservation-purpose-input')).toHaveValue(purpose);
@@ -128,6 +125,7 @@ test('admin can create a reservation and see it on detail and list pages', async
 
     const created = JSON.parse(createResponseBody) as { id: string };
     createdReservationId = created.id;
+    e2eData.registerReservation(createdReservationId);
 
     await expect(page).toHaveURL(new RegExp(`/reservations/${createdReservationId}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(purpose);
@@ -138,7 +136,7 @@ test('admin can create a reservation and see it on detail and list pages', async
     await expect(page.getByTestId('reservations-table')).toContainText(room.name);
   } finally {
     if (createdReservationId) {
-      await cancelReservationByApi(request, createdReservationId, 'E2E cleanup');
+      await cancelReservationByApi(request, createdReservationId, 'e2e-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }

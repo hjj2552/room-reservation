@@ -1,17 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
-  createRoomByApi,
-  createReservationByApi,
   deleteRoomByApi,
   getSettingsByApi,
   loginByApi,
   updateSettingsByApi,
-  uniqueE2eName,
 } from './helpers';
 
-test('rooms smoke: list renders and an existing room can be updated', async ({ page, request }) => {
+test('rooms smoke: list renders and an existing room can be updated', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Rooms Smoke'));
+  const room = await e2eData.createTestRoom('rooms-smoke');
 
   try {
     await page.goto('/rooms');
@@ -22,7 +19,7 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
     await expect(row).toBeVisible();
     await row.getByTestId('room-edit-button').click();
 
-    const updatedLocation = uniqueE2eName('Updated Location');
+    const updatedLocation = e2eData.name('updated-location');
     await expect(page.getByTestId('room-name-input')).toHaveValue(room.name);
     await page.getByTestId('room-location-input').fill(updatedLocation);
     await page.getByTestId('room-save-button').click();
@@ -33,9 +30,9 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
   }
 });
 
-test('rooms smoke: deletion requires matching room name and server checks', async ({ page, request }) => {
+test('rooms smoke: deletion requires matching room name and server checks', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Rooms Delete'));
+  const room = await e2eData.createTestRoom('rooms-delete');
 
   await page.goto('/rooms');
   const row = page.getByRole('row').filter({ hasText: room.name });
@@ -59,10 +56,10 @@ test('rooms smoke: deletion requires matching room name and server checks', asyn
   await expect(page.getByRole('row').filter({ hasText: room.name })).toHaveCount(0);
 });
 
-test('rooms smoke: deletion explains preserved reservation records', async ({ page, request }) => {
+test('rooms smoke: deletion explains preserved reservation records', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Rooms Delete Blocked'));
-  await createReservationByApi(request, room.id, uniqueE2eName('room delete blocker'));
+  const room = await e2eData.createTestRoom('rooms-delete-blocked');
+  await e2eData.createTestReservation(room.id, 'room-delete-blocker');
 
   try {
     await page.goto('/rooms');
@@ -81,17 +78,17 @@ test('rooms smoke: deletion explains preserved reservation records', async ({ pa
   }
 });
 
-test('settings smoke: settings load and can be saved with feedback', async ({ page, request }) => {
+test('settings smoke: settings load and can be saved with feedback', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const originalSettings = await getSettingsByApi(request);
-  const updatedOrganizationName = uniqueE2eName('Settings Org');
+  const updatedOrganizationName = e2eData.name('settings-org');
 
   try {
     await page.goto('/settings');
     await expect(page.getByTestId('settings-form')).toBeVisible();
 
     await page.getByTestId('settings-organization-input').fill(updatedOrganizationName);
-    await page.getByTestId('settings-public-notice-input').fill('E2E settings smoke notice');
+    await page.getByTestId('settings-public-notice-input').fill('e2e-settings-smoke-notice');
     await page.getByTestId('settings-save-button').click();
 
     await expect(page.getByRole('status')).toBeVisible();

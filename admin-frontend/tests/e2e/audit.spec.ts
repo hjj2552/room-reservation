@@ -1,17 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
   cancelReservationByApi,
-  createReservationByApi,
-  createRoomByApi,
   deleteRoomByApi,
   loginByApi,
 } from './helpers';
 
-test('audit filters are reflected in URL query and render server results', async ({ page, request }) => {
+test('audit filters are reflected in URL query and render server results', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const unique = Date.now();
-  const room = await createRoomByApi(request, `E2E Audit Room ${unique}`);
-  const reservation = await createReservationByApi(request, room.id, `E2E audit reservation ${unique}`);
+  const room = await e2eData.createTestRoom('audit-room');
+  const reservation = await e2eData.createTestReservation(room.id, 'audit-reservation');
 
   try {
     await page.goto('/audit');
@@ -29,16 +26,16 @@ test('audit filters are reflected in URL query and render server results', async
     await expect(page).toHaveURL(/page=0/);
 
     const table = page.getByTestId('audit-table');
-    await expect(table).toContainText('E2E audit seed');
+    await expect(table).toContainText('e2e-audit-seed');
     await expect(table.locator(`a[href="/reservations/${reservation.id}"]`)).toBeVisible();
 
     await page.reload();
     await expect(page.getByTestId('audit-reservation-id-input')).toHaveValue(reservation.id);
     await expect(page.getByTestId('audit-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('audit-action-select')).toHaveValue('CREATED_BY_ADMIN');
-    await expect(table).toContainText('E2E audit seed');
+    await expect(table).toContainText('e2e-audit-seed');
   } finally {
-    await cancelReservationByApi(request, reservation.id, 'E2E cleanup');
+    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });

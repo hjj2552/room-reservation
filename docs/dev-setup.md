@@ -193,6 +193,44 @@ npm run e2e:ci
 ```
 
 E2E runner는 기본적으로 백엔드 readiness URL이 열려 있지 않으면 `e2e` profile로 백엔드 jar를 실행하고, 프런트엔드 URL이 열려 있지 않으면 Vite 개발 서버를 실행합니다.
+E2E가 만든 강의실/예약/반복예약은 `e2e-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
+
+```powershell
+npm run e2e:cleanup:preview
+npm run e2e:cleanup
+```
+
+기존 구버전 E2E가 남긴 `E2E ...` 형식의 dev/UAT 데이터까지 정리해야 하면 preview 후 legacy cleanup을 실행합니다.
+
+```powershell
+npm run e2e:cleanup:legacy:preview
+npm run e2e:cleanup:legacy
+```
+
+`local` 또는 `dev` profile 백엔드에 대해 이 명령을 쓰려면 백엔드를 `E2E_CLEANUP_ENABLED=true`로 실행해야 합니다. cleanup은 `e2e-` prefix가 붙은 데이터와 그 반복예약 하위 예약만 삭제하며, legacy 옵션은 구버전 `E2E ...` 테스트 데이터만 추가로 대상으로 삼습니다. `prod` profile에서는 endpoint가 로드되지 않습니다.
+
+로컬 백엔드에서 수동 cleanup endpoint를 열어 실행하는 예시는 다음과 같습니다.
+
+```powershell
+.\start-backend-cleanup-enabled.bat
+```
+
+또는 직접 실행하려면 다음과 같이 환경 변수를 켜고 백엔드를 시작합니다.
+
+```powershell
+cd <repo>\backend
+$env:E2E_CLEANUP_ENABLED="true"
+.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+```
+
+다른 터미널에서 관리자 프런트엔드 cleanup 명령을 실행합니다.
+
+```powershell
+cd <repo>\admin-frontend
+npm run e2e:cleanup:preview
+```
+
+`E2E_CLEANUP_ENABLED=true` 없이 local/dev 백엔드를 실행하면 `/api/admin/test-data/e2e/preview`는 404를 반환합니다. 이는 endpoint 미등록을 통한 보호 장치입니다. 백엔드 주소가 기본값이 아니면 `E2E_API_BASE_URL=http://host:port` 또는 `E2E_BACKEND_URL=http://host:port/api/public/settings`를 지정합니다.
 
 자세한 E2E 범위와 환경 변수는 [admin-e2e.md](admin-e2e.md)를 참고하세요.
 

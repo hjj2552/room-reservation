@@ -1,19 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './fixtures';
 import {
   cancelRecurrenceByApi,
   cancelReservationByApi,
-  createReservationByApi,
-  createRoomByApi,
   deleteRoomByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
-  uniqueE2eName,
 } from './helpers';
 
-test('recurrence smoke: list, preview, create, detail, and cancel', async ({ page, request }) => {
+test('recurrence smoke: list, preview, create, detail, and cancel', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Recurrence Room'));
-  const purpose = uniqueE2eName('recurrence smoke');
+  const room = await e2eData.createTestRoom('recurrence-room');
+  const purpose = e2eData.name('recurring-smoke');
   const recurrenceTime = nextWeekdayRecurrenceInputs();
   let recurrenceId: string | undefined;
   let cancelled = false;
@@ -24,8 +21,8 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrences-table').or(page.getByText('등록된 반복 예약이 없습니다.'))).toBeVisible();
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
-    await page.getByTestId('recurrence-applicant-name-input').fill('E2E Recurrence Admin');
-    await page.getByTestId('recurrence-email-input').fill(`recurrence-${Date.now()}@example.com`);
+    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-admin');
+    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-${Date.now()}@example.test`);
     await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
@@ -59,6 +56,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     expect(createResponse.ok(), createBody).toBeTruthy();
     const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
     recurrenceId = created.recurrenceId;
+    e2eData.registerRecurrence(recurrenceId);
     expect(created.createdCount, createBody).toBeGreaterThan(0);
 
     await page.goto(`/recurrences/${recurrenceId}`);
@@ -67,7 +65,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
 
-    await page.getByTestId('recurrence-detail-cancel-memo-input').fill('E2E recurrence cancel');
+    await page.getByTestId('recurrence-detail-cancel-memo-input').fill('e2e-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>
       response.url().includes(`/api/admin/recurrences/${recurrenceId}/cancel`) &&
       response.request().method() === 'POST',
@@ -86,29 +84,29 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(row).toContainText('취소');
   } finally {
     if (recurrenceId && !cancelled) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'E2E cleanup');
+      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }
 });
 
-test('recurrence SKIP_CONFLICTS creates only available candidates when one slot conflicts', async ({ page, request }) => {
+test('recurrence SKIP_CONFLICTS creates only available candidates when one slot conflicts', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const room = await createRoomByApi(request, uniqueE2eName('Recurrence Skip Room'));
-  const purpose = uniqueE2eName('recurrence skip conflicts');
+  const room = await e2eData.createTestRoom('recurrence-skip-room');
+  const purpose = e2eData.name('recurring-skip-conflicts');
   const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 35, weeks: 1 });
-  const blocker = await createReservationByApi(request, room.id, uniqueE2eName('recurrence blocker'), {
+  const blocker = await e2eData.createTestReservation(room.id, 'recurrence-blocker', {
     startAt: recurrenceTime.firstStartAt,
     endAt: recurrenceTime.firstEndAt,
-    memo: 'E2E recurrence conflict blocker',
+    memo: 'e2e-recurrence-conflict-blocker',
   });
   let recurrenceId: string | undefined;
 
   try {
     await page.goto('/recurrences');
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
-    await page.getByTestId('recurrence-applicant-name-input').fill('E2E Recurrence Admin');
-    await page.getByTestId('recurrence-email-input').fill(`recurrence-skip-${Date.now()}@example.com`);
+    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-admin');
+    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-skip-${Date.now()}@example.test`);
     await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
@@ -151,6 +149,7 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
       items: Array<{ status: string; reason: string | null }>;
     };
     recurrenceId = created.recurrenceId;
+    e2eData.registerRecurrence(recurrenceId);
     expect(created.createdCount, createBody).toBe(1);
     expect(created.skippedCount, createBody).toBe(1);
     expect(created.items.map((item) => item.status)).toEqual(['SKIPPED', 'CREATED']);
@@ -161,9 +160,9 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
   } finally {
     if (recurrenceId) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'E2E cleanup');
+      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
     }
-    await cancelReservationByApi(request, blocker.id, 'E2E cleanup');
+    await cancelReservationByApi(request, blocker.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });

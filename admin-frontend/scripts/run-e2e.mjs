@@ -3,6 +3,7 @@ import { closeSync, openSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cleanupE2eData } from './cleanup-e2e-data.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const adminRoot = path.resolve(__dirname, '..');
@@ -36,10 +37,13 @@ async function main() {
       console.log('Using existing E2E frontend.');
     }
 
+    await cleanupE2eData({ required: false, label: 'before-suite' });
+
     console.log('Running Playwright E2E...');
     const playwrightCli = path.join(adminRoot, 'node_modules', 'playwright', 'cli.js');
     process.exitCode = await runCommand(process.execPath, [playwrightCli, 'test', ...process.argv.slice(2)]);
   } finally {
+    await cleanupE2eData({ required: false, label: 'after-suite' });
     stopFrontend();
     stopBackend();
   }
