@@ -1,4 +1,4 @@
-import { FormEvent, useMemo } from 'react';
+import { FormEvent, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Pagination } from '../components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
@@ -26,7 +26,12 @@ function numberParam(value: string | null, fallback: number) {
 
 export function AuditPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const rooms = useRooms();
+
+  useEffect(() => {
+    searchParamsRef.current = new URLSearchParams(window.location.search);
+  }, [searchParams]);
 
   const reservationId = searchParams.get('reservationId') || '';
   const roomId = searchParams.get('roomId') || '';
@@ -50,13 +55,12 @@ export function AuditPage() {
   const audit = useReservationHistoryAudit(filters);
 
   function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (value) next.set(name, value);
-      else next.delete(name);
-      if (options.resetPage !== false) next.set('page', '0');
-      return next;
-    });
+    const next = new URLSearchParams(searchParamsRef.current);
+    if (value) next.set(name, value);
+    else next.delete(name);
+    if (options.resetPage !== false) next.set('page', '0');
+    searchParamsRef.current = next;
+    setSearchParams(new URLSearchParams(next));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
