@@ -3,13 +3,14 @@ import { statusLabels } from '../utils/labels';
 
 interface StatusBadgeProps {
   status: ReservationStatus;
+  label?: string;
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, label }: StatusBadgeProps) {
   return (
     <span className={`status-badge status-${status.toLowerCase()}`}>
       <span aria-hidden="true" className="status-dot" />
-      {statusLabels[status]}
+      {label || statusLabels[status]}
     </span>
   );
 }

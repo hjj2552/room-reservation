@@ -16,7 +16,8 @@ public record CreatePublicReservationRequest(
     @Size(max = 50) String applicantPhone,
     @NotBlank @Size(max = 500) String purpose,
     @NotNull OffsetDateTime startAt,
-    @NotNull OffsetDateTime endAt
+    @NotNull OffsetDateTime endAt,
+    @NotBlank @Size(min = 4, max = 100) String cancelPassword
 ) {
     public ReservationService.CreateReservationCommand toCommand() {
         return new ReservationService.CreateReservationCommand(
@@ -32,4 +33,3 @@ public record CreatePublicReservationRequest(
         );
     }
 }
-

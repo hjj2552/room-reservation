@@ -68,7 +68,8 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
                       "applicantPhone": "010-0000-0000",
                       "purpose": "Study",
                       "startAt": "%s",
-                      "endAt": "%s"
+                      "endAt": "%s",
+                      "cancelPassword": "test-password"
                     }
                     """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated())
@@ -95,4 +96,3 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
             .getSession(false);
     }
 }
-

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { AdminRoom, ReservationListItem } from '../api/types';
+import type { ReservationStatus } from '../api/types';
 import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
@@ -9,15 +9,34 @@ const fallbackOpenTime = '09:00';
 const fallbackCloseTime = '18:00';
 const timetableTimeZone = 'Asia/Seoul';
 
+export interface TimetableRoom {
+  id: string;
+  name: string;
+  location?: string | null;
+}
+
+export interface TimetableReservation {
+  id: string;
+  roomId: string;
+  roomName?: string;
+  applicantName: string;
+  purpose: string;
+  startAt: string;
+  endAt: string;
+  status: ReservationStatus;
+}
+
 interface ReservationDateTimetableProps {
-  rooms: AdminRoom[];
-  reservations: ReservationListItem[];
+  rooms: TimetableRoom[];
+  reservations: TimetableReservation[];
   selectedDate: string;
   openTime?: string;
   closeTime?: string;
   slotMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
+  onReservationClick?: (reservation: TimetableReservation) => void;
+  statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
 }
 
 export function clockToMinutes(value?: string) {
@@ -54,7 +73,7 @@ export function buildSlots(openMinutes: number, closeMinutes: number, slotMinute
   return slots;
 }
 
-export function clippedBlockPosition(reservation: ReservationListItem, openMinutes: number, closeMinutes: number) {
+export function clippedBlockPosition(reservation: TimetableReservation, openMinutes: number, closeMinutes: number) {
   const startMinutes = dateTimeToClockMinutes(reservation.startAt);
   const endMinutes = dateTimeToClockMinutes(reservation.endAt);
   const visibleStart = Math.max(startMinutes, openMinutes);
@@ -78,6 +97,8 @@ export function ReservationDateTimetable({
   slotMinutes = 60,
   highlightedReservationId,
   onEmptySlotClick,
+  onReservationClick,
+  statusLabelOverride,
 }: ReservationDateTimetableProps) {
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
@@ -90,7 +111,7 @@ export function ReservationDateTimetable({
   const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const roomIds = useMemo(() => new Set(rooms.map((room) => room.id)), [rooms]);
   const reservationsByRoom = useMemo(() => {
-    const grouped = new Map<string, ReservationListItem[]>();
+    const grouped = new Map<string, TimetableReservation[]>();
     reservations
       .filter((reservation) => roomIds.has(reservation.roomId))
       .forEach((reservation) => {
@@ -181,8 +202,10 @@ export function ReservationDateTimetable({
                       reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''
                     }`}
                     style={{ top: position.top, height: position.height }}
-                    onClick={() => navigate(`/reservations/${reservation.id}`)}
-                    aria-label={`${room.name} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabels[reservation.status]}`}
+                    onClick={() =>
+                      onReservationClick ? onReservationClick(reservation) : navigate(`/reservations/${reservation.id}`)
+                    }
+                    aria-label={`${room.name} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabelOverride?.[reservation.status] || statusLabels[reservation.status]}`}
                     data-testid="reservation-timetable-block"
                   >
                     <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
@@ -191,7 +214,7 @@ export function ReservationDateTimetable({
                     </span>
                     <span className="reservation-block-footer">
                       <span>{reservation.applicantName}</span>
-                      <StatusBadge status={reservation.status} />
+                      <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                     </span>
                   </button>
                 );

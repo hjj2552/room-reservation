@@ -83,6 +83,73 @@ export interface OperationSettings {
   version: number;
 }
 
+export type PublicSettings = Omit<
+  OperationSettings,
+  'adminContactName' | 'adminContactPhone' | 'version'
+>;
+
+export interface PublicRoom {
+  id: string;
+  name: string;
+  location: string | null;
+  capacity: number | null;
+  description: string | null;
+}
+
+export interface PublicReservationBlock {
+  id: string;
+  roomId: string;
+  roomName: string;
+  applicantName: string;
+  startAt: string;
+  endAt: string;
+  status: Extract<ReservationStatus, 'REQUESTED' | 'CONFIRMED'>;
+  purpose: string;
+}
+
+export interface PublicWeeklyReservations {
+  room: {
+    id: string;
+    name: string;
+    location: string | null;
+  };
+  weekStart: string;
+  weekEnd: string;
+  reservations: PublicReservationBlock[];
+}
+
+export interface PublicReservationPayload {
+  roomId: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone?: string;
+  purpose: string;
+  startAt: string;
+  endAt: string;
+  cancelPassword: string;
+}
+
+export interface PublicReservationResult {
+  id: string;
+  status: ReservationStatus;
+  message: string | null;
+}
+
+export interface PublicReservationDetail {
+  id: string;
+  room: {
+    id: string;
+    name: string;
+    location: string | null;
+  };
+  applicantName: string;
+  purpose: string;
+  startAt: string;
+  endAt: string;
+  status: ReservationStatus;
+  cancellable: boolean;
+}
+
 export interface ReservationListItem {
   id: string;
   roomId: string;

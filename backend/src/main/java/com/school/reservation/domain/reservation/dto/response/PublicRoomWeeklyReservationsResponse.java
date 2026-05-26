@@ -30,6 +30,9 @@ public record PublicRoomWeeklyReservationsResponse(
 
     public record ReservationBlock(
         UUID id,
+        UUID roomId,
+        String roomName,
+        String applicantName,
         OffsetDateTime startAt,
         OffsetDateTime endAt,
         Reservation.ReservationStatus status,
@@ -38,6 +41,9 @@ public record PublicRoomWeeklyReservationsResponse(
         static ReservationBlock from(Reservation reservation) {
             return new ReservationBlock(
                 reservation.getId(),
+                reservation.getRoom().getId(),
+                reservation.getDisplayRoomName(),
+                reservation.getApplicantName(),
                 reservation.getStartAt(),
                 reservation.getEndAt(),
                 reservation.getStatus(),
@@ -46,4 +52,3 @@ public record PublicRoomWeeklyReservationsResponse(
         }
     }
 }
-

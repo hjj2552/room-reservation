@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -27,34 +28,45 @@ public class ReservationService {
     private final ReservationHistoryRepository historyRepository;
     private final ReservationPolicyService policyService;
     private final ReservationConflictService conflictService;
+    private final PasswordEncoder passwordEncoder;
 
     public ReservationService(
         RoomRepository roomRepository,
         ReservationRepository reservationRepository,
         ReservationHistoryRepository historyRepository,
         ReservationPolicyService policyService,
-        ReservationConflictService conflictService
+        ReservationConflictService conflictService,
+        PasswordEncoder passwordEncoder
     ) {
         this.roomRepository = roomRepository;
         this.reservationRepository = reservationRepository;
         this.historyRepository = historyRepository;
         this.policyService = policyService;
         this.conflictService = conflictService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional
-    public Reservation createPublicReservation(@Valid CreateReservationCommand command) {
-        return createReservation(command, Reservation.ActorType.PUBLIC_USER, command.applicantEmail(), ReservationHistory.Action.CREATED, null, null);
+    public Reservation createPublicReservation(@Valid CreateReservationCommand command, String cancelPassword) {
+        return createReservation(
+            command,
+            Reservation.ActorType.PUBLIC_USER,
+            command.applicantEmail(),
+            ReservationHistory.Action.CREATED,
+            null,
+            null,
+            passwordEncoder.encode(cancelPassword)
+        );
     }
 
     @Transactional
     public Reservation createAdminReservation(@Valid CreateReservationCommand command, String adminId, String memo) {
-        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.CREATED_BY_ADMIN, memo, null);
+        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.CREATED_BY_ADMIN, memo, null, null);
     }
 
     @Transactional
     public Reservation createRecurringReservation(@Valid CreateReservationCommand command, String adminId, UUID recurrenceId) {
-        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.RECURRENCE_GENERATED, null, recurrenceId);
+        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.RECURRENCE_GENERATED, null, recurrenceId, null);
     }
 
     private Reservation createReservation(
@@ -63,7 +75,8 @@ public class ReservationService {
         String actorId,
         ReservationHistory.Action historyAction,
         String memo,
-        UUID recurrenceId
+        UUID recurrenceId,
+        String cancelPasswordHash
     ) {
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
@@ -86,6 +99,9 @@ public class ReservationService {
         );
         if (recurrenceId != null) {
             reservation.attachRecurrence(recurrenceId);
+        }
+        if (cancelPasswordHash != null) {
+            reservation.setCancelPasswordHash(cancelPasswordHash);
         }
 
         try {
@@ -197,6 +213,32 @@ public class ReservationService {
         return reservation;
     }
 
+    @Transactional
+    public Reservation cancelPublicReservation(UUID reservationId, String cancelPassword) {
+        Reservation reservation = getReservationOrThrow(reservationId);
+        if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cancelled reservations cannot be cancelled again.");
+        }
+        if (reservation.getCancelPasswordHash() == null
+            || !passwordEncoder.matches(cancelPassword, reservation.getCancelPasswordHash())) {
+            throw new PublicCancelPasswordMismatchException();
+        }
+
+        Reservation.ReservationStatus beforeStatus = reservation.getStatus();
+        reservation.cancel(Reservation.ActorType.PUBLIC_USER, reservation.getApplicantEmail());
+        historyRepository.save(new ReservationHistory(
+            reservation,
+            ReservationHistory.Action.CANCELLED,
+            beforeStatus,
+            reservation.getStatus(),
+            null,
+            Reservation.ActorType.PUBLIC_USER,
+            reservation.getApplicantEmail()
+        ));
+        reservationRepository.flush();
+        return reservation;
+    }
+
     @Transactional(readOnly = true)
     public Reservation getReservationOrThrow(UUID reservationId) {
         return reservationRepository.findDetailById(reservationId)
@@ -282,5 +324,11 @@ public class ReservationService {
         @NotNull OffsetDateTime endAt,
         @NotNull Reservation.ReservationStatus status
     ) {
+    }
+
+    public static class PublicCancelPasswordMismatchException extends RuntimeException {
+        public PublicCancelPasswordMismatchException() {
+            super("Cancel password does not match.");
+        }
     }
 }

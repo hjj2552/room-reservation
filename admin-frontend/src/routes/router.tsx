@@ -3,6 +3,7 @@ import { AdminLayout } from './AdminLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { AuditPage } from '../pages/AuditPage';
 import { LoginPage } from '../pages/LoginPage';
+import { PublicReservationPage } from '../pages/PublicReservationPage';
 import { RecurrenceDetailPage } from '../pages/RecurrenceDetailPage';
 import { ReservationDetailPage } from '../pages/ReservationDetailPage';
 import { ReservationFormPage } from '../pages/ReservationFormPage';
@@ -16,6 +17,18 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/public',
+    element: <Navigate to="/public/reservations/new" replace />,
+  },
+  {
+    path: '/request',
+    element: <Navigate to="/public/reservations/new" replace />,
+  },
+  {
+    path: '/public/reservations/new',
+    element: <PublicReservationPage />,
   },
   {
     element: <ProtectedRoute />,
