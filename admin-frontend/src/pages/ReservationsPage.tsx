@@ -26,7 +26,7 @@ export function ReservationsPage() {
   const rooms = useRooms();
 
   useEffect(() => {
-    searchParamsRef.current = new URLSearchParams(searchParams);
+    searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
 
   const status = (searchParams.get('status') || '') as '' | ReservationStatus;
