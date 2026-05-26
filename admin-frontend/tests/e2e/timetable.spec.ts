@@ -119,7 +119,7 @@ test('date view can create a reservation from an empty slot', async ({ page, req
   }
 });
 
-test('date view can create a reservation after choosing room inside quick add panel', async ({ page, request }) => {
+test('date view quick add defaults to the clicked room column', async ({ page, request }) => {
   await loginByApi(request);
   const room = await createRoomByApi(request, uniqueE2eName('Date Quick Add Select Room'));
   const purpose = uniqueE2eName('date quick add select room');
@@ -130,11 +130,11 @@ test('date view can create a reservation after choosing room inside quick add pa
     await page.goto('/timetable');
     await page.getByTestId('timetable-date-input').fill(reservationDay);
 
-    await page.getByTestId('timetable-empty-slot').nth(0).click();
+    await page.getByRole('button', { name: new RegExp(`^${escapeRegExp(room.name)} 12:00-12:30`) }).click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
-    await expect(page.getByTestId('quick-add-room-select')).toHaveValue('');
-    await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
 
     await page.getByTestId('quick-add-applicant-name-input').fill('E2E Admin');
     await page.getByTestId('quick-add-email-input').fill(`quick-add-select-room-${Date.now()}@example.com`);
@@ -214,4 +214,8 @@ function mondayOf(dateString: string) {
   const diff = day === 0 ? -6 : 1 - day;
   date.setUTCDate(date.getUTCDate() + diff);
   return date.toISOString().slice(0, 10);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
