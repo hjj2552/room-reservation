@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AdminLayout } from './AdminLayout';
 import { ProtectedRoute } from './ProtectedRoute';
 import { AuditPage } from '../pages/AuditPage';
+import { EntryChoicePage } from '../pages/EntryChoicePage';
 import { LoginPage } from '../pages/LoginPage';
 import { PublicReservationPage } from '../pages/PublicReservationPage';
 import { RecurrenceDetailPage } from '../pages/RecurrenceDetailPage';
@@ -14,6 +15,10 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { TimetablePage } from '../pages/TimetablePage';
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <EntryChoicePage />,
+  },
   {
     path: '/login',
     element: <LoginPage />,
@@ -36,7 +41,6 @@ export const router = createBrowserRouter([
       {
         element: <AdminLayout />,
         children: [
-          { index: true, element: <Navigate to="/reservations" replace /> },
           { path: '/reservations', element: <ReservationsPage /> },
           { path: '/timetable', element: <TimetablePage /> },
           { path: '/reservations/new', element: <ReservationFormPage mode="create" /> },
@@ -53,6 +57,6 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: <Navigate to="/reservations" replace />,
+    element: <Navigate to="/" replace />,
   },
 ]);

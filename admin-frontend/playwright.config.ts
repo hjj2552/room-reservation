@@ -21,7 +21,7 @@ export default defineConfig({
     },
     {
       name: 'unauthenticated',
-      testMatch: /auth\.spec\.ts/,
+      testMatch: /(auth|entry)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
       },
@@ -29,7 +29,7 @@ export default defineConfig({
     {
       name: 'admin',
       dependencies: ['setup'],
-      testIgnore: [/.*\.setup\.ts/, /auth\.spec\.ts/],
+      testIgnore: [/.*\.setup\.ts/, /(auth|entry)\.spec\.ts/],
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'tests/e2e/.auth/admin.json',

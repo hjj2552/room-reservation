@@ -1,7 +1,6 @@
 import { useQueries } from '@tanstack/react-query';
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Send, X } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { ApiError } from '../api/http';
 import { getPublicWeeklyReservations } from '../api/public';
 import type { PublicReservationBlock, PublicReservationPayload, PublicRoom } from '../api/types';
@@ -206,15 +205,6 @@ export function PublicReservationPage() {
           <h1>예약 신청</h1>
           <p className="muted">시간표에서 빈 시간을 선택해 예약을 신청합니다. 신청은 즉시 확정되지 않습니다.</p>
         </div>
-        <nav className="public-tabs" aria-label="공개 메뉴">
-          <Link className="public-tab active" to="/public/reservations/new">
-            <CalendarDays size={17} aria-hidden="true" />
-            예약 신청
-          </Link>
-          <Link className="public-tab" to="/login">
-            관리자
-          </Link>
-        </nav>
       </header>
 
       {rooms.isLoading || settings.isLoading ? <LoadingState /> : null}
@@ -225,12 +215,12 @@ export function PublicReservationPage() {
         <section className="public-notice" aria-live="polite">
           <CalendarDays size={18} aria-hidden="true" />
           <div>
+            {settings.data.publicNotice ? <p>{settings.data.publicNotice}</p> : null}
             <strong>
               신청 가능 시간 {String(settings.data.openTime).slice(0, 5)}-
               {String(settings.data.closeTime).slice(0, 5)}
             </strong>
             <p>{timetablePageSizeNote}</p>
-            {settings.data.publicNotice ? <p>{settings.data.publicNotice}</p> : null}
           </div>
         </section>
       ) : null}
