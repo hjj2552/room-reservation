@@ -13,7 +13,7 @@ test('root public choice opens the public reservation UI', async ({ page }) => {
   await page.getByTestId('entry-public-link').click();
 
   await expect(page).toHaveURL(/\/public\/reservations\/new$/);
-  await expect(page.getByRole('heading', { name: '예약 신청' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '시간표' })).toBeVisible();
 });
 
 test('root admin choice opens the admin login UI', async ({ page }) => {
