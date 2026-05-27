@@ -4,7 +4,6 @@ import {
   FileClock,
   FileText,
   LogOut,
-  Plus,
   Repeat,
   SlidersHorizontal,
   Table2,
@@ -32,10 +31,6 @@ export function AdminLayout() {
           <NavLink to="/timetable">
             <Table2 size={18} aria-hidden="true" />
             시간표
-          </NavLink>
-          <NavLink to="/reservations/new">
-            <Plus size={18} aria-hidden="true" />
-            예약 등록
           </NavLink>
           <NavLink to="/recurrences">
             <Repeat size={18} aria-hidden="true" />

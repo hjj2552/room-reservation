@@ -5,11 +5,16 @@ import type { AdminRoom, ReservationFilters, ReservationStatus } from '../api/ty
 import { ReservationDateTimetable } from '../components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../components/ReservationRoomTimetable';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
-import { TimetableQuickAddPanel, type TimetableSlotSelection } from '../components/TimetableQuickAddPanel';
-import { useReservations } from '../hooks/useReservations';
+import { TimetablePageHeader, timetableCopy } from '../components/TimetablePageHeader';
+import {
+  ReservationRequestPanel,
+  type ReservationRequestValues,
+  type TimetableSlotSelection,
+} from '../components/TimetableQuickAddPanel';
+import { useCreateReservation, useReservations } from '../hooks/useReservations';
 import { useRooms } from '../hooks/useRooms';
 import { useSettings } from '../hooks/useSettings';
-import { toEndOfDayOffset, toStartOfDayOffset } from '../utils/date';
+import { fromDateTimeLocal, toEndOfDayOffset, toStartOfDayOffset } from '../utils/date';
 
 const timetablePageSize = 500;
 const timetableViewModes = ['date', 'room'] as const;
@@ -38,12 +43,41 @@ function minutesToTimeInput(minutes: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+function timeValueToMinutes(value?: string) {
+  const match = value?.match(/^(\d{2}):(\d{2})/);
+  if (!match) return undefined;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
 function slotToSelection(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
   return {
+    source: 'slot' as const,
     roomId: slot.roomId,
     date: slot.date,
     startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
     endAt: `${slot.date}T${minutesToTimeInput(slot.endMinutes)}`,
+  };
+}
+
+function newRequestSelection(slotMinutes = 30, openTime?: string, closeTime?: string): TimetableSlotSelection {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  const date = local.toISOString().slice(0, 10);
+  const currentMinutes = local.getHours() * 60 + local.getMinutes();
+  const step = Math.max(slotMinutes || 30, 30);
+  const openMinutes = timeValueToMinutes(openTime) ?? 0;
+  const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
+  const latestStartMinutes = Math.max(openMinutes, closeMinutes - step);
+  const roundedStartMinutes = Math.ceil(currentMinutes / step) * step;
+  const startMinutes = Math.min(Math.max(roundedStartMinutes, openMinutes), latestStartMinutes);
+  const endMinutes = Math.min(startMinutes + step, closeMinutes);
+
+  return {
+    source: 'toolbar',
+    roomId: '',
+    date,
+    startAt: `${date}T${minutesToTimeInput(startMinutes)}`,
+    endAt: `${date}T${minutesToTimeInput(endMinutes)}`,
   };
 }
 
@@ -81,6 +115,7 @@ export function TimetablePage() {
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const rooms = useRooms();
   const settings = useSettings();
+  const createReservation = useCreateReservation();
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(searchParams);
@@ -179,20 +214,42 @@ export function TimetablePage() {
     setQuickAddSelection(slotToSelection(slot));
   }
 
+  function handleNewRequestClick() {
+    setQuickAddSelection(newRequestSelection(settings.data?.slotMinutes, settings.data?.openTime, settings.data?.closeTime));
+  }
+
   function handleQuickAddCreated(reservationId: string) {
     setHighlightedReservationId(reservationId);
     setQuickAddSelection(null);
   }
 
+  function handleReservationRequest(values: ReservationRequestValues) {
+    createReservation.mutate(
+      {
+        roomId: values.roomId,
+        applicantName: values.applicantName,
+        applicantEmail: values.applicantEmail,
+        applicantPhone: values.applicantPhone || undefined,
+        purpose: values.purpose,
+        startAt: fromDateTimeLocal(values.startAt),
+        endAt: fromDateTimeLocal(values.endAt),
+        status: values.status,
+        memo: values.memo || undefined,
+      },
+      {
+        onSuccess: (created) => handleQuickAddCreated(created.id),
+      },
+    );
+  }
+
   return (
     <section className="page-section timetable-page" aria-labelledby="timetable-title">
-      <div className="page-header">
-        <div>
-          <p className="eyebrow">운영 현황</p>
-          <h1 id="timetable-title">시간표</h1>
-          <p className="muted">강의실 점유 현황과 빈 시간을 날짜별 또는 강의실별로 확인합니다.</p>
-        </div>
-      </div>
+      <TimetablePageHeader
+        eyebrow="운영 현황"
+        helperText={timetableCopy.adminHelper}
+        buttonTestId="timetable-new-request-button"
+        onNewRequest={handleNewRequestClick}
+      />
 
       <div className="view-mode-bar" role="tablist" aria-label="시간표 보기 방식">
         {timetableViewModes.map((mode) => (
@@ -215,8 +272,8 @@ export function TimetablePage() {
         <section className="panel timetable-panel" aria-labelledby="date-timetable-title">
           <div className="panel-header">
             <div>
-              <h2 id="date-timetable-title">날짜별 예약 시간표</h2>
-              <p className="muted">선택한 날짜의 활성 강의실 점유 현황을 시간순으로 확인합니다.</p>
+              <h2 id="date-timetable-title">{timetableCopy.dateTitle}</h2>
+              <p className="muted">{timetableCopy.dateDescription}</p>
             </div>
             <div className="room-week-controls">
               <label className="compact-room-picker">
@@ -274,8 +331,8 @@ export function TimetablePage() {
         <section className="panel timetable-panel" aria-labelledby="room-timetable-title">
           <div className="panel-header">
             <div>
-              <h2 id="room-timetable-title">강의실별 주간 시간표</h2>
-              <p className="muted">선택한 강의실의 월요일부터 일요일까지 예약 흐름을 확인합니다.</p>
+              <h2 id="room-timetable-title">{timetableCopy.roomTitle}</h2>
+              <p className="muted">{timetableCopy.roomDescription}</p>
             </div>
             <div className="room-week-controls">
               <label className="compact-room-picker">
@@ -349,11 +406,14 @@ export function TimetablePage() {
         </section>
       ) : null}
       {quickAddSelection ? (
-        <TimetableQuickAddPanel
+        <ReservationRequestPanel
+          variant="admin"
           rooms={roomViewRooms}
           selection={quickAddSelection}
           onClose={() => setQuickAddSelection(null)}
-          onCreated={handleQuickAddCreated}
+          onSubmit={handleReservationRequest}
+          submitError={createReservation.error}
+          isPending={createReservation.isPending}
         />
       ) : null}
     </section>

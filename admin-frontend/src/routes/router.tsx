@@ -43,7 +43,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/reservations', element: <ReservationsPage /> },
           { path: '/timetable', element: <TimetablePage /> },
-          { path: '/reservations/new', element: <ReservationFormPage mode="create" /> },
+          { path: '/reservations/new', element: <Navigate to="/timetable" replace /> },
           { path: '/reservations/:reservationId', element: <ReservationDetailPage /> },
           { path: '/reservations/:reservationId/edit', element: <ReservationFormPage mode="edit" /> },
           { path: '/recurrences', element: <RecurrencesPage /> },

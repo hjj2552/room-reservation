@@ -1,6 +1,34 @@
 import { expect, test } from './fixtures';
 import { getSettingsByApi, nextWeekdayReservationLocalInputs, updateSettingsByApi } from './helpers';
 
+test('public toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
+  const originalSettings = await getSettingsByApi(request);
+  await updateSettingsByApi(request, {
+    ...originalSettings,
+    reservationEnabled: true,
+    reservationDisabledMessage: originalSettings.reservationDisabledMessage || 'Reservation is currently disabled.',
+  });
+  const room = await e2eData.createTestRoom('public-toolbar-request-room');
+
+  try {
+    await page.goto('/public/reservations/new');
+    await page.getByTestId('public-timetable-view-room').click();
+    await page.getByTestId('public-timetable-room-select').selectOption(room.id);
+    await page.getByTestId('public-new-request-button').click();
+
+    await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
+    await expect(page.getByTestId('public-request-room-select')).toHaveValue('');
+    await expect(page.getByTestId('public-request-start-input')).not.toHaveValue('');
+    await expect(page.getByTestId('public-request-end-input')).not.toHaveValue('');
+    await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue('');
+    await expect(page.getByTestId('public-request-email-input')).toHaveValue('');
+    await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('');
+  } finally {
+    const latestSettings = await getSettingsByApi(request);
+    await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
+  }
+});
+
 test('public timetable supports slot-based request, detail, and password cancellation', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {

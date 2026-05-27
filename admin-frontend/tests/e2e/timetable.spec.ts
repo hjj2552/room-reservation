@@ -84,7 +84,7 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await page.getByTestId('timetable-date-input').fill(reservationDay);
     await page.getByTestId('timetable-date-room-select').selectOption(room.id);
 
-    await page.getByLabel(`${room.name} 12:00-12:30 예약 등록`).click();
+    await page.getByLabel(`${room.name} 12:00-12:30 예약 신청`).click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
@@ -114,6 +114,27 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     if (createdReservationId) {
       await cancelReservationByApi(request, createdReservationId, 'e2e-cleanup');
     }
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
+test('toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('toolbar-request-room');
+
+  try {
+    await page.goto('/timetable');
+    await page.getByTestId('timetable-date-room-select').selectOption(room.id);
+    await page.getByTestId('timetable-new-request-button').click();
+
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue('');
+    await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue('');
+    await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue('');
+    await expect(page.getByTestId('quick-add-applicant-name-input')).toHaveValue('');
+    await expect(page.getByTestId('quick-add-email-input')).toHaveValue('');
+    await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue('');
+  } finally {
     await deleteRoomByApi(request, room.id);
   }
 });

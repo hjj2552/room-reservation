@@ -74,7 +74,7 @@ export function AuditPage() {
         <div>
           <p className="eyebrow">감사 이력</p>
           <h1 id="audit-title">예약 감사 이력</h1>
-          <p className="muted">예약 등록, 수정, 승인, 취소 이력을 조건별로 조회합니다.</p>
+          <p className="muted">예약 신청, 수정, 승인, 취소 이력을 조건별로 조회합니다.</p>
         </div>
       </div>
 
