@@ -3,12 +3,14 @@ setlocal
 
 pushd "%~dp0admin-frontend"
 
-echo Installing frontend dependencies...
-call npm ci
-if errorlevel 1 (
-  echo Failed to install frontend dependencies.
-  popd
-  exit /b 1
+if not exist "node_modules\.bin\vite.cmd" (
+  echo Installing frontend dependencies...
+  call npm ci
+  if errorlevel 1 (
+    echo Failed to install frontend dependencies.
+    popd
+    exit /b 1
+  )
 )
 
 echo Starting Vite admin frontend...
