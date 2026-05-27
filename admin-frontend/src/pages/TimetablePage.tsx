@@ -185,7 +185,7 @@ export function TimetablePage() {
   }
 
   return (
-    <section className="page-section" aria-labelledby="timetable-title">
+    <section className="page-section timetable-page" aria-labelledby="timetable-title">
       <div className="page-header">
         <div>
           <p className="eyebrow">운영 현황</p>

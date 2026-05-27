@@ -137,7 +137,7 @@ export function ReservationDateTimetable({
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>
         <div
           className="timetable-grid"
-          style={{ gridTemplateColumns: `86px repeat(${rooms.length}, minmax(180px, 1fr))` }}
+          style={{ gridTemplateColumns: `76px repeat(${rooms.length}, minmax(164px, 1fr))` }}
         >
           <div className="timetable-corner">시간</div>
           {rooms.map((room) => (
