@@ -215,7 +215,7 @@ export function PublicReservationPage() {
         <section className="public-notice" aria-live="polite">
           <CalendarDays size={18} aria-hidden="true" />
           <div>
-            {settings.data.publicNotice ? <p>{settings.data.publicNotice}</p> : null}
+            {settings.data.publicNotice ? <strong className="public-notice-message">{settings.data.publicNotice}</strong> : null}
             <strong>
               신청 가능 시간 {String(settings.data.openTime).slice(0, 5)}-
               {String(settings.data.closeTime).slice(0, 5)}

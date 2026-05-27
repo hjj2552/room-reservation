@@ -374,6 +374,30 @@ button:disabled {
   font-size: 13px;
 }
 
+.nowrap-cell {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.rooms-table {
+  min-width: 900px;
+}
+
+.rooms-table th:nth-child(1),
+.rooms-table td:nth-child(1) {
+  width: 108px;
+}
+
+.rooms-table th:nth-child(3),
+.rooms-table td:nth-child(3) {
+  width: 72px;
+}
+
+.rooms-table th:nth-child(4),
+.rooms-table td:nth-child(4) {
+  width: 172px;
+}
+
 .clickable-row {
   cursor: pointer;
 }
@@ -896,6 +920,8 @@ button:disabled {
   font-size: 13px;
   font-weight: 750;
   border: 1px solid #c8d2dc;
+  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .plain-badge.good {
@@ -1085,7 +1111,13 @@ button:disabled {
   margin: 4px 0 0;
 }
 
-.public-notice p:first-child {
+.public-notice-message {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.public-notice p:first-child,
+.public-notice-message:first-child {
   margin-top: 0;
 }
 
