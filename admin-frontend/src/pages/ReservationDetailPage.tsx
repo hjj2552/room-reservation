@@ -130,7 +130,7 @@ export function ReservationDetailPage() {
                 disabled={approve.isPending || detail.status === 'CONFIRMED' || isCancelled}
               >
                 <Check size={16} aria-hidden="true" />
-                승인 처리
+                승인
               </button>
               <button
                 type="button"
@@ -139,7 +139,7 @@ export function ReservationDetailPage() {
                 onClick={() => performAction('cancel')}
               >
                 <X size={16} aria-hidden="true" />
-                취소 처리
+                취소
               </button>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}

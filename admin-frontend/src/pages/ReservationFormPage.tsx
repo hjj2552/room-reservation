@@ -109,7 +109,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
       <div className="page-header">
         <div>
           <p className="eyebrow">예약 운영</p>
-          <h1 id="reservation-form-title">{mode === 'create' ? '예약 등록' : '예약 수정'}</h1>
+          <h1 id="reservation-form-title">{mode === 'create' ? '예약 신청' : '예약 수정'}</h1>
           <p className="muted">운영자가 직접 예약 정보를 입력하고 저장합니다.</p>
         </div>
       </div>
@@ -190,7 +190,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
             data-testid="reservation-memo-input"
             rows={4}
             {...register('memo')}
-            placeholder="등록 또는 수정 사유를 남깁니다."
+            placeholder="신청 또는 수정 사유를 남깁니다."
           />
         </label>
         {mutationError ? <div className="inline-error full-span" role="alert">{errorMessage(mutationError)}</div> : null}

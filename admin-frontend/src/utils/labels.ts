@@ -2,14 +2,14 @@ import type { ConflictPolicy, ReservationSource, ReservationStatus } from '../ap
 
 export const statusLabels: Record<ReservationStatus, string> = {
   REQUESTED: '승인 대기',
-  CONFIRMED: '확정',
+  CONFIRMED: '승인',
   CANCELLED: '취소',
 };
 
 export const sourceLabels: Record<ReservationSource, string> = {
   PUBLIC_FORM: '공개 신청',
   ADMIN_GRID: '관리자 화면',
-  ADMIN_MANUAL: '관리자 등록',
+  ADMIN_MANUAL: '관리자 신청',
   RECURRING_GENERATED: '반복 예약 건',
 };
 
@@ -31,9 +31,9 @@ export const dayLabels: Record<string, string> = {
 
 export function historyActionLabel(action: string) {
   const labels: Record<string, string> = {
-    CREATED: '등록',
-    CREATED_BY_ADMIN: '관리자 등록',
-    CREATED_BY_PUBLIC: '공개 신청 등록',
+    CREATED: '신청',
+    CREATED_BY_ADMIN: '관리자 신청',
+    CREATED_BY_PUBLIC: '공개 신청',
     RECURRENCE_CREATED: '반복 예약 등록',
     RECURRENCE_GENERATED: '반복 예약 건 등록',
     UPDATED: '수정',

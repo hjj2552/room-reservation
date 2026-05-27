@@ -1,11 +1,17 @@
 import { useQueries } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, Send, X } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, X } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api/http';
 import { getPublicWeeklyReservations } from '../api/public';
-import type { PublicReservationBlock, PublicReservationPayload, PublicRoom } from '../api/types';
+import type { PublicReservationBlock } from '../api/types';
 import { ReservationDateTimetable, type TimetableReservation } from '../components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../components/ReservationRoomTimetable';
+import {
+  ReservationRequestPanel,
+  type ReservationRequestValues,
+  type TimetableSlotSelection,
+} from '../components/TimetableQuickAddPanel';
+import { TimetablePageHeader, timetableCopy } from '../components/TimetablePageHeader';
 import { ErrorState, LoadingState } from '../components/StateViews';
 import {
   publicReservationKeys,
@@ -17,32 +23,13 @@ import {
   usePublicWeeklyReservations,
 } from '../hooks/usePublicReservation';
 import { formatDateTime, fromDateTimeLocal } from '../utils/date';
-import { statusLabels } from '../utils/labels';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
-interface PublicSlotSelection {
-  roomId: string;
-  date: string;
-  startAt: string;
-  endAt: string;
-}
-
-interface QuickRequestValues {
-  roomId: string;
-  applicantName: string;
-  applicantEmail: string;
-  applicantPhone: string;
-  purpose: string;
-  startAt: string;
-  endAt: string;
-  cancelPassword: string;
-}
-
-const timetablePageSizeNote = '표시된 신청/예약은 대기 또는 확정 상태입니다.';
+const timetablePageSizeNote = '표시된 신청/예약은 대기 또는 승인 상태입니다.';
 const publicStatusLabels = {
   REQUESTED: '신청 대기',
-  CONFIRMED: '예약 확정',
+  CONFIRMED: '예약 승인',
   CANCELLED: '취소됨',
 };
 
@@ -72,12 +59,41 @@ function minutesToTimeInput(minutes: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+function timeValueToMinutes(value?: string) {
+  const match = value?.match(/^(\d{2}):(\d{2})/);
+  if (!match) return undefined;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
 function slotToSelection(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
   return {
+    source: 'slot' as const,
     roomId: slot.roomId,
     date: slot.date,
     startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
     endAt: `${slot.date}T${minutesToTimeInput(slot.endMinutes)}`,
+  };
+}
+
+function newRequestSelection(slotMinutes = 30, openTime?: string, closeTime?: string): TimetableSlotSelection {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  const date = local.toISOString().slice(0, 10);
+  const currentMinutes = local.getHours() * 60 + local.getMinutes();
+  const step = Math.max(slotMinutes || 30, 30);
+  const openMinutes = timeValueToMinutes(openTime) ?? 0;
+  const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
+  const latestStartMinutes = Math.max(openMinutes, closeMinutes - step);
+  const roundedStartMinutes = Math.ceil(currentMinutes / step) * step;
+  const startMinutes = Math.min(Math.max(roundedStartMinutes, openMinutes), latestStartMinutes);
+  const endMinutes = Math.min(startMinutes + step, closeMinutes);
+
+  return {
+    source: 'toolbar',
+    roomId: '',
+    date,
+    startAt: `${date}T${minutesToTimeInput(startMinutes)}`,
+    endAt: `${date}T${minutesToTimeInput(endMinutes)}`,
   };
 }
 
@@ -122,19 +138,6 @@ function publicErrorMessage(error: unknown) {
   return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-function initialQuickValues(selection: PublicSlotSelection): QuickRequestValues {
-  return {
-    roomId: selection.roomId,
-    applicantName: '',
-    applicantEmail: '',
-    applicantPhone: '',
-    purpose: '',
-    startAt: selection.startAt,
-    endAt: selection.endAt,
-    cancelPassword: '',
-  };
-}
-
 export function PublicReservationPage() {
   const rooms = usePublicRooms();
   const settings = usePublicSettings();
@@ -142,7 +145,7 @@ export function PublicReservationPage() {
   const [viewMode, setViewMode] = useState<PublicTimetableViewMode>('date');
   const [selectedDate, setSelectedDate] = useState(todayInputValue());
   const [selectedRoomId, setSelectedRoomId] = useState('');
-  const [quickSelection, setQuickSelection] = useState<PublicSlotSelection | null>(null);
+  const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
 
@@ -193,19 +196,45 @@ export function PublicReservationPage() {
     setQuickSelection(slotToSelection(slot));
   }
 
+  function handleNewRequestClick() {
+    if (isUnavailable) return;
+    setQuickSelection(newRequestSelection(settings.data?.slotMinutes, settings.data?.openTime, settings.data?.closeTime));
+  }
+
   function handleReservationClick(reservation: TimetableReservation) {
     setSelectedReservationId(reservation.id);
   }
 
+  function handlePublicRequest(values: ReservationRequestValues) {
+    create.mutate(
+      {
+        roomId: values.roomId,
+        applicantName: values.applicantName,
+        applicantEmail: values.applicantEmail,
+        applicantPhone: values.applicantPhone || undefined,
+        purpose: values.purpose,
+        startAt: fromDateTimeLocal(values.startAt),
+        endAt: fromDateTimeLocal(values.endAt),
+        cancelPassword: values.cancelPassword,
+      },
+      {
+        onSuccess: (created) => {
+          setHighlightedReservationId(created.id);
+          setQuickSelection(null);
+        },
+      },
+    );
+  }
+
   return (
-    <div className="public-shell">
-      <header className="public-header">
-        <div>
-          <p className="eyebrow">{settings.data?.organizationName || '강의실 예약'}</p>
-          <h1>예약 신청</h1>
-          <p className="muted">시간표에서 빈 시간을 선택해 예약을 신청합니다. 신청은 즉시 확정되지 않습니다.</p>
-        </div>
-      </header>
+    <div className="public-shell" aria-labelledby="timetable-title">
+      <TimetablePageHeader
+        eyebrow={settings.data?.organizationName || '강의실 예약'}
+        helperText="신청은 대기 상태로 접수되며 운영자 승인 후 예약됩니다."
+        buttonTestId="public-new-request-button"
+        buttonDisabled={Boolean(isUnavailable)}
+        onNewRequest={handleNewRequestClick}
+      />
 
       {rooms.isLoading || settings.isLoading ? <LoadingState /> : null}
       {rooms.isError ? <ErrorState error={rooms.error} /> : null}
@@ -232,35 +261,42 @@ export function PublicReservationPage() {
       ) : null}
 
       {rooms.data && settings.data ? (
+        <div className="view-mode-bar" role="tablist" aria-label="시간표 보기 방식">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'date'}
+            className={viewMode === 'date' ? 'view-mode-tab active' : 'view-mode-tab'}
+            onClick={() => setViewMode('date')}
+            data-testid="public-timetable-view-date"
+          >
+            <CalendarDays size={16} aria-hidden="true" />
+            날짜별
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'room'}
+            className={viewMode === 'room' ? 'view-mode-tab active' : 'view-mode-tab'}
+            onClick={() => setViewMode('room')}
+            data-testid="public-timetable-view-room"
+          >
+            <DoorOpen size={16} aria-hidden="true" />
+            강의실별
+          </button>
+        </div>
+      ) : null}
+
+      {rooms.data && settings.data ? (
         <section className="panel timetable-panel" aria-labelledby="public-timetable-title">
           <div className="panel-header">
             <div>
-              <h2 id="public-timetable-title">예약 현황</h2>
-              <p className="muted">빈 슬롯을 누르면 해당 날짜, 시간, 강의실로 예약 신청 패널이 열립니다.</p>
-            </div>
-            <div className="view-mode-bar" role="tablist" aria-label="시간표 보기 방식">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'date'}
-                className={viewMode === 'date' ? 'view-mode-tab active' : 'view-mode-tab'}
-                onClick={() => setViewMode('date')}
-                data-testid="public-timetable-view-date"
-              >
-                <CalendarDays size={16} aria-hidden="true" />
-                날짜별
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={viewMode === 'room'}
-                className={viewMode === 'room' ? 'view-mode-tab active' : 'view-mode-tab'}
-                onClick={() => setViewMode('room')}
-                data-testid="public-timetable-view-room"
-              >
-                <DoorOpen size={16} aria-hidden="true" />
-                강의실별
-              </button>
+              <h2 id="public-timetable-title">
+                {viewMode === 'date' ? timetableCopy.dateTitle : timetableCopy.roomTitle}
+              </h2>
+              <p className="muted">
+                {viewMode === 'date' ? timetableCopy.dateDescription : timetableCopy.roomDescription}
+              </p>
             </div>
           </div>
 
@@ -359,15 +395,15 @@ export function PublicReservationPage() {
       ) : null}
 
       {quickSelection ? (
-        <PublicQuickRequestPanel
+        <ReservationRequestPanel
+          variant="public"
           rooms={activeRooms}
           selection={quickSelection}
           requirePhone={Boolean(settings.data?.requirePhone)}
           onClose={() => setQuickSelection(null)}
-          onCreated={(reservationId) => {
-            setHighlightedReservationId(reservationId);
-            setQuickSelection(null);
-          }}
+          onSubmit={handlePublicRequest}
+          submitError={create.error}
+          isPending={create.isPending}
         />
       ) : null}
 
@@ -378,200 +414,6 @@ export function PublicReservationPage() {
         />
       ) : null}
     </div>
-  );
-}
-
-function PublicQuickRequestPanel({
-  rooms,
-  selection,
-  requirePhone,
-  onClose,
-  onCreated,
-}: {
-  rooms: PublicRoom[];
-  selection: PublicSlotSelection;
-  requirePhone: boolean;
-  onClose: () => void;
-  onCreated: (reservationId: string) => void;
-}) {
-  const create = useCreatePublicReservation();
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [values, setValues] = useState<QuickRequestValues>(() => initialQuickValues(selection));
-  const [errors, setErrors] = useState<Partial<Record<keyof QuickRequestValues, string>>>({});
-
-  useEffect(() => {
-    setValues(initialQuickValues(selection));
-    setErrors({});
-    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-  }, [selection.endAt, selection.roomId, selection.startAt]);
-
-  function updateField<K extends keyof QuickRequestValues>(name: K, value: QuickRequestValues[K]) {
-    setValues((current) => ({ ...current, [name]: value }));
-    setErrors((current) => {
-      if (!current[name]) return current;
-      const next = { ...current };
-      delete next[name];
-      return next;
-    });
-  }
-
-  function validate() {
-    const nextErrors: Partial<Record<keyof QuickRequestValues, string>> = {};
-    if (!values.roomId) nextErrors.roomId = '강의실을 선택해 주세요.';
-    if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
-    if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
-    if (requirePhone && !values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
-    if (!values.purpose) nextErrors.purpose = '사용 목적을 입력해 주세요.';
-    if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
-    if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
-    if (!values.cancelPassword || values.cancelPassword.length < 4) {
-      nextErrors.cancelPassword = '취소 비밀번호를 4자 이상 입력해 주세요.';
-    }
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }
-
-  function toPayload(): PublicReservationPayload {
-    return {
-      roomId: values.roomId,
-      applicantName: values.applicantName,
-      applicantEmail: values.applicantEmail,
-      applicantPhone: values.applicantPhone || undefined,
-      purpose: values.purpose,
-      startAt: fromDateTimeLocal(values.startAt),
-      endAt: fromDateTimeLocal(values.endAt),
-      cancelPassword: values.cancelPassword,
-    };
-  }
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!validate()) return;
-    create.mutate(toPayload(), {
-      onSuccess: (created) => onCreated(created.id),
-    });
-  }
-
-  return (
-    <aside className="quick-add-panel" aria-labelledby="public-quick-request-title" data-testid="public-quick-request-panel">
-      <div className="quick-add-header">
-        <div>
-          <p className="eyebrow">빠른 예약 신청</p>
-          <h2 id="public-quick-request-title">예약 신청</h2>
-          <p className="muted">{selection.date} 선택 슬롯</p>
-        </div>
-        <button
-          type="button"
-          className="ghost-button icon-button"
-          onClick={onClose}
-          ref={closeButtonRef}
-          aria-label="예약 신청 패널 닫기"
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
-      </div>
-
-      <form className="quick-add-form" onSubmit={onSubmit}>
-        <label>
-          강의실
-          <select
-            value={values.roomId}
-            onChange={(event) => updateField('roomId', event.target.value)}
-            data-testid="public-request-room-select"
-          >
-            {rooms.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-          {errors.roomId ? <span className="field-error">{errors.roomId}</span> : null}
-        </label>
-        <label>
-          시작 시간
-          <input
-            type="datetime-local"
-            value={values.startAt}
-            onChange={(event) => updateField('startAt', event.target.value)}
-            data-testid="public-request-start-input"
-          />
-          {errors.startAt ? <span className="field-error">{errors.startAt}</span> : null}
-        </label>
-        <label>
-          종료 시간
-          <input
-            type="datetime-local"
-            value={values.endAt}
-            onChange={(event) => updateField('endAt', event.target.value)}
-            data-testid="public-request-end-input"
-          />
-          {errors.endAt ? <span className="field-error">{errors.endAt}</span> : null}
-        </label>
-        <label>
-          신청자 이름
-          <input
-            value={values.applicantName}
-            onChange={(event) => updateField('applicantName', event.target.value)}
-            data-testid="public-request-applicant-name-input"
-          />
-          {errors.applicantName ? <span className="field-error">{errors.applicantName}</span> : null}
-        </label>
-        <label>
-          이메일
-          <input
-            type="email"
-            value={values.applicantEmail}
-            onChange={(event) => updateField('applicantEmail', event.target.value)}
-            data-testid="public-request-email-input"
-          />
-          {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail}</span> : null}
-        </label>
-        <label>
-          전화번호{requirePhone ? '' : ' (선택)'}
-          <input
-            value={values.applicantPhone}
-            onChange={(event) => updateField('applicantPhone', event.target.value)}
-            data-testid="public-request-phone-input"
-          />
-          {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone}</span> : null}
-        </label>
-        <label className="full-span">
-          사용 목적
-          <input
-            value={values.purpose}
-            onChange={(event) => updateField('purpose', event.target.value)}
-            data-testid="public-request-purpose-input"
-          />
-          {errors.purpose ? <span className="field-error">{errors.purpose}</span> : null}
-        </label>
-        <label className="full-span">
-          취소 비밀번호
-          <input
-            type="password"
-            value={values.cancelPassword}
-            onChange={(event) => updateField('cancelPassword', event.target.value)}
-            data-testid="public-request-cancel-password-input"
-          />
-          <span className="muted">나중에 이 신청을 취소할 때 필요합니다.</span>
-          {errors.cancelPassword ? <span className="field-error">{errors.cancelPassword}</span> : null}
-        </label>
-        {create.isError ? <div className="inline-error full-span" role="alert">{publicErrorMessage(create.error)}</div> : null}
-        {create.isSuccess ? (
-          <div className="success-box full-span" role="status">
-            예약 신청이 접수되었습니다. 상태: 신청 대기
-          </div>
-        ) : null}
-        <div className="button-row full-span">
-          <button type="button" className="ghost-button" onClick={onClose}>
-            취소
-          </button>
-          <button type="submit" className="primary-button" disabled={create.isPending} data-testid="public-request-submit-button">
-            <Send size={16} aria-hidden="true" />
-            {create.isPending ? '신청 접수 중' : '예약 신청'}
-          </button>
-        </div>
-      </form>
-    </aside>
   );
 }
 

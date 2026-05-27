@@ -91,7 +91,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
-test('admin can create a reservation and see it on detail and list pages', async ({ page, request, e2eData }) => {
+test('admin can request a reservation from the timetable and see it on detail and list pages', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-create-room');
   const purpose = e2eData.name('reservation-create');
@@ -99,26 +99,28 @@ test('admin can create a reservation and see it on detail and list pages', async
   let createdReservationId: string | undefined;
 
   try {
-    await page.goto('/reservations/new');
-    await page.getByTestId('reservation-room-select').selectOption(room.id);
-    await page.getByTestId('reservation-applicant-name-input').fill('e2e-admin');
-    await page.getByTestId('reservation-email-input').fill(`e2e-reservation-${Date.now()}@example.test`);
-    await page.getByTestId('reservation-phone-input').fill('010-1111-2222');
-    await page.getByTestId('reservation-purpose-input').fill(purpose);
-    await page.getByTestId('reservation-start-input').fill(reservationTime.startAt);
-    await page.getByTestId('reservation-end-input').fill(reservationTime.endAt);
-    await page.getByTestId('reservation-memo-input').fill('e2e-create-verification');
+    await page.goto(`/timetable?view=date&date=${reservationTime.date}&roomId=${room.id}`);
+    await page.getByTestId('timetable-empty-slot').first().click();
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await page.getByTestId('quick-add-room-select').selectOption(room.id);
+    await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
+    await page.getByTestId('quick-add-email-input').fill(`e2e-reservation-${Date.now()}@example.test`);
+    await page.getByTestId('quick-add-phone-input').fill('010-1111-2222');
+    await page.getByTestId('quick-add-purpose-input').fill(purpose);
+    await page.getByTestId('quick-add-start-input').fill(reservationTime.startAt);
+    await page.getByTestId('quick-add-end-input').fill(reservationTime.endAt);
+    await page.getByTestId('quick-add-memo-input').fill('e2e-create-verification');
 
-    await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('reservation-purpose-input')).toHaveValue(purpose);
-    await expect(page.getByTestId('reservation-start-input')).toHaveValue(reservationTime.startAt);
-    await expect(page.getByTestId('reservation-end-input')).toHaveValue(reservationTime.endAt);
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
+    await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(purpose);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(reservationTime.startAt);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(reservationTime.endAt);
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/reservations') &&
       response.request().method() === 'POST',
     );
-    await page.getByTestId('reservation-save-button').click();
+    await page.getByTestId('quick-add-save-button').click();
     const createResponse = await createResponsePromise;
     const createResponseBody = await createResponse.text();
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
@@ -127,6 +129,8 @@ test('admin can create a reservation and see it on detail and list pages', async
     createdReservationId = created.id;
     e2eData.registerReservation(createdReservationId);
 
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
+    await page.getByText(purpose).click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${createdReservationId}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(purpose);
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();

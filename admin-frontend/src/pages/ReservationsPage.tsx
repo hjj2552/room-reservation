@@ -1,6 +1,6 @@
 import { Download, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../api/http';
 import { exportReservationsCsv } from '../api/reservations';
 import type { ReservationFilters, ReservationStatus } from '../api/types';
@@ -92,9 +92,6 @@ export function ReservationsPage() {
             <Download size={16} aria-hidden="true" />
             CSV 내보내기
           </button>
-          <Link className="primary-button" to="/reservations/new">
-            예약 등록
-          </Link>
         </div>
       </div>
 

@@ -113,7 +113,9 @@ export function ReservationRoomTimetable({
             {slots.map((slot) => (
               <div
                 key={slot}
-                className="timetable-time-label"
+                className={`timetable-time-label${
+                  slot === openMinutes ? ' is-first' : slot === closeMinutes ? ' is-last' : ''
+                }`}
                 style={{ top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT }}
               >
                 {formatClock(slot)}
@@ -141,7 +143,7 @@ export function ReservationRoomTimetable({
                         roomId: room.id,
                       })
                     }
-                    aria-label={`${room.name} ${day.label} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 등록`}
+                    aria-label={`${room.name} ${day.label} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 신청`}
                     data-testid="timetable-empty-slot"
                   />
                 );

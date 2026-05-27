@@ -1,26 +1,18 @@
 import { X } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import type { AdminRoom, ReservationPayload, ReservationStatus } from '../api/types';
+import type { ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
-import { useCreateReservation } from '../hooks/useReservations';
-import { fromDateTimeLocal } from '../utils/date';
 import { statusLabels } from '../utils/labels';
 
 export interface TimetableSlotSelection {
+  source: 'slot' | 'toolbar';
   roomId: string;
   date: string;
   startAt: string;
   endAt: string;
 }
 
-interface TimetableQuickAddPanelProps {
-  rooms: AdminRoom[];
-  selection: TimetableSlotSelection;
-  onClose: () => void;
-  onCreated: (reservationId: string) => void;
-}
-
-interface QuickAddFormValues {
+export interface ReservationRequestValues {
   roomId: string;
   applicantName: string;
   applicantEmail: string;
@@ -30,9 +22,26 @@ interface QuickAddFormValues {
   endAt: string;
   status: ReservationStatus;
   memo: string;
+  cancelPassword: string;
 }
 
-function initialValues(selection: TimetableSlotSelection): QuickAddFormValues {
+interface RequestRoom {
+  id: string;
+  name: string;
+}
+
+interface ReservationRequestPanelProps {
+  variant: 'admin' | 'public';
+  rooms: RequestRoom[];
+  selection: TimetableSlotSelection;
+  requirePhone?: boolean;
+  submitError?: unknown;
+  isPending?: boolean;
+  onClose: () => void;
+  onSubmit: (values: ReservationRequestValues) => void;
+}
+
+function initialValues(selection: TimetableSlotSelection, variant: 'admin' | 'public'): ReservationRequestValues {
   return {
     roomId: selection.roomId,
     applicantName: '',
@@ -41,22 +50,64 @@ function initialValues(selection: TimetableSlotSelection): QuickAddFormValues {
     purpose: '',
     startAt: selection.startAt,
     endAt: selection.endAt,
-    status: 'CONFIRMED',
+    status: variant === 'admin' ? 'CONFIRMED' : 'REQUESTED',
     memo: '',
+    cancelPassword: '',
   };
 }
 
-export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }: TimetableQuickAddPanelProps) {
-  const create = useCreateReservation();
+const testIds = {
+  admin: {
+    panel: 'timetable-quick-add-panel',
+    close: 'timetable-quick-add-close',
+    room: 'quick-add-room-select',
+    status: 'quick-add-status-select',
+    applicantName: 'quick-add-applicant-name-input',
+    email: 'quick-add-email-input',
+    phone: 'quick-add-phone-input',
+    purpose: 'quick-add-purpose-input',
+    start: 'quick-add-start-input',
+    end: 'quick-add-end-input',
+    memo: 'quick-add-memo-input',
+    submit: 'quick-add-save-button',
+  },
+  public: {
+    panel: 'public-quick-request-panel',
+    close: 'public-quick-request-close',
+    room: 'public-request-room-select',
+    status: 'public-request-status-select',
+    applicantName: 'public-request-applicant-name-input',
+    email: 'public-request-email-input',
+    phone: 'public-request-phone-input',
+    purpose: 'public-request-purpose-input',
+    start: 'public-request-start-input',
+    end: 'public-request-end-input',
+    memo: 'public-request-memo-input',
+    submit: 'public-request-submit-button',
+  },
+};
+
+export function ReservationRequestPanel({
+  variant,
+  rooms,
+  selection,
+  requirePhone = false,
+  submitError,
+  isPending = false,
+  onClose,
+  onSubmit,
+}: ReservationRequestPanelProps) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [values, setValues] = useState<QuickAddFormValues>(() => initialValues(selection));
-  const [errors, setErrors] = useState<Partial<Record<keyof QuickAddFormValues, string>>>({});
+  const [values, setValues] = useState<ReservationRequestValues>(() => initialValues(selection, variant));
+  const [errors, setErrors] = useState<Partial<Record<keyof ReservationRequestValues, string>>>({});
+  const ids = testIds[variant];
+  const isAdmin = variant === 'admin';
 
   useEffect(() => {
-    setValues(initialValues(selection));
+    setValues(initialValues(selection, variant));
     setErrors({});
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-  }, [selection.date, selection.endAt, selection.roomId, selection.startAt]);
+  }, [selection.date, selection.endAt, selection.roomId, selection.startAt, variant]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -66,7 +117,7 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  function updateField<K extends keyof QuickAddFormValues>(name: K, value: QuickAddFormValues[K]) {
+  function updateField<K extends keyof ReservationRequestValues>(name: K, value: ReservationRequestValues[K]) {
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => {
       if (!current[name]) return current;
@@ -77,68 +128,68 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
   }
 
   function validate() {
-    const nextErrors: Partial<Record<keyof QuickAddFormValues, string>> = {};
-    if (!values.roomId) nextErrors.roomId = '강의실을 선택하세요.';
-    if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력하세요.';
-    if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력하세요.';
-    if (!values.purpose) nextErrors.purpose = '예약 목적을 입력하세요.';
-    if (!values.startAt) nextErrors.startAt = '시작 시간을 입력하세요.';
-    if (!values.endAt) nextErrors.endAt = '종료 시간을 입력하세요.';
+    const nextErrors: Partial<Record<keyof ReservationRequestValues, string>> = {};
+    if (!values.roomId) nextErrors.roomId = '강의실을 선택해 주세요.';
+    if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
+    if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
+    if (requirePhone && !values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
+    if (!values.purpose) nextErrors.purpose = '예약 목적을 입력해 주세요.';
+    if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
+    if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
+    if (!isAdmin && (!values.cancelPassword || values.cancelPassword.length < 4)) {
+      nextErrors.cancelPassword = '취소 비밀번호를 4자 이상 입력해 주세요.';
+    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
-  function toPayload(): ReservationPayload {
-    return {
-      roomId: values.roomId,
-      applicantName: values.applicantName,
-      applicantEmail: values.applicantEmail,
-      applicantPhone: values.applicantPhone || undefined,
-      purpose: values.purpose,
-      startAt: fromDateTimeLocal(values.startAt),
-      endAt: fromDateTimeLocal(values.endAt),
-      status: values.status,
-      memo: values.memo || undefined,
-    };
-  }
-
-  function onSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!validate()) return;
-
-    create.mutate(toPayload(), {
-      onSuccess: (created) => onCreated(created.id),
-    });
+    onSubmit(values);
   }
 
   return (
-    <aside className="quick-add-panel" aria-labelledby="quick-add-title" data-testid="timetable-quick-add-panel">
+    <aside
+      className="quick-add-panel reservation-request-panel"
+      aria-labelledby="reservation-request-title"
+      data-testid={ids.panel}
+    >
       <div className="quick-add-header">
         <div>
-          <p className="eyebrow">시간표 등록</p>
-          <h2 id="quick-add-title">예약 빠른 등록</h2>
-          <p className="muted">{selection.date} 선택 슬롯</p>
+          <p className="eyebrow">시간표 예약 신청</p>
+          <h2 id="reservation-request-title">예약 신청</h2>
+          <p className="muted">
+            {selection.source === 'slot' ? `${selection.date} 선택 슬롯` : `${selection.date} 새 신청`}
+            {isAdmin ? ' · 관리자는 승인 상태로 저장할 수 있습니다.' : ' · 신청은 대기 상태로 접수됩니다.'}
+          </p>
         </div>
         <button
           type="button"
           className="ghost-button icon-button"
           onClick={onClose}
           ref={closeButtonRef}
-          aria-label="예약 등록 패널 닫기"
-          data-testid="timetable-quick-add-close"
+          aria-label="예약 신청 패널 닫기"
+          data-testid={ids.close}
         >
           <X size={16} aria-hidden="true" />
         </button>
       </div>
 
-      <form className="quick-add-form" onSubmit={onSubmit}>
+      <form className="quick-add-form compact-request-form" onSubmit={handleSubmit}>
+        <label className="full-span request-title-field">
+          신청 목적
+          <input
+            data-testid={ids.purpose}
+            value={values.purpose}
+            placeholder="예: 세미나, 보강, 회의"
+            onChange={(event) => updateField('purpose', event.target.value)}
+          />
+          {errors.purpose ? <span className="field-error">{errors.purpose}</span> : null}
+        </label>
         <label>
           강의실
-          <select
-            data-testid="quick-add-room-select"
-            value={values.roomId}
-            onChange={(event) => updateField('roomId', event.target.value)}
-          >
+          <select data-testid={ids.room} value={values.roomId} onChange={(event) => updateField('roomId', event.target.value)}>
             <option value="">선택</option>
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
@@ -148,24 +199,51 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
           </select>
           {errors.roomId ? <span className="field-error">{errors.roomId}</span> : null}
         </label>
+        {isAdmin ? (
+          <label>
+            저장 상태
+            <select
+              data-testid={ids.status}
+              value={values.status}
+              onChange={(event) => updateField('status', event.target.value as ReservationStatus)}
+            >
+              {(['CONFIRMED', 'REQUESTED'] as ReservationStatus[]).map((value) => (
+                <option key={value} value={value}>
+                  {value === 'CONFIRMED' ? '승인으로 저장' : statusLabels[value]}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <label>
+            접수 상태
+            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} />
+          </label>
+        )}
         <label>
-          상태
-          <select
-            data-testid="quick-add-status-select"
-            value={values.status}
-            onChange={(event) => updateField('status', event.target.value as ReservationStatus)}
-          >
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+          시작
+          <input
+            data-testid={ids.start}
+            type="datetime-local"
+            value={values.startAt}
+            onChange={(event) => updateField('startAt', event.target.value)}
+          />
+          {errors.startAt ? <span className="field-error">{errors.startAt}</span> : null}
         </label>
         <label>
-          신청자 이름
+          종료
           <input
-            data-testid="quick-add-applicant-name-input"
+            data-testid={ids.end}
+            type="datetime-local"
+            value={values.endAt}
+            onChange={(event) => updateField('endAt', event.target.value)}
+          />
+          {errors.endAt ? <span className="field-error">{errors.endAt}</span> : null}
+        </label>
+        <label>
+          신청자
+          <input
+            data-testid={ids.applicantName}
             value={values.applicantName}
             onChange={(event) => updateField('applicantName', event.target.value)}
           />
@@ -174,7 +252,7 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
         <label>
           이메일
           <input
-            data-testid="quick-add-email-input"
+            data-testid={ids.email}
             type="email"
             value={values.applicantEmail}
             onChange={(event) => updateField('applicantEmail', event.target.value)}
@@ -182,58 +260,34 @@ export function TimetableQuickAddPanel({ rooms, selection, onClose, onCreated }:
           {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail}</span> : null}
         </label>
         <label>
-          전화번호
-          <input
-            data-testid="quick-add-phone-input"
-            value={values.applicantPhone}
-            onChange={(event) => updateField('applicantPhone', event.target.value)}
-          />
+          전화번호{requirePhone ? '' : ' (선택)'}
+          <input data-testid={ids.phone} value={values.applicantPhone} onChange={(event) => updateField('applicantPhone', event.target.value)} />
+          {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone}</span> : null}
         </label>
-        <label>
-          예약 목적
-          <input
-            data-testid="quick-add-purpose-input"
-            value={values.purpose}
-            onChange={(event) => updateField('purpose', event.target.value)}
-          />
-          {errors.purpose ? <span className="field-error">{errors.purpose}</span> : null}
-        </label>
-        <label>
-          시작 시간
-          <input
-            data-testid="quick-add-start-input"
-            type="datetime-local"
-            value={values.startAt}
-            onChange={(event) => updateField('startAt', event.target.value)}
-          />
-          {errors.startAt ? <span className="field-error">{errors.startAt}</span> : null}
-        </label>
-        <label>
-          종료 시간
-          <input
-            data-testid="quick-add-end-input"
-            type="datetime-local"
-            value={values.endAt}
-            onChange={(event) => updateField('endAt', event.target.value)}
-          />
-          {errors.endAt ? <span className="field-error">{errors.endAt}</span> : null}
-        </label>
-        <label className="full-span">
-          처리 메모
-          <textarea
-            data-testid="quick-add-memo-input"
-            rows={3}
-            value={values.memo}
-            onChange={(event) => updateField('memo', event.target.value)}
-          />
-        </label>
-        {create.isError ? <div className="inline-error full-span" role="alert">{errorMessage(create.error)}</div> : null}
-        <div className="button-row full-span">
+        {isAdmin ? (
+          <label>
+            처리 메모
+            <input data-testid={ids.memo} value={values.memo} onChange={(event) => updateField('memo', event.target.value)} />
+          </label>
+        ) : (
+          <label>
+            취소 비밀번호
+            <input
+              type="password"
+              data-testid="public-request-cancel-password-input"
+              value={values.cancelPassword}
+              onChange={(event) => updateField('cancelPassword', event.target.value)}
+            />
+            {errors.cancelPassword ? <span className="field-error">{errors.cancelPassword}</span> : null}
+          </label>
+        )}
+        {submitError ? <div className="inline-error full-span" role="alert">{errorMessage(submitError)}</div> : null}
+        <div className="button-row full-span request-form-actions">
           <button type="button" className="ghost-button" onClick={onClose}>
             취소
           </button>
-          <button type="submit" className="primary-button" data-testid="quick-add-save-button" disabled={create.isPending}>
-            {create.isPending ? '저장 중...' : '예약 등록'}
+          <button type="submit" className="primary-button" data-testid={ids.submit} disabled={isPending}>
+            {isPending ? '신청 중...' : isAdmin ? '예약 신청 저장' : '예약 신청'}
           </button>
         </div>
       </form>

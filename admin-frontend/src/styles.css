@@ -589,6 +589,14 @@ button:disabled {
   transform: translateY(-50%);
 }
 
+.timetable-time-label.is-first {
+  transform: none;
+}
+
+.timetable-time-label.is-last {
+  transform: translateY(-100%);
+}
+
 .timetable-room-column {
   min-width: 0;
   border-left: 1px solid #e6ebf0;
@@ -728,6 +736,13 @@ button:disabled {
   padding: 18px;
   background: #ffffff;
   box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
+  overflow: visible;
+}
+
+.reservation-request-panel {
+  width: min(520px, calc(100vw - 48px));
+  gap: 12px;
+  padding: 16px;
 }
 
 .quick-add-header {
@@ -751,7 +766,39 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   overflow: auto;
-  padding-right: 2px;
+  padding: 4px 8px 8px 4px;
+}
+
+.compact-request-form {
+  gap: 10px;
+  margin: 0;
+}
+
+.compact-request-form label {
+  gap: 4px;
+}
+
+.compact-request-form input,
+.compact-request-form select {
+  padding: 8px 9px;
+}
+
+.reservation-request-panel input:focus-visible,
+.reservation-request-panel select:focus-visible,
+.reservation-request-panel textarea:focus-visible {
+  outline: 0;
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 2px #78a6ff;
+}
+
+.request-title-field input {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.request-form-actions {
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .detail-grid {
@@ -1074,10 +1121,19 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 18px;
-  width: min(1440px, 100%);
+  width: min(1680px, 100%);
   min-height: 100vh;
   margin: 0 auto;
   padding: 24px 28px;
+}
+
+.timetable-entry-header {
+  align-items: flex-end;
+}
+
+.timetable-helper-text {
+  margin-top: 4px;
+  font-size: 14px;
 }
 
 .public-header {
