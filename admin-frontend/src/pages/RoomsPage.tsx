@@ -163,21 +163,21 @@ export function RoomsPage() {
           {rooms.data?.items.length === 0 ? <EmptyState message="등록된 강의실이 없습니다." /> : null}
           {rooms.data?.items.length ? (
             <div className="table-wrap">
-              <table className="data-table" data-testid="rooms-table">
+              <table className="data-table rooms-table" data-testid="rooms-table">
                 <caption className="sr-only">강의실 목록</caption>
                 <thead>
                   <tr>
-                    <th scope="col">예약 대상</th>
+                    <th scope="col" className="nowrap-cell">예약 대상</th>
                     <th scope="col">강의실</th>
-                    <th scope="col">정원</th>
-                    <th scope="col">수정일</th>
-                    <th scope="col">관리</th>
+                    <th scope="col" className="nowrap-cell">정원</th>
+                    <th scope="col" className="nowrap-cell">수정일</th>
+                    <th scope="col" className="nowrap-cell">관리</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rooms.data.items.map((room) => (
                     <tr key={room.id}>
-                      <td>
+                      <td className="nowrap-cell">
                         <span className={`plain-badge ${room.enabled ? 'good' : 'muted-badge'}`}>
                           {room.enabled ? '사용 중' : '제외됨'}
                         </span>
@@ -187,8 +187,8 @@ export function RoomsPage() {
                         <br />
                         <span className="muted">{room.location || '-'}</span>
                       </td>
-                      <td>{room.capacity ?? 0}명</td>
-                      <td>{formatDateTime(room.updatedAt)}</td>
+                      <td className="nowrap-cell">{room.capacity ?? 0}명</td>
+                      <td className="nowrap-cell">{formatDateTime(room.updatedAt)}</td>
                       <td>
                         <div className="button-row table-actions">
                           <button
