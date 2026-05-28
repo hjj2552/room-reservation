@@ -23,6 +23,7 @@ export function ReservationDetailPage() {
   const cancel = useReservationAction(reservationId, 'cancel');
   const deleteReservation = useDeleteReservation(reservationId);
   const [memo, setMemo] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   function performAction(action: 'approve' | 'cancel') {
     const mutation = action === 'approve' ? approve : cancel;
@@ -32,13 +33,9 @@ export function ReservationDetailPage() {
   }
 
   function performDelete() {
-    const confirmed = window.confirm(
-      '예약을 영구 삭제합니다. 삭제 후 예약 상세 정보는 볼 수 없고, 감사 로그에는 삭제 기록이 남습니다.',
-    );
-    if (!confirmed) return;
-
     deleteReservation.mutate(memo || undefined, {
       onSuccess: () => {
+        setShowDeleteModal(false);
         navigate(`/audit?reservationId=${reservationId}&action=DELETED`);
       },
     });
@@ -56,13 +53,13 @@ export function ReservationDetailPage() {
 
   return (
     <section className="page-section" aria-labelledby="reservation-detail-title">
-      <div className="page-header">
+      <div className="page-header reservation-detail-page-header">
         <div>
           <p className="eyebrow">예약 상세</p>
           <h1 id="reservation-detail-title">{detail.room.name}</h1>
           <p className="muted">{formatDateTime(detail.startAt)} 예약</p>
         </div>
-        <div className="header-actions">
+        <div className="header-actions reservation-navigation-actions" aria-label="예약 상세 이동">
           <button type="button" className="ghost-button" onClick={() => navigate('/reservations')}>
             목록으로
           </button>
@@ -73,14 +70,6 @@ export function ReservationDetailPage() {
           >
             <CalendarDays size={16} aria-hidden="true" />
             시간표에서 보기
-          </Link>
-          <Link
-            className="secondary-button"
-            data-testid="reservation-edit-link"
-            to={`/reservations/${detail.id}/edit`}
-          >
-            <PenLine size={16} aria-hidden="true" />
-            예약 수정
           </Link>
         </div>
       </div>
@@ -99,8 +88,12 @@ export function ReservationDetailPage() {
           })}
         />
 
-        <section className="panel" aria-labelledby="actions-title">
-          <h2 id="actions-title">상태 처리</h2>
+        <section className="panel reservation-action-panel" aria-labelledby="actions-title">
+          <div>
+            <p className="eyebrow">운영 액션</p>
+            <h2 id="actions-title">상태 처리</h2>
+            <p className="muted">승인과 취소는 현재 예약 상태를 처리하는 주요 액션입니다.</p>
+          </div>
           <form
             className="form-stack"
             onSubmit={(event) => {
@@ -117,38 +110,37 @@ export function ReservationDetailPage() {
                 placeholder="승인 또는 취소 사유를 남깁니다."
               />
             </label>
-            <div className="button-row">
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={approve.isPending || detail.status === 'CONFIRMED' || isCancelled}
+            <div className="reservation-primary-actions">
+              <div className="button-row" aria-label="주요 상태 처리">
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={approve.isPending || detail.status === 'CONFIRMED' || isCancelled}
+                >
+                  <Check size={16} aria-hidden="true" />
+                  승인
+                </button>
+                <button
+                  type="button"
+                  className="danger-button"
+                  disabled={cancel.isPending || isCancelled}
+                  onClick={() => performAction('cancel')}
+                >
+                  <X size={16} aria-hidden="true" />
+                  취소
+                </button>
+              </div>
+              <Link
+                className="secondary-button reservation-edit-action"
+                data-testid="reservation-edit-link"
+                to={`/reservations/${detail.id}/edit`}
               >
-                <Check size={16} aria-hidden="true" />
-                승인
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                disabled={cancel.isPending || isCancelled}
-                onClick={() => performAction('cancel')}
-              >
-                <X size={16} aria-hidden="true" />
-                취소
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                disabled={deleteReservation.isPending}
-                onClick={performDelete}
-                data-testid="reservation-delete-button"
-              >
-                <Trash2 size={16} aria-hidden="true" />
-                예약 삭제
-              </button>
+                <PenLine size={16} aria-hidden="true" />
+                예약 수정
+              </Link>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
             {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
-            {deleteReservation.isError ? <div className="inline-error" role="alert">{errorMessage(deleteReservation.error)}</div> : null}
           </form>
         </section>
       </div>
@@ -173,6 +165,55 @@ export function ReservationDetailPage() {
           </ol>
         ) : null}
       </section>
+
+      <div className="reservation-delete-action">
+        <button
+          type="button"
+          className="danger-button"
+          disabled={deleteReservation.isPending}
+          onClick={() => setShowDeleteModal(true)}
+          data-testid="reservation-delete-button"
+        >
+          <Trash2 size={16} aria-hidden="true" />
+          예약 삭제
+        </button>
+        {deleteReservation.isError ? <div className="inline-error" role="alert">{errorMessage(deleteReservation.error)}</div> : null}
+      </div>
+
+      {showDeleteModal ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-panel reservation-delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reservation-delete-modal-title"
+            aria-describedby="reservation-delete-modal-description"
+            data-testid="reservation-delete-modal"
+          >
+            <div className="modal-header">
+              <h2 id="reservation-delete-modal-title">예약을 영구 삭제할까요?</h2>
+            </div>
+            <p id="reservation-delete-modal-description" className="danger-copy">
+              삭제하면 이 예약의 상세 정보는 더 이상 조회할 수 없습니다. 감사 로그에는 삭제 기록과 처리 메모가 남습니다.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={() => setShowDeleteModal(false)} autoFocus>
+                돌아가기
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                disabled={deleteReservation.isPending}
+                onClick={performDelete}
+                data-testid="reservation-delete-confirm-button"
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                {deleteReservation.isPending ? '삭제 중...' : '예약 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
