@@ -4,6 +4,7 @@ import { Pagination } from '../components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../components/StateViews';
 import { useReservationHistoryAudit } from '../hooks/useAudit';
 import { useRooms } from '../hooks/useRooms';
+import type { ReservationHistory } from '../api/types';
 import { formatDateTime, toEndOfDayOffset, toStartOfDayOffset } from '../utils/date';
 import { historyActionLabel, statusLabels } from '../utils/labels';
 
@@ -23,6 +24,38 @@ const actions = [
 function numberParam(value: string | null, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function cleanSnapshotValue(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function deletedReservationSnapshot(history: ReservationHistory) {
+  return {
+    roomName: cleanSnapshotValue(history.reservationRoomName) || '-',
+    time: reservationTimeRange(history) || '-',
+  };
+}
+
+function reservationTimeRange(history: ReservationHistory) {
+  const startAt = cleanSnapshotValue(history.reservationStartAt);
+  const endAt = cleanSnapshotValue(history.reservationEndAt);
+  if (startAt && endAt) return `${formatDateTime(startAt)} ~ ${formatSnapshotEndTime(startAt, endAt)}`;
+  if (startAt) return formatDateTime(startAt);
+  if (endAt) return formatDateTime(endAt);
+  return null;
+}
+
+function formatSnapshotEndTime(startAt: string, endAt: string) {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (start.toDateString() !== end.toDateString()) {
+    return formatDateTime(endAt);
+  }
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeStyle: 'short',
+  }).format(end);
 }
 
 export function AuditPage() {
@@ -149,34 +182,43 @@ export function AuditPage() {
                 </tr>
               </thead>
               <tbody>
-                {audit.data.items.map((history) => (
-                  <tr key={history.id}>
-                    <td>{formatDateTime(history.createdAt)}</td>
-                    <td>{historyActionLabel(history.action)}</td>
-                    <td>
-                      {history.beforeStatus ? statusLabels[history.beforeStatus] : '-'} →{' '}
-                      {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
-                    </td>
-                    <td>
-                      {history.actorId}
-                      <br />
-                      <span className="muted">{history.actorType}</span>
-                    </td>
-                    <td>
-                      <Link className="text-link" to={`/reservations/${history.reservationId}`}>
-                        상세 보기
-                      </Link>
-                      {history.reservationPurpose || history.reservationRoomName ? (
-                        <span className="muted">
-                          <br />
-                          {history.reservationPurpose || '삭제된 예약'}
-                          {history.reservationRoomName ? ` / ${history.reservationRoomName}` : ''}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td>{history.memo || '-'}</td>
-                  </tr>
-                ))}
+                {audit.data.items.map((history) => {
+                  const isDeleted = history.action === 'DELETED';
+                  const snapshot = isDeleted ? deletedReservationSnapshot(history) : null;
+
+                  return (
+                    <tr key={history.id}>
+                      <td>{formatDateTime(history.createdAt)}</td>
+                      <td>{historyActionLabel(history.action)}</td>
+                      <td>
+                        {history.beforeStatus ? statusLabels[history.beforeStatus] : '-'} →{' '}
+                        {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
+                      </td>
+                      <td>
+                        {history.actorId}
+                        <br />
+                        <span className="muted">{history.actorType}</span>
+                      </td>
+                      <td>
+                        {isDeleted ? (
+                          <span className="audit-reservation-snapshot">
+                            <span className="audit-snapshot-room" title={snapshot?.roomName}>
+                              {snapshot?.roomName}
+                            </span>
+                            <span className="audit-snapshot-time" title={snapshot?.time}>
+                              {snapshot?.time}
+                            </span>
+                          </span>
+                        ) : (
+                          <Link className="text-link" to={`/reservations/${history.reservationId}`}>
+                            상세 보기
+                          </Link>
+                        )}
+                      </td>
+                      <td>{history.memo || '-'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

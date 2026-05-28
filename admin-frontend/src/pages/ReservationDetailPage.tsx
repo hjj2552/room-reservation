@@ -18,7 +18,7 @@ export function ReservationDetailPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
   const reservation = useReservation(reservationId);
-  const histories = useReservationHistories(reservationId);
+  const histories = useReservationHistories(reservationId, { enabled: Boolean(reservation.data) });
   const approve = useReservationAction(reservationId, 'approve');
   const cancel = useReservationAction(reservationId, 'cancel');
   const deleteReservation = useDeleteReservation(reservationId);

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '../api/http';
 import {
   approveReservation,
   cancelReservation,
@@ -31,14 +32,18 @@ export function useReservation(id?: string) {
     queryKey: reservationKeys.detail(id || ''),
     queryFn: () => getReservation(id || ''),
     enabled: Boolean(id),
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && error.status === 404) return false;
+      return failureCount < 2;
+    },
   });
 }
 
-export function useReservationHistories(id?: string) {
+export function useReservationHistories(id?: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: reservationKeys.histories(id || ''),
     queryFn: () => getReservationHistories(id || ''),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && (options.enabled ?? true),
   });
 }
 
