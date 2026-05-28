@@ -133,6 +133,7 @@ export function TimetablePage() {
       status,
       roomId,
       keyword,
+      excludeCancelled: true,
       from: toStartOfDayOffset(selectedDate),
       to: toEndOfDayOffset(selectedDate),
       page: 0,
@@ -154,6 +155,7 @@ export function TimetablePage() {
       status,
       roomId: selectedRoomViewRoomId,
       keyword,
+      excludeCancelled: true,
       from: toStartOfDayOffset(selectedWeekStart),
       to: toEndOfDayOffset(addDaysInputValue(selectedWeekStart, 6)),
       page: 0,
@@ -164,14 +166,6 @@ export function TimetablePage() {
   const roomTimetableReservations = useReservations(roomTimetableFilters, {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
-  const visibleDateTimetableReservations = useMemo(
-    () => (dateTimetableReservations.data?.items || []).filter((reservation) => reservation.status !== 'CANCELLED'),
-    [dateTimetableReservations.data?.items],
-  );
-  const visibleRoomTimetableReservations = useMemo(
-    () => (roomTimetableReservations.data?.items || []).filter((reservation) => reservation.status !== 'CANCELLED'),
-    [roomTimetableReservations.data?.items],
-  );
 
   useEffect(() => {
     if (!highlightedReservationId) return;
@@ -318,7 +312,7 @@ export function TimetablePage() {
           {rooms.data && settings.data && dateTimetableReservations.data ? (
             <ReservationDateTimetable
               rooms={dateTimetableRooms}
-              reservations={visibleDateTimetableReservations}
+              reservations={dateTimetableReservations.data.items}
               selectedDate={selectedDate}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
@@ -397,7 +391,7 @@ export function TimetablePage() {
           {settings.data && selectedRoomViewRoom && roomTimetableReservations.data ? (
             <ReservationRoomTimetable
               room={selectedRoomViewRoom}
-              reservations={visibleRoomTimetableReservations}
+              reservations={roomTimetableReservations.data.items}
               weekStart={selectedWeekStart}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}

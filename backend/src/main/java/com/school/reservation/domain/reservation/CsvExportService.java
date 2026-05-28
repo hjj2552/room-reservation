@@ -35,7 +35,7 @@ public class CsvExportService {
     ) {
         String normalizedKeyword = keyword == null || keyword.isBlank() ? "" : keyword.trim();
         List<Reservation> reservations = reservationRepository.findAll(
-            reservationService.adminReservationSpec(fromAt, toAt, roomId, status, source, normalizedKeyword),
+            reservationService.adminReservationSpec(fromAt, toAt, roomId, status, source, normalizedKeyword, false),
             Sort.by(Sort.Direction.ASC, "startAt")
         );
 

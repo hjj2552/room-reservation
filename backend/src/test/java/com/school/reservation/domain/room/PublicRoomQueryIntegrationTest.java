@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.school.reservation.support.IntegrationTestSupport;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -17,6 +18,9 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     MockMvc mockMvc;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     @Test
     void publicCanGetRoomDetail() throws Exception {
@@ -46,8 +50,29 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.reservations[0].purpose").value("Study"));
     }
 
-    private void createPublicReservation(OffsetDateTime startAt) throws Exception {
-        mockMvc.perform(post("/api/public/reservations")
+    @Test
+    void publicWeeklyReservationsExcludeCancelledReservations() throws Exception {
+        OffsetDateTime startAt = nextWeekdayAt(10, 0);
+        UUID reservationId = createPublicReservation(startAt);
+
+        mockMvc.perform(post("/api/public/reservations/{reservationId}/cancel", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "cancelPassword": "test-password"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+                .param("weekStart", startAt.toLocalDate().toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reservations.length()").value(0));
+    }
+
+    private UUID createPublicReservation(OffsetDateTime startAt) throws Exception {
+        String response = mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
@@ -61,6 +86,11 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
                       "cancelPassword": "test-password"
                     }
                     """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
-            .andExpect(status().isCreated());
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        return UUID.fromString(objectMapper.readTree(response).get("id").asText());
     }
 }
