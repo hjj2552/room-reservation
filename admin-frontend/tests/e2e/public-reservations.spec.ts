@@ -1,6 +1,13 @@
 import { expect, test } from './fixtures';
 import { getSettingsByApi, nextWeekdayReservationLocalInputs, updateSettingsByApi } from './helpers';
 
+function maskName(value: string) {
+  const chars = Array.from(value);
+  if (chars.length === 1) return '*';
+  if (chars.length === 2) return `${chars[0]}*`;
+  return `${chars[0]}*${chars[chars.length - 1]}`;
+}
+
 test('public toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -29,7 +36,7 @@ test('public toolbar request opens the shared panel without slot room context', 
   }
 });
 
-test('public timetable supports slot-based request, detail, and password cancellation', async ({ page, request, e2eData }) => {
+test('public timetable supports slot-based request, masked detail page, and password cancellation', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
     ...originalSettings,
@@ -41,6 +48,7 @@ test('public timetable supports slot-based request, detail, and password cancell
   const applicantName = e2eData.name('public-applicant');
   const purpose = e2eData.name('public-purpose');
   const email = `${e2eData.name('public-email')}@example.test`;
+  const phone = '010-3333-4444';
   const cancelPassword = 'e2e-public-password';
 
   try {
@@ -57,7 +65,7 @@ test('public timetable supports slot-based request, detail, and password cancell
 
     await page.getByTestId('public-request-applicant-name-input').fill(applicantName);
     await page.getByTestId('public-request-email-input').fill(email);
-    await page.getByTestId('public-request-phone-input').fill('010-3333-4444');
+    await page.getByTestId('public-request-phone-input').fill(phone);
     await page.getByTestId('public-request-purpose-input').fill(purpose);
     await page.getByTestId('public-request-cancel-password-input').fill(cancelPassword);
 
@@ -78,8 +86,29 @@ test('public timetable supports slot-based request, detail, and password cancell
     await expect(page.getByText(purpose)).toBeVisible();
     await page.getByText(purpose).click();
 
-    await expect(page.getByRole('dialog', { name: '상세 정보' })).toBeVisible();
-    await expect(page.getByRole('dialog', { name: '상세 정보' })).toContainText('신청 대기');
+    const detailPanel = page.locator('.reservation-detail-main');
+    await expect(page).toHaveURL(new RegExp(`/public/reservations/${created.id}$`));
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
+    await expect(detailPanel.locator('dt')).toHaveCount(6);
+    await expect(detailPanel.locator('.status-badge')).toContainText('승인 대기');
+    await expect(detailPanel).toContainText('예약 정보');
+    await expect(detailPanel).toContainText('신청 목적');
+    await expect(detailPanel).toContainText('강의실');
+    await expect(detailPanel).toContainText('날짜/시간');
+    await expect(detailPanel).toContainText('신청자 이름');
+    await expect(detailPanel).toContainText('이메일');
+    await expect(detailPanel).toContainText('전화번호');
+    await expect(detailPanel).toContainText(purpose);
+    await expect(detailPanel).toContainText(maskName(applicantName));
+    await expect(detailPanel).not.toContainText(applicantName);
+    await expect(detailPanel).not.toContainText(email);
+    await expect(detailPanel).not.toContainText(phone);
+    await expect(detailPanel).not.toContainText('신청 경로');
+    await expect(detailPanel).not.toContainText('반복 예약');
+    await expect(detailPanel).not.toContainText('예약 요약');
+    await expect(page.getByRole('heading', { name: '감사 이력' })).toHaveCount(0);
+
     await page.getByRole('button', { name: '예약 신청 취소' }).click();
     await page.getByTestId('public-cancel-password-input').fill('wrong-password');
     await page.getByTestId('public-cancel-submit-button').click();
@@ -87,7 +116,7 @@ test('public timetable supports slot-based request, detail, and password cancell
 
     await page.getByTestId('public-cancel-password-input').fill(cancelPassword);
     await page.getByTestId('public-cancel-submit-button').click();
-    await expect(page.getByRole('status')).toContainText('예약 신청이 취소되었습니다');
+    await expect(page.getByRole('status')).toContainText('예약 신청을 취소했습니다');
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });

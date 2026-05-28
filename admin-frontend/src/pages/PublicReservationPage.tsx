@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen, X } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ApiError } from '../api/http';
+import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getPublicWeeklyReservations } from '../api/public';
 import type { PublicReservationBlock } from '../api/types';
 import { ReservationDateTimetable, type TimetableReservation } from '../components/ReservationDateTimetable';
@@ -15,14 +15,12 @@ import { TimetablePageHeader, timetableCopy } from '../components/TimetablePageH
 import { ErrorState, LoadingState } from '../components/StateViews';
 import {
   publicReservationKeys,
-  useCancelPublicReservation,
   useCreatePublicReservation,
-  usePublicReservationDetail,
   usePublicRooms,
   usePublicSettings,
   usePublicWeeklyReservations,
 } from '../hooks/usePublicReservation';
-import { formatDateTime, fromDateTimeLocal } from '../utils/date';
+import { fromDateTimeLocal } from '../utils/date';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
@@ -121,24 +119,8 @@ function toTimetableReservation(reservation: PublicReservationBlock): TimetableR
   };
 }
 
-function publicErrorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    if (error.body?.code === 'TIME_SLOT_CONFLICT') {
-      return '이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 강의실이나 시간을 선택해 주세요.';
-    }
-    if (error.body?.code === 'PUBLIC_CANCEL_PASSWORD_MISMATCH') {
-      return '취소 비밀번호가 일치하지 않습니다. 다시 입력해 주세요.';
-    }
-    if (error.body?.code === 'RESERVATION_DISABLED') {
-      return '현재 예약 신청 접수가 중지되어 있습니다.';
-    }
-    if (error.status === 400) return '입력한 정보를 다시 확인해 주세요.';
-    if (error.status === 422) return '운영 시간, 신청 가능 요일, 예약 가능 기간을 확인해 주세요.';
-  }
-  return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
-}
-
 export function PublicReservationPage() {
+  const navigate = useNavigate();
   const rooms = usePublicRooms();
   const settings = usePublicSettings();
   const create = useCreatePublicReservation();
@@ -147,7 +129,6 @@ export function PublicReservationPage() {
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
-  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
 
   const activeRooms = rooms.data || [];
   const roomViewRoomId = activeRooms.some((room) => room.id === selectedRoomId)
@@ -202,7 +183,7 @@ export function PublicReservationPage() {
   }
 
   function handleReservationClick(reservation: TimetableReservation) {
-    setSelectedReservationId(reservation.id);
+    navigate(`/public/reservations/${reservation.id}`);
   }
 
   function handlePublicRequest(values: ReservationRequestValues) {
@@ -407,107 +388,6 @@ export function PublicReservationPage() {
         />
       ) : null}
 
-      {selectedReservationId ? (
-        <PublicReservationDetailModal
-          reservationId={selectedReservationId}
-          onClose={() => setSelectedReservationId(null)}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function PublicReservationDetailModal({ reservationId, onClose }: { reservationId: string; onClose: () => void }) {
-  const detail = usePublicReservationDetail(reservationId);
-  const cancel = useCancelPublicReservation(reservationId);
-  const [cancelPassword, setCancelPassword] = useState('');
-  const [showCancelForm, setShowCancelForm] = useState(false);
-
-  function onCancelSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    cancel.mutate(cancelPassword);
-  }
-
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="public-reservation-detail-title">
-        <div className="modal-header">
-          <div>
-            <p className="eyebrow">예약 신청 상세</p>
-            <h2 id="public-reservation-detail-title">상세 정보</h2>
-          </div>
-          <button type="button" className="ghost-button icon-button" onClick={onClose} aria-label="상세 닫기">
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-
-        {detail.isLoading ? <LoadingState /> : null}
-        {detail.isError ? <ErrorState error={detail.error} /> : null}
-        {detail.data ? (
-          <>
-            <dl className="description-list">
-              <div>
-                <dt>상태</dt>
-                <dd>{publicStatusLabels[detail.data.status]}</dd>
-              </div>
-              <div>
-                <dt>강의실</dt>
-                <dd>{detail.data.room.name}</dd>
-              </div>
-              <div>
-                <dt>시간</dt>
-                <dd>{formatDateTime(detail.data.startAt)} - {formatDateTime(detail.data.endAt)}</dd>
-              </div>
-              <div>
-                <dt>신청자</dt>
-                <dd>{detail.data.applicantName}</dd>
-              </div>
-              <div>
-                <dt>용도</dt>
-                <dd>{detail.data.purpose}</dd>
-              </div>
-              <div>
-                <dt>취소 가능</dt>
-                <dd>{detail.data.cancellable ? '가능' : '불가'}</dd>
-              </div>
-            </dl>
-
-            {detail.data.cancellable ? (
-              <div className="modal-actions">
-                {!showCancelForm ? (
-                  <button type="button" className="danger-button" onClick={() => setShowCancelForm(true)}>
-                    예약 신청 취소
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {showCancelForm ? (
-              <form className="form-stack" onSubmit={onCancelSubmit}>
-                <label>
-                  취소 비밀번호
-                  <input
-                    type="password"
-                    value={cancelPassword}
-                    onChange={(event) => setCancelPassword(event.target.value)}
-                    data-testid="public-cancel-password-input"
-                  />
-                </label>
-                {cancel.isError ? <div className="inline-error" role="alert">{publicErrorMessage(cancel.error)}</div> : null}
-                {cancel.isSuccess ? <div className="success-box" role="status">예약 신청이 취소되었습니다.</div> : null}
-                <div className="button-row">
-                  <button type="button" className="ghost-button" onClick={() => setShowCancelForm(false)}>
-                    돌아가기
-                  </button>
-                  <button type="submit" className="danger-button" disabled={cancel.isPending} data-testid="public-cancel-submit-button">
-                    {cancel.isPending ? '취소 중' : '비밀번호 확인 후 취소'}
-                  </button>
-                </div>
-              </form>
-            ) : null}
-          </>
-        ) : null}
-      </section>
     </div>
   );
 }

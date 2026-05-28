@@ -153,6 +153,9 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/public/reservations/{reservationId}", reservationId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
+            .andExpect(jsonPath("$.applicantName").value("P*r"))
+            .andExpect(jsonPath("$.applicantEmail").value("pu***********@example.com"))
+            .andExpect(jsonPath("$.applicantPhone").value("0100******0"))
             .andExpect(jsonPath("$.cancellable").value(true));
 
         mockMvc.perform(post("/api/public/reservations/{reservationId}/cancel", reservationId)

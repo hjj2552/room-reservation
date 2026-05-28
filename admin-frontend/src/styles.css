@@ -858,6 +858,32 @@ button:disabled {
   align-items: start;
 }
 
+.reservation-detail-main {
+  display: grid;
+  gap: 18px;
+}
+
+.reservation-detail-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.reservation-detail-section {
+  display: grid;
+  gap: 8px;
+}
+
+.reservation-detail-header h2,
+.reservation-detail-section h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.reservation-detail-section .description-list {
+  margin-top: 0;
+}
+
 .description-list {
   display: grid;
   gap: 12px;

@@ -168,6 +168,18 @@ test('admin can request a reservation from the timetable and see it on detail an
     await expect(page).toHaveURL(new RegExp(`/reservations/${createdReservationId}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(purpose);
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
+    await expect(page.locator('.reservation-detail-main dt')).toHaveCount(6);
+    await expect(page.locator('.reservation-detail-main .status-badge')).toBeVisible();
+    await expect(page.locator('.reservation-detail-main')).toContainText('예약 정보');
+    await expect(page.locator('.reservation-detail-main')).toContainText('신청 목적');
+    await expect(page.locator('.reservation-detail-main')).toContainText('신청자 이름');
+    await expect(page.locator('.reservation-detail-main')).not.toContainText('신청 경로');
+    await expect(page.locator('.reservation-detail-main')).not.toContainText('반복 예약');
+    await expect(page.locator('.reservation-detail-main')).not.toContainText('예약 요약');
+    await expect(page.getByRole('heading', { name: '감사 이력' })).toBeVisible();
+    await expect(page.locator('.timeline')).toContainText('관리자 신청');
+    await expect(page.locator('.timeline')).toContainText('/ admin');
+    await expect(page.locator('.timeline')).toContainText('e2e-create-verification');
 
     await page.goto(`/reservations?keyword=${encodeURIComponent(purpose)}`);
     await expect(page.getByTestId('reservations-table')).toContainText(purpose);
