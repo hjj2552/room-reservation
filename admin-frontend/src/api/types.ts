@@ -103,7 +103,7 @@ export interface PublicReservationBlock {
   applicantName: string;
   startAt: string;
   endAt: string;
-  status: Extract<ReservationStatus, 'REQUESTED' | 'CONFIRMED'>;
+  status: ReservationStatus;
   purpose: string;
 }
 

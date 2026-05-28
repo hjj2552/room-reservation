@@ -21,15 +21,16 @@ import {
   usePublicWeeklyReservations,
 } from '../hooks/usePublicReservation';
 import { fromDateTimeLocal } from '../utils/date';
+import { statusLabels } from '../utils/labels';
 import { maskName } from '../utils/privacyMasking';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
 const timetablePageSizeNote = '표시된 신청/예약은 대기 또는 승인 상태입니다.';
 const publicStatusLabels = {
-  REQUESTED: '신청 대기',
-  CONFIRMED: '예약 승인',
-  CANCELLED: '취소됨',
+  REQUESTED: statusLabels.REQUESTED,
+  CONFIRMED: statusLabels.CONFIRMED,
+  CANCELLED: statusLabels.CANCELLED,
 };
 
 function todayInputValue() {
@@ -160,12 +161,13 @@ export function PublicReservationPage() {
     () =>
       dateWeeklyQueries
         .flatMap((query) => query.data?.reservations || [])
+        .filter((reservation) => reservation.status !== 'CANCELLED')
         .filter((reservation) => dateInKst(reservation.startAt) === selectedDate)
         .map(toTimetableReservation),
     [dateWeeklyQueries, selectedDate],
   );
   const roomReservations = useMemo(
-    () => (roomWeekly.data?.reservations || []).map(toTimetableReservation),
+    () => (roomWeekly.data?.reservations || []).filter((reservation) => reservation.status !== 'CANCELLED').map(toTimetableReservation),
     [roomWeekly.data],
   );
 
