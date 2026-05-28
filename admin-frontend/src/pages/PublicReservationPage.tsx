@@ -161,13 +161,12 @@ export function PublicReservationPage() {
     () =>
       dateWeeklyQueries
         .flatMap((query) => query.data?.reservations || [])
-        .filter((reservation) => reservation.status !== 'CANCELLED')
         .filter((reservation) => dateInKst(reservation.startAt) === selectedDate)
         .map(toTimetableReservation),
     [dateWeeklyQueries, selectedDate],
   );
   const roomReservations = useMemo(
-    () => (roomWeekly.data?.reservations || []).filter((reservation) => reservation.status !== 'CANCELLED').map(toTimetableReservation),
+    () => (roomWeekly.data?.reservations || []).map(toTimetableReservation),
     [roomWeekly.data],
   );
 

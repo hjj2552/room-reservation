@@ -210,6 +210,7 @@ export interface ReservationFilters {
   from?: string;
   to?: string;
   keyword?: string;
+  excludeCancelled?: boolean;
   page?: number;
   size?: number;
 }

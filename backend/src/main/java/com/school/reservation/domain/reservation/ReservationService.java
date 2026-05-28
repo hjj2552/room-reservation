@@ -288,10 +288,14 @@ public class ReservationService {
         Reservation.ReservationStatus status,
         Reservation.ReservationSource source,
         String keyword,
+        boolean excludeCancelled,
         Pageable pageable
     ) {
         String normalizedKeyword = keyword == null || keyword.isBlank() ? "" : keyword.trim();
-        return reservationRepository.findAll(adminReservationSpec(fromAt, toAt, roomId, status, source, normalizedKeyword), pageable);
+        return reservationRepository.findAll(
+            adminReservationSpec(fromAt, toAt, roomId, status, source, normalizedKeyword, excludeCancelled),
+            pageable
+        );
     }
 
     public Specification<Reservation> adminReservationSpec(
@@ -300,7 +304,8 @@ public class ReservationService {
         UUID roomId,
         Reservation.ReservationStatus status,
         Reservation.ReservationSource source,
-        String keyword
+        String keyword,
+        boolean excludeCancelled
     ) {
         return (root, query, criteriaBuilder) -> {
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
@@ -319,6 +324,8 @@ public class ReservationService {
             }
             if (status != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), status));
+            } else if (excludeCancelled) {
+                predicates.add(criteriaBuilder.notEqual(root.get("status"), Reservation.ReservationStatus.CANCELLED));
             }
             if (source != null) {
                 predicates.add(criteriaBuilder.equal(root.get("source"), source));
