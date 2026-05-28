@@ -4,7 +4,9 @@ import type { ReservationStatus } from '../api/types';
 import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
-export const TIMETABLE_MINUTE_HEIGHT = 1.35;
+export const TIMETABLE_MINUTE_HEIGHT = 1.6;
+export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
+export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
 const fallbackOpenTime = '09:00';
 const fallbackCloseTime = '18:00';
 const timetableTimeZone = 'Asia/Seoul';
@@ -73,6 +75,15 @@ export function buildSlots(openMinutes: number, closeMinutes: number, slotMinute
   return slots;
 }
 
+export function timetableGridStyle(columnCount: number) {
+  const safeColumnCount = Math.max(columnCount, 1);
+
+  return {
+    gridTemplateColumns: `${TIMETABLE_TIME_COLUMN_WIDTH}px repeat(${safeColumnCount}, minmax(${TIMETABLE_MIN_COLUMN_WIDTH}px, 1fr))`,
+    minWidth: `${TIMETABLE_TIME_COLUMN_WIDTH + safeColumnCount * TIMETABLE_MIN_COLUMN_WIDTH}px`,
+  };
+}
+
 export function clippedBlockPosition(reservation: TimetableReservation, openMinutes: number, closeMinutes: number) {
   const startMinutes = dateTimeToClockMinutes(reservation.startAt);
   const endMinutes = dateTimeToClockMinutes(reservation.endAt);
@@ -135,10 +146,7 @@ export function ReservationDateTimetable({
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>
-        <div
-          className="timetable-grid"
-          style={{ gridTemplateColumns: `76px repeat(${rooms.length}, minmax(164px, 1fr))` }}
-        >
+        <div className="timetable-grid" style={timetableGridStyle(rooms.length)}>
           <div className="timetable-corner">시간</div>
           {rooms.map((room) => (
             <div key={room.id} className="timetable-room-header">

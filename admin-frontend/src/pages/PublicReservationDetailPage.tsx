@@ -57,7 +57,7 @@ export function PublicReservationDetailPage() {
         </div>
       </div>
 
-      <div className="detail-grid">
+      <div className="detail-grid public-detail-grid">
         <ReservationDetailView
           status={reservation.status}
           sections={reservationCoreSections({
@@ -70,7 +70,7 @@ export function PublicReservationDetailPage() {
             purpose: reservation.purpose,
           })}
         />
-        <section className="panel" aria-labelledby="public-actions-title">
+        <section className="panel public-detail-actions" aria-labelledby="public-actions-title">
           <h2 id="public-actions-title">상태 처리</h2>
           {reservation.cancellable && !showCancelForm ? (
             <div className="button-row">
