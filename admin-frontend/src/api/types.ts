@@ -143,6 +143,8 @@ export interface PublicReservationDetail {
     location: string | null;
   };
   applicantName: string;
+  applicantEmail?: string | null;
+  applicantPhone?: string | null;
   purpose: string;
   startAt: string;
   endAt: string;

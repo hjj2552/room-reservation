@@ -4,6 +4,7 @@ import { ProtectedRoute } from './ProtectedRoute';
 import { AuditPage } from '../pages/AuditPage';
 import { EntryChoicePage } from '../pages/EntryChoicePage';
 import { LoginPage } from '../pages/LoginPage';
+import { PublicReservationDetailPage } from '../pages/PublicReservationDetailPage';
 import { PublicReservationPage } from '../pages/PublicReservationPage';
 import { RecurrenceDetailPage } from '../pages/RecurrenceDetailPage';
 import { ReservationDetailPage } from '../pages/ReservationDetailPage';
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
   {
     path: '/public/reservations/new',
     element: <PublicReservationPage />,
+  },
+  {
+    path: '/public/reservations/:reservationId',
+    element: <PublicReservationDetailPage />,
   },
   {
     element: <ProtectedRoute />,

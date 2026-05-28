@@ -2,16 +2,16 @@ import { CalendarDays, Check, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../api/http';
+import { ReservationDetailView, reservationCoreSections } from '../components/ReservationDetailView';
 import { ErrorState, LoadingState } from '../components/StateViews';
-import { StatusBadge } from '../components/StatusBadge';
 import {
+  useDeleteReservation,
   useReservation,
   useReservationAction,
   useReservationHistories,
-  useDeleteReservation,
 } from '../hooks/useReservations';
 import { formatDateTime } from '../utils/date';
-import { historyActionLabel, sourceLabels, statusLabels } from '../utils/labels';
+import { historyActionLabel, statusLabels } from '../utils/labels';
 import { timetableReservationUrl } from '../utils/timetable';
 
 export function ReservationDetailPage() {
@@ -86,42 +86,18 @@ export function ReservationDetailPage() {
       </div>
 
       <div className="detail-grid">
-        <section className="panel" aria-labelledby="basic-info-title">
-          <div className="panel-header">
-            <h2 id="basic-info-title">기본 정보</h2>
-            <StatusBadge status={detail.status} />
-          </div>
-          <dl className="description-list">
-            <div>
-              <dt>강의실</dt>
-              <dd>{detail.room.name} {detail.room.location ? `(${detail.room.location})` : ''}</dd>
-            </div>
-            <div>
-              <dt>예약 시간</dt>
-              <dd>{formatDateTime(detail.startAt)} ~ {formatDateTime(detail.endAt)}</dd>
-            </div>
-            <div>
-              <dt>신청자</dt>
-              <dd>{detail.applicantName}</dd>
-            </div>
-            <div>
-              <dt>연락처</dt>
-              <dd>{detail.applicantEmail} / {detail.applicantPhone || '-'}</dd>
-            </div>
-            <div>
-              <dt>목적</dt>
-              <dd data-testid="reservation-purpose">{detail.purpose}</dd>
-            </div>
-            <div>
-              <dt>신청 경로</dt>
-              <dd>{sourceLabels[detail.source]}</dd>
-            </div>
-            <div>
-              <dt>반복 예약</dt>
-              <dd>{detail.recurrenceId || '-'}</dd>
-            </div>
-          </dl>
-        </section>
+        <ReservationDetailView
+          status={detail.status}
+          sections={reservationCoreSections({
+            room: detail.room,
+            startAt: detail.startAt,
+            endAt: detail.endAt,
+            applicantName: detail.applicantName,
+            applicantEmail: detail.applicantEmail,
+            applicantPhone: detail.applicantPhone,
+            purpose: <span data-testid="reservation-purpose">{detail.purpose}</span>,
+          })}
+        />
 
         <section className="panel" aria-labelledby="actions-title">
           <h2 id="actions-title">상태 처리</h2>
