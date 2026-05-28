@@ -55,6 +55,13 @@ export function cancelReservation(reservationId: string, memo?: string) {
   });
 }
 
+export function deleteReservation(reservationId: string, memo?: string) {
+  return apiRequest<void>(`/api/admin/reservations/${reservationId}`, {
+    method: 'DELETE',
+    body: memo ? { memo } : undefined,
+  });
+}
+
 export async function exportReservationsCsv(filters: ReservationFilters = {}) {
   const response = await fetch(
     `/api/admin/exports/reservations.csv${buildQuery({

@@ -192,6 +192,11 @@ export interface ReservationHistory {
   beforeStatus: ReservationStatus | null;
   afterStatus: ReservationStatus | null;
   memo: string | null;
+  reservationRoomId: string | null;
+  reservationPurpose: string | null;
+  reservationRoomName: string | null;
+  reservationStartAt: string | null;
+  reservationEndAt: string | null;
   actorType: string;
   actorId: string;
   createdAt: string;

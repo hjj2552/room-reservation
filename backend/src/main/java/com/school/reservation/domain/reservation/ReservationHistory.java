@@ -25,6 +25,7 @@ public class ReservationHistory {
         UPDATED,
         APPROVED,
         CANCELLED,
+        DELETED,
         RECURRENCE_GENERATED,
         RECURRENCE_CANCELLED
     }
@@ -33,9 +34,15 @@ public class ReservationHistory {
     @GeneratedValue
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "reservation_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reservation_id")
     private Reservation reservation;
+
+    @Column(name = "reservation_deleted_id")
+    private UUID reservationDeletedId;
+
+    @Column(name = "reservation_room_id")
+    private UUID reservationRoomId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
@@ -53,6 +60,18 @@ public class ReservationHistory {
 
     @Column(columnDefinition = "text")
     private String memo;
+
+    @Column(name = "reservation_purpose", length = 500)
+    private String reservationPurpose;
+
+    @Column(name = "reservation_room_name", length = 100)
+    private String reservationRoomName;
+
+    @Column(name = "reservation_start_at")
+    private OffsetDateTime reservationStartAt;
+
+    @Column(name = "reservation_end_at")
+    private OffsetDateTime reservationEndAt;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
@@ -85,6 +104,49 @@ public class ReservationHistory {
         this.actorType = actorType;
         this.actorId = actorId;
         this.createdAt = OffsetDateTime.now();
+        copyReservationSnapshot(reservation);
+    }
+
+    public static ReservationHistory deleted(
+        UUID reservationId,
+        UUID roomId,
+        String purpose,
+        String roomName,
+        OffsetDateTime startAt,
+        OffsetDateTime endAt,
+        Reservation.ReservationStatus beforeStatus,
+        String memo,
+        Reservation.ActorType actorType,
+        String actorId
+    ) {
+        ReservationHistory history = new ReservationHistory();
+        history.reservation = null;
+        history.reservationDeletedId = reservationId;
+        history.reservationRoomId = roomId;
+        history.action = Action.DELETED;
+        history.beforeStatus = beforeStatus;
+        history.afterStatus = null;
+        history.memo = memo;
+        history.reservationPurpose = purpose;
+        history.reservationRoomName = roomName;
+        history.reservationStartAt = startAt;
+        history.reservationEndAt = endAt;
+        history.actorType = actorType;
+        history.actorId = actorId;
+        history.createdAt = OffsetDateTime.now();
+        return history;
+    }
+
+    private void copyReservationSnapshot(Reservation reservation) {
+        if (reservation == null) {
+            return;
+        }
+        this.reservationDeletedId = reservation.getId();
+        this.reservationRoomId = reservation.getRoom() == null ? null : reservation.getRoom().getId();
+        this.reservationPurpose = reservation.getPurpose();
+        this.reservationRoomName = reservation.getDisplayRoomName();
+        this.reservationStartAt = reservation.getStartAt();
+        this.reservationEndAt = reservation.getEndAt();
     }
 
     public UUID getId() {
@@ -93,6 +155,14 @@ public class ReservationHistory {
 
     public Reservation getReservation() {
         return reservation;
+    }
+
+    public UUID getReservationIdForDisplay() {
+        return reservation != null ? reservation.getId() : reservationDeletedId;
+    }
+
+    public UUID getReservationRoomId() {
+        return reservationRoomId;
     }
 
     public Action getAction() {
@@ -109,6 +179,22 @@ public class ReservationHistory {
 
     public String getMemo() {
         return memo;
+    }
+
+    public String getReservationPurpose() {
+        return reservationPurpose;
+    }
+
+    public String getReservationRoomName() {
+        return reservationRoomName;
+    }
+
+    public OffsetDateTime getReservationStartAt() {
+        return reservationStartAt;
+    }
+
+    public OffsetDateTime getReservationEndAt() {
+        return reservationEndAt;
     }
 
     public Reservation.ActorType getActorType() {

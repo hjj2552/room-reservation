@@ -91,6 +91,36 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
+test('deleted reservation detail shows domain guidance from audit link', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('reservation-delete-room');
+  const reservation = await e2eData.createTestReservation(room.id, 'reservation-delete-seed');
+
+  try {
+    page.once('dialog', async (dialog) => {
+      expect(dialog.message()).toContain('예약을 영구 삭제합니다');
+      await dialog.accept();
+    });
+
+    await page.goto(`/reservations/${reservation.id}`);
+    await page.getByTestId('reservation-delete-button').click();
+
+    await expect(page).toHaveURL(new RegExp(`/audit\\?reservationId=${reservation.id}&action=DELETED`));
+    await expect(page.getByTestId('audit-table')).toContainText(reservation.purpose || '');
+    await expect(page.getByTestId('audit-table')).toContainText('삭제');
+
+    await page.getByTestId('audit-table').locator(`a[href="/reservations/${reservation.id}"]`).first().click();
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+    await expect(page.getByRole('heading', { name: '삭제된 예약입니다' })).toBeVisible();
+    await expect(page.getByText('이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다')).toBeVisible();
+
+    await page.getByRole('link', { name: '예약 목록으로 돌아가기' }).click();
+    await expect(page).toHaveURL(/\/reservations$/);
+  } finally {
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
 test('admin can request a reservation from the timetable and see it on detail and list pages', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-create-room');

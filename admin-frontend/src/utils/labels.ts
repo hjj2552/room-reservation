@@ -39,6 +39,7 @@ export function historyActionLabel(action: string) {
     UPDATED: '수정',
     APPROVED: '승인',
     CANCELLED: '취소',
+    DELETED: '삭제',
     RECURRENCE_CANCELLED: '반복 예약 취소',
   };
   return labels[action] || action;

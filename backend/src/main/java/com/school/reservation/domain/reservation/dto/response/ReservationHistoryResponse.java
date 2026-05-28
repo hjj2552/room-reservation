@@ -12,6 +12,11 @@ public record ReservationHistoryResponse(
     Reservation.ReservationStatus beforeStatus,
     Reservation.ReservationStatus afterStatus,
     String memo,
+    UUID reservationRoomId,
+    String reservationPurpose,
+    String reservationRoomName,
+    OffsetDateTime reservationStartAt,
+    OffsetDateTime reservationEndAt,
     Reservation.ActorType actorType,
     String actorId,
     OffsetDateTime createdAt
@@ -19,15 +24,19 @@ public record ReservationHistoryResponse(
     public static ReservationHistoryResponse from(ReservationHistory history) {
         return new ReservationHistoryResponse(
             history.getId(),
-            history.getReservation().getId(),
+            history.getReservationIdForDisplay(),
             history.getAction(),
             history.getBeforeStatus(),
             history.getAfterStatus(),
             history.getMemo(),
+            history.getReservationRoomId(),
+            history.getReservationPurpose(),
+            history.getReservationRoomName(),
+            history.getReservationStartAt(),
+            history.getReservationEndAt(),
             history.getActorType(),
             history.getActorId(),
             history.getCreatedAt()
         );
     }
 }
-

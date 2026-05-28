@@ -1,13 +1,14 @@
-import { CalendarDays, Check, PenLine, X } from 'lucide-react';
+import { CalendarDays, Check, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { errorMessage } from '../api/http';
+import { ApiError, errorMessage } from '../api/http';
 import { ErrorState, LoadingState } from '../components/StateViews';
 import { StatusBadge } from '../components/StatusBadge';
 import {
   useReservation,
   useReservationAction,
   useReservationHistories,
+  useDeleteReservation,
 } from '../hooks/useReservations';
 import { formatDateTime } from '../utils/date';
 import { historyActionLabel, sourceLabels, statusLabels } from '../utils/labels';
@@ -20,6 +21,7 @@ export function ReservationDetailPage() {
   const histories = useReservationHistories(reservationId);
   const approve = useReservationAction(reservationId, 'approve');
   const cancel = useReservationAction(reservationId, 'cancel');
+  const deleteReservation = useDeleteReservation(reservationId);
   const [memo, setMemo] = useState('');
 
   function performAction(action: 'approve' | 'cancel') {
@@ -29,7 +31,23 @@ export function ReservationDetailPage() {
     });
   }
 
+  function performDelete() {
+    const confirmed = window.confirm(
+      '예약을 영구 삭제합니다. 삭제 후 예약 상세 정보는 볼 수 없고, 감사 로그에는 삭제 기록이 남습니다.',
+    );
+    if (!confirmed) return;
+
+    deleteReservation.mutate(memo || undefined, {
+      onSuccess: () => {
+        navigate(`/audit?reservationId=${reservationId}&action=DELETED`);
+      },
+    });
+  }
+
   if (reservation.isLoading) return <LoadingState />;
+  if (reservation.isError && isReservationNotFound(reservation.error)) {
+    return <DeletedReservationState reservationId={reservationId} />;
+  }
   if (reservation.isError) return <ErrorState error={reservation.error} />;
   if (!reservation.data) return null;
 
@@ -141,9 +159,20 @@ export function ReservationDetailPage() {
                 <X size={16} aria-hidden="true" />
                 취소
               </button>
+              <button
+                type="button"
+                className="danger-button"
+                disabled={deleteReservation.isPending}
+                onClick={performDelete}
+                data-testid="reservation-delete-button"
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                예약 삭제
+              </button>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
             {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
+            {deleteReservation.isError ? <div className="inline-error" role="alert">{errorMessage(deleteReservation.error)}</div> : null}
           </form>
         </section>
       </div>
@@ -168,6 +197,35 @@ export function ReservationDetailPage() {
           </ol>
         ) : null}
       </section>
+    </section>
+  );
+}
+
+function isReservationNotFound(error: unknown) {
+  return error instanceof ApiError && error.status === 404;
+}
+
+function DeletedReservationState({ reservationId }: { reservationId: string }) {
+  const navigate = useNavigate();
+
+  return (
+    <section className="page-section narrow" aria-labelledby="deleted-reservation-title">
+      <div className="state-box error">
+        <p className="eyebrow">예약 상세</p>
+        <h1 id="deleted-reservation-title">삭제된 예약입니다</h1>
+        <p>이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다. 감사 로그에서 삭제 기록은 계속 확인할 수 있습니다.</p>
+        <div className="button-row">
+          <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
+            이전 페이지로 돌아가기
+          </button>
+          <Link className="secondary-button" to="/reservations">
+            예약 목록으로 돌아가기
+          </Link>
+          <Link className="secondary-button" to={`/audit?reservationId=${reservationId}`}>
+            감사 로그로 이동
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }

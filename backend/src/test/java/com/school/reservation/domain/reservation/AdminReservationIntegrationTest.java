@@ -1,9 +1,11 @@
 package com.school.reservation.domain.reservation;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,6 +56,49 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void adminCanHardDeleteReservationAndKeepAuditHistory() throws Exception {
+        UUID reservationId = createPublicReservation();
+        MockHttpSession session = loginAsAdmin();
+
+        mockMvc.perform(delete("/api/admin/reservations/{reservationId}", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memo": "deleted in test"
+                    }
+                    """))
+            .andExpect(status().isNoContent());
+
+        Integer reservationCount = jdbcTemplate.queryForObject(
+            "select count(*) from reservations where id = ?",
+            Integer.class,
+            reservationId
+        );
+        assertThat(reservationCount).isZero();
+
+        mockMvc.perform(get("/api/admin/reservations/{reservationId}", reservationId).session(session))
+            .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/admin/audit/reservation-histories")
+                .session(session)
+                .param("reservationId", reservationId.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].reservationId").value(reservationId.toString()))
+            .andExpect(jsonPath("$.items[0].action").value("DELETED"))
+            .andExpect(jsonPath("$.items[0].memo").value("deleted in test"))
+            .andExpect(jsonPath("$.items[0].reservationPurpose").value("Study"))
+            .andExpect(jsonPath("$.items[0].reservationRoomName").value("Room 101"));
+
+        Integer detachedHistoryCount = jdbcTemplate.queryForObject(
+            "select count(*) from reservation_histories where reservation_deleted_id = ? and reservation_id is null",
+            Integer.class,
+            reservationId
+        );
+        assertThat(detachedHistoryCount).isEqualTo(2);
     }
 
     private UUID createPublicReservation() throws Exception {

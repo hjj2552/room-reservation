@@ -16,6 +16,7 @@ const actions = [
   'UPDATED',
   'APPROVED',
   'CANCELLED',
+  'DELETED',
   'RECURRENCE_CANCELLED',
 ];
 
@@ -165,6 +166,13 @@ export function AuditPage() {
                       <Link className="text-link" to={`/reservations/${history.reservationId}`}>
                         상세 보기
                       </Link>
+                      {history.reservationPurpose || history.reservationRoomName ? (
+                        <span className="muted">
+                          <br />
+                          {history.reservationPurpose || '삭제된 예약'}
+                          {history.reservationRoomName ? ` / ${history.reservationRoomName}` : ''}
+                        </span>
+                      ) : null}
                     </td>
                     <td>{history.memo || '-'}</td>
                   </tr>

@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.criteria.JoinType;
 
 @Service
 public class AuditQueryService {
@@ -20,7 +21,7 @@ public class AuditQueryService {
 
     @Transactional(readOnly = true)
     public List<ReservationHistory> getReservationHistories(UUID reservationId) {
-        return reservationHistoryRepository.findByReservationIdOrderByCreatedAtDesc(reservationId);
+        return reservationHistoryRepository.findByReservationIdIncludingDeletedOrderByCreatedAtDesc(reservationId);
     }
 
     @Transactional(readOnly = true)
@@ -52,13 +53,19 @@ public class AuditQueryService {
     ) {
         return (root, query, criteriaBuilder) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
-            var reservation = root.join("reservation");
+            var reservation = root.join("reservation", JoinType.LEFT);
 
             if (reservationId != null) {
-                predicates.add(criteriaBuilder.equal(reservation.get("id"), reservationId));
+                predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.equal(reservation.get("id"), reservationId),
+                    criteriaBuilder.equal(root.get("reservationDeletedId"), reservationId)
+                ));
             }
             if (roomId != null) {
-                predicates.add(criteriaBuilder.equal(reservation.get("room").get("id"), roomId));
+                predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.equal(reservation.get("room").get("id"), roomId),
+                    criteriaBuilder.equal(root.get("reservationRoomId"), roomId)
+                ));
             }
             if (action != null) {
                 predicates.add(criteriaBuilder.equal(root.get("action"), action));
