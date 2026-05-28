@@ -3,6 +3,7 @@ import {
   createReservationByApi,
   createRecurrenceByApi,
   createRoomByApi,
+  deleteReservationByApi,
   uniqueE2eName,
   type E2eRecurrence,
   type E2eReservation,
@@ -99,10 +100,18 @@ async function cleanupRegisteredResources(request: APIRequestContext, registry: 
     await postIgnoringFailures(request, `/api/admin/recurrences/${recurrenceId}/cancel`, { memo: 'e2e-fixture-cleanup' });
   }
   for (const reservationId of [...registry.reservations].reverse()) {
-    await postIgnoringFailures(request, `/api/admin/reservations/${reservationId}/cancel`, { memo: 'e2e-fixture-cleanup' });
+    await deleteReservationIgnoringFailures(request, reservationId);
   }
   for (const roomId of [...registry.rooms].reverse()) {
     await deleteIgnoringFailures(request, `/api/admin/rooms/${roomId}`);
+  }
+}
+
+async function deleteReservationIgnoringFailures(request: APIRequestContext, reservationId: string) {
+  try {
+    await deleteReservationByApi(request, reservationId, 'e2e-fixture-cleanup');
+  } catch {
+    // Prefix cleanup runs next and handles any resources that are still present.
   }
 }
 

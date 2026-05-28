@@ -114,6 +114,13 @@ export async function cancelReservationByApi(request: APIRequestContext, reserva
   expect([200, 404, 409]).toContain(response.status());
 }
 
+export async function deleteReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
+  const response = await request.delete(`/api/admin/reservations/${reservationId}`, {
+    data: memo ? { memo } : undefined,
+  });
+  expect([204, 404]).toContain(response.status());
+}
+
 export async function cancelRecurrenceByApi(request: APIRequestContext, recurrenceId: string, memo?: string) {
   const response = await request.post(`/api/admin/recurrences/${recurrenceId}/cancel`, {
     data: memo ? { memo } : undefined,

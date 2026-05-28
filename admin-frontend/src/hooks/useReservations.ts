@@ -3,6 +3,7 @@ import {
   approveReservation,
   cancelReservation,
   createReservation,
+  deleteReservation,
   getReservation,
   getReservationHistories,
   listReservations,
@@ -72,6 +73,19 @@ export function useReservationAction(id: string, action: 'approve' | 'cancel') {
       queryClient.invalidateQueries({ queryKey: reservationKeys.all });
       queryClient.invalidateQueries({ queryKey: reservationKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: reservationKeys.histories(id) });
+    },
+  });
+}
+
+export function useDeleteReservation(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (memo?: string) => deleteReservation(id, memo),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reservationKeys.all });
+      queryClient.invalidateQueries({ queryKey: reservationKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: reservationKeys.histories(id) });
+      queryClient.invalidateQueries({ queryKey: ['audit'] });
     },
   });
 }

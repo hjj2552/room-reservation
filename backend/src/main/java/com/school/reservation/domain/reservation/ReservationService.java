@@ -239,6 +239,41 @@ public class ReservationService {
         return reservation;
     }
 
+    @Transactional
+    public void deleteReservation(UUID reservationId, String adminId, String memo) {
+        Reservation reservation = getReservationOrThrow(reservationId);
+        UUID deletedReservationId = reservation.getId();
+        UUID roomId = reservation.getRoom().getId();
+        String purpose = reservation.getPurpose();
+        String roomName = reservation.getDisplayRoomName();
+        OffsetDateTime startAt = reservation.getStartAt();
+        OffsetDateTime endAt = reservation.getEndAt();
+        Reservation.ReservationStatus beforeStatus = reservation.getStatus();
+
+        historyRepository.detachReservationReferencesForDelete(
+            deletedReservationId,
+            roomId,
+            purpose,
+            roomName,
+            startAt,
+            endAt
+        );
+        historyRepository.save(ReservationHistory.deleted(
+            deletedReservationId,
+            roomId,
+            purpose,
+            roomName,
+            startAt,
+            endAt,
+            beforeStatus,
+            memo,
+            Reservation.ActorType.ADMIN,
+            adminId
+        ));
+        reservationRepository.delete(reservation);
+        reservationRepository.flush();
+    }
+
     @Transactional(readOnly = true)
     public Reservation getReservationOrThrow(UUID reservationId) {
         return reservationRepository.findDetailById(reservationId)

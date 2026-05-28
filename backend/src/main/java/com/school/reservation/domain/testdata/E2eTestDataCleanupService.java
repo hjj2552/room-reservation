@@ -38,7 +38,7 @@ public class E2eTestDataCleanupService {
                 normalizedPrefix,
                 true,
                 includeLegacy,
-                countHistories(reservationIds),
+                countHistories(patterns, reservationIds),
                 reservationIds.size(),
                 recurrenceIds.size(),
                 roomCount,
@@ -46,10 +46,7 @@ public class E2eTestDataCleanupService {
             );
         }
 
-        int historyCount = deleteByIds(
-            "delete from reservation_histories where reservation_id in (:ids)",
-            reservationIds
-        );
+        int historyCount = deleteHistories(patterns, reservationIds);
         int reservationCount = deleteByIds(
             "delete from reservations where id in (:ids)",
             reservationIds
@@ -150,16 +147,24 @@ public class E2eTestDataCleanupService {
         );
     }
 
-    private int countHistories(List<UUID> reservationIds) {
-        if (reservationIds.isEmpty()) {
-            return 0;
-        }
+    private int countHistories(MatchPatterns patterns, List<UUID> reservationIds) {
+        MapSqlParameterSource params = params(patterns)
+            .addValue("ids", reservationIds);
         Integer count = jdbcTemplate.queryForObject(
-            "select count(*) from reservation_histories where reservation_id in (:ids)",
-            Map.of("ids", reservationIds),
+            "select count(*) from reservation_histories where " + historyMatchExpression(patterns, reservationIds),
+            params,
             Integer.class
         );
         return count == null ? 0 : count;
+    }
+
+    private int deleteHistories(MatchPatterns patterns, List<UUID> reservationIds) {
+        MapSqlParameterSource params = params(patterns)
+            .addValue("ids", reservationIds);
+        return jdbcTemplate.update(
+            "delete from reservation_histories where " + historyMatchExpression(patterns, reservationIds),
+            params
+        );
     }
 
     private int deleteByIds(String sql, List<UUID> ids) {
@@ -240,6 +245,15 @@ public class E2eTestDataCleanupService {
         String expression = "lower(" + column + ") like :prefix";
         if (patterns.legacyPrefixPattern() != null) {
             expression += " or lower(" + column + ") like :legacyPrefix";
+        }
+        return "(" + expression + ")";
+    }
+
+    private String historyMatchExpression(MatchPatterns patterns, List<UUID> reservationIds) {
+        String expression = matchExpression(patterns, "reservation_purpose")
+            + " or " + matchExpression(patterns, "reservation_room_name");
+        if (!reservationIds.isEmpty()) {
+            expression = "reservation_id in (:ids) or reservation_deleted_id in (:ids) or " + expression;
         }
         return "(" + expression + ")";
     }

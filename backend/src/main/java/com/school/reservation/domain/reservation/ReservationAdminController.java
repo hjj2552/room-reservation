@@ -16,6 +16,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -111,6 +112,17 @@ public class ReservationAdminController {
         String memo = request == null ? null : request.memo();
         Reservation reservation = reservationService.cancel(reservationId, authentication.getName(), memo);
         return ResponseEntity.ok(AdminReservationListItemResponse.from(reservation));
+    }
+
+    @DeleteMapping("/{reservationId}")
+    public ResponseEntity<Void> delete(
+        @PathVariable UUID reservationId,
+        @Valid @RequestBody(required = false) ReservationActionRequest request,
+        Authentication authentication
+    ) {
+        String memo = request == null ? null : request.memo();
+        reservationService.deleteReservation(reservationId, authentication.getName(), memo);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{reservationId}/histories")
