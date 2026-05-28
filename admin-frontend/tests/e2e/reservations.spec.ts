@@ -139,6 +139,7 @@ test('admin can request a reservation from the timetable and see it on detail an
     await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
     await page.getByTestId('quick-add-email-input').fill(`e2e-reservation-${Date.now()}@example.test`);
+    await expect(page.getByTestId('quick-add-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
     await page.getByTestId('quick-add-phone-input').fill('010-1111-2222');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
     await page.getByTestId('quick-add-start-input').fill(reservationTime.startAt);

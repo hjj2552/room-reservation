@@ -164,6 +164,14 @@ export function TimetablePage() {
   const roomTimetableReservations = useReservations(roomTimetableFilters, {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
+  const visibleDateTimetableReservations = useMemo(
+    () => (dateTimetableReservations.data?.items || []).filter((reservation) => reservation.status !== 'CANCELLED'),
+    [dateTimetableReservations.data?.items],
+  );
+  const visibleRoomTimetableReservations = useMemo(
+    () => (roomTimetableReservations.data?.items || []).filter((reservation) => reservation.status !== 'CANCELLED'),
+    [roomTimetableReservations.data?.items],
+  );
 
   useEffect(() => {
     if (!highlightedReservationId) return;
@@ -310,7 +318,7 @@ export function TimetablePage() {
           {rooms.data && settings.data && dateTimetableReservations.data ? (
             <ReservationDateTimetable
               rooms={dateTimetableRooms}
-              reservations={dateTimetableReservations.data.items}
+              reservations={visibleDateTimetableReservations}
               selectedDate={selectedDate}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
@@ -389,7 +397,7 @@ export function TimetablePage() {
           {settings.data && selectedRoomViewRoom && roomTimetableReservations.data ? (
             <ReservationRoomTimetable
               room={selectedRoomViewRoom}
-              reservations={roomTimetableReservations.data.items}
+              reservations={visibleRoomTimetableReservations}
               weekStart={selectedWeekStart}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}

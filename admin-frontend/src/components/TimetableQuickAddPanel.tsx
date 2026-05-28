@@ -297,6 +297,7 @@ export function ReservationRequestPanel({
           <input
             data-testid={ids.phone}
             value={values.applicantPhone}
+            placeholder="- 제외하고 입력"
             onChange={(event) => updateField('applicantPhone', event.target.value)}
             {...inputErrorProps('applicantPhone')}
           />
@@ -320,6 +321,7 @@ export function ReservationRequestPanel({
               type="password"
               data-testid="public-request-cancel-password-input"
               value={values.cancelPassword}
+              placeholder="4자리 이상"
               onChange={(event) => updateField('cancelPassword', event.target.value)}
               {...inputErrorProps('cancelPassword')}
             />

@@ -43,6 +43,8 @@ test('public toolbar request opens the shared panel without slot room context', 
     await expect(page.getByTestId('public-request-end-input')).not.toHaveValue('');
     await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue('');
     await expect(page.getByTestId('public-request-email-input')).toHaveValue('');
+    await expect(page.getByTestId('public-request-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveAttribute('placeholder', '4자리 이상');
     await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('');
   } finally {
     const latestSettings = await getSettingsByApi(request);
@@ -136,6 +138,12 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await page.getByTestId('public-cancel-password-input').fill(cancelPassword);
     await page.getByTestId('public-cancel-submit-button').click();
     await expect(page.getByRole('status')).toContainText('예약 신청을 취소했습니다');
+
+    await page.goto('/public/reservations/new');
+    await page.getByTestId('public-timetable-view-room').click();
+    await page.getByTestId('public-timetable-room-select').selectOption(room.id);
+    await page.getByTestId('public-timetable-week-input').fill(reservationTime.date);
+    await expect(page.getByText(purpose)).toHaveCount(0);
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });

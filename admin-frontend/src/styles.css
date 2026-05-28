@@ -449,10 +449,11 @@ button:disabled {
   background: currentColor;
 }
 
-.status-pending {
+.status-pending,
+.status-requested {
   color: #8a4b00;
-  background: #fff6df;
-  border-color: #f5d48a;
+  background: #fff9ea;
+  border-color: #f1c56a;
 }
 
 .status-confirmed {
