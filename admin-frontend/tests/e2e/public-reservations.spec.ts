@@ -8,6 +8,20 @@ function maskName(value: string) {
   return `${chars[0]}*${chars[chars.length - 1]}`;
 }
 
+function maskEmail(value: string) {
+  const [localPart, domain] = value.split('@');
+  if (!domain) return maskName(value);
+  if (localPart.length === 1) return `*@${domain}`;
+  return `${localPart.slice(0, 2)}${'*'.repeat(Math.max(1, localPart.length - 2))}@${domain}`;
+}
+
+function maskPhone(value: string) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length <= 1) return '*';
+  if (digits.length <= 5) return `${digits[0]}${'*'.repeat(Math.max(1, digits.length - 2))}${digits.at(-1)}`;
+  return `${digits.slice(0, 4)}${'*'.repeat(digits.length - 5)}${digits.at(-1)}`;
+}
+
 test('public toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -84,6 +98,9 @@ test('public timetable supports slot-based request, masked detail page, and pass
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
     await expect(page.getByText(purpose)).toBeVisible();
+    const timetableBlock = page.locator('.reservation-block').filter({ hasText: purpose });
+    await expect(timetableBlock).toContainText(maskName(applicantName));
+    await expect(timetableBlock).not.toContainText(applicantName);
     await page.getByText(purpose).click();
 
     const detailPanel = page.locator('.reservation-detail-main');
@@ -101,6 +118,8 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(detailPanel).toContainText('전화번호');
     await expect(detailPanel).toContainText(purpose);
     await expect(detailPanel).toContainText(maskName(applicantName));
+    await expect(detailPanel).toContainText(maskEmail(email));
+    await expect(detailPanel).toContainText(maskPhone(phone));
     await expect(detailPanel).not.toContainText(applicantName);
     await expect(detailPanel).not.toContainText(email);
     await expect(detailPanel).not.toContainText(phone);
