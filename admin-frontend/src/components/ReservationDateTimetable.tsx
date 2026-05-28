@@ -195,14 +195,15 @@ export function ReservationDateTimetable({
               {(reservationsByRoom.get(room.id) || []).map((reservation) => {
                 const position = clippedBlockPosition(reservation, openMinutes, closeMinutes);
                 if (!position.visible) return null;
+                const blockClassName = `reservation-block reservation-block-${reservation.status.toLowerCase()}${
+                  position.height < 52 ? ' reservation-block-compact' : ''
+                }${reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''}`;
 
                 return (
                   <button
                     key={reservation.id}
                     type="button"
-                    className={`reservation-block reservation-block-${reservation.status.toLowerCase()}${
-                      reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''
-                    }`}
+                    className={blockClassName}
                     style={{ top: position.top, height: position.height }}
                     onClick={() =>
                       onReservationClick ? onReservationClick(reservation) : navigate(`/reservations/${reservation.id}`)
@@ -212,10 +213,12 @@ export function ReservationDateTimetable({
                   >
                     <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
                     <span className="reservation-block-meta">
-                      {position.startLabel}-{position.endLabel}
+                      <span>
+                        {position.startLabel}-{position.endLabel}
+                      </span>
+                      <span>{reservation.applicantName}</span>
                     </span>
                     <span className="reservation-block-footer">
-                      <span>{reservation.applicantName}</span>
                       <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                     </span>
                   </button>

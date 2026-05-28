@@ -660,12 +660,12 @@ button:disabled {
   z-index: 1;
   display: grid;
   align-content: start;
-  gap: 3px;
+  gap: 2px;
   overflow: hidden;
   border: 1px solid #b8c5d2;
   border-left-width: 4px;
   border-radius: 6px;
-  padding: 6px 7px;
+  padding: 5px 7px;
   background: #f8fbfd;
   color: #17202a;
   cursor: pointer;
@@ -706,29 +706,37 @@ button:disabled {
   overflow: hidden;
   font-size: 13px;
   font-weight: 800;
+  line-height: 1.28;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .reservation-block-meta {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
   color: #475466;
   font-size: 12px;
   font-weight: 700;
+  line-height: 1.28;
+  white-space: nowrap;
+}
+
+.reservation-block-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reservation-block-meta span:first-child {
+  flex: 0 0 auto;
 }
 
 .reservation-block-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
   overflow: hidden;
   font-size: 12px;
-}
-
-.reservation-block-footer > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .reservation-block .status-badge {
@@ -739,6 +747,26 @@ button:disabled {
 .reservation-block .status-dot {
   width: 6px;
   height: 6px;
+}
+
+.reservation-block-compact {
+  align-content: center;
+  gap: 1px;
+  padding: 3px 6px;
+}
+
+.reservation-block-compact .reservation-block-title {
+  font-size: 12px;
+  line-height: 1.28;
+}
+
+.reservation-block-compact .reservation-block-meta {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.reservation-block-compact .reservation-block-footer {
+  display: none;
 }
 
 .quick-add-panel {
@@ -800,7 +828,9 @@ button:disabled {
 
 .compact-request-form input,
 .compact-request-form select {
+  min-height: 38px;
   padding: 8px 9px;
+  line-height: 20px;
 }
 
 .reservation-request-panel input:focus-visible,
@@ -969,8 +999,11 @@ button:disabled {
 }
 
 .field-error {
+  display: block;
+  min-height: 16px;
   color: #b42318;
   font-size: 13px;
+  line-height: 1.2;
 }
 
 .result-summary {

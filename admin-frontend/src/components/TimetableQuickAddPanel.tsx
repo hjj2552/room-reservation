@@ -149,6 +149,26 @@ export function ReservationRequestPanel({
     onSubmit(values);
   }
 
+  function errorId(name: keyof ReservationRequestValues) {
+    return `${ids.panel}-${name}-error`;
+  }
+
+  function inputErrorProps(name: keyof ReservationRequestValues) {
+    const hasError = Boolean(errors[name]);
+    return {
+      'aria-invalid': hasError || undefined,
+      'aria-describedby': errorId(name),
+    };
+  }
+
+  function fieldError(name: keyof ReservationRequestValues) {
+    return (
+      <span id={errorId(name)} className="field-error" role={errors[name] ? 'alert' : undefined}>
+        {errors[name] || ''}
+      </span>
+    );
+  }
+
   return (
     <aside
       className="quick-add-panel reservation-request-panel"
@@ -184,12 +204,18 @@ export function ReservationRequestPanel({
             value={values.purpose}
             placeholder="예: 세미나, 보강, 회의"
             onChange={(event) => updateField('purpose', event.target.value)}
+            {...inputErrorProps('purpose')}
           />
-          {errors.purpose ? <span className="field-error">{errors.purpose}</span> : null}
+          {fieldError('purpose')}
         </label>
         <label>
           강의실
-          <select data-testid={ids.room} value={values.roomId} onChange={(event) => updateField('roomId', event.target.value)}>
+          <select
+            data-testid={ids.room}
+            value={values.roomId}
+            onChange={(event) => updateField('roomId', event.target.value)}
+            {...inputErrorProps('roomId')}
+          >
             <option value="">선택</option>
             {rooms.map((room) => (
               <option key={room.id} value={room.id}>
@@ -197,7 +223,7 @@ export function ReservationRequestPanel({
               </option>
             ))}
           </select>
-          {errors.roomId ? <span className="field-error">{errors.roomId}</span> : null}
+          {fieldError('roomId')}
         </label>
         {isAdmin ? (
           <label>
@@ -206,6 +232,7 @@ export function ReservationRequestPanel({
               data-testid={ids.status}
               value={values.status}
               onChange={(event) => updateField('status', event.target.value as ReservationStatus)}
+              {...inputErrorProps('status')}
             >
               {(['CONFIRMED', 'REQUESTED'] as ReservationStatus[]).map((value) => (
                 <option key={value} value={value}>
@@ -213,11 +240,13 @@ export function ReservationRequestPanel({
                 </option>
               ))}
             </select>
+            {fieldError('status')}
           </label>
         ) : (
           <label>
             접수 상태
-            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} />
+            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} {...inputErrorProps('status')} />
+            {fieldError('status')}
           </label>
         )}
         <label>
@@ -227,8 +256,9 @@ export function ReservationRequestPanel({
             type="datetime-local"
             value={values.startAt}
             onChange={(event) => updateField('startAt', event.target.value)}
+            {...inputErrorProps('startAt')}
           />
-          {errors.startAt ? <span className="field-error">{errors.startAt}</span> : null}
+          {fieldError('startAt')}
         </label>
         <label>
           종료
@@ -237,8 +267,9 @@ export function ReservationRequestPanel({
             type="datetime-local"
             value={values.endAt}
             onChange={(event) => updateField('endAt', event.target.value)}
+            {...inputErrorProps('endAt')}
           />
-          {errors.endAt ? <span className="field-error">{errors.endAt}</span> : null}
+          {fieldError('endAt')}
         </label>
         <label>
           신청자
@@ -246,8 +277,9 @@ export function ReservationRequestPanel({
             data-testid={ids.applicantName}
             value={values.applicantName}
             onChange={(event) => updateField('applicantName', event.target.value)}
+            {...inputErrorProps('applicantName')}
           />
-          {errors.applicantName ? <span className="field-error">{errors.applicantName}</span> : null}
+          {fieldError('applicantName')}
         </label>
         <label>
           이메일
@@ -256,18 +288,30 @@ export function ReservationRequestPanel({
             type="email"
             value={values.applicantEmail}
             onChange={(event) => updateField('applicantEmail', event.target.value)}
+            {...inputErrorProps('applicantEmail')}
           />
-          {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail}</span> : null}
+          {fieldError('applicantEmail')}
         </label>
         <label>
           전화번호{requirePhone ? '' : ' (선택)'}
-          <input data-testid={ids.phone} value={values.applicantPhone} onChange={(event) => updateField('applicantPhone', event.target.value)} />
-          {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone}</span> : null}
+          <input
+            data-testid={ids.phone}
+            value={values.applicantPhone}
+            onChange={(event) => updateField('applicantPhone', event.target.value)}
+            {...inputErrorProps('applicantPhone')}
+          />
+          {fieldError('applicantPhone')}
         </label>
         {isAdmin ? (
           <label>
             처리 메모
-            <input data-testid={ids.memo} value={values.memo} onChange={(event) => updateField('memo', event.target.value)} />
+            <input
+              data-testid={ids.memo}
+              value={values.memo}
+              onChange={(event) => updateField('memo', event.target.value)}
+              {...inputErrorProps('memo')}
+            />
+            {fieldError('memo')}
           </label>
         ) : (
           <label>
@@ -277,8 +321,9 @@ export function ReservationRequestPanel({
               data-testid="public-request-cancel-password-input"
               value={values.cancelPassword}
               onChange={(event) => updateField('cancelPassword', event.target.value)}
+              {...inputErrorProps('cancelPassword')}
             />
-            {errors.cancelPassword ? <span className="field-error">{errors.cancelPassword}</span> : null}
+            {fieldError('cancelPassword')}
           </label>
         )}
         {submitError ? <div className="inline-error full-span" role="alert">{errorMessage(submitError)}</div> : null}
