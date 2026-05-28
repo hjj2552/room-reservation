@@ -519,7 +519,7 @@ button:disabled {
 .timetable-scroll {
   overflow: auto;
   max-height: calc(100vh - 320px);
-  min-height: 460px;
+  min-height: 520px;
   border: 1px solid #d9e0e8;
   border-radius: 8px;
   background: #ffffff;
@@ -527,7 +527,7 @@ button:disabled {
 
 .timetable-grid {
   display: grid;
-  min-width: max-content;
+  width: 100%;
 }
 
 .timetable-corner,
@@ -856,6 +856,21 @@ button:disabled {
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
   gap: 18px;
   align-items: start;
+}
+
+.public-detail-grid {
+  gap: 28px;
+}
+
+.public-detail-actions {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  padding-block: 28px 30px;
+}
+
+.public-detail-actions .button-row {
+  padding-top: 8px;
 }
 
 .reservation-detail-main {
@@ -1496,6 +1511,14 @@ button:disabled {
   .timetable-summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timetable-scroll {
+    min-height: 440px;
+  }
+
+  .public-detail-actions {
+    padding-block: 22px 24px;
   }
 
   .room-week-controls,

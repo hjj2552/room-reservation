@@ -10,6 +10,7 @@ import {
   clippedBlockPosition,
   clockToMinutes,
   formatClock,
+  timetableGridStyle,
 } from './ReservationDateTimetable';
 import { StatusBadge } from './StatusBadge';
 
@@ -101,7 +102,7 @@ export function ReservationRoomTimetable({
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${room.name} 주간 예약 시간표`}>
-        <div className="timetable-grid" style={{ gridTemplateColumns: '76px repeat(7, minmax(136px, 1fr))' }}>
+        <div className="timetable-grid" style={timetableGridStyle(days.length)}>
           <div className="timetable-corner">시간</div>
           {days.map((day) => (
             <div key={day.date} className="timetable-day-header">
