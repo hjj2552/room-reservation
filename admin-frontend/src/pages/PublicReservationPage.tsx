@@ -21,6 +21,7 @@ import {
   usePublicWeeklyReservations,
 } from '../hooks/usePublicReservation';
 import { fromDateTimeLocal } from '../utils/date';
+import { maskName } from '../utils/privacyMasking';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
@@ -111,7 +112,7 @@ function toTimetableReservation(reservation: PublicReservationBlock): TimetableR
     id: reservation.id,
     roomId: reservation.roomId,
     roomName: reservation.roomName,
-    applicantName: reservation.applicantName,
+    applicantName: maskName(reservation.applicantName) || '-',
     purpose: reservation.purpose,
     startAt: reservation.startAt,
     endAt: reservation.endAt,
