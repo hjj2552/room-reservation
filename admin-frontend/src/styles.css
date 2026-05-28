@@ -878,6 +878,40 @@ button:disabled {
   gap: 18px;
 }
 
+.reservation-action-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.reservation-action-panel h2 {
+  margin: 0;
+}
+
+.reservation-action-panel p {
+  margin-bottom: 0;
+}
+
+.reservation-primary-actions {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.reservation-edit-action {
+  justify-self: start;
+}
+
+.reservation-delete-modal {
+  border-color: #efb0aa;
+}
+
+.reservation-delete-action {
+  display: grid;
+  justify-content: start;
+  gap: 10px;
+  padding-top: 2px;
+}
+
 .reservation-detail-sections {
   display: grid;
   gap: 18px;
@@ -1525,6 +1559,16 @@ button:disabled {
   .week-navigation {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .reservation-edit-action,
+  .reservation-delete-action .danger-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .reservation-delete-action {
+    justify-content: stretch;
   }
 
   .icon-button {

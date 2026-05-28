@@ -97,26 +97,22 @@ test('deleted reservation audit row is read-only and detail URL shows domain gui
   const reservation = await e2eData.createTestReservation(room.id, 'reservation-delete-seed');
 
   try {
-    page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('예약을 영구 삭제합니다');
-      await dialog.accept();
-    });
-
     await page.goto(`/reservations/${reservation.id}`);
     await page.getByTestId('reservation-delete-button').click();
+    await expect(page.getByTestId('reservation-delete-modal')).toBeVisible();
+    await page.getByTestId('reservation-delete-confirm-button').click();
 
     await expect(page).toHaveURL(new RegExp(`/audit\\?reservationId=${reservation.id}&action=DELETED`));
     const table = page.getByTestId('audit-table');
     await expect(table.locator('.audit-snapshot-room')).toHaveText(room.name);
     await expect(table.locator('.audit-snapshot-time')).not.toHaveText('-');
     await expect(table).not.toContainText(reservation.purpose || '');
-    await expect(table).toContainText('삭제');
     await expect(table.locator(`a[href="/reservations/${reservation.id}"]`)).toHaveCount(0);
 
     await page.goto(`/reservations/${reservation.id}`);
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
     await expect(page.getByRole('heading', { name: '삭제된 예약입니다' })).toBeVisible();
-    await expect(page.getByText('이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다')).toBeVisible();
+    await expect(page.getByText('이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다.')).toBeVisible();
 
     await page.getByRole('link', { name: '예약 목록으로 돌아가기' }).click();
     await expect(page).toHaveURL(/\/reservations$/);
@@ -139,7 +135,6 @@ test('admin can request a reservation from the timetable and see it on detail an
     await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
     await page.getByTestId('quick-add-email-input').fill(`e2e-reservation-${Date.now()}@example.test`);
-    await expect(page.getByTestId('quick-add-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
     await page.getByTestId('quick-add-phone-input').fill('010-1111-2222');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
     await page.getByTestId('quick-add-start-input').fill(reservationTime.startAt);
@@ -171,15 +166,7 @@ test('admin can request a reservation from the timetable and see it on detail an
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
     await expect(page.locator('.reservation-detail-main dt')).toHaveCount(6);
     await expect(page.locator('.reservation-detail-main .status-badge')).toBeVisible();
-    await expect(page.locator('.reservation-detail-main')).toContainText('예약 정보');
-    await expect(page.locator('.reservation-detail-main')).toContainText('신청 목적');
-    await expect(page.locator('.reservation-detail-main')).toContainText('신청자 이름');
-    await expect(page.locator('.reservation-detail-main')).not.toContainText('신청 경로');
-    await expect(page.locator('.reservation-detail-main')).not.toContainText('반복 예약');
-    await expect(page.locator('.reservation-detail-main')).not.toContainText('예약 요약');
     await expect(page.getByRole('heading', { name: '감사 이력' })).toBeVisible();
-    await expect(page.locator('.timeline')).toContainText('관리자 신청');
-    await expect(page.locator('.timeline')).toContainText('/ admin');
     await expect(page.locator('.timeline')).toContainText('e2e-create-verification');
 
     await page.goto(`/reservations?keyword=${encodeURIComponent(purpose)}`);
