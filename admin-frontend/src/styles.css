@@ -379,6 +379,26 @@ button:disabled {
   word-break: keep-all;
 }
 
+.audit-reservation-snapshot {
+  display: grid;
+  max-width: 320px;
+  gap: 3px;
+  color: #475466;
+}
+
+.audit-snapshot-room,
+.audit-snapshot-time {
+  display: block;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.audit-snapshot-time {
+  color: #687484;
+  font-size: 13px;
+}
+
 .rooms-table {
   min-width: 900px;
 }
