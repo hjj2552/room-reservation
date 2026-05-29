@@ -59,6 +59,19 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void adminReservationListDefaultsToNewestCreatedFirst() throws Exception {
+        OffsetDateTime firstStart = nextWeekdayAt(9, 0);
+        UUID olderReservationId = createPublicReservation(firstStart, "Older reservation");
+        UUID newerReservationId = createPublicReservation(firstStart.plusHours(1), "Newer reservation");
+        MockHttpSession session = loginAsAdmin();
+
+        mockMvc.perform(get("/api/admin/reservations").session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].id").value(newerReservationId.toString()))
+            .andExpect(jsonPath("$.items[1].id").value(olderReservationId.toString()));
+    }
+
+    @Test
     void adminCanExcludeCancelledReservationsFromTimetablePaging() throws Exception {
         OffsetDateTime firstStart = nextWeekdayAt(9, 0);
         UUID firstActiveId = createPublicReservation(firstStart, "Active first");
@@ -88,7 +101,7 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.totalItems").value(2))
             .andExpect(jsonPath("$.totalPages").value(2))
             .andExpect(jsonPath("$.items.length()").value(1))
-            .andExpect(jsonPath("$.items[0].id").value(firstActiveId.toString()));
+            .andExpect(jsonPath("$.items[0].id").value(secondActiveId.toString()));
 
         mockMvc.perform(get("/api/admin/reservations")
                 .session(session)
@@ -101,7 +114,7 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.totalItems").value(2))
             .andExpect(jsonPath("$.totalPages").value(2))
             .andExpect(jsonPath("$.items.length()").value(1))
-            .andExpect(jsonPath("$.items[0].id").value(secondActiveId.toString()));
+            .andExpect(jsonPath("$.items[0].id").value(firstActiveId.toString()));
 
         mockMvc.perform(get("/api/admin/reservations")
                 .session(session)

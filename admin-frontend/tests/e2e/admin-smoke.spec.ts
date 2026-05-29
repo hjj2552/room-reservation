@@ -89,10 +89,14 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
 
     await page.getByTestId('settings-organization-input').fill(updatedOrganizationName);
     await page.getByTestId('settings-public-notice-input').fill('e2e-settings-smoke-notice');
+    await page.getByTestId('settings-slot-minutes-select').selectOption('5');
     await page.getByTestId('settings-save-button').click();
 
     await expect(page.getByRole('status')).toBeVisible();
     await expect(page.getByTestId('settings-organization-input')).toHaveValue(updatedOrganizationName);
+    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
+    await page.reload();
+    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, {

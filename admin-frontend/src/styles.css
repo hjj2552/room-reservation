@@ -740,11 +740,18 @@ button:disabled {
 }
 
 .reservation-block .status-badge {
+  max-width: 100%;
+  min-width: 0;
   padding: 2px 6px;
   font-size: 11px;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .reservation-block .status-dot {
+  flex: 0 0 auto;
   width: 6px;
   height: 6px;
 }

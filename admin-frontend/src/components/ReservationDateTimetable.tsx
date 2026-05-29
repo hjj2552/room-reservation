@@ -5,8 +5,10 @@ import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
 export const TIMETABLE_MINUTE_HEIGHT = 1.6;
+export const TIMETABLE_GRID_MINUTES = 30;
 export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
 export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
+export const TIMETABLE_COMPACT_BLOCK_HEIGHT = 72;
 const fallbackOpenTime = '09:00';
 const fallbackCloseTime = '18:00';
 const timetableTimeZone = 'Asia/Seoul';
@@ -105,7 +107,6 @@ export function ReservationDateTimetable({
   selectedDate,
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
-  slotMinutes = 60,
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
@@ -114,10 +115,9 @@ export function ReservationDateTimetable({
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
   const closeMinutes = Math.max(clockToMinutes(closeTime || fallbackCloseTime), openMinutes + 60);
-  const normalizedSlotMinutes = slotMinutes <= 30 ? 30 : 60;
   const slots = useMemo(
-    () => buildSlots(openMinutes, closeMinutes, normalizedSlotMinutes),
-    [openMinutes, closeMinutes, normalizedSlotMinutes],
+    () => buildSlots(openMinutes, closeMinutes, TIMETABLE_GRID_MINUTES),
+    [openMinutes, closeMinutes],
   );
   const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const roomIds = useMemo(() => new Set(rooms.map((room) => room.id)), [rooms]);
@@ -204,7 +204,7 @@ export function ReservationDateTimetable({
                 const position = clippedBlockPosition(reservation, openMinutes, closeMinutes);
                 if (!position.visible) return null;
                 const blockClassName = `reservation-block reservation-block-${reservation.status.toLowerCase()}${
-                  position.height < 52 ? ' reservation-block-compact' : ''
+                  position.height < TIMETABLE_COMPACT_BLOCK_HEIGHT ? ' reservation-block-compact' : ''
                 }${reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''}`;
 
                 return (

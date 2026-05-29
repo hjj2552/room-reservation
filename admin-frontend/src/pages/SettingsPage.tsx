@@ -139,13 +139,18 @@ export function SettingsPage() {
         </label>
         <label>
           예약 단위(분)
-          <input
-            type="number"
-            min="1"
+          <select
+            data-testid="settings-slot-minutes-select"
             value={form.slotMinutes}
             onChange={(event) => updateField('slotMinutes', Number(event.target.value))}
             required
-          />
+          >
+            {[5, 10, 15, 30, 60].map((minutes) => (
+              <option key={minutes} value={minutes}>
+                {minutes}분
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           최소 예약 시간(분)

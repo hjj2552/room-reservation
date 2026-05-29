@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SettingsService {
 
-    private static final Set<Integer> ALLOWED_SLOT_MINUTES = Set.of(10, 15, 30, 60);
+    private static final Set<Integer> ALLOWED_SLOT_MINUTES = Set.of(5, 10, 15, 30, 60);
     private static final Set<String> ALLOWED_DAYS = Set.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
 
     private final OperationSettingsRepository operationSettingsRepository;
@@ -66,7 +66,7 @@ public class SettingsService {
             throw new IllegalArgumentException("Open time must be before close time.");
         }
         if (!ALLOWED_SLOT_MINUTES.contains(request.slotMinutes())) {
-            throw new IllegalArgumentException("Slot minutes must be one of 10, 15, 30, 60.");
+            throw new IllegalArgumentException("Slot minutes must be one of 5, 10, 15, 30, 60.");
         }
         if (request.maxReservationMinutes() < request.minReservationMinutes()) {
             throw new IllegalArgumentException("Max reservation minutes must be greater than or equal to min.");
@@ -79,4 +79,3 @@ public class SettingsService {
         }
     }
 }
-

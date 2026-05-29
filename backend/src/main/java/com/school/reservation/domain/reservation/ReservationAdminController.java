@@ -54,7 +54,7 @@ public class ReservationAdminController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "startAt"));
+        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return PagedResponse.from(reservationService
             .searchAdminReservations(fromAt, toAt, roomId, status, source, keyword, excludeCancelled, pageable)
             .map(AdminReservationListItemResponse::from));
