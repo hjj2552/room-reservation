@@ -29,7 +29,7 @@ cd backend
 관리자 프런트엔드를 실행합니다.
 
 ```powershell
-cd admin-frontend
+cd frontend
 npm ci
 npm run dev
 ```

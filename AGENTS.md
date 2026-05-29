@@ -33,6 +33,6 @@ These rules apply to every Codex/agent task in this repository.
 
 ## Documentation Expectations
 
-- When adding or changing E2E data creation, update `admin-frontend/AGENTS.md` or `docs/admin-e2e.md` if the shared workflow changes.
+- When adding or changing E2E data creation, update `frontend/AGENTS.md` or `docs/admin-e2e.md` if the shared workflow changes.
 - Keep manual acceptance-test cleanup commands documented.
 - New Codex chats and future agents should treat these rules as the project baseline before editing tests or cleanup code.

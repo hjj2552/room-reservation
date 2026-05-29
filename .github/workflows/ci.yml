@@ -52,8 +52,8 @@ jobs:
       - name: Run backend tests
         run: ./gradlew test
 
-  admin-frontend:
-    name: Admin frontend build and E2E
+  frontend:
+    name: Frontend build and E2E
     runs-on: ubuntu-latest
     needs: backend-test
     services:
@@ -102,14 +102,14 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: admin-frontend/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Install admin frontend dependencies
-        working-directory: admin-frontend
+      - name: Install Frontend dependencies
+        working-directory: frontend
         run: npm ci
 
-      - name: Build admin frontend
-        working-directory: admin-frontend
+      - name: Build Frontend
+        working-directory: frontend
         run: npm run build
 
       - name: Build backend jar for E2E
@@ -117,11 +117,11 @@ jobs:
         run: ./gradlew bootJar
 
       - name: Install Playwright browsers
-        working-directory: admin-frontend
+        working-directory: frontend
         run: npx playwright install --with-deps chromium
 
       - name: Run admin Playwright E2E
-        working-directory: admin-frontend
+        working-directory: frontend
         run: npm run e2e:ci
 
       - name: Upload Playwright report
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: admin-playwright-report
-          path: admin-frontend/playwright-report
+          path: frontend/playwright-report
           if-no-files-found: ignore
           retention-days: 7
 
@@ -138,6 +138,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: admin-e2e-test-results
-          path: admin-frontend/test-results
+          path: frontend/test-results
           if-no-files-found: ignore
           retention-days: 7

@@ -20,7 +20,7 @@ The suite intentionally does not cover CSV download or full CRUD matrices for ro
 Prerequisites:
 
 - JDK 21.
-- Node dependencies installed in `admin-frontend`.
+- Node dependencies installed in `frontend`.
 - Playwright browsers installed.
 - PostgreSQL test database running from the repository root:
 
@@ -38,7 +38,7 @@ cd backend
 Run the E2E suite:
 
 ```powershell
-cd admin-frontend
+cd frontend
 npm.cmd run e2e
 ```
 
@@ -51,14 +51,14 @@ The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull 
 Jobs:
 
 - `backend-test`: starts a PostgreSQL 16 service on host port `5433` and runs `backend/./gradlew test` with the backend test profile.
-- `admin-frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the admin frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
+- `frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the admin frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
 
-The E2E job reuses `admin-frontend/scripts/run-e2e.mjs`. In CI, that runner starts the backend jar with the `e2e` profile and starts the Vite dev server if they are not already reachable.
+The E2E job reuses `frontend/scripts/run-e2e.mjs`. In CI, that runner starts the backend jar with the `e2e` profile and starts the Vite dev server if they are not already reachable.
 
 Artifacts:
 
-- `admin-playwright-report`: Playwright HTML report from `admin-frontend/playwright-report`.
-- `admin-e2e-test-results`: Playwright traces, screenshots, error contexts, and backend/frontend logs from `admin-frontend/test-results`.
+- `admin-playwright-report`: Playwright HTML report from `frontend/playwright-report`.
+- `admin-e2e-test-results`: Playwright traces, screenshots, error contexts, and backend/frontend logs from `frontend/test-results`.
 
 Artifacts are uploaded with `if: always()`, so failed E2E runs should still leave debugging output.
 
@@ -70,7 +70,7 @@ Recommended CI shape:
 docker compose up -d postgres-test
 cd backend
 .\gradlew.bat bootJar
-cd ..\admin-frontend
+cd ..\frontend
 npm ci
 npx playwright install --with-deps chromium
 npm run e2e:ci
@@ -100,7 +100,7 @@ Useful environment variables:
 - Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence` over direct setup calls.
 - Public UI-created reservations use `e2e-` applicant names, emails, and purposes, then register returned ids for cleanup.
 - Data-creating specs use a Playwright fixture registry for created room, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, and deletion for rooms by id.
-- `npm run e2e` also runs cleanup before and after the full suite through `admin-frontend/scripts/run-e2e.mjs`.
+- `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`.
 - The cleanup endpoint can preview or hard-delete rows identified by the `e2e-` prefix:
   - rooms whose name starts with `e2e-`;
   - recurrences whose purpose/applicant/email starts with `e2e-`, plus recurrences attached to an `e2e-` room;
@@ -116,7 +116,7 @@ Useful environment variables:
 Manual cleanup before acceptance testing:
 
 ```powershell
-cd admin-frontend
+cd frontend
 npm.cmd run e2e:cleanup:preview
 npm.cmd run e2e:cleanup
 ```
@@ -124,7 +124,7 @@ npm.cmd run e2e:cleanup
 Legacy cleanup for existing dev/UAT data left by old E2E naming:
 
 ```powershell
-cd admin-frontend
+cd frontend
 npm.cmd run e2e:cleanup:legacy:preview
 npm.cmd run e2e:cleanup:legacy
 ```
