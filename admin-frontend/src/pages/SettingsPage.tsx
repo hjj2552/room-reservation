@@ -226,8 +226,7 @@ export function SettingsPage() {
         {updateSettings.isError ? (
           <div className="inline-error full-span" role="alert">{errorMessage(updateSettings.error)}</div>
         ) : null}
-        <div className="button-row full-span">
-          <span className="muted">현재 버전 {form.version}</span>
+        <div className="button-row full-span settings-form-actions">
           <button
             type="submit"
             className="primary-button"
