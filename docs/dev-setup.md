@@ -16,9 +16,9 @@ room-reservation/
     src/main/resources/application-*.yml
     src/main/resources/db/migration
     src/test/java/com/school/reservation
-  admin-frontend/
+  frontend/
     package.json
-    vite.config.ts
+    vite.config.mjs
     playwright.config.ts
     src/
     tests/e2e/
@@ -28,7 +28,7 @@ room-reservation/
 주요 구성은 다음과 같습니다.
 
 - `backend`: Java 21, Spring Boot, Spring Web, Spring Security, Spring Data JPA, Bean Validation, Flyway 기반 API 서버입니다.
-- `admin-frontend`: React, Vite, TypeScript, React Router, TanStack Query 기반 관리자 SPA입니다.
+- `frontend`: React, Vite, TypeScript, React Router, TanStack Query 기반 관리자 SPA입니다.
 - `docker-compose.yml`: 로컬 개발 DB와 테스트/E2E DB를 실행합니다.
 - `.github/workflows/ci.yml`: 백엔드 테스트와 관리자 프런트엔드 build/E2E를 검증합니다.
 
@@ -118,7 +118,7 @@ cd backend
 1. 의존성을 설치합니다.
 
 ```powershell
-cd <repo>\admin-frontend
+cd <repo>\frontend
 npm ci
 ```
 
@@ -154,7 +154,7 @@ cd backend
 ## 프런트엔드 build 실행
 
 ```powershell
-cd <repo>\admin-frontend
+cd <repo>\frontend
 npm ci
 npm run build
 ```
@@ -180,7 +180,7 @@ cd backend
 관리자 프런트엔드에서 E2E를 실행합니다.
 
 ```powershell
-cd ..\admin-frontend
+cd ..\frontend
 npm ci
 npx playwright install --with-deps chromium
 npm run e2e
@@ -226,7 +226,7 @@ $env:E2E_CLEANUP_ENABLED="true"
 다른 터미널에서 관리자 프런트엔드 cleanup 명령을 실행합니다.
 
 ```powershell
-cd <repo>\admin-frontend
+cd <repo>\frontend
 npm run e2e:cleanup:preview
 ```
 
@@ -245,12 +245,12 @@ CI workflow는 `.github/workflows/ci.yml`에 있습니다. 현재 `pull_request`
 - Gradle wrapper 실행 권한 설정
 - `backend/./gradlew test`
 
-`admin-frontend` job은 `backend-test` 성공 후 다음을 검증합니다.
+`frontend` job은 `backend-test` 성공 후 다음을 검증합니다.
 
 - PostgreSQL 16 테스트 서비스 실행
 - JDK 21 설정
 - Node.js 22 설정
-- `admin-frontend/npm ci`
+- `frontend/npm ci`
 - `npm run build`
 - `backend/./gradlew bootJar`
 - Playwright Chromium 설치
@@ -288,7 +288,7 @@ Flyway 또는 JPA validate 오류가 나면 최근 migration과 엔티티 필드
 E2E가 브라우저 설치 오류로 실패하면 다음 명령을 다시 실행합니다.
 
 ```powershell
-cd <repo>\admin-frontend
+cd <repo>\frontend
 npx playwright install --with-deps chromium
 ```
 
