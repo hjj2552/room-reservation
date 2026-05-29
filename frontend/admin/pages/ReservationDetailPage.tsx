@@ -92,7 +92,6 @@ export function ReservationDetailPage() {
           <div>
             <p className="eyebrow">운영 액션</p>
             <h2 id="actions-title">상태 처리</h2>
-            <p className="muted">승인과 취소는 현재 예약 상태를 처리하는 주요 액션입니다.</p>
           </div>
           <form
             className="form-stack"
@@ -159,7 +158,11 @@ export function ReservationDetailPage() {
                   {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
                 </span>
                 <span className="muted">{formatDateTime(history.createdAt)} / {history.actorId}</span>
-                {history.memo ? <p>{history.memo}</p> : null}
+                {history.memo ? (
+                  <p className="timeline-memo">
+                    <span className="timeline-memo-label">처리 메모:</span> {history.memo}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ol>
