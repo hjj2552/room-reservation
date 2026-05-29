@@ -57,7 +57,7 @@ export function SettingsPage() {
   if (!form) return null;
 
   return (
-    <section className="page-section narrow" aria-labelledby="settings-title">
+    <section className="page-section settings-page" aria-labelledby="settings-title">
       <div className="page-header">
         <div>
           <p className="eyebrow">운영 관리</p>

@@ -124,12 +124,12 @@ tr[tabindex]:focus-visible {
 .page-section {
   display: grid;
   gap: 18px;
-  max-width: 1440px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 .page-section.timetable-page {
-  max-width: 1680px;
+  width: 100%;
 }
 
 .page-section.narrow {
@@ -976,6 +976,19 @@ button:disabled {
   display: block;
 }
 
+.timeline-memo {
+  margin: 6px 0 0;
+  color: #475466;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.timeline-memo .timeline-memo-label {
+  display: inline;
+  color: #364152;
+  font-weight: 750;
+}
+
 .state-box,
 .inline-error,
 .success-box {
@@ -1260,9 +1273,8 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 18px;
-  width: min(1680px, 100%);
+  width: 100%;
   min-height: 100vh;
-  margin: 0 auto;
   padding: 24px 28px;
 }
 
@@ -1427,6 +1439,10 @@ button:disabled {
     padding-left: 32px;
   }
 
+  .settings-page .form-grid {
+    grid-template-columns: repeat(3, minmax(210px, 1fr));
+  }
+
   .page-section.timetable-page {
     width: 100%;
   }
@@ -1437,6 +1453,12 @@ button:disabled {
 
   .timetable-page .panel-header {
     gap: 16px;
+  }
+}
+
+@media (min-width: 1680px) {
+  .settings-page .form-grid {
+    grid-template-columns: repeat(4, minmax(210px, 1fr));
   }
 }
 
