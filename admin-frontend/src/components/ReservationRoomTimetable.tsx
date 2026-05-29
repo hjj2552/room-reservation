@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import type { ReservationStatus } from '../api/types';
 import { statusLabels } from '../utils/labels';
 import {
+  TIMETABLE_COMPACT_BLOCK_HEIGHT,
+  TIMETABLE_GRID_MINUTES,
   TIMETABLE_MINUTE_HEIGHT,
   type TimetableReservation,
   type TimetableRoom,
@@ -59,7 +61,6 @@ export function ReservationRoomTimetable({
   weekStart,
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
-  slotMinutes = 60,
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
@@ -68,10 +69,9 @@ export function ReservationRoomTimetable({
   const navigate = useNavigate();
   const openMinutes = clockToMinutes(openTime || fallbackOpenTime);
   const closeMinutes = Math.max(clockToMinutes(closeTime || fallbackCloseTime), openMinutes + 60);
-  const normalizedSlotMinutes = slotMinutes <= 30 ? 30 : 60;
   const slots = useMemo(
-    () => buildSlots(openMinutes, closeMinutes, normalizedSlotMinutes),
-    [openMinutes, closeMinutes, normalizedSlotMinutes],
+    () => buildSlots(openMinutes, closeMinutes, TIMETABLE_GRID_MINUTES),
+    [openMinutes, closeMinutes],
   );
   const days = useMemo(
     () => dayLabels.map((label, index) => ({ label, date: addDays(weekStart, index) })),
@@ -160,7 +160,7 @@ export function ReservationRoomTimetable({
                 const position = clippedBlockPosition(reservation, openMinutes, closeMinutes);
                 if (!position.visible) return null;
                 const blockClassName = `reservation-block reservation-block-${reservation.status.toLowerCase()}${
-                  position.height < 52 ? ' reservation-block-compact' : ''
+                  position.height < TIMETABLE_COMPACT_BLOCK_HEIGHT ? ' reservation-block-compact' : ''
                 }${reservation.id === highlightedReservationId ? ' reservation-block-highlighted' : ''}`;
 
                 return (
