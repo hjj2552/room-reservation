@@ -1144,6 +1144,10 @@ button:disabled {
   min-height: 42px;
 }
 
+.settings-form-actions {
+  justify-content: flex-end;
+}
+
 .audit-filter {
   grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) minmax(130px, 0.7fr) minmax(130px, 0.7fr) auto;
 }
