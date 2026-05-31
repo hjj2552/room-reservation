@@ -53,7 +53,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void cancelledReservationCannotBeUpdated() throws Exception {
+    void cancelledReservationCanBeReactivatedAsRequestedThroughUpdate() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime startAt = nextWeekdayAt(11, 0);
         UUID reservationId = createAdminReservation(session, startAt, "Cancel Then Update");
@@ -74,17 +74,130 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                 .content("""
                     {
                       "roomId": "%s",
-                      "applicantName": "Should Fail",
-                      "applicantEmail": "fail@example.com",
+                      "applicantName": "Reactivated User",
+                      "applicantEmail": "reactivated-requested@example.com",
                       "applicantPhone": "010-3333-3333",
-                      "purpose": "Should fail",
+                      "purpose": "Reactivated as requested",
                       "startAt": "%s",
                       "endAt": "%s",
-                      "status": "CONFIRMED"
+                      "status": "REQUESTED",
+                      "memo": "reactivate as requested"
                     }
                     """.formatted(firstRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("REQUESTED"))
+            .andExpect(jsonPath("$.purpose").value("Reactivated as requested"));
+    }
+
+    @Test
+    void cancelledReservationCanBeReactivatedAsConfirmedThroughUpdate() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        OffsetDateTime startAt = nextWeekdayAt(12, 0);
+        UUID reservationId = createAdminReservation(session, startAt, "Cancel Then Confirm");
+
+        mockMvc.perform(post("/api/admin/reservations/{reservationId}/cancel", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memo": "cancel before confirmed update"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/admin/reservations/{reservationId}", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Confirmed Again",
+                      "applicantEmail": "reactivated-confirmed@example.com",
+                      "applicantPhone": "010-4444-4444",
+                      "purpose": "Reactivated as confirmed",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "status": "CONFIRMED",
+                      "memo": "reactivate as confirmed"
+                    }
+                    """.formatted(firstRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("CONFIRMED"))
+            .andExpect(jsonPath("$.purpose").value("Reactivated as confirmed"));
+    }
+
+    @Test
+    void cancelledReservationReactivationFailsWhenRequestedSlotConflicts() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        OffsetDateTime startAt = nextWeekdayAt(14, 0);
+        UUID reservationId = createAdminReservation(session, startAt, "Cancelled Conflict Source");
+        createAdminReservation(session, startAt.plusHours(1), "Existing Conflict");
+
+        mockMvc.perform(post("/api/admin/reservations/{reservationId}/cancel", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memo": "cancel before conflict update"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/admin/reservations/{reservationId}", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Conflict User",
+                      "applicantEmail": "reactivated-conflict@example.com",
+                      "applicantPhone": "010-5555-5555",
+                      "purpose": "Reactivated conflict",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "status": "REQUESTED",
+                      "memo": "reactivate conflict"
+                    }
+                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
+    }
+
+    @Test
+    void cancelledReservationConfirmedReactivationFailsWhenSlotConflicts() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        OffsetDateTime startAt = nextWeekdayAt(15, 0);
+        UUID reservationId = createAdminReservation(session, startAt, "Cancelled Confirm Conflict Source");
+        createAdminReservation(session, startAt.plusHours(1), "Existing Confirm Conflict");
+
+        mockMvc.perform(post("/api/admin/reservations/{reservationId}/cancel", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memo": "cancel before confirmed conflict update"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/admin/reservations/{reservationId}", reservationId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Confirm Conflict User",
+                      "applicantEmail": "reactivated-confirm-conflict@example.com",
+                      "applicantPhone": "010-6666-6666",
+                      "purpose": "Reactivated confirmed conflict",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "status": "CONFIRMED",
+                      "memo": "reactivate confirmed conflict"
+                    }
+                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
     }
 
     private UUID createAdminReservation(MockHttpSession session, OffsetDateTime startAt, String purpose) throws Exception {

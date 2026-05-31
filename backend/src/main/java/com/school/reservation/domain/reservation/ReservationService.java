@@ -128,9 +128,6 @@ public class ReservationService {
     @Transactional
     public Reservation updateReservation(UUID reservationId, @Valid UpdateReservationCommand command, String adminId, String memo) {
         Reservation reservation = getReservationOrThrow(reservationId);
-        if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cancelled reservations cannot be updated.");
-        }
 
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));

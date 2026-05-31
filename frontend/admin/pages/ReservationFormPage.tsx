@@ -105,12 +105,16 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
   const isPending = create.isPending || update.isPending;
 
   return (
-    <section className="page-section narrow" aria-labelledby="reservation-form-title">
+    <section className="page-section" aria-labelledby="reservation-form-title">
       <div className="page-header">
         <div>
           <p className="eyebrow">예약 운영</p>
           <h1 id="reservation-form-title">{mode === 'create' ? '예약 신청' : '예약 수정'}</h1>
-          <p className="muted">운영자가 직접 예약 정보를 입력하고 저장합니다.</p>
+          <p className="muted">
+            {mode === 'edit'
+              ? '운영자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.'
+              : '운영자가 직접 예약 정보를 입력하고 저장합니다.'}
+          </p>
         </div>
       </div>
 
