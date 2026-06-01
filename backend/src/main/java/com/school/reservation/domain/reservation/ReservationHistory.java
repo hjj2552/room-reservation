@@ -44,6 +44,9 @@ public class ReservationHistory {
     @Column(name = "reservation_room_id")
     private UUID reservationRoomId;
 
+    @Column(name = "before_reservation_room_id")
+    private UUID beforeReservationRoomId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     private Action action;
@@ -64,14 +67,44 @@ public class ReservationHistory {
     @Column(name = "reservation_purpose", length = 500)
     private String reservationPurpose;
 
+    @Column(name = "before_reservation_purpose", length = 500)
+    private String beforeReservationPurpose;
+
     @Column(name = "reservation_room_name", length = 100)
     private String reservationRoomName;
+
+    @Column(name = "before_reservation_room_name", length = 100)
+    private String beforeReservationRoomName;
 
     @Column(name = "reservation_start_at")
     private OffsetDateTime reservationStartAt;
 
+    @Column(name = "before_reservation_start_at")
+    private OffsetDateTime beforeReservationStartAt;
+
     @Column(name = "reservation_end_at")
     private OffsetDateTime reservationEndAt;
+
+    @Column(name = "before_reservation_end_at")
+    private OffsetDateTime beforeReservationEndAt;
+
+    @Column(name = "reservation_applicant_name", length = 100)
+    private String reservationApplicantName;
+
+    @Column(name = "before_reservation_applicant_name", length = 100)
+    private String beforeReservationApplicantName;
+
+    @Column(name = "reservation_applicant_email", length = 255)
+    private String reservationApplicantEmail;
+
+    @Column(name = "before_reservation_applicant_email", length = 255)
+    private String beforeReservationApplicantEmail;
+
+    @Column(name = "reservation_applicant_phone", length = 50)
+    private String reservationApplicantPhone;
+
+    @Column(name = "before_reservation_applicant_phone", length = 50)
+    private String beforeReservationApplicantPhone;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
@@ -137,6 +170,27 @@ public class ReservationHistory {
         return history;
     }
 
+    public static ReservationHistory updated(
+        Reservation reservation,
+        Reservation.ReservationStatus beforeStatus,
+        String memo,
+        Reservation.ActorType actorType,
+        String actorId,
+        Snapshot beforeSnapshot
+    ) {
+        ReservationHistory history = new ReservationHistory(
+            reservation,
+            Action.UPDATED,
+            beforeStatus,
+            reservation.getStatus(),
+            memo,
+            actorType,
+            actorId
+        );
+        history.copyBeforeReservationSnapshot(beforeSnapshot);
+        return history;
+    }
+
     private void copyReservationSnapshot(Reservation reservation) {
         if (reservation == null) {
             return;
@@ -147,6 +201,50 @@ public class ReservationHistory {
         this.reservationRoomName = reservation.getDisplayRoomName();
         this.reservationStartAt = reservation.getStartAt();
         this.reservationEndAt = reservation.getEndAt();
+        this.reservationApplicantName = reservation.getApplicantName();
+        this.reservationApplicantEmail = reservation.getApplicantEmail();
+        this.reservationApplicantPhone = reservation.getApplicantPhone();
+    }
+
+    private void copyBeforeReservationSnapshot(Snapshot snapshot) {
+        if (snapshot == null) {
+            return;
+        }
+        this.beforeReservationRoomId = snapshot.roomId();
+        this.beforeReservationRoomName = snapshot.roomName();
+        this.beforeReservationPurpose = snapshot.purpose();
+        this.beforeReservationStartAt = snapshot.startAt();
+        this.beforeReservationEndAt = snapshot.endAt();
+        this.beforeReservationApplicantName = snapshot.applicantName();
+        this.beforeReservationApplicantEmail = snapshot.applicantEmail();
+        this.beforeReservationApplicantPhone = snapshot.applicantPhone();
+    }
+
+    public record Snapshot(
+        UUID roomId,
+        String roomName,
+        String purpose,
+        OffsetDateTime startAt,
+        OffsetDateTime endAt,
+        String applicantName,
+        String applicantEmail,
+        String applicantPhone
+    ) {
+        public static Snapshot from(Reservation reservation) {
+            if (reservation == null) {
+                return null;
+            }
+            return new Snapshot(
+                reservation.getRoom() == null ? null : reservation.getRoom().getId(),
+                reservation.getDisplayRoomName(),
+                reservation.getPurpose(),
+                reservation.getStartAt(),
+                reservation.getEndAt(),
+                reservation.getApplicantName(),
+                reservation.getApplicantEmail(),
+                reservation.getApplicantPhone()
+            );
+        }
     }
 
     public UUID getId() {
@@ -163,6 +261,10 @@ public class ReservationHistory {
 
     public UUID getReservationRoomId() {
         return reservationRoomId;
+    }
+
+    public UUID getBeforeReservationRoomId() {
+        return beforeReservationRoomId;
     }
 
     public Action getAction() {
@@ -185,16 +287,56 @@ public class ReservationHistory {
         return reservationPurpose;
     }
 
+    public String getBeforeReservationPurpose() {
+        return beforeReservationPurpose;
+    }
+
     public String getReservationRoomName() {
         return reservationRoomName;
+    }
+
+    public String getBeforeReservationRoomName() {
+        return beforeReservationRoomName;
     }
 
     public OffsetDateTime getReservationStartAt() {
         return reservationStartAt;
     }
 
+    public OffsetDateTime getBeforeReservationStartAt() {
+        return beforeReservationStartAt;
+    }
+
     public OffsetDateTime getReservationEndAt() {
         return reservationEndAt;
+    }
+
+    public OffsetDateTime getBeforeReservationEndAt() {
+        return beforeReservationEndAt;
+    }
+
+    public String getReservationApplicantName() {
+        return reservationApplicantName;
+    }
+
+    public String getBeforeReservationApplicantName() {
+        return beforeReservationApplicantName;
+    }
+
+    public String getReservationApplicantEmail() {
+        return reservationApplicantEmail;
+    }
+
+    public String getBeforeReservationApplicantEmail() {
+        return beforeReservationApplicantEmail;
+    }
+
+    public String getReservationApplicantPhone() {
+        return reservationApplicantPhone;
+    }
+
+    public String getBeforeReservationApplicantPhone() {
+        return beforeReservationApplicantPhone;
     }
 
     public Reservation.ActorType getActorType() {

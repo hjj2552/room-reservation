@@ -135,6 +135,7 @@ public class ReservationService {
         conflictService.validateNoConflict(command.roomId(), command.startAt(), command.endAt(), reservationId);
 
         Reservation.ReservationStatus beforeStatus = reservation.getStatus();
+        ReservationHistory.Snapshot beforeSnapshot = ReservationHistory.Snapshot.from(reservation);
         try {
             reservation.update(
                 room,
@@ -148,14 +149,13 @@ public class ReservationService {
                 Reservation.ActorType.ADMIN,
                 adminId
             );
-            historyRepository.save(new ReservationHistory(
+            historyRepository.save(ReservationHistory.updated(
                 reservation,
-                ReservationHistory.Action.UPDATED,
                 beforeStatus,
-                reservation.getStatus(),
                 memo,
                 Reservation.ActorType.ADMIN,
-                adminId
+                adminId,
+                beforeSnapshot
             ));
             reservationRepository.flush();
             return reservation;

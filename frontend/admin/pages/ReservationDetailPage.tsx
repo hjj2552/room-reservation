@@ -1,6 +1,7 @@
 import { CalendarDays, Check, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import type { ReservationHistory } from '../../shared/api/types';
 import { ApiError, errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -150,7 +151,10 @@ export function ReservationDetailPage() {
         {histories.isError ? <ErrorState error={histories.error} /> : null}
         {histories.data?.length ? (
           <ol className="timeline">
-            {histories.data.map((history) => (
+            {histories.data.map((history) => {
+              const diffItems = updatedHistoryDiffs(history);
+
+              return (
               <li key={history.id}>
                 <strong>{historyActionLabel(history.action)}</strong>
                 <span>
@@ -158,13 +162,28 @@ export function ReservationDetailPage() {
                   {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
                 </span>
                 <span className="muted">{formatDateTime(history.createdAt)} / {history.actorId}</span>
+                {diffItems.length ? (
+                  <dl className="timeline-diff" aria-label="수정된 필드">
+                    {diffItems.map((item) => (
+                      <div className="timeline-diff-row" key={item.label}>
+                        <dt>{item.label}</dt>
+                        <dd>
+                          <span className="timeline-diff-value">{item.before}</span>
+                          <span className="timeline-diff-arrow" aria-hidden="true">→</span>
+                          <span className="timeline-diff-value">{item.after}</span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
                 {history.memo ? (
                   <p className="timeline-memo">
                     <span className="timeline-memo-label">처리 메모:</span> {history.memo}
                   </p>
                 ) : null}
               </li>
-            ))}
+              );
+            })}
           </ol>
         ) : null}
       </section>
@@ -223,6 +242,58 @@ export function ReservationDetailPage() {
 
 function isReservationNotFound(error: unknown) {
   return error instanceof ApiError && error.status === 404;
+}
+
+interface TimelineDiffItem {
+  label: string;
+  before: string;
+  after: string;
+}
+
+function updatedHistoryDiffs(history: ReservationHistory): TimelineDiffItem[] {
+  if (history.action !== 'UPDATED' || !hasBeforeSnapshot(history)) {
+    return [];
+  }
+
+  const items: TimelineDiffItem[] = [];
+  appendDiff(items, '강의실', history.beforeReservationRoomName, history.reservationRoomName);
+  appendDiff(items, '신청자 이름', history.beforeReservationApplicantName, history.reservationApplicantName);
+  appendDiff(items, '이메일', history.beforeReservationApplicantEmail, history.reservationApplicantEmail);
+  appendDiff(items, '전화번호', history.beforeReservationApplicantPhone, history.reservationApplicantPhone);
+  appendDiff(items, '예약 목적', history.beforeReservationPurpose, history.reservationPurpose);
+  appendDiff(items, '시작 시간', formatOptionalDateTime(history.beforeReservationStartAt), formatOptionalDateTime(history.reservationStartAt));
+  appendDiff(items, '종료 시간', formatOptionalDateTime(history.beforeReservationEndAt), formatOptionalDateTime(history.reservationEndAt));
+  return items;
+}
+
+function hasBeforeSnapshot(history: ReservationHistory) {
+  return Boolean(
+    history.beforeReservationRoomName
+      || history.beforeReservationPurpose
+      || history.beforeReservationStartAt
+      || history.beforeReservationEndAt
+      || history.beforeReservationApplicantName
+      || history.beforeReservationApplicantEmail
+      || history.beforeReservationApplicantPhone
+  );
+}
+
+function appendDiff(items: TimelineDiffItem[], label: string, before: string | null | undefined, after: string | null | undefined) {
+  const beforeValue = displayValue(before);
+  const afterValue = displayValue(after);
+  if (beforeValue === afterValue) {
+    return;
+  }
+  items.push({ label, before: beforeValue, after: afterValue });
+}
+
+function formatOptionalDateTime(value: string | null | undefined) {
+  return value ? formatDateTime(value) : null;
+}
+
+function displayValue(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : '-';
 }
 
 function DeletedReservationState({ reservationId }: { reservationId: string }) {
