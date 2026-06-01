@@ -247,7 +247,7 @@ export function TimetablePage() {
   return (
     <section className="page-section timetable-page" aria-labelledby="timetable-title">
       <TimetablePageHeader
-        eyebrow="운영 현황"
+        eyebrow="관리자 메뉴"
         helperText={timetableCopy.adminHelper}
         buttonTestId="timetable-new-request-button"
         onNewRequest={handleNewRequestClick}

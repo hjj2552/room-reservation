@@ -212,7 +212,7 @@ export function PublicReservationPage() {
   return (
     <div className="public-shell" aria-labelledby="timetable-title">
       <TimetablePageHeader
-        eyebrow={settings.data?.organizationName || '강의실 예약'}
+        eyebrow="일반 사용자"
         helperText="신청은 대기 상태로 접수되며 운영자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
         buttonDisabled={Boolean(isUnavailable)}

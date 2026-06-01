@@ -56,7 +56,7 @@ export function ReservationDetailPage() {
     <section className="page-section" aria-labelledby="reservation-detail-title">
       <div className="page-header reservation-detail-page-header">
         <div>
-          <p className="eyebrow">예약 상세</p>
+          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="reservation-detail-title">{detail.room.name}</h1>
           <p className="muted">{formatDateTime(detail.startAt)} 예약</p>
         </div>
@@ -91,7 +91,6 @@ export function ReservationDetailPage() {
 
         <section className="panel reservation-action-panel" aria-labelledby="actions-title">
           <div>
-            <p className="eyebrow">운영 액션</p>
             <h2 id="actions-title">상태 처리</h2>
           </div>
           <form
@@ -302,7 +301,6 @@ function DeletedReservationState({ reservationId }: { reservationId: string }) {
   return (
     <section className="page-section narrow" aria-labelledby="deleted-reservation-title">
       <div className="state-box error">
-        <p className="eyebrow">예약 상세</p>
         <h1 id="deleted-reservation-title">삭제된 예약입니다</h1>
         <p>이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다. 감사 로그에서 삭제 기록은 계속 확인할 수 있습니다.</p>
         <div className="button-row">

@@ -60,7 +60,7 @@ export function SettingsPage() {
     <section className="page-section settings-page" aria-labelledby="settings-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">운영 관리</p>
+          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="settings-title">운영 설정</h1>
           <p className="muted">예약 가능 기간, 시간, 안내 문구를 관리합니다.</p>
         </div>

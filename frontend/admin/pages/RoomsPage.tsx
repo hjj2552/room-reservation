@@ -128,7 +128,7 @@ export function RoomsPage() {
     <section className="page-section" aria-labelledby="rooms-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">운영 관리</p>
+          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="rooms-title">강의실 관리</h1>
           <p className="muted">예약에 사용할 강의실을 등록하고, 삭제된 강의실의 예약 기록은 보존합니다.</p>
         </div>
@@ -304,7 +304,6 @@ export function RoomsPage() {
           >
             <div className="modal-header">
               <div>
-                <p className="eyebrow danger-text">삭제 확인</p>
                 <h2 id="room-delete-title">강의실 영구 삭제</h2>
               </div>
             </div>

@@ -177,7 +177,6 @@ export function ReservationRequestPanel({
     >
       <div className="quick-add-header">
         <div>
-          <p className="eyebrow">시간표 예약 신청</p>
           <h2 id="reservation-request-title">예약 신청</h2>
           <p className="muted">
             {selection.source === 'slot' ? `${selection.date} 선택 슬롯` : `${selection.date} 새 신청`}
