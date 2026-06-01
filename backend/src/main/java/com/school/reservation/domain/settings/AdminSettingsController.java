@@ -1,6 +1,7 @@
 package com.school.reservation.domain.settings;
 
 import com.school.reservation.domain.settings.dto.request.UpdateOperationSettingsRequest;
+import com.school.reservation.domain.settings.dto.response.LogoCleanupResponse;
 import com.school.reservation.domain.settings.dto.response.LogoUploadResponse;
 import com.school.reservation.domain.settings.dto.response.OperationSettingsResponse;
 import jakarta.validation.Valid;
@@ -38,5 +39,10 @@ public class AdminSettingsController {
     @PostMapping("/logo")
     public LogoUploadResponse uploadLogo(@RequestParam("file") MultipartFile file) {
         return logoStorageService.store(file);
+    }
+
+    @PostMapping("/logo/cleanup")
+    public LogoCleanupResponse cleanupLogos() {
+        return settingsService.cleanupOrphanLogos();
     }
 }

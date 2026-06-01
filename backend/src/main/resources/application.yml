@@ -11,3 +11,9 @@ spring:
 server:
   port: 8080
 
+app:
+  upload:
+    logo-cleanup:
+      enabled: ${LOGO_CLEANUP_ENABLED:true}
+      cron: ${LOGO_CLEANUP_CRON:0 0 4 * * *}
+      zone: ${LOGO_CLEANUP_ZONE:Asia/Seoul}
