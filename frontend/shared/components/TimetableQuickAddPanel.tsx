@@ -34,7 +34,6 @@ interface ReservationRequestPanelProps {
   variant: 'admin' | 'public';
   rooms: RequestRoom[];
   selection: TimetableSlotSelection;
-  requirePhone?: boolean;
   submitError?: unknown;
   isPending?: boolean;
   onClose: () => void;
@@ -91,7 +90,6 @@ export function ReservationRequestPanel({
   variant,
   rooms,
   selection,
-  requirePhone = false,
   submitError,
   isPending = false,
   onClose,
@@ -132,7 +130,7 @@ export function ReservationRequestPanel({
     if (!values.roomId) nextErrors.roomId = '강의실을 선택해 주세요.';
     if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
     if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
-    if (requirePhone && !values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
+    if (!values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
     if (!values.purpose) nextErrors.purpose = '예약 목적을 입력해 주세요.';
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
@@ -292,7 +290,7 @@ export function ReservationRequestPanel({
           {fieldError('applicantEmail')}
         </label>
         <label>
-          전화번호{requirePhone ? '' : ' (선택)'}
+          전화번호
           <input
             data-testid={ids.phone}
             value={values.applicantPhone}

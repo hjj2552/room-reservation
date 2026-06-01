@@ -15,7 +15,7 @@ public record CreateRecurrenceRequest(
     @NotNull UUID roomId,
     @NotBlank @Size(max = 100) String applicantName,
     @NotBlank @Email @Size(max = 255) String applicantEmail,
-    @Size(max = 50) String applicantPhone,
+    @NotBlank @Size(max = 50) String applicantPhone,
     @NotBlank @Size(max = 500) String purpose,
     @NotNull LocalDate startDate,
     @NotNull LocalDate endDate,
@@ -28,4 +28,3 @@ public record CreateRecurrenceRequest(
         return new PreviewRecurrenceRequest(roomId, startDate, endDate, daysOfWeek, startTime, endTime);
     }
 }
-

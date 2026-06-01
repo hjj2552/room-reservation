@@ -231,7 +231,7 @@ export function TimetablePage() {
         roomId: values.roomId,
         applicantName: values.applicantName,
         applicantEmail: values.applicantEmail,
-        applicantPhone: values.applicantPhone || undefined,
+        applicantPhone: values.applicantPhone,
         purpose: values.purpose,
         startAt: fromDateTimeLocal(values.startAt),
         endAt: fromDateTimeLocal(values.endAt),

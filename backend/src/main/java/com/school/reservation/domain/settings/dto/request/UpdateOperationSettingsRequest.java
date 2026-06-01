@@ -23,7 +23,6 @@ public record UpdateOperationSettingsRequest(
     @NotEmpty List<String> availableDaysOfWeek,
     @NotNull @Min(1) Integer minReservationMinutes,
     @NotNull @Min(1) Integer maxReservationMinutes,
-    boolean requirePhone,
     @Size(max = 100) String adminContactName,
     @Email @Size(max = 255) String adminContactEmail,
     @Size(max = 50) String adminContactPhone,

@@ -75,7 +75,7 @@ export function RecurrencesPage() {
       ...basePayload(),
       applicantName: form.applicantName,
       applicantEmail: form.applicantEmail,
-      applicantPhone: form.applicantPhone || undefined,
+      applicantPhone: form.applicantPhone,
       purpose: form.purpose,
       conflictPolicy: form.conflictPolicy,
     });
@@ -146,6 +146,7 @@ export function RecurrencesPage() {
               name="applicantPhone"
               value={form.applicantPhone}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
+              required
             />
           </label>
           <label className="full-span">

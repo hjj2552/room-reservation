@@ -67,7 +67,7 @@ public class ReservationPolicyService {
             throw new PolicyViolationException("INVALID_SLOT_UNIT", "The requested time must match the configured slot unit.");
         }
 
-        if (settings.isRequirePhone() && (applicantPhone == null || applicantPhone.isBlank())) {
+        if (applicantPhone == null || applicantPhone.isBlank()) {
             throw new PolicyViolationException("VALIDATION_ERROR", "Phone number is required.");
         }
     }
@@ -89,4 +89,3 @@ public class ReservationPolicyService {
         }
     }
 }
-

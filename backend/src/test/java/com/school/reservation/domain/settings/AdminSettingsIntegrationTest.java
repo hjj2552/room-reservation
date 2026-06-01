@@ -94,7 +94,6 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
               "availableDaysOfWeek": ["MON", "TUE", "WED", "THU", "FRI"],
               "minReservationMinutes": 30,
               "maxReservationMinutes": 240,
-              "requirePhone": true,
               "adminContactName": "Admin",
               "adminContactEmail": "admin@example.edu",
               "adminContactPhone": "02-0000-0000",
