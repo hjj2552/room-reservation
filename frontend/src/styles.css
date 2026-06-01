@@ -1306,9 +1306,9 @@ button:disabled {
 }
 
 .entry-logo {
-  width: 96px;
-  height: 96px;
-  padding: 10px;
+  width: 288px;
+  height: 288px;
+  padding: 18px;
 }
 
 .entry-heading h1 {
@@ -1671,9 +1671,9 @@ button:disabled {
   }
 
   .entry-logo {
-    width: 72px;
-    height: 72px;
-    padding: 8px;
+    width: 216px;
+    height: 216px;
+    padding: 14px;
   }
 
   .settings-logo-row {
