@@ -94,8 +94,8 @@ export function RecurrencesPage() {
     <section className="page-section" aria-labelledby="recurrences-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">반복 예약</p>
-          <h1 id="recurrences-title">반복 예약 등록과 취소</h1>
+          <p className="eyebrow">관리자 메뉴</p>
+          <h1 id="recurrences-title">반복 예약</h1>
           <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 등록 정책을 선택합니다.</p>
         </div>
       </div>

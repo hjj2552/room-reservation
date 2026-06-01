@@ -106,8 +106,8 @@ export function AuditPage() {
     <section className="page-section" aria-labelledby="audit-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">감사 이력</p>
-          <h1 id="audit-title">예약 감사 이력</h1>
+          <p className="eyebrow">관리자 메뉴</p>
+          <h1 id="audit-title">감사 이력</h1>
           <p className="muted">예약 신청, 수정, 승인, 취소 이력을 조건별로 조회합니다.</p>
         </div>
       </div>
@@ -170,7 +170,7 @@ export function AuditPage() {
         <>
           <div className="table-wrap">
             <table className="data-table" data-testid="audit-table">
-              <caption className="sr-only">예약 감사 이력</caption>
+              <caption className="sr-only">감사 이력</caption>
               <thead>
                 <tr>
                   <th scope="col">처리 시각</th>

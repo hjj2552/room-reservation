@@ -108,7 +108,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
     <section className="page-section" aria-labelledby="reservation-form-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">예약 운영</p>
+          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="reservation-form-title">{mode === 'create' ? '예약 신청' : '예약 수정'}</h1>
           <p className="muted">
             {mode === 'edit'

@@ -36,7 +36,7 @@ export function RecurrenceDetailPage() {
     <section className="page-section" aria-labelledby="recurrence-detail-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">반복 예약 상세</p>
+          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="recurrence-detail-title">{detail.room.name}</h1>
           <p className="muted">{detail.purpose}</p>
         </div>

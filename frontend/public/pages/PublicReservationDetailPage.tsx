@@ -43,7 +43,7 @@ export function PublicReservationDetailPage() {
     <main className="public-shell" aria-labelledby="public-reservation-detail-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">예약 상세</p>
+          <p className="eyebrow">일반 사용자</p>
           <h1 id="public-reservation-detail-title">{reservation.room.name}</h1>
           <p className="muted">{formatDateTime(reservation.startAt)} 예약</p>
         </div>

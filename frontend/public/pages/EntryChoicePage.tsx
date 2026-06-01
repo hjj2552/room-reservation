@@ -1,12 +1,16 @@
 import { CalendarDays, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { usePublicSettings } from '../../shared/hooks/usePublicReservation';
 
 export function EntryChoicePage() {
+  const settings = usePublicSettings();
+  const organizationName = settings.data?.organizationName || '강의실 예약';
+
   return (
     <main className="entry-page">
       <section className="entry-panel" aria-labelledby="entry-title">
         <div className="entry-heading">
-          <p className="eyebrow">강의실 예약</p>
+          <p className="eyebrow">{organizationName}</p>
           <h1 id="entry-title">이용 목적을 선택해 주세요</h1>
           <p className="muted">예약 신청과 운영 관리를 구분해서 바로 시작할 수 있습니다.</p>
         </div>
