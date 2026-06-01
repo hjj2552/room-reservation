@@ -1,11 +1,14 @@
 package com.school.reservation.domain.settings;
 
 import com.school.reservation.domain.settings.dto.request.UpdateOperationSettingsRequest;
+import com.school.reservation.domain.settings.dto.response.LogoCleanupResponse;
 import com.school.reservation.global.exception.ApiConflictException;
 import jakarta.persistence.EntityNotFoundException;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
+    private static final Duration LOGO_CLEANUP_GRACE_PERIOD = Duration.ofHours(24);
     private static final Set<Integer> ALLOWED_SLOT_MINUTES = Set.of(5, 10, 15, 30, 60);
     private static final Set<String> ALLOWED_DAYS = Set.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
 
@@ -68,6 +72,16 @@ public class SettingsService {
         );
         schedulePreviousLogoCleanup(previousLogoUrl, nextLogoUrl);
         return settings;
+    }
+
+    @Transactional(readOnly = true)
+    public LogoCleanupResponse cleanupOrphanLogos() {
+        Set<String> referencedLogoUrls = operationSettingsRepository.findAll().stream()
+            .map(OperationSettings::getLogoUrl)
+            .filter(Objects::nonNull)
+            .filter(value -> !value.isBlank())
+            .collect(Collectors.toSet());
+        return logoStorageService.cleanupOrphanLogos(referencedLogoUrls, LOGO_CLEANUP_GRACE_PERIOD);
     }
 
     private void schedulePreviousLogoCleanup(String previousLogoUrl, String nextLogoUrl) {
