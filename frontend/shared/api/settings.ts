@@ -11,3 +11,12 @@ export function updateSettings(payload: OperationSettings) {
     body: payload,
   });
 }
+
+export function uploadSettingsLogo(file: File) {
+  const formData = new FormData();
+  formData.set('file', file);
+  return apiRequest<{ logoUrl: string }>('/api/admin/settings/logo', {
+    method: 'POST',
+    body: formData,
+  });
+}

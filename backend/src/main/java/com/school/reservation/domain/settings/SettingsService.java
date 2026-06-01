@@ -53,6 +53,7 @@ public class SettingsService {
             request.adminContactEmail(),
             request.adminContactPhone(),
             request.completionMessage(),
+            request.logoUrl(),
             actorId
         );
         return settings;

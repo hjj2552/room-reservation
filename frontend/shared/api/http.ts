@@ -17,8 +17,9 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
+  const isFormData = options.body instanceof FormData;
 
-  if (options.body !== undefined && !headers.has('Content-Type')) {
+  if (options.body !== undefined && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -26,7 +27,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ...options,
     headers,
     credentials: 'include',
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined
+      ? undefined
+      : isFormData
+        ? options.body as BodyInit
+        : JSON.stringify(options.body),
   });
 
   if (!response.ok) {

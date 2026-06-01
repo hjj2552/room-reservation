@@ -23,6 +23,7 @@ public record OperationSettingsResponse(
     String adminContactEmail,
     String adminContactPhone,
     String completionMessage,
+    String logoUrl,
     Long version
 ) {
     public static OperationSettingsResponse from(OperationSettings settings) {
@@ -44,8 +45,8 @@ public record OperationSettingsResponse(
             settings.getAdminContactEmail(),
             settings.getAdminContactPhone(),
             settings.getCompletionMessage(),
+            settings.getLogoUrl(),
             settings.getVersion()
         );
     }
 }
-
