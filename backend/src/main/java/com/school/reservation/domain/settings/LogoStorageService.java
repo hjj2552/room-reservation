@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import javax.imageio.ImageIO;
@@ -74,5 +75,31 @@ public class LogoStorageService {
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to load logo image.", exception);
         }
+    }
+
+    public void deleteStoredLogo(String logoUrl) {
+        storedLogoPath(logoUrl).ifPresent(path -> {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException exception) {
+                throw new IllegalStateException("Failed to delete previous logo image.", exception);
+            }
+        });
+    }
+
+    private Optional<Path> storedLogoPath(String logoUrl) {
+        if (logoUrl == null || logoUrl.isBlank()) {
+            return Optional.empty();
+        }
+        String prefix = "/api/public/settings/logo/";
+        if (!logoUrl.startsWith(prefix)) {
+            return Optional.empty();
+        }
+        String fileName = Path.of(logoUrl.substring(prefix.length())).getFileName().toString();
+        Path file = logoRoot.resolve(fileName).normalize();
+        if (!file.startsWith(logoRoot)) {
+            return Optional.empty();
+        }
+        return Optional.of(file);
     }
 }
