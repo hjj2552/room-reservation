@@ -159,6 +159,14 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$[0].action").value("CANCELLED"))
             .andExpect(jsonPath("$[1].action").value("APPROVED"))
             .andExpect(jsonPath("$[2].action").value("UPDATED"))
+            .andExpect(jsonPath("$[2].beforeReservationPurpose").value("History enum"))
+            .andExpect(jsonPath("$[2].reservationPurpose").value("History enum updated"))
+            .andExpect(jsonPath("$[2].beforeReservationRoomName").value("Room 101"))
+            .andExpect(jsonPath("$[2].reservationRoomName").value("Room 101"))
+            .andExpect(jsonPath("$[2].beforeReservationApplicantName").value("History User"))
+            .andExpect(jsonPath("$[2].reservationApplicantName").value("History Updated"))
+            .andExpect(jsonPath("$[2].beforeReservationApplicantEmail").value("history@example.com"))
+            .andExpect(jsonPath("$[2].reservationApplicantEmail").value("history-updated@example.com"))
             .andExpect(jsonPath("$[3].action").value("CREATED_BY_ADMIN"));
     }
 
