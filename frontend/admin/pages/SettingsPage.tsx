@@ -207,14 +207,6 @@ export function SettingsPage() {
             required
           />
         </label>
-        <label className="toggle-label settings-toggle">
-          <input
-            type="checkbox"
-            checked={form.requirePhone}
-            onChange={(event) => updateField('requirePhone', event.target.checked)}
-          />
-          전화번호 필수 입력
-        </label>
         <fieldset className="full-span checkbox-group">
           <legend>예약 가능 요일</legend>
           {days.map((day) => (

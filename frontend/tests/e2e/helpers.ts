@@ -33,7 +33,6 @@ export interface E2eSettings {
   availableDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
-  requirePhone: boolean;
   adminContactName: string | null;
   adminContactEmail: string | null;
   adminContactPhone: string | null;

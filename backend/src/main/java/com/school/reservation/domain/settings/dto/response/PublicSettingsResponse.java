@@ -18,7 +18,6 @@ public record PublicSettingsResponse(
     List<String> availableDaysOfWeek,
     Integer minReservationMinutes,
     Integer maxReservationMinutes,
-    boolean requirePhone,
     String completionMessage,
     String logoUrl,
     String adminContactEmail
@@ -37,7 +36,6 @@ public record PublicSettingsResponse(
             settings.availableDaySet().stream().sorted().toList(),
             settings.getMinReservationMinutes(),
             settings.getMaxReservationMinutes(),
-            settings.isRequirePhone(),
             settings.getCompletionMessage(),
             settings.getLogoUrl(),
             settings.getAdminContactEmail()

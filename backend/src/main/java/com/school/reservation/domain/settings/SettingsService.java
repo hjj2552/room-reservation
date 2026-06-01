@@ -62,7 +62,6 @@ public class SettingsService {
             String.join(",", request.availableDaysOfWeek()),
             request.minReservationMinutes(),
             request.maxReservationMinutes(),
-            request.requirePhone(),
             request.adminContactName(),
             request.adminContactEmail(),
             request.adminContactPhone(),

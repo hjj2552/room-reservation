@@ -76,7 +76,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
       roomId: values.roomId,
       applicantName: values.applicantName,
       applicantEmail: values.applicantEmail,
-      applicantPhone: values.applicantPhone || undefined,
+      applicantPhone: values.applicantPhone,
       purpose: values.purpose,
       startAt: fromDateTimeLocal(values.startAt),
       endAt: fromDateTimeLocal(values.endAt),
@@ -160,7 +160,12 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </label>
         <label>
           전화번호
-          <input data-testid="reservation-phone-input" {...register('applicantPhone')} />
+          <input
+            data-testid="reservation-phone-input"
+            placeholder="- 제외하고 입력"
+            {...register('applicantPhone', { required: '전화번호를 입력하세요.' })}
+          />
+          {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
         </label>
         <label>
           예약 목적

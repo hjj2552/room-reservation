@@ -75,7 +75,6 @@ export interface OperationSettings {
   availableDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
-  requirePhone: boolean;
   adminContactName: string | null;
   adminContactEmail: string | null;
   adminContactPhone: string | null;
@@ -123,7 +122,7 @@ export interface PublicReservationPayload {
   roomId: string;
   applicantName: string;
   applicantEmail: string;
-  applicantPhone?: string;
+  applicantPhone: string;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -231,7 +230,7 @@ export interface ReservationPayload {
   roomId: string;
   applicantName: string;
   applicantEmail: string;
-  applicantPhone?: string;
+  applicantPhone: string;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -251,7 +250,7 @@ export interface RecurrencePreviewPayload {
 export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
   applicantName: string;
   applicantEmail: string;
-  applicantPhone?: string;
+  applicantPhone: string;
   purpose: string;
   conflictPolicy: ConflictPolicy;
 }

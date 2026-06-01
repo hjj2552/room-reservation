@@ -13,7 +13,7 @@ public record UpdateReservationRequest(
     @NotNull UUID roomId,
     @NotBlank @Size(max = 100) String applicantName,
     @NotBlank @Email @Size(max = 255) String applicantEmail,
-    @Size(max = 50) String applicantPhone,
+    @NotBlank @Size(max = 50) String applicantPhone,
     @NotBlank @Size(max = 500) String purpose,
     @NotNull OffsetDateTime startAt,
     @NotNull OffsetDateTime endAt,
@@ -33,4 +33,3 @@ public record UpdateReservationRequest(
         );
     }
 }
-

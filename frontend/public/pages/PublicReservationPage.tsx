@@ -194,7 +194,7 @@ export function PublicReservationPage() {
         roomId: values.roomId,
         applicantName: values.applicantName,
         applicantEmail: values.applicantEmail,
-        applicantPhone: values.applicantPhone || undefined,
+        applicantPhone: values.applicantPhone,
         purpose: values.purpose,
         startAt: fromDateTimeLocal(values.startAt),
         endAt: fromDateTimeLocal(values.endAt),
@@ -382,7 +382,6 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          requirePhone={Boolean(settings.data?.requirePhone)}
           onClose={() => setQuickSelection(null)}
           onSubmit={handlePublicRequest}
           submitError={create.error}
