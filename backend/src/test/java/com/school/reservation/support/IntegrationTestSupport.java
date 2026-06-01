@@ -69,7 +69,6 @@ public abstract class IntegrationTestSupport {
                 available_days_of_week = 'MON,TUE,WED,THU,FRI',
                 min_reservation_minutes = 30,
                 max_reservation_minutes = 240,
-                require_phone = true,
                 semester_start_date = current_date - interval '1 day',
                 semester_end_date = current_date + interval '120 days',
                 version = 0
