@@ -10,6 +10,9 @@ export function EntryChoicePage() {
     <main className="entry-page">
       <section className="entry-panel" aria-labelledby="entry-title">
         <div className="entry-heading">
+          {settings.data?.logoUrl ? (
+            <img className="entry-logo" src={settings.data.logoUrl} alt={`${organizationName} 로고`} />
+          ) : null}
           <p className="eyebrow">{organizationName}</p>
           <h1 id="entry-title">이용 목적을 선택해 주세요</h1>
           <p className="muted">예약 신청과 운영 관리를 구분해서 바로 시작할 수 있습니다.</p>

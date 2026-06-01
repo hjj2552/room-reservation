@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getSettings, updateSettings } from '../api/settings';
+import { getSettings, updateSettings, uploadSettingsLogo } from '../api/settings';
 
 export const settingsKeys = {
   current: ['settings', 'current'] as const,
@@ -20,5 +20,11 @@ export function useUpdateSettings() {
       queryClient.setQueryData(settingsKeys.current, settings);
       queryClient.invalidateQueries({ queryKey: settingsKeys.current });
     },
+  });
+}
+
+export function useUploadSettingsLogo() {
+  return useMutation({
+    mutationFn: uploadSettingsLogo,
   });
 }
