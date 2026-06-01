@@ -14,8 +14,8 @@ export function EntryChoicePage() {
             <img className="entry-logo" src={settings.data.logoUrl} alt={`${organizationName} 로고`} />
           ) : null}
           <p className="eyebrow">{organizationName}</p>
-          <h1 id="entry-title">이용 목적을 선택해 주세요</h1>
-          <p className="muted">예약 신청과 운영 관리를 구분해서 바로 시작할 수 있습니다.</p>
+          <h1 id="entry-title">이용할 메뉴를 선택해 주세요</h1>
+          <p className="muted">예약 신청 또는 관리자 메뉴로 바로 이동할 수 있습니다.</p>
         </div>
 
         <div className="entry-options">
