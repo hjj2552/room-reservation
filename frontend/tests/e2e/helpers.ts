@@ -14,6 +14,13 @@ export interface E2eReservation {
   purpose?: string;
 }
 
+export interface E2ePublicReservation extends E2eReservation {
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  cancelPassword: string;
+}
+
 export interface E2eRecurrence {
   recurrenceId: string;
   createdCount: number;
@@ -104,6 +111,55 @@ export async function createReservationByApi(
   });
   expect(response.ok()).toBeTruthy();
   return response.json() as Promise<E2eReservation>;
+}
+
+export async function createPublicReservationByApi(
+  request: APIRequestContext,
+  roomId: string,
+  purpose: string,
+  options: {
+    startAt?: string;
+    endAt?: string;
+    applicantName?: string;
+    applicantEmail?: string;
+    applicantPhone?: string;
+    cancelPassword?: string;
+  } = {},
+) {
+  const startAt = options.startAt || nextWeekdayAtOffset(13, 0);
+  const applicantName = options.applicantName || uniqueE2eName('public-applicant');
+  const applicantEmail = options.applicantEmail || `${uniqueE2eName('public-email')}@example.test`;
+  const applicantPhone = options.applicantPhone || '010-3000-4000';
+  const cancelPassword = options.cancelPassword || 'e2e-public-password';
+  const response = await request.post('/api/public/reservations', {
+    data: {
+      roomId,
+      applicantName,
+      applicantEmail,
+      applicantPhone,
+      purpose,
+      startAt,
+      endAt: options.endAt || addHours(startAt, 1),
+      cancelPassword,
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  const reservation = await response.json() as E2eReservation;
+  return {
+    ...reservation,
+    purpose,
+    applicantName,
+    applicantEmail,
+    applicantPhone,
+    cancelPassword,
+  } as E2ePublicReservation;
+}
+
+export async function approveReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
+  const response = await request.post(`/api/admin/reservations/${reservationId}/approve`, {
+    data: memo ? { memo } : undefined,
+  });
+  expect(response.ok()).toBeTruthy();
 }
 
 export async function cancelReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {

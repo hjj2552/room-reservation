@@ -6,8 +6,10 @@ import {
   getPublicSettings,
   getPublicWeeklyReservations,
   listPublicRooms,
+  updatePublicReservation,
+  verifyPublicReservationForEdit,
 } from '../api/public';
-import type { PublicReservationPayload } from '../api/types';
+import type { PublicReservationUpdatePayload, PublicReservationPayload } from '../api/types';
 
 export const publicReservationKeys = {
   rooms: ['public', 'rooms'] as const,
@@ -60,6 +62,23 @@ export function useCancelPublicReservation(reservationId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (cancelPassword: string) => cancelPublicReservation(reservationId, cancelPassword),
+    onSuccess: (reservation) => {
+      queryClient.setQueryData(publicReservationKeys.detail(reservationId), reservation);
+      queryClient.invalidateQueries({ queryKey: ['public', 'weekly-reservations'] });
+    },
+  });
+}
+
+export function useVerifyPublicReservationForEdit(reservationId: string) {
+  return useMutation({
+    mutationFn: (cancelPassword: string) => verifyPublicReservationForEdit(reservationId, cancelPassword),
+  });
+}
+
+export function useUpdatePublicReservation(reservationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PublicReservationUpdatePayload) => updatePublicReservation(reservationId, payload),
     onSuccess: (reservation) => {
       queryClient.setQueryData(publicReservationKeys.detail(reservationId), reservation);
       queryClient.invalidateQueries({ queryKey: ['public', 'weekly-reservations'] });

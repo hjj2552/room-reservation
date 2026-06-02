@@ -12,6 +12,7 @@ import { RoomsPage } from '../admin/pages/RoomsPage';
 import { SettingsPage } from '../admin/pages/SettingsPage';
 import { TimetablePage } from '../admin/pages/TimetablePage';
 import { PublicReservationDetailPage } from '../public/pages/PublicReservationDetailPage';
+import { PublicReservationEditPage } from '../public/pages/PublicReservationEditPage';
 import { EntryChoicePage } from '../public/pages/EntryChoicePage';
 import { PublicReservationPage } from '../public/pages/PublicReservationPage';
 
@@ -20,11 +21,13 @@ export const router = createBrowserRouter([
   { path: '/timetable', element: <PublicReservationPage /> },
   { path: '/reserve', element: <PublicReservationPage /> },
   { path: '/reservations/:reservationId', element: <PublicReservationDetailPage /> },
+  { path: '/reservations/:reservationId/edit', element: <PublicReservationEditPage /> },
   { path: '/cancel', element: <Navigate to="/timetable" replace /> },
   { path: '/cancel/:reservationId', element: <PublicReservationDetailPage /> },
   { path: '/public', element: <Navigate to="/timetable" replace /> },
   { path: '/request', element: <Navigate to="/reserve" replace /> },
   { path: '/public/reservations/new', element: <Navigate to="/reserve" replace /> },
+  { path: '/public/reservations/:reservationId/edit', element: <NavigateToPublicReservationEdit /> },
   { path: '/public/reservations/:reservationId', element: <NavigateToPublicReservationDetail /> },
   { path: '/login', element: <Navigate to="/admin/login" replace /> },
   { path: '/admin/login', element: <LoginPage /> },
@@ -50,7 +53,6 @@ export const router = createBrowserRouter([
   },
   { path: '/reservations', element: <Navigate to="/admin/reservations" replace /> },
   { path: '/reservations/new', element: <Navigate to="/admin/timetable" replace /> },
-  { path: '/reservations/:reservationId/edit', element: <NavigateToAdminReservationEdit /> },
   { path: '/recurrences', element: <Navigate to="/admin/recurrences" replace /> },
   { path: '/recurrences/:recurrenceId', element: <NavigateToAdminRecurrenceDetail /> },
   { path: '/rooms', element: <Navigate to="/admin/rooms" replace /> },
@@ -63,8 +65,8 @@ function NavigateToPublicReservationDetail() {
   return <Navigate to={window.location.pathname.replace('/public/reservations', '/reservations')} replace />;
 }
 
-function NavigateToAdminReservationEdit() {
-  return <Navigate to={`/admin${window.location.pathname}`} replace />;
+function NavigateToPublicReservationEdit() {
+  return <Navigate to={window.location.pathname.replace('/public/reservations', '/reservations')} replace />;
 }
 
 function NavigateToAdminRecurrenceDetail() {

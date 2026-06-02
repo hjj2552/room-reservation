@@ -236,6 +236,59 @@ public class ReservationService {
         return reservation;
     }
 
+    @Transactional(readOnly = true)
+    public Reservation verifyPublicReservationForEdit(UUID reservationId, String cancelPassword) {
+        Reservation reservation = getReservationOrThrow(reservationId);
+        validatePublicPassword(reservation, cancelPassword);
+        validatePublicEditable(reservation);
+        return reservation;
+    }
+
+    @Transactional
+    public Reservation updatePublicReservation(UUID reservationId, @Valid UpdateReservationCommand command, String cancelPassword) {
+        Reservation reservation = getReservationOrThrow(reservationId);
+        validatePublicPassword(reservation, cancelPassword);
+        validatePublicEditable(reservation);
+
+        Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
+            .orElseThrow(() -> new EntityNotFoundException("Room not found."));
+        policyService.validate(room, command.startAt(), command.endAt(), command.applicantPhone());
+        conflictService.validateNoConflict(command.roomId(), command.startAt(), command.endAt(), reservationId);
+
+        Reservation.ReservationStatus beforeStatus = reservation.getStatus();
+        ReservationHistory.Snapshot beforeSnapshot = ReservationHistory.Snapshot.from(reservation);
+        try {
+            reservation.update(
+                room,
+                command.applicantName(),
+                command.applicantEmail(),
+                command.applicantPhone(),
+                command.purpose(),
+                command.startAt(),
+                command.endAt(),
+                Reservation.ReservationStatus.REQUESTED,
+                Reservation.ActorType.PUBLIC_USER,
+                command.applicantEmail()
+            );
+            historyRepository.save(ReservationHistory.updated(
+                reservation,
+                beforeStatus,
+                null,
+                Reservation.ActorType.PUBLIC_USER,
+                command.applicantEmail(),
+                beforeSnapshot
+            ));
+            reservationRepository.flush();
+            return reservation;
+        } catch (DataIntegrityViolationException exception) {
+            throw new ReservationConflictService.TimeSlotConflictException(
+                command.roomId(),
+                command.startAt(),
+                command.endAt()
+            );
+        }
+    }
+
     @Transactional
     public void deleteReservation(UUID reservationId, String adminId, String memo) {
         Reservation reservation = getReservationOrThrow(reservationId);
@@ -275,6 +328,19 @@ public class ReservationService {
     public Reservation getReservationOrThrow(UUID reservationId) {
         return reservationRepository.findDetailById(reservationId)
             .orElseThrow(() -> new EntityNotFoundException("Reservation not found."));
+    }
+
+    private void validatePublicPassword(Reservation reservation, String cancelPassword) {
+        if (reservation.getCancelPasswordHash() == null
+            || !passwordEncoder.matches(cancelPassword, reservation.getCancelPasswordHash())) {
+            throw new PublicReservationPasswordMismatchException();
+        }
+    }
+
+    private void validatePublicEditable(Reservation reservation) {
+        if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
+            throw new IllegalArgumentException("Cancelled reservations cannot be edited.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -368,6 +434,12 @@ public class ReservationService {
     public static class PublicCancelPasswordMismatchException extends RuntimeException {
         public PublicCancelPasswordMismatchException() {
             super("Cancel password does not match.");
+        }
+    }
+
+    public static class PublicReservationPasswordMismatchException extends RuntimeException {
+        public PublicReservationPasswordMismatchException() {
+            super("Reservation password does not match.");
         }
     }
 }

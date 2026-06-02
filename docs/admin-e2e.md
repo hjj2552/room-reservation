@@ -44,6 +44,8 @@ npm.cmd run e2e
 
 `npm run e2e` starts a backend only when `E2E_BACKEND_URL` is not reachable. The started backend uses `SPRING_PROFILES_ACTIVE=e2e` by default. It also starts the Vite dev server when `PLAYWRIGHT_BASE_URL` is not reachable.
 
+If a backend is already reachable on `E2E_BACKEND_URL`, the runner reuses it. Make sure that existing backend is either running with the `e2e` profile or was started with cleanup explicitly enabled. Otherwise the suite can still run, but the before/after prefix cleanup may log that the cleanup endpoint is unavailable.
+
 ## GitHub Actions CI
 
 The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull requests and pushes to `main`.
@@ -130,3 +132,5 @@ npm.cmd run e2e:cleanup:legacy
 ```
 
 When running against a local/dev backend, start that backend with `E2E_CLEANUP_ENABLED=true` first. From the repository root you can use `.\start-backend-cleanup-enabled.bat`. Without that opt-in, `/api/admin/test-data/e2e/preview` returns 404 because the controller is not registered. The manual cleanup command logs in as the admin user and calls the guarded `/api/admin/test-data/e2e` cleanup endpoints. If the backend is not on `http://127.0.0.1:8080`, set `E2E_API_BASE_URL`.
+
+`start-backend-cleanup-enabled.bat` starts the normal local PostgreSQL service, then runs the backend with `--spring.profiles.active=local` and `E2E_CLEANUP_ENABLED=true`. It is intended only for local/dev test-data cleanup. Do not use it for production. For CI-shaped E2E runs against the disposable test database, prefer `postgres-test` plus the `e2e` profile.

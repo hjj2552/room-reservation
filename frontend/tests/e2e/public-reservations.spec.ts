@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { getSettingsByApi, nextWeekdayReservationLocalInputs, updateSettingsByApi } from './helpers';
+import { approveReservationByApi, getSettingsByApi, nextWeekdayReservationLocalInputs, updateSettingsByApi } from './helpers';
 
 function maskName(value: string) {
   const chars = Array.from(value);
@@ -144,6 +144,56 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
     await page.getByTestId('public-timetable-week-input').fill(reservationTime.date);
     await expect(page.getByText(purpose)).toHaveCount(0);
+  } finally {
+    const latestSettings = await getSettingsByApi(request);
+    await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
+  }
+});
+
+test('public can edit an approved reservation and it returns to pending approval', async ({ page, request, e2eData }) => {
+  const originalSettings = await getSettingsByApi(request);
+  await updateSettingsByApi(request, {
+    ...originalSettings,
+    reservationEnabled: true,
+    reservationDisabledMessage: originalSettings.reservationDisabledMessage || 'Reservation is currently disabled.',
+  });
+  const room = await e2eData.createTestRoom('public-edit-room');
+  const createTime = nextWeekdayReservationLocalInputs({ daysAhead: 28, startHour: 10, endHour: 11 });
+  const editTime = nextWeekdayReservationLocalInputs({ daysAhead: 28, startHour: 12, endHour: 13 });
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-edit-approved', {
+    startAt: `${createTime.startAt}:00+09:00`,
+    endAt: `${createTime.endAt}:00+09:00`,
+    cancelPassword: 'e2e-public-edit-password',
+  });
+  await approveReservationByApi(request, reservation.id, 'e2e-approve-public-edit');
+  const editedPurpose = e2eData.name('reservation-public-edit-updated');
+  const editedName = e2eData.name('public-edit-applicant-updated');
+  const editedEmail = `${e2eData.name('public-edit-email-updated')}@example.test`;
+  const editedPhone = '010-5555-6666';
+
+  try {
+    await page.goto(`/reservations/${reservation.id}`);
+    await expect(page.locator('.status-badge')).toContainText('승인');
+    await page.getByTestId('public-reservation-edit-link').click();
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
+
+    await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
+    await page.getByTestId('public-edit-verify-button').click();
+    await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
+    await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
+
+    await page.getByTestId('public-edit-purpose-input').fill(editedPurpose);
+    await page.getByTestId('public-edit-applicant-name-input').fill(editedName);
+    await page.getByTestId('public-edit-email-input').fill(editedEmail);
+    await page.getByTestId('public-edit-phone-input').fill(editedPhone);
+    await page.getByTestId('public-edit-start-input').fill(editTime.startAt);
+    await page.getByTestId('public-edit-end-input').fill(editTime.endAt);
+    await page.getByTestId('public-edit-save-button').click();
+
+    await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');
+    await page.goto(`/reservations/${reservation.id}`);
+    await expect(page.locator('.status-badge')).toContainText('승인 대기');
+    await expect(page.locator('.reservation-detail-main')).toContainText(editedPurpose);
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });

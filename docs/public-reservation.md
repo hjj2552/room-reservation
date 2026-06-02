@@ -12,9 +12,16 @@ The public reservation page is available at `/public/reservations/new`. `/reques
 
 ## Request State
 
-- Public submissions are stored as `REQUESTED`, not as confirmed reservations.
+- Public submissions are stored as `REQUESTED`, not as approved (`CONFIRMED`) reservations.
 - The success message must say that the reservation request was received, not that the reservation is complete.
 - Admin approval, rejection, forced creation, recurrence creation, audit history, and admin memo fields are not exposed in the public UI.
+- Reservation state names are `REQUESTED` for pending approval, `CONFIRMED` for approved, and `CANCELLED` for cancelled. `APPROVED` is not a reservation state; it is an audit/history action for an approval event.
+
+## Public Edit Policy
+
+- Public users can edit their own `REQUESTED` reservations after password verification. Saving keeps the state as `REQUESTED`.
+- Public users can edit their own `CONFIRMED` reservations after password verification. Saving runs the normal room/time conflict check again and changes the state back to `REQUESTED`.
+- Public users cannot edit `CANCELLED` reservations. Public cancellation restore is not supported.
 
 ## Cancel Password Policy
 
@@ -30,6 +37,7 @@ The backend is the final authority for overlap checks.
 
 - A public request is rejected when it overlaps an existing `CONFIRMED` reservation for the same room.
 - A public request is also rejected when it overlaps an existing `REQUESTED` request for the same room.
+- Public edits also run this conflict check before saving. The reservation being edited is excluded from its own overlap check.
 - This keeps the policy to one pending request per room/time slot.
 - Cancelled reservations do not block new requests.
 

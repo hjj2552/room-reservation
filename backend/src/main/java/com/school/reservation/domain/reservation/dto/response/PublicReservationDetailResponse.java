@@ -14,9 +14,11 @@ public record PublicReservationDetailResponse(
     OffsetDateTime startAt,
     OffsetDateTime endAt,
     Reservation.ReservationStatus status,
-    boolean cancellable
+    boolean cancellable,
+    boolean editable
 ) {
     public static PublicReservationDetailResponse from(Reservation reservation) {
+        boolean active = reservation.getStatus() != Reservation.ReservationStatus.CANCELLED;
         return new PublicReservationDetailResponse(
             reservation.getId(),
             RoomSummary.from(reservation),
@@ -27,7 +29,8 @@ public record PublicReservationDetailResponse(
             reservation.getStartAt(),
             reservation.getEndAt(),
             reservation.getStatus(),
-            reservation.getStatus() != Reservation.ReservationStatus.CANCELLED
+            active,
+            active
         );
     }
 
