@@ -90,7 +90,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void cancelledReservationCanBeReactivatedAsConfirmedThroughUpdate() throws Exception {
+    void cancelledReservationCanBeReactivatedAsConfirmedStatusThroughUpdate() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime startAt = nextWeekdayAt(12, 0);
         UUID reservationId = createAdminReservation(session, startAt, "Cancel Then Confirm");
@@ -100,7 +100,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "memo": "cancel before confirmed update"
+                      "memo": "cancel before confirmed status update"
                     }
                     """))
             .andExpect(status().isOk());
@@ -111,19 +111,19 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                 .content("""
                     {
                       "roomId": "%s",
-                      "applicantName": "Confirmed Again",
-                      "applicantEmail": "reactivated-confirmed@example.com",
+                      "applicantName": "Confirmed Status Again",
+                      "applicantEmail": "reactivated-confirmed-status@example.com",
                       "applicantPhone": "010-4444-4444",
-                      "purpose": "Reactivated as confirmed",
+                      "purpose": "Reactivated as confirmed status",
                       "startAt": "%s",
                       "endAt": "%s",
                       "status": "CONFIRMED",
-                      "memo": "reactivate as confirmed"
+                      "memo": "reactivate as confirmed status"
                     }
                     """.formatted(firstRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CONFIRMED"))
-            .andExpect(jsonPath("$.purpose").value("Reactivated as confirmed"));
+            .andExpect(jsonPath("$.purpose").value("Reactivated as confirmed status"));
     }
 
     @Test
@@ -164,18 +164,18 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void cancelledReservationConfirmedReactivationFailsWhenSlotConflicts() throws Exception {
+    void cancelledReservationConfirmedStatusReactivationFailsWhenSlotConflicts() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime startAt = nextWeekdayAt(15, 0);
-        UUID reservationId = createAdminReservation(session, startAt, "Cancelled Confirm Conflict Source");
-        createAdminReservation(session, startAt.plusHours(1), "Existing Confirm Conflict");
+        UUID reservationId = createAdminReservation(session, startAt, "Cancelled Confirmed Status Conflict Source");
+        createAdminReservation(session, startAt.plusHours(1), "Existing Confirmed Status Conflict");
 
         mockMvc.perform(post("/api/admin/reservations/{reservationId}/cancel", reservationId)
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "memo": "cancel before confirmed conflict update"
+                      "memo": "cancel before confirmed status conflict update"
                     }
                     """))
             .andExpect(status().isOk());
@@ -186,14 +186,14 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                 .content("""
                     {
                       "roomId": "%s",
-                      "applicantName": "Confirm Conflict User",
-                      "applicantEmail": "reactivated-confirm-conflict@example.com",
+                      "applicantName": "Confirmed Status Conflict User",
+                      "applicantEmail": "reactivated-confirmed-status-conflict@example.com",
                       "applicantPhone": "010-6666-6666",
-                      "purpose": "Reactivated confirmed conflict",
+                      "purpose": "Reactivated confirmed status conflict",
                       "startAt": "%s",
                       "endAt": "%s",
                       "status": "CONFIRMED",
-                      "memo": "reactivate confirmed conflict"
+                      "memo": "reactivate confirmed status conflict"
                     }
                     """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isConflict())

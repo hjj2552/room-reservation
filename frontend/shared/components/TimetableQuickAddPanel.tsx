@@ -178,7 +178,7 @@ export function ReservationRequestPanel({
           <h2 id="reservation-request-title">예약 신청</h2>
           <p className="muted">
             {selection.source === 'slot' ? `${selection.date} 선택 슬롯` : `${selection.date} 새 신청`}
-            {isAdmin ? ' · 관리자는 승인 상태로 저장할 수 있습니다.' : ' · 신청은 대기 상태로 접수됩니다.'}
+            {isAdmin ? ' · 관리자는 승인 상태로 저장할 수 있습니다.' : ' · 신청은 승인 대기 상태로 저장됩니다.'}
           </p>
         </div>
         <button
@@ -241,7 +241,7 @@ export function ReservationRequestPanel({
           </label>
         ) : (
           <label>
-            접수 상태
+            예약 상태
             <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} {...inputErrorProps('status')} />
             {fieldError('status')}
           </label>

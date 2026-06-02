@@ -26,7 +26,7 @@ import { maskName } from '../../shared/utils/privacyMasking';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
-const timetablePageSizeNote = '표시된 신청/예약은 대기 또는 승인 상태입니다.';
+const timetablePageSizeNote = '표시된 신청/예약은 승인 대기 또는 승인 상태입니다.';
 const publicStatusLabels = {
   REQUESTED: statusLabels.REQUESTED,
   CONFIRMED: statusLabels.CONFIRMED,
@@ -213,7 +213,7 @@ export function PublicReservationPage() {
     <div className="public-shell" aria-labelledby="timetable-title">
       <TimetablePageHeader
         eyebrow="일반 사용자"
-        helperText="신청은 대기 상태로 접수되며 운영자 승인 후 예약됩니다."
+        helperText="신청은 승인 대기 상태로 저장되며 운영자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
         buttonDisabled={Boolean(isUnavailable)}
         onNewRequest={handleNewRequestClick}

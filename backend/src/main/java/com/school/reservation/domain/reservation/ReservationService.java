@@ -214,7 +214,7 @@ public class ReservationService {
     public Reservation cancelPublicReservation(UUID reservationId, String cancelPassword) {
         Reservation reservation = getReservationOrThrow(reservationId);
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cancelled reservations cannot be cancelled again.");
+            throw new IllegalArgumentException("CANCELLED status reservations cannot be cancelled again.");
         }
         if (reservation.getCancelPasswordHash() == null
             || !passwordEncoder.matches(cancelPassword, reservation.getCancelPasswordHash())) {
@@ -339,7 +339,7 @@ public class ReservationService {
 
     private void validatePublicEditable(Reservation reservation) {
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cancelled reservations cannot be edited.");
+            throw new IllegalArgumentException("CANCELLED status reservations cannot be edited.");
         }
     }
 

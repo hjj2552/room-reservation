@@ -150,7 +150,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
   }
 });
 
-test('public can edit an approved reservation and it returns to pending approval', async ({ page, request, e2eData }) => {
+test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
     ...originalSettings,
