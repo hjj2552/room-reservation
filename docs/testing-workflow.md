@@ -39,6 +39,8 @@ cd backend
 
 ## 회귀 위험이 큰 계약
 
+- 예약 상태 enum은 `REQUESTED`(승인 대기), `CONFIRMED`(승인), `CANCELLED`(취소)로 해석한다.
+- `APPROVED`는 예약 상태가 아니라 `reservation_histories.action` 값이다. 승인 처리 후 예약 상태는 `CONFIRMED`, 감사 이력 action은 `APPROVED`가 된다.
 - `REQUESTED`, `CONFIRMED` 예약은 모두 충돌 대상으로 본다.
 - `FAIL_ALL` 반복 예약은 일부 충돌만 있어도 recurrence와 generated reservation을 만들지 않는다.
 - `SKIP_CONFLICTS`, `CREATE_AVAILABLE_ONLY`는 가능한 회차만 생성하고 skipped 응답을 돌려준다.

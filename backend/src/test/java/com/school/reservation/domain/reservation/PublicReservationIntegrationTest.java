@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -180,6 +181,182 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.cancellable").value(false));
     }
 
+    @Test
+    void publicCanEditRequestedReservationAndStatusStaysRequested() throws Exception {
+        OffsetDateTime startAt = nextWeekdayAt(9, 0);
+        OffsetDateTime updatedStartAt = nextWeekdayAt(10, 0);
+        UUID reservationId = createPublicReservationAndReturnId(startAt, startAt.plusHours(1), "Public edit requested");
+
+        mockMvc.perform(post("/api/public/reservations/{reservationId}/edit", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "cancelPassword": "test-password"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.applicantEmail").value("public-cancel@example.com"))
+            .andExpect(jsonPath("$.editable").value(true));
+
+        mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Public Edited User",
+                      "applicantEmail": "public-edited@example.com",
+                      "applicantPhone": "010-1234-5678",
+                      "purpose": "Edited requested purpose",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "cancelPassword": "test-password"
+                    }
+                    """.formatted(firstRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("REQUESTED"))
+            .andExpect(jsonPath("$.purpose").value("Edited requested purpose"));
+
+        String status = jdbcTemplate.queryForObject(
+            "select status from reservations where id = ?",
+            String.class,
+            reservationId
+        );
+        assertThat(status).isEqualTo("REQUESTED");
+
+        String afterStatus = jdbcTemplate.queryForObject(
+            "select after_status from reservation_histories where reservation_id = ? order by created_at desc limit 1",
+            String.class,
+            reservationId
+        );
+        assertThat(afterStatus).isEqualTo("REQUESTED");
+    }
+
+    @Test
+    void publicEditingConfirmedReservationChangesItBackToRequested() throws Exception {
+        OffsetDateTime startAt = nextWeekdayAt(11, 0);
+        OffsetDateTime updatedStartAt = nextWeekdayAt(12, 0);
+        UUID reservationId = createPublicReservationAndReturnId(startAt, startAt.plusHours(1), "Public edit confirmed");
+        approveReservation(reservationId);
+
+        mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Public Confirmed Edited User",
+                      "applicantEmail": "public-confirmed-edited@example.com",
+                      "applicantPhone": "010-2222-3333",
+                      "purpose": "Edited confirmed purpose",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "cancelPassword": "test-password"
+                    }
+                    """.formatted(firstRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("REQUESTED"))
+            .andExpect(jsonPath("$.purpose").value("Edited confirmed purpose"));
+
+        String status = jdbcTemplate.queryForObject(
+            "select status from reservations where id = ?",
+            String.class,
+            reservationId
+        );
+        assertThat(status).isEqualTo("REQUESTED");
+
+        java.util.Map<String, Object> history = jdbcTemplate.queryForMap(
+            "select action, before_status, after_status, actor_type from reservation_histories where reservation_id = ? order by created_at desc limit 1",
+            reservationId
+        );
+        assertThat(history.get("action")).isEqualTo("UPDATED");
+        assertThat(history.get("before_status")).isEqualTo("CONFIRMED");
+        assertThat(history.get("after_status")).isEqualTo("REQUESTED");
+        assertThat(history.get("actor_type")).isEqualTo("PUBLIC_USER");
+    }
+
+    @Test
+    void publicEditingConfirmedReservationRunsConflictCheckBeforeSaving() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        OffsetDateTime originalStartAt = nextWeekdayAt(9, 0);
+        OffsetDateTime conflictingStartAt = nextWeekdayAt(13, 0);
+        UUID reservationId = createPublicReservationAndReturnId(originalStartAt, originalStartAt.plusHours(1), "Public edit conflict");
+        approveReservation(reservationId);
+        createAdminReservation(
+            session,
+            firstRoomId(),
+            "Admin Conflict User",
+            "admin-conflict@example.com",
+            conflictingStartAt,
+            conflictingStartAt.plusHours(1),
+            "Confirmed conflict"
+        );
+
+        mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Public Conflict User",
+                      "applicantEmail": "public-conflict-edit@example.com",
+                      "applicantPhone": "010-4444-5555",
+                      "purpose": "Should not be saved",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "cancelPassword": "test-password"
+                    }
+                    """.formatted(firstRoomId(), conflictingStartAt.plusMinutes(30), conflictingStartAt.plusHours(1))))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
+
+        java.util.Map<String, Object> reservation = jdbcTemplate.queryForMap(
+            "select status, purpose from reservations where id = ?",
+            reservationId
+        );
+        assertThat(reservation.get("status")).isEqualTo("CONFIRMED");
+        assertThat(reservation.get("purpose")).isEqualTo("Public edit conflict");
+    }
+
+    @Test
+    void publicCannotEditCancelledReservation() throws Exception {
+        OffsetDateTime startAt = nextWeekdayAt(15, 0);
+        UUID reservationId = createPublicReservationAndReturnId(startAt, startAt.plusHours(1), "Public edit cancelled");
+
+        mockMvc.perform(post("/api/public/reservations/{reservationId}/cancel", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "cancelPassword": "test-password"
+                    }
+                    """))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/public/reservations/{reservationId}/edit", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "cancelPassword": "test-password"
+                    }
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "Public Cancelled User",
+                      "applicantEmail": "public-cancelled-edit@example.com",
+                      "applicantPhone": "010-6666-7777",
+                      "purpose": "Should not be saved",
+                      "startAt": "%s",
+                      "endAt": "%s",
+                      "cancelPassword": "test-password"
+                    }
+                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
     private void createPublicReservation(OffsetDateTime startAt, OffsetDateTime endAt, String purpose) throws Exception {
         mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -236,5 +413,18 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
             .andReturn()
             .getRequest()
             .getSession(false);
+    }
+
+    private void approveReservation(UUID reservationId) throws Exception {
+        mockMvc.perform(post("/api/admin/reservations/{reservationId}/approve", reservationId)
+                .session(loginAsAdmin())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "memo": "approve for public edit test"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("CONFIRMED"));
     }
 }

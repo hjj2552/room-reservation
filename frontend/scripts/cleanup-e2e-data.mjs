@@ -114,7 +114,8 @@ function buildFailureMessage({ label, status, body, cleanupUrl, apiBaseUrl }) {
   if (status === 404) {
     message +=
       `\nCleanup endpoint was not found on ${apiBaseUrl}. ` +
-      'For local/dev, restart the backend with E2E_CLEANUP_ENABLED=true and make sure this script points at that backend via E2E_API_BASE_URL or E2E_BACKEND_URL. ' +
+      'For local/dev, restart the backend with E2E_CLEANUP_ENABLED=true, or use start-backend-cleanup-enabled.bat from the repository root. ' +
+      'Make sure this script points at that backend via E2E_API_BASE_URL or E2E_BACKEND_URL. ' +
       'The cleanup endpoint is intentionally unavailable in prod.';
   }
   return message;

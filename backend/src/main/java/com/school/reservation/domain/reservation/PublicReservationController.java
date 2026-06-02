@@ -2,8 +2,11 @@ package com.school.reservation.domain.reservation;
 
 import com.school.reservation.domain.reservation.dto.request.CreatePublicReservationRequest;
 import com.school.reservation.domain.reservation.dto.request.PublicCancelReservationRequest;
+import com.school.reservation.domain.reservation.dto.request.PublicReservationPasswordRequest;
+import com.school.reservation.domain.reservation.dto.request.UpdatePublicReservationRequest;
 import com.school.reservation.domain.reservation.dto.response.CreatePublicReservationResponse;
 import com.school.reservation.domain.reservation.dto.response.PublicReservationDetailResponse;
+import com.school.reservation.domain.reservation.dto.response.PublicReservationEditResponse;
 import com.school.reservation.domain.settings.OperationSettings;
 import com.school.reservation.domain.settings.OperationSettingsRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -13,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,6 +52,26 @@ public class PublicReservationController {
     @GetMapping("/{reservationId}")
     public PublicReservationDetailResponse getDetail(@PathVariable java.util.UUID reservationId) {
         return PublicReservationDetailResponse.from(reservationService.getReservationOrThrow(reservationId));
+    }
+
+    @PostMapping("/{reservationId}/edit")
+    public PublicReservationEditResponse verifyForEdit(
+        @PathVariable java.util.UUID reservationId,
+        @Valid @RequestBody PublicReservationPasswordRequest request
+    ) {
+        return PublicReservationEditResponse.from(
+            reservationService.verifyPublicReservationForEdit(reservationId, request.cancelPassword())
+        );
+    }
+
+    @PutMapping("/{reservationId}")
+    public PublicReservationDetailResponse update(
+        @PathVariable java.util.UUID reservationId,
+        @Valid @RequestBody UpdatePublicReservationRequest request
+    ) {
+        return PublicReservationDetailResponse.from(
+            reservationService.updatePublicReservation(reservationId, request.toCommand(), request.cancelPassword())
+        );
     }
 
     @PostMapping("/{reservationId}/cancel")

@@ -9,6 +9,7 @@ These rules apply to `frontend`, especially Playwright E2E work.
   - `e2eData.name(label)` for unique `e2e-` names.
   - `e2eData.createTestRoom(label)` for rooms; it prefixes and registers the room id.
   - `e2eData.createTestReservation(roomId, label, options)` for API-seeded reservations; it prefixes and registers the reservation id.
+  - `e2eData.createTestPublicReservation(roomId, label, options)` for API-seeded public reservations; it prefixes, keeps the public password in the returned object, and registers the reservation id.
   - `e2eData.createTestRecurringReservation(roomId, label, options)` for API-seeded recurring reservations; it prefixes and registers the recurrence id.
   - `e2eData.registerReservation(id)` and `e2eData.registerRecurrence(id)` for ids created through the UI.
 - Do not bypass the fixture with local one-off factories unless adding the missing capability to the shared fixture in the same change.

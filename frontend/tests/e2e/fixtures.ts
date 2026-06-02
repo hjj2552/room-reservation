@@ -1,10 +1,12 @@
 import { expect, test as base, type APIRequestContext } from '@playwright/test';
 import {
+  createPublicReservationByApi,
   createReservationByApi,
   createRecurrenceByApi,
   createRoomByApi,
   deleteReservationByApi,
   uniqueE2eName,
+  type E2ePublicReservation,
   type E2eRecurrence,
   type E2eReservation,
   type E2eRoom,
@@ -24,6 +26,18 @@ interface E2eDataFactory {
     label: string,
     options?: { startAt?: string; endAt?: string; memo?: string },
   ): Promise<E2eReservation>;
+  createTestPublicReservation(
+    roomId: string,
+    label: string,
+    options?: {
+      startAt?: string;
+      endAt?: string;
+      applicantName?: string;
+      applicantEmail?: string;
+      applicantPhone?: string;
+      cancelPassword?: string;
+    },
+  ): Promise<E2ePublicReservation>;
   createTestRecurringReservation(
     roomId: string,
     label: string,
@@ -73,6 +87,12 @@ export const test = base.extend<E2eFixtures>({
         const reservation = await createReservationByApi(request, roomId, purpose, options);
         e2eRegistry.reservations.push(reservation.id);
         return { ...reservation, purpose };
+      },
+      createTestPublicReservation: async (roomId, label, options) => {
+        const purpose = uniqueE2eName(`reservation-${label}`);
+        const reservation = await createPublicReservationByApi(request, roomId, purpose, options);
+        e2eRegistry.reservations.push(reservation.id);
+        return reservation;
       },
       createTestRecurringReservation: async (roomId, label, options) => {
         const purpose = uniqueE2eName(`recurring-${label}`);

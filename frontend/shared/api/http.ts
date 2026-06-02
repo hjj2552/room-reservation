@@ -106,6 +106,7 @@ function apiErrorMessage(error: ApiError) {
 function messageByCode(code: string, error: ApiError) {
   const messages: Record<string, string> = {
     ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
+    PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
     TIME_SLOT_CONFLICT: '같은 강의실의 같은 시간대에 이미 예약이 있습니다.',
     RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
     VERSION_CONFLICT: '다른 사용자가 먼저 수정했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.',

@@ -2,7 +2,9 @@ import { apiRequest, buildQuery } from './http';
 import type {
   PublicReservationPayload,
   PublicReservationDetail,
+  PublicReservationEditDetail,
   PublicReservationResult,
+  PublicReservationUpdatePayload,
   PublicRoom,
   PublicSettings,
   PublicWeeklyReservations,
@@ -31,6 +33,20 @@ export function createPublicReservation(payload: PublicReservationPayload) {
 
 export function getPublicReservation(reservationId: string) {
   return apiRequest<PublicReservationDetail>(`/api/public/reservations/${reservationId}`);
+}
+
+export function verifyPublicReservationForEdit(reservationId: string, cancelPassword: string) {
+  return apiRequest<PublicReservationEditDetail>(`/api/public/reservations/${reservationId}/edit`, {
+    method: 'POST',
+    body: { cancelPassword },
+  });
+}
+
+export function updatePublicReservation(reservationId: string, payload: PublicReservationUpdatePayload) {
+  return apiRequest<PublicReservationDetail>(`/api/public/reservations/${reservationId}`, {
+    method: 'PUT',
+    body: payload,
+  });
 }
 
 export function cancelPublicReservation(reservationId: string, cancelPassword: string) {

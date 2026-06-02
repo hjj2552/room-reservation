@@ -129,6 +129,8 @@ export interface PublicReservationPayload {
   cancelPassword: string;
 }
 
+export type PublicReservationUpdatePayload = PublicReservationPayload;
+
 export interface PublicReservationResult {
   id: string;
   status: ReservationStatus;
@@ -150,6 +152,12 @@ export interface PublicReservationDetail {
   endAt: string;
   status: ReservationStatus;
   cancellable: boolean;
+  editable: boolean;
+}
+
+export interface PublicReservationEditDetail extends PublicReservationDetail {
+  applicantEmail: string;
+  applicantPhone: string;
 }
 
 export interface ReservationListItem {

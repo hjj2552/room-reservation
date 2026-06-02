@@ -54,6 +54,20 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(ReservationService.PublicReservationPasswordMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handlePublicReservationPasswordMismatch(
+        ReservationService.PublicReservationPasswordMismatchException exception,
+        HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiErrorResponse.of(
+            "PUBLIC_RESERVATION_PASSWORD_MISMATCH",
+            exception.getMessage(),
+            Map.of(),
+            List.of(),
+            request.getRequestURI()
+        ));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
         DataIntegrityViolationException exception,

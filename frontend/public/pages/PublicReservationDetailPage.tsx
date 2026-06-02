@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { PenLine, X } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -74,12 +74,23 @@ export function PublicReservationDetailPage() {
           <h2 id="public-actions-title">상태 처리</h2>
           {reservation.cancellable && !showCancelForm ? (
             <div className="button-row">
+              {reservation.editable ? (
+                <Link
+                  className="secondary-button"
+                  to={`/reservations/${reservation.id}/edit`}
+                  data-testid="public-reservation-edit-link"
+                >
+                  <PenLine size={16} aria-hidden="true" />
+                  예약 수정
+                </Link>
+              ) : null}
               <button type="button" className="danger-button" onClick={() => setShowCancelForm(true)}>
                 <X size={16} aria-hidden="true" />
                 예약 신청 취소
               </button>
             </div>
           ) : null}
+          {!reservation.editable ? <p className="muted">취소된 예약은 수정할 수 없습니다.</p> : null}
           {!reservation.cancellable ? <p className="muted">현재 상태에서는 취소할 수 없습니다.</p> : null}
           {showCancelForm ? (
             <form className="form-stack" onSubmit={onCancelSubmit}>
