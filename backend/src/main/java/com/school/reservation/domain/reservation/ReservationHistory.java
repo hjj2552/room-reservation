@@ -20,6 +20,7 @@ import org.hibernate.type.SqlTypes;
 public class ReservationHistory {
 
     public enum Action {
+        // History action values are events, not reservation states. APPROVED means 승인 처리.
         CREATED,
         CREATED_BY_ADMIN,
         UPDATED,

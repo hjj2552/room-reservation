@@ -37,7 +37,7 @@ export function historyActionLabel(action: string) {
     RECURRENCE_CREATED: '반복 예약 등록',
     RECURRENCE_GENERATED: '반복 예약 건 등록',
     UPDATED: '수정',
-    APPROVED: '승인',
+    APPROVED: '승인 처리',
     CANCELLED: '취소',
     DELETED: '삭제',
     RECURRENCE_CANCELLED: '반복 예약 취소',

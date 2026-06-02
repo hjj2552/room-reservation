@@ -21,6 +21,7 @@ import org.hibernate.type.SqlTypes;
 public class Reservation {
 
     public enum ReservationStatus {
+        // Reservation state values: REQUESTED=승인 대기, CONFIRMED=승인, CANCELLED=취소.
         REQUESTED,
         CONFIRMED,
         CANCELLED

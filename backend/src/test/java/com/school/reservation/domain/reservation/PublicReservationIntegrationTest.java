@@ -232,10 +232,10 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void publicEditingConfirmedReservationChangesItBackToRequested() throws Exception {
+    void publicEditingConfirmedStatusReservationChangesItBackToRequestedStatus() throws Exception {
         OffsetDateTime startAt = nextWeekdayAt(11, 0);
         OffsetDateTime updatedStartAt = nextWeekdayAt(12, 0);
-        UUID reservationId = createPublicReservationAndReturnId(startAt, startAt.plusHours(1), "Public edit confirmed");
+        UUID reservationId = createPublicReservationAndReturnId(startAt, startAt.plusHours(1), "Public edit confirmed status");
         approveReservation(reservationId);
 
         mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
@@ -243,10 +243,10 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                 .content("""
                     {
                       "roomId": "%s",
-                      "applicantName": "Public Confirmed Edited User",
-                      "applicantEmail": "public-confirmed-edited@example.com",
+                      "applicantName": "Public Confirmed Status Edited User",
+                      "applicantEmail": "public-confirmed-status-edited@example.com",
                       "applicantPhone": "010-2222-3333",
-                      "purpose": "Edited confirmed purpose",
+                      "purpose": "Edited confirmed status purpose",
                       "startAt": "%s",
                       "endAt": "%s",
                       "cancelPassword": "test-password"
@@ -254,7 +254,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                     """.formatted(firstRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
-            .andExpect(jsonPath("$.purpose").value("Edited confirmed purpose"));
+            .andExpect(jsonPath("$.purpose").value("Edited confirmed status purpose"));
 
         String status = jdbcTemplate.queryForObject(
             "select status from reservations where id = ?",
@@ -274,11 +274,11 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void publicEditingConfirmedReservationRunsConflictCheckBeforeSaving() throws Exception {
+    void publicEditingConfirmedStatusReservationRunsConflictCheckBeforeSaving() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime originalStartAt = nextWeekdayAt(9, 0);
         OffsetDateTime conflictingStartAt = nextWeekdayAt(13, 0);
-        UUID reservationId = createPublicReservationAndReturnId(originalStartAt, originalStartAt.plusHours(1), "Public edit conflict");
+        UUID reservationId = createPublicReservationAndReturnId(originalStartAt, originalStartAt.plusHours(1), "Public edit confirmed status conflict");
         approveReservation(reservationId);
         createAdminReservation(
             session,
@@ -287,7 +287,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
             "admin-conflict@example.com",
             conflictingStartAt,
             conflictingStartAt.plusHours(1),
-            "Confirmed conflict"
+            "Confirmed status conflict"
         );
 
         mockMvc.perform(put("/api/public/reservations/{reservationId}", reservationId)
@@ -312,7 +312,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
             reservationId
         );
         assertThat(reservation.get("status")).isEqualTo("CONFIRMED");
-        assertThat(reservation.get("purpose")).isEqualTo("Public edit conflict");
+        assertThat(reservation.get("purpose")).isEqualTo("Public edit confirmed status conflict");
     }
 
     @Test
