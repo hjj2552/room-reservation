@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReservationStatus } from '../api/types';
+import { hexToTint } from '../utils/color';
 import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
@@ -218,6 +219,7 @@ export function ReservationDateTimetable({
                       top: position.top,
                       height: position.height,
                       borderColor: reservation.seriesColor || undefined,
+                      backgroundColor: reservation.seriesColor ? hexToTint(reservation.seriesColor) : undefined,
                     }}
                     onClick={() =>
                       onReservationClick ? onReservationClick(reservation) : navigate(`/admin/reservations/${reservation.id}`)
@@ -227,7 +229,12 @@ export function ReservationDateTimetable({
                   >
                     <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
                     {reservation.seriesLabel ? (
-                      <span className="reservation-block-series" style={reservation.seriesColor ? { color: reservation.seriesColor } : undefined}>
+                      <span
+                        className="reservation-block-series"
+                        style={reservation.seriesColor ? {
+                          borderColor: reservation.seriesColor,
+                        } : undefined}
+                      >
                         {reservation.seriesLabel}
                       </span>
                     ) : null}
