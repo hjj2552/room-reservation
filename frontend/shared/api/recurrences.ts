@@ -4,6 +4,7 @@ import type {
   RecurrenceCreatePayload,
   RecurrenceCreateResult,
   RecurrenceDetail,
+  RecurrenceFilters,
   RecurrenceListItem,
   RecurrencePreview,
   RecurrencePreviewPayload,
@@ -23,9 +24,14 @@ export function createRecurrence(payload: RecurrenceCreatePayload) {
   });
 }
 
-export function listRecurrences(includeDeleted = false) {
+export function listRecurrences(filters: RecurrenceFilters = {}) {
   return apiRequest<PagedResponse<RecurrenceListItem>>(
-    `/api/admin/recurrences${buildQuery({ includeDeleted, size: 20 })}`,
+    `/api/admin/recurrences${buildQuery({
+      ...filters,
+      includeDeleted: filters.includeDeleted ?? false,
+      size: filters.size ?? 20,
+      page: filters.page ?? 0,
+    })}`,
   );
 }
 

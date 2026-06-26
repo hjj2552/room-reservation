@@ -202,6 +202,19 @@ tr[tabindex]:focus-visible {
   padding: 14px;
 }
 
+.recurrence-list-panel .filter-bar {
+  margin-top: 14px;
+}
+
+.recurrence-list-panel .table-wrap,
+.recurrence-reservations-panel .table-wrap {
+  margin-top: 14px;
+}
+
+.recurrence-list-panel .pagination {
+  margin-top: 14px;
+}
+
 .view-mode-bar {
   display: inline-flex;
   width: fit-content;
@@ -1306,6 +1319,43 @@ button:disabled {
 
 .pagination p {
   margin: 0;
+  color: #687484;
+}
+
+.pagination .page-buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.page-button {
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid #d7dee8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2a37;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-button:hover:not(:disabled) {
+  border-color: #0f5f78;
+  color: #0f5f78;
+}
+
+.page-button[aria-current='page'] {
+  border-color: #0f5f78;
+  background: #0f5f78;
+  color: #ffffff;
+  cursor: default;
+}
+
+.page-ellipsis {
+  padding: 0 2px;
   color: #687484;
 }
 

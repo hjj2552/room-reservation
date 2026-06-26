@@ -43,12 +43,43 @@ public interface ReservationRecurrenceRepository extends JpaRepository<Reservati
             from ReservationRecurrence rr
             join fetch rr.room room
             where (:includeDeleted = true or rr.deletedAt is null)
+              and (:status is null
+                or (:status = 'ACTIVE' and rr.deletedAt is null)
+                or (:status = 'CANCELLED' and rr.deletedAt is not null))
+              and (:roomId is null or room.id = :roomId)
+              and (:fromDate is null or rr.endDate >= :fromDate)
+              and (:toDate is null or rr.startDate <= :toDate)
+              and (:keyword is null
+                or lower(rr.purpose) like :keyword
+                or lower(rr.applicantName) like :keyword
+                or lower(room.name) like :keyword
+                or lower(coalesce(rr.seriesLabel, '')) like :keyword)
             """,
         countQuery = """
             select count(rr)
             from ReservationRecurrence rr
+            join rr.room room
             where (:includeDeleted = true or rr.deletedAt is null)
+              and (:status is null
+                or (:status = 'ACTIVE' and rr.deletedAt is null)
+                or (:status = 'CANCELLED' and rr.deletedAt is not null))
+              and (:roomId is null or room.id = :roomId)
+              and (:fromDate is null or rr.endDate >= :fromDate)
+              and (:toDate is null or rr.startDate <= :toDate)
+              and (:keyword is null
+                or lower(rr.purpose) like :keyword
+                or lower(rr.applicantName) like :keyword
+                or lower(room.name) like :keyword
+                or lower(coalesce(rr.seriesLabel, '')) like :keyword)
             """
     )
-    Page<ReservationRecurrence> findRecurrences(@Param("includeDeleted") boolean includeDeleted, Pageable pageable);
+    Page<ReservationRecurrence> findRecurrences(
+        @Param("includeDeleted") boolean includeDeleted,
+        @Param("status") String status,
+        @Param("roomId") UUID roomId,
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate,
+        @Param("keyword") String keyword,
+        Pageable pageable
+    );
 }

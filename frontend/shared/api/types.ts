@@ -1,6 +1,7 @@
 export type ReservationStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
 export type ReservationSource = 'PUBLIC_FORM' | 'ADMIN_GRID' | 'ADMIN_MANUAL' | 'RECURRING_GENERATED';
 export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS';
+export type RecurrenceStatus = 'ACTIVE' | 'CANCELLED';
 
 export interface PagedResponse<T> {
   items: T[];
@@ -268,6 +269,17 @@ export interface RecurrencePreviewPayload {
   endTime: string;
   applicantPhone: string;
   conflictPolicy: ConflictPolicy;
+}
+
+export interface RecurrenceFilters {
+  status?: RecurrenceStatus | '';
+  roomId?: string;
+  fromDate?: string;
+  toDate?: string;
+  keyword?: string;
+  includeDeleted?: boolean;
+  page?: number;
+  size?: number;
 }
 
 export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
