@@ -1,6 +1,6 @@
 import { RefreshCw } from 'lucide-react';
 import { FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { ConflictPolicy } from '../../shared/api/types';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -49,6 +49,7 @@ const initialForm: RecurrenceForm = {
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 export function RecurrencesPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const [cancelTarget, setCancelTarget] = useState('');
   const [cancelMemo, setCancelMemo] = useState('');
@@ -346,21 +347,43 @@ export function RecurrencesPage() {
                   <th scope="col">기간</th>
                   <th scope="col">요일/시간</th>
                   <th scope="col">목적</th>
+                  <th scope="col">등록 정책</th>
                   <th scope="col">취소</th>
                 </tr>
               </thead>
               <tbody>
                 {recurrences.data.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.deleted ? '취소됨' : '운영 중'}</td>
+                  <tr
+                    key={item.id}
+                    tabIndex={0}
+                    className="clickable-row"
+                    onClick={() => navigate(`/admin/recurrences/${item.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
+                    }}
+                  >
                     <td>
-                      <Link className="text-link" to={`/admin/recurrences/${item.id}`}>
+                      <span className={`plain-badge ${item.deleted ? 'muted-badge' : 'good'}`}>
+                        {item.deleted ? '취소됨' : '운영 중'}
+                      </span>
+                    </td>
+                    <td>
+                      <Link
+                        className="text-link"
+                        to={`/admin/recurrences/${item.id}`}
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         {item.roomName}
                       </Link>
                     </td>
                     <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
-                    <td>{formatDayCodes(item.daysOfWeek)} / {formatTime(item.startTime)}~{formatTime(item.endTime)}</td>
                     <td>
+                      {formatDayCodes(item.daysOfWeek)}
+                      <br />
+                      <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
+                    </td>
+                    <td className="purpose-cell">
                       {item.seriesLabel ? (
                         <span
                           className="series-chip"
@@ -371,13 +394,17 @@ export function RecurrencesPage() {
                       ) : null}
                       {item.purpose}
                     </td>
+                    <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
                     <td>
                       <button
                         type="button"
                         className="ghost-button"
                         disabled={item.deleted}
                         data-testid="recurrence-list-cancel-entry-button"
-                        onClick={() => setCancelTarget(item.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setCancelTarget(item.id);
+                        }}
                       >
                         취소
                       </button>
