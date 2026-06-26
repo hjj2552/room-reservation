@@ -63,7 +63,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
-    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
+    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
 
     await page.getByTestId('recurrence-detail-cancel-memo-input').fill('e2e-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>
@@ -157,7 +157,7 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
 
     await page.goto(`/admin/recurrences/${recurrenceId}`);
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
-    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
+    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
   } finally {
     if (recurrenceId) {
       await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
@@ -166,3 +166,16 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await deleteRoomByApi(request, room.id);
   }
 });
+
+function dayLabel(day: string) {
+  const labels: Record<string, string> = {
+    MON: '월',
+    TUE: '화',
+    WED: '수',
+    THU: '목',
+    FRI: '금',
+    SAT: '토',
+    SUN: '일',
+  };
+  return labels[day] || day;
+}
