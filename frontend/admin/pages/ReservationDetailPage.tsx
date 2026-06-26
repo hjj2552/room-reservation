@@ -62,10 +62,10 @@ export function ReservationDetailPage() {
   });
   if (detail.series) {
     coreSections.push({
-      title: 'Series',
+      title: '반복 예약',
       fields: [
         {
-          label: 'Tag',
+          label: '태그',
           value: detail.series.label ? (
             <span
               className="series-chip"
@@ -75,12 +75,12 @@ export function ReservationDetailPage() {
             </span>
           ) : '-',
         },
-        { label: 'Exception', value: detail.recurrenceException ? 'Yes' : 'No' },
+        { label: '수정 여부', value: detail.recurrenceException ? '개별 수정됨' : '수정 없음' },
         {
-          label: 'Series detail',
+          label: '반복 예약 상세',
           value: (
             <Link className="text-link" to={`/admin/recurrences/${detail.series.id}`}>
-              Open series
+              상세 보기
             </Link>
           ),
         },

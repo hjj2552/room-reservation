@@ -4,7 +4,7 @@ import { errorMessage } from '../../shared/api/http';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCancelRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
-import { conflictPolicyLabels } from '../../shared/utils/labels';
+import { conflictPolicyLabels, dayLabels, statusLabels } from '../../shared/utils/labels';
 
 export function RecurrenceDetailPage() {
   const { recurrenceId = '' } = useParams();
@@ -72,14 +72,14 @@ export function RecurrenceDetailPage() {
             </div>
             <div>
               <dt>요일/시간</dt>
-              <dd data-testid="recurrence-detail-schedule">{detail.daysOfWeek} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
+              <dd data-testid="recurrence-detail-schedule">{formatDayCodes(detail.daysOfWeek)} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
             </div>
             <div>
               <dt>등록 정책</dt>
               <dd>{conflictPolicyLabels[detail.conflictPolicy]}</dd>
             </div>
             <div>
-              <dt>Series tag</dt>
+              <dt>태그</dt>
               <dd>
                 {detail.seriesLabel ? (
                   <span
@@ -127,7 +127,7 @@ export function RecurrenceDetailPage() {
               data-testid="recurrence-detail-cancel-button"
               disabled={detail.deleted || cancel.isPending}
             >
-              {detail.deleted ? '이미 취소됨' : cancel.isPending ? '취소 중...' : '반복 예약 취소'}
+              {detail.deleted ? '취소됨' : cancel.isPending ? '취소 중...' : '반복 예약 취소'}
             </button>
           </form>
         </section>
@@ -149,8 +149,8 @@ export function RecurrenceDetailPage() {
               {detail.reservations.map((reservation) => (
                 <tr key={reservation.id}>
                   <td>{formatDateTime(reservation.startAt)} ~ {formatDateTime(reservation.endAt)}</td>
-                  <td>{reservation.purpose}{reservation.exception ? ' (exception)' : ''}</td>
-                  <td>{reservation.status}</td>
+                  <td>{reservation.purpose}{reservation.exception ? ' (개별 수정됨)' : ''}</td>
+                  <td>{statusLabels[reservation.status]}</td>
                   <td>
                     <Link className="text-link" to={`/admin/reservations/${reservation.id}`}>
                       상세
@@ -164,4 +164,11 @@ export function RecurrenceDetailPage() {
       </section>
     </section>
   );
+}
+
+function formatDayCodes(daysOfWeek: string) {
+  return daysOfWeek
+    .split(',')
+    .map((day) => dayLabels[day.trim()] || day.trim())
+    .join(', ');
 }

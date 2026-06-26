@@ -167,17 +167,17 @@ export function RecurrencesPage() {
             />
           </label>
           <label>
-            Series label
+            태그
             <input
               data-testid="recurrence-series-label-input"
               name="seriesLabel"
               value={form.seriesLabel}
               onChange={(event) => setForm((prev) => ({ ...prev, seriesLabel: event.target.value }))}
-              placeholder="1학년 / 동아리 / 정기회의"
+              placeholder="예: 1학년, 2학년"
             />
           </label>
           <label>
-            Series color
+            표시 색상
             <input
               data-testid="recurrence-series-color-input"
               name="seriesColor"
@@ -297,7 +297,7 @@ export function RecurrencesPage() {
                 <div><strong>{preview.data.totalCandidates}</strong><span>전체 후보</span></div>
                 <div><strong>{preview.data.availableCount}</strong><span>가능</span></div>
                 <div><strong>{preview.data.conflictCount}</strong><span>충돌</span></div>
-                <div><strong>{preview.data.createAllowed ? 'OK' : 'NO'}</strong><span>생성 가능</span></div>
+                <div><strong>{preview.data.createAllowed ? '가능' : '불가능'}</strong><span>생성 여부</span></div>
               </div>
               <div className="table-wrap compact">
                 <table className="data-table" data-testid="recurrence-preview-table">
@@ -359,7 +359,7 @@ export function RecurrencesPage() {
                       </Link>
                     </td>
                     <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
-                    <td>{item.daysOfWeek} / {formatTime(item.startTime)}~{formatTime(item.endTime)}</td>
+                    <td>{formatDayCodes(item.daysOfWeek)} / {formatTime(item.startTime)}~{formatTime(item.endTime)}</td>
                     <td>
                       {item.seriesLabel ? (
                         <span
@@ -430,4 +430,11 @@ export function RecurrencesPage() {
       ) : null}
     </section>
   );
+}
+
+function formatDayCodes(daysOfWeek: string) {
+  return daysOfWeek
+    .split(',')
+    .map((day) => dayLabels[day.trim()] || day.trim())
+    .join(', ');
 }
