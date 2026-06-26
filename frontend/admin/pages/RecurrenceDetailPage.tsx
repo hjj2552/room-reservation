@@ -1,10 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
+import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCancelRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
-import { conflictPolicyLabels, dayLabels, statusLabels } from '../../shared/utils/labels';
+import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 
 export function RecurrenceDetailPage() {
   const { recurrenceId = '' } = useParams();
@@ -139,20 +140,44 @@ export function RecurrenceDetailPage() {
           <table className="data-table" data-testid="recurrence-reservations-table">
             <thead>
               <tr>
-                <th scope="col">시간</th>
-                <th scope="col">목적</th>
                 <th scope="col">상태</th>
+                <th scope="col">강의실</th>
+                <th scope="col">예약 시간</th>
+                <th scope="col">목적</th>
                 <th scope="col">예약</th>
               </tr>
             </thead>
             <tbody>
               {detail.reservations.map((reservation) => (
-                <tr key={reservation.id}>
-                  <td>{formatDateTime(reservation.startAt)} ~ {formatDateTime(reservation.endAt)}</td>
-                  <td>{reservation.purpose}{reservation.exception ? ' (개별 수정됨)' : ''}</td>
-                  <td>{statusLabels[reservation.status]}</td>
+                <tr
+                  key={reservation.id}
+                  tabIndex={0}
+                  className="clickable-row"
+                  onClick={() => navigate(`/admin/reservations/${reservation.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter') navigate(`/admin/reservations/${reservation.id}`);
+                  }}
+                >
                   <td>
-                    <Link className="text-link" to={`/admin/reservations/${reservation.id}`}>
+                    <StatusBadge status={reservation.status} />
+                  </td>
+                  <td>{reservation.roomName}</td>
+                  <td>
+                    {formatDateTime(reservation.startAt)}
+                    <br />
+                    <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                  </td>
+                  <td className="purpose-cell">
+                    {reservation.purpose}
+                    {reservation.exception ? <div className="muted">개별 수정됨</div> : null}
+                  </td>
+                  <td>
+                    <Link
+                      className="text-link"
+                      to={`/admin/reservations/${reservation.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       상세
                     </Link>
                   </td>
