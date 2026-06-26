@@ -11,6 +11,7 @@ const repoRoot = path.resolve(frontendRoot, '..');
 const backendRoot = path.join(repoRoot, 'backend');
 const backendUrl = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8080/api/public/settings';
 const frontendUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
+const cleanupRequired = process.env.E2E_CLEANUP_REQUIRED !== 'false';
 
 let backendProcess = null;
 let frontendProcess = null;
@@ -37,15 +38,22 @@ async function main() {
       console.log('Using existing E2E frontend.');
     }
 
-    await cleanupE2eData({ required: false, label: 'before-suite' });
+    await cleanupE2eData({ required: cleanupRequired, label: 'before-suite' });
 
     console.log('Running Playwright E2E...');
     const playwrightCli = path.join(frontendRoot, 'node_modules', 'playwright', 'cli.js');
     process.exitCode = await runCommand(process.execPath, [playwrightCli, 'test', ...process.argv.slice(2)]);
   } finally {
-    await cleanupE2eData({ required: false, label: 'after-suite' });
-    stopFrontend();
-    stopBackend();
+    try {
+      await cleanupE2eData({ required: cleanupRequired, label: 'after-suite' });
+      if (cleanupRequired) {
+        const preview = await cleanupE2eData({ required: true, label: 'after-suite-preview', preview: true });
+        assertNoE2eDataLeft(preview);
+      }
+    } finally {
+      stopFrontend();
+      stopBackend();
+    }
   }
 }
 
@@ -91,10 +99,11 @@ async function startFrontend() {
 
   frontendOutFd = openSync(path.join(logDir, 'frontend.out.log'), 'a');
   frontendErrFd = openSync(path.join(logDir, 'frontend.err.log'), 'a');
+  const frontendPort = new URL(frontendUrl).port;
   const command = process.platform === 'win32' ? 'cmd.exe' : 'npm';
   const args = process.platform === 'win32'
-    ? ['/d', '/s', '/c', 'npm.cmd', 'run', 'dev', '--', '--host', '127.0.0.1']
-    : ['run', 'dev', '--', '--host', '127.0.0.1'];
+    ? ['/d', '/s', '/c', 'npm.cmd', 'run', 'dev', '--', '--host', '127.0.0.1', '--port', frontendPort]
+    : ['run', 'dev', '--', '--host', '127.0.0.1', '--port', frontendPort];
   const processRef = spawn(command, args, {
     cwd: frontendRoot,
     stdio: ['ignore', frontendOutFd, frontendErrFd],
@@ -149,6 +158,28 @@ function runCommand(command, args) {
     child.on('error', reject);
     child.on('close', (code) => resolve(code ?? 1));
   });
+}
+
+function assertNoE2eDataLeft(summary) {
+  if (!summary) {
+    throw new Error('E2E cleanup preview did not return a summary.');
+  }
+  const remaining =
+    summary.reservationHistoriesDeleted +
+    summary.reservationsDeleted +
+    summary.recurrencesDeleted +
+    summary.roomsDeleted +
+    summary.roomsSkipped;
+  if (remaining > 0) {
+    throw new Error(
+      'E2E cleanup left matching test data after after-suite cleanup: ' +
+        `${summary.reservationHistoriesDeleted} histories, ` +
+        `${summary.reservationsDeleted} reservations, ` +
+        `${summary.recurrencesDeleted} recurrences, ` +
+        `${summary.roomsDeleted} rooms, ` +
+        `${summary.roomsSkipped} skipped rooms.`
+    );
+  }
 }
 
 function stopBackend() {

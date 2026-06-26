@@ -44,7 +44,7 @@ npm.cmd run e2e
 
 `npm run e2e` starts a backend only when `E2E_BACKEND_URL` is not reachable. The started backend uses `SPRING_PROFILES_ACTIVE=e2e` by default. It also starts the Vite dev server when `PLAYWRIGHT_BASE_URL` is not reachable.
 
-If a backend is already reachable on `E2E_BACKEND_URL`, the runner reuses it. Make sure that existing backend is either running with the `e2e` profile or was started with cleanup explicitly enabled. Otherwise the suite can still run, but the before/after prefix cleanup may log that the cleanup endpoint is unavailable.
+If a backend is already reachable on `E2E_BACKEND_URL`, the runner reuses it. Make sure that existing backend is either running with the `e2e` profile or was started with cleanup explicitly enabled. The runner treats before/after cleanup as required by default, so a reachable backend without the cleanup endpoint fails fast instead of silently leaving E2E data behind.
 
 ## GitHub Actions CI
 
@@ -86,6 +86,7 @@ Useful environment variables:
 | `E2E_BACKEND_URL` | `http://127.0.0.1:8080/api/public/settings` | Backend readiness probe. |
 | `E2E_API_BASE_URL` | Derived from `E2E_BACKEND_URL` | Backend API origin used by manual cleanup scripts. |
 | `E2E_BACKEND_PROFILE` | `e2e` | Spring profile used when the runner starts the backend. |
+| `E2E_CLEANUP_REQUIRED` | `true` | Requires before/after suite cleanup to reach the guarded cleanup endpoint. Set to `false` only for intentional debugging against a cleanup-disabled backend. |
 | `E2E_DB_URL` | `jdbc:postgresql://localhost:5433/room_reservation_test` | Database URL for `application-e2e.yml`. |
 | `E2E_DB_USERNAME` | `room_reservation` | E2E database username. |
 | `E2E_DB_PASSWORD` | `room_reservation` | E2E database password. |
@@ -102,7 +103,7 @@ Useful environment variables:
 - Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence` over direct setup calls.
 - Public UI-created reservations use `e2e-` applicant names, emails, and purposes, then register returned ids for cleanup.
 - Data-creating specs use a Playwright fixture registry for created room, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, and deletion for rooms by id.
-- `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`.
+- `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`. After the final cleanup, the runner performs a cleanup preview and fails if any matching E2E data remains.
 - The cleanup endpoint can preview or hard-delete rows identified by the `e2e-` prefix:
   - rooms whose name starts with `e2e-`;
   - recurrences whose purpose/applicant/email/tag starts with `e2e-`, plus recurrences attached to an `e2e-` room;
