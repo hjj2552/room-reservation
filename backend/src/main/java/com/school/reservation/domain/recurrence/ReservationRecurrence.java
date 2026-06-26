@@ -27,8 +27,7 @@ public class ReservationRecurrence {
 
     public enum ConflictPolicy {
         SKIP_CONFLICTS,
-        FAIL_ALL,
-        CREATE_AVAILABLE_ONLY
+        FAIL_ALL
     }
 
     @Id
@@ -53,6 +52,12 @@ public class ReservationRecurrence {
 
     @Column(nullable = false, length = 500)
     private String purpose;
+
+    @Column(name = "series_label", length = 100)
+    private String seriesLabel;
+
+    @Column(name = "series_color", length = 20)
+    private String seriesColor;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -98,6 +103,8 @@ public class ReservationRecurrence {
         String applicantEmail,
         String applicantPhone,
         String purpose,
+        String seriesLabel,
+        String seriesColor,
         LocalDate startDate,
         LocalDate endDate,
         String daysOfWeek,
@@ -111,6 +118,8 @@ public class ReservationRecurrence {
         this.applicantEmail = applicantEmail;
         this.applicantPhone = applicantPhone;
         this.purpose = purpose;
+        this.seriesLabel = blankToNull(seriesLabel);
+        this.seriesColor = blankToNull(seriesColor);
         this.startDate = startDate;
         this.endDate = endDate;
         this.daysOfWeek = daysOfWeek;
@@ -134,6 +143,10 @@ public class ReservationRecurrence {
             .map(String::trim)
             .filter(value -> !value.isBlank())
             .collect(Collectors.toSet());
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public UUID getId() {
@@ -172,6 +185,14 @@ public class ReservationRecurrence {
 
     public String getPurpose() {
         return purpose;
+    }
+
+    public String getSeriesLabel() {
+        return seriesLabel;
+    }
+
+    public String getSeriesColor() {
+        return seriesColor;
     }
 
     public LocalDate getStartDate() {

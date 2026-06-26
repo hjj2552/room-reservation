@@ -20,6 +20,8 @@ interface RecurrenceForm {
   applicantEmail: string;
   applicantPhone: string;
   purpose: string;
+  seriesLabel: string;
+  seriesColor: string;
   startDate: string;
   endDate: string;
   daysOfWeek: string[];
@@ -34,6 +36,8 @@ const initialForm: RecurrenceForm = {
   applicantEmail: '',
   applicantPhone: '',
   purpose: '',
+  seriesLabel: '',
+  seriesColor: '#2563eb',
   startDate: '',
   endDate: '',
   daysOfWeek: [],
@@ -62,6 +66,8 @@ export function RecurrencesPage() {
       daysOfWeek: form.daysOfWeek,
       startTime: `${form.startTime}:00`,
       endTime: `${form.endTime}:00`,
+      applicantPhone: form.applicantPhone,
+      conflictPolicy: form.conflictPolicy,
     };
   }
 
@@ -77,7 +83,8 @@ export function RecurrencesPage() {
       applicantEmail: form.applicantEmail,
       applicantPhone: form.applicantPhone,
       purpose: form.purpose,
-      conflictPolicy: form.conflictPolicy,
+      seriesLabel: form.seriesLabel || undefined,
+      seriesColor: form.seriesColor || undefined,
     });
   }
 
@@ -157,6 +164,26 @@ export function RecurrencesPage() {
               value={form.purpose}
               onChange={(event) => setForm((prev) => ({ ...prev, purpose: event.target.value }))}
               required
+            />
+          </label>
+          <label>
+            Series label
+            <input
+              data-testid="recurrence-series-label-input"
+              name="seriesLabel"
+              value={form.seriesLabel}
+              onChange={(event) => setForm((prev) => ({ ...prev, seriesLabel: event.target.value }))}
+              placeholder="1학년 / 동아리 / 정기회의"
+            />
+          </label>
+          <label>
+            Series color
+            <input
+              data-testid="recurrence-series-color-input"
+              name="seriesColor"
+              type="color"
+              value={form.seriesColor}
+              onChange={(event) => setForm((prev) => ({ ...prev, seriesColor: event.target.value }))}
             />
           </label>
           <label>
@@ -251,7 +278,7 @@ export function RecurrencesPage() {
               type="button"
               className="primary-button"
               data-testid="recurrence-create-button"
-              disabled={!preview.data || create.isPending}
+              disabled={!preview.data?.createAllowed || create.isPending}
               onClick={handleCreate}
             >
               {create.isPending ? '등록 중...' : '반복 예약 등록'}
@@ -270,6 +297,7 @@ export function RecurrencesPage() {
                 <div><strong>{preview.data.totalCandidates}</strong><span>전체 후보</span></div>
                 <div><strong>{preview.data.availableCount}</strong><span>가능</span></div>
                 <div><strong>{preview.data.conflictCount}</strong><span>충돌</span></div>
+                <div><strong>{preview.data.createAllowed ? 'OK' : 'NO'}</strong><span>생성 가능</span></div>
               </div>
               <div className="table-wrap compact">
                 <table className="data-table" data-testid="recurrence-preview-table">
@@ -332,7 +360,17 @@ export function RecurrencesPage() {
                     </td>
                     <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
                     <td>{item.daysOfWeek} / {formatTime(item.startTime)}~{formatTime(item.endTime)}</td>
-                    <td>{item.purpose}</td>
+                    <td>
+                      {item.seriesLabel ? (
+                        <span
+                          className="series-chip"
+                          style={item.seriesColor ? { borderColor: item.seriesColor, color: item.seriesColor } : undefined}
+                        >
+                          {item.seriesLabel}
+                        </span>
+                      ) : null}
+                      {item.purpose}
+                    </td>
                     <td>
                       <button
                         type="button"

@@ -193,7 +193,7 @@ export async function createRecurrenceByApi(
     dayOfWeek?: string;
     startTime?: string;
     endTime?: string;
-    conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL' | 'CREATE_AVAILABLE_ONLY';
+    conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL';
   } = {},
 ) {
   const recurrenceTime = nextWeekdayRecurrenceInputs();
@@ -210,6 +210,8 @@ export async function createRecurrenceByApi(
       startTime: options.startTime || recurrenceTime.startTime,
       endTime: options.endTime || recurrenceTime.endTime,
       conflictPolicy: options.conflictPolicy || 'FAIL_ALL',
+      seriesLabel: `${E2E_TEST_DATA_PREFIX}series-${Date.now()}`,
+      seriesColor: '#2563eb',
     },
   });
   expect(response.ok()).toBeTruthy();

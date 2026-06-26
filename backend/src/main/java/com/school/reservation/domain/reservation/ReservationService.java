@@ -2,6 +2,7 @@ package com.school.reservation.domain.reservation;
 
 import com.school.reservation.domain.room.Room;
 import com.school.reservation.domain.room.RoomRepository;
+import com.school.reservation.domain.recurrence.ReservationRecurrence;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -65,8 +66,8 @@ public class ReservationService {
     }
 
     @Transactional
-    public Reservation createRecurringReservation(@Valid CreateReservationCommand command, String adminId, UUID recurrenceId) {
-        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.RECURRENCE_GENERATED, null, recurrenceId, null);
+    public Reservation createRecurringReservation(@Valid CreateReservationCommand command, String adminId, ReservationRecurrence recurrence) {
+        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.RECURRENCE_GENERATED, null, recurrence, null);
     }
 
     private Reservation createReservation(
@@ -75,7 +76,7 @@ public class ReservationService {
         String actorId,
         ReservationHistory.Action historyAction,
         String memo,
-        UUID recurrenceId,
+        ReservationRecurrence recurrence,
         String cancelPasswordHash
     ) {
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
@@ -97,8 +98,8 @@ public class ReservationService {
             actorType,
             actorId
         );
-        if (recurrenceId != null) {
-            reservation.attachRecurrence(recurrenceId);
+        if (recurrence != null) {
+            reservation.attachRecurrence(recurrence);
         }
         if (cancelPasswordHash != null) {
             reservation.setCancelPasswordHash(cancelPasswordHash);
@@ -373,6 +374,7 @@ public class ReservationService {
         return (root, query, criteriaBuilder) -> {
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
                 root.fetch("room");
+                root.fetch("recurrence", jakarta.persistence.criteria.JoinType.LEFT);
             }
 
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();

@@ -51,6 +51,42 @@ export function ReservationDetailPage() {
 
   const detail = reservation.data;
   const isCancelled = detail.status === 'CANCELLED';
+  const coreSections = reservationCoreSections({
+    room: detail.room,
+    startAt: detail.startAt,
+    endAt: detail.endAt,
+    applicantName: detail.applicantName,
+    applicantEmail: detail.applicantEmail,
+    applicantPhone: detail.applicantPhone,
+    purpose: <span data-testid="reservation-purpose">{detail.purpose}</span>,
+  });
+  if (detail.series) {
+    coreSections.push({
+      title: 'Series',
+      fields: [
+        {
+          label: 'Tag',
+          value: detail.series.label ? (
+            <span
+              className="series-chip"
+              style={detail.series.color ? { borderColor: detail.series.color, color: detail.series.color } : undefined}
+            >
+              {detail.series.label}
+            </span>
+          ) : '-',
+        },
+        { label: 'Exception', value: detail.recurrenceException ? 'Yes' : 'No' },
+        {
+          label: 'Series detail',
+          value: (
+            <Link className="text-link" to={`/admin/recurrences/${detail.series.id}`}>
+              Open series
+            </Link>
+          ),
+        },
+      ],
+    });
+  }
 
   return (
     <section className="page-section" aria-labelledby="reservation-detail-title">
@@ -78,15 +114,7 @@ export function ReservationDetailPage() {
       <div className="detail-grid">
         <ReservationDetailView
           status={detail.status}
-          sections={reservationCoreSections({
-            room: detail.room,
-            startAt: detail.startAt,
-            endAt: detail.endAt,
-            applicantName: detail.applicantName,
-            applicantEmail: detail.applicantEmail,
-            applicantPhone: detail.applicantPhone,
-            purpose: <span data-testid="reservation-purpose">{detail.purpose}</span>,
-          })}
+          sections={coreSections}
         />
 
         <section className="panel reservation-action-panel" aria-labelledby="actions-title">

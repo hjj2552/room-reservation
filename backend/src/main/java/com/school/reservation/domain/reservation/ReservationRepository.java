@@ -50,6 +50,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         select r
         from Reservation r
         join fetch r.room room
+        left join fetch r.recurrence recurrence
         where r.id = :id
         """)
     Optional<Reservation> findDetailById(@Param("id") UUID id);
@@ -99,6 +100,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         select r
         from Reservation r
         join fetch r.room room
+        left join fetch r.recurrence recurrence
         where room.id = :roomId
           and r.status in :statuses
           and r.startAt < :endAt
@@ -116,7 +118,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         select r
         from Reservation r
         join fetch r.room room
-        where r.recurrenceId = :recurrenceId
+        where r.recurrence.id = :recurrenceId
           and r.status in :statuses
         order by r.startAt asc
         """)
@@ -124,6 +126,16 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         @Param("recurrenceId") UUID recurrenceId,
         @Param("statuses") List<Reservation.ReservationStatus> statuses
     );
+
+    @Query("""
+        select r
+        from Reservation r
+        join fetch r.room room
+        left join fetch r.recurrence recurrence
+        where r.recurrence.id = :recurrenceId
+        order by r.startAt asc
+        """)
+    List<Reservation> findByRecurrenceIdOrderByStartAt(@Param("recurrenceId") UUID recurrenceId);
 
     @Query("""
         select count(r)

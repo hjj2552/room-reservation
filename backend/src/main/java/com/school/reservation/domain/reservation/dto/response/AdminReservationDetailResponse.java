@@ -8,6 +8,8 @@ public record AdminReservationDetailResponse(
     UUID id,
     RoomSummary room,
     UUID recurrenceId,
+    SeriesSummary series,
+    boolean recurrenceException,
     String applicantName,
     String applicantEmail,
     String applicantPhone,
@@ -24,6 +26,8 @@ public record AdminReservationDetailResponse(
             reservation.getId(),
             RoomSummary.from(reservation),
             reservation.getRecurrenceId(),
+            SeriesSummary.from(reservation),
+            reservation.isRecurrenceException(),
             reservation.getApplicantName(),
             reservation.getApplicantEmail(),
             reservation.getApplicantPhone(),
@@ -43,6 +47,19 @@ public record AdminReservationDetailResponse(
                 reservation.getRoom().getId(),
                 reservation.getDisplayRoomName(),
                 reservation.getRoom().getLocation()
+            );
+        }
+    }
+
+    public record SeriesSummary(UUID id, String label, String color) {
+        static SeriesSummary from(Reservation reservation) {
+            if (reservation.getRecurrence() == null) {
+                return null;
+            }
+            return new SeriesSummary(
+                reservation.getRecurrence().getId(),
+                reservation.getRecurrence().getSeriesLabel(),
+                reservation.getRecurrence().getSeriesColor()
             );
         }
     }

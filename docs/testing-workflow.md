@@ -43,7 +43,7 @@ cd backend
 - `APPROVED`는 예약 상태가 아니라 `reservation_histories.action` 값이다. 승인 처리 후 예약 상태는 `CONFIRMED`, 감사 이력 action은 `APPROVED`가 된다.
 - `REQUESTED`, `CONFIRMED` 예약은 모두 충돌 대상으로 본다.
 - `FAIL_ALL` 반복 예약은 일부 충돌만 있어도 recurrence와 generated reservation을 만들지 않는다.
-- `SKIP_CONFLICTS`, `CREATE_AVAILABLE_ONLY`는 가능한 회차만 생성하고 skipped 응답을 돌려준다.
+- `SKIP_CONFLICTS`는 가능한 회차만 생성하고 skipped 응답을 돌려준다.
 - recurrence cancel은 recurrence soft delete, 연결 예약 `CANCELLED`, `RECURRENCE_CANCELLED` history 저장을 함께 반영한다.
 - `reservation_histories.action`은 enum 문자열로 저장하고 API에서도 같은 값으로 응답한다.
 - CSV export는 Excel 호환을 위해 UTF-8 BOM을 포함하고, 시간은 KST `yyyy-MM-dd HH:mm:ss` 문자열로 내보낸다.
