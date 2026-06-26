@@ -61,7 +61,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
 
     await page.goto(`/admin/recurrences/${recurrenceId}`);
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
-    await expect(page.getByText(purpose)).toBeVisible();
+    await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
 
@@ -156,7 +156,7 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     expect(created.items[0].reason).toBe('TIME_SLOT_CONFLICT');
 
     await page.goto(`/admin/recurrences/${recurrenceId}`);
-    await expect(page.getByText(purpose)).toBeVisible();
+    await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(recurrenceTime.dayOfWeek);
   } finally {
     if (recurrenceId) {

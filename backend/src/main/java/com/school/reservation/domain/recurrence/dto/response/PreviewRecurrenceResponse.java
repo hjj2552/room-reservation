@@ -31,7 +31,9 @@ public record PreviewRecurrenceResponse(
             items.size(),
             availableCount,
             conflictCount,
-            conflictPolicy == ReservationRecurrence.ConflictPolicy.FAIL_ALL ? conflictCount == 0 : availableCount > 0,
+            conflictPolicy == ReservationRecurrence.ConflictPolicy.FAIL_ALL
+                ? items.size() > 0 && conflictCount == 0
+                : availableCount > 0,
             items
         );
     }

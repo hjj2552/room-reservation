@@ -38,7 +38,7 @@ export function RecurrenceDetailPage() {
         <div>
           <p className="eyebrow">관리자 메뉴</p>
           <h1 id="recurrence-detail-title">{detail.room.name}</h1>
-          <p className="muted">{detail.purpose}</p>
+          <p className="muted" data-testid="recurrence-detail-purpose">{detail.purpose}</p>
         </div>
         <div className="header-actions">
           <button type="button" className="ghost-button" onClick={() => navigate('/admin/recurrences')}>
