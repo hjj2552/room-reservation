@@ -6,6 +6,7 @@ import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCancelRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
+import { timetableReservationUrl } from '../../shared/utils/timetable';
 
 export function RecurrenceDetailPage() {
   const { recurrenceId = '' } = useParams();
@@ -144,7 +145,7 @@ export function RecurrenceDetailPage() {
                 <th scope="col">강의실</th>
                 <th scope="col">예약 시간</th>
                 <th scope="col">목적</th>
-                <th scope="col">예약</th>
+                <th scope="col">시간표</th>
               </tr>
             </thead>
             <tbody>
@@ -175,10 +176,10 @@ export function RecurrenceDetailPage() {
                   <td>
                     <Link
                       className="text-link"
-                      to={`/admin/reservations/${reservation.id}`}
+                      to={timetableReservationUrl({ startAt: reservation.startAt, roomId: reservation.roomId })}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      상세
+                      시간표에서 보기
                     </Link>
                   </td>
                 </tr>
