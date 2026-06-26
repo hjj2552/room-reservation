@@ -18,7 +18,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
   try {
     await page.goto('/admin/recurrences');
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
-    await expect(page.getByTestId('recurrences-table').or(page.getByText('등록된 반복 예약이 없습니다.'))).toBeVisible();
+    await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
     await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-admin');
@@ -79,6 +79,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-cancel-button')).toBeDisabled();
 
     await page.goto('/admin/recurrences');
+    await expect(page.getByTestId('recurrence-status-filter')).toHaveValue('ALL');
     const row = page.getByRole('row').filter({ hasText: purpose });
     await expect(row).toBeVisible();
     await expect(row).toContainText('취소');

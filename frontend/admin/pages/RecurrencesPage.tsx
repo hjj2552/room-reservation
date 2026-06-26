@@ -1,8 +1,9 @@
-import { RefreshCw } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { RefreshCw, Search } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
-import type { ConflictPolicy } from '../../shared/api/types';
+import type { ConflictPolicy, RecurrenceFilters, RecurrenceStatus } from '../../shared/api/types';
+import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCreateRecurrence,
@@ -46,14 +47,48 @@ const initialForm: RecurrenceForm = {
 };
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const pageSize = 20;
+
+function numberParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
 export function RecurrencesPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const rooms = useRooms();
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
-  const recurrences = useRecurrences(true);
+
+  useEffect(() => {
+    searchParamsRef.current = new URLSearchParams(window.location.search);
+  }, [searchParams]);
+
+  const statusParam = searchParams.get('status');
+  const status = statusParam === null || statusParam === 'ALL' ? '' : (statusParam as RecurrenceStatus);
+  const roomId = searchParams.get('roomId') || '';
+  const fromDate = searchParams.get('fromDate') || '';
+  const toDate = searchParams.get('toDate') || '';
+  const keyword = searchParams.get('keyword') || '';
+  const page = numberParam(searchParams.get('page'), 0);
+
+  const filters = useMemo<RecurrenceFilters>(
+    () => ({
+      status,
+      roomId,
+      fromDate,
+      toDate,
+      keyword,
+      includeDeleted: status !== 'ACTIVE',
+      page,
+      size: pageSize,
+    }),
+    [status, roomId, fromDate, toDate, keyword, page],
+  );
+  const recurrences = useRecurrences(filters);
 
   function basePayload() {
     return {
@@ -92,6 +127,26 @@ export function RecurrencesPage() {
         ? prev.daysOfWeek.filter((item) => item !== day)
         : [...prev.daysOfWeek, day],
     }));
+  }
+
+  function updateSearchParams(updater: (next: URLSearchParams) => void) {
+    const next = new URLSearchParams(searchParamsRef.current);
+    updater(next);
+    searchParamsRef.current = next;
+    setSearchParams(new URLSearchParams(next));
+  }
+
+  function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
+    updateSearchParams((next) => {
+      if (value) next.set(name, value);
+      else next.delete(name);
+      if (options.resetPage !== false) next.set('page', '0');
+    });
+  }
+
+  function handleListFilterSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setParam('page', '0', { resetPage: false });
   }
 
   return (
@@ -325,76 +380,146 @@ export function RecurrencesPage() {
         </section>
       </div>
 
-      <section className="panel" aria-labelledby="recurrence-list-title">
+      <section className="panel recurrence-list-panel" aria-labelledby="recurrence-list-title">
         <div className="panel-header">
           <h2 id="recurrence-list-title">반복 예약 목록</h2>
         </div>
+        <form className="filter-bar" onSubmit={handleListFilterSubmit}>
+          <label>
+            상태
+            <select
+              data-testid="recurrence-status-filter"
+              value={status || 'ALL'}
+              onChange={(event) => setParam('status', event.target.value)}
+            >
+              <option value="ACTIVE">운영 중</option>
+              <option value="CANCELLED">취소됨</option>
+              <option value="ALL">전체</option>
+            </select>
+          </label>
+          <label>
+            강의실
+            <select
+              data-testid="recurrence-list-room-filter"
+              value={roomId}
+              onChange={(event) => setParam('roomId', event.target.value)}
+            >
+              <option value="">전체</option>
+              {rooms.data?.items.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            시작일
+            <input
+              data-testid="recurrence-list-from-date-filter"
+              type="date"
+              value={fromDate}
+              onChange={(event) => setParam('fromDate', event.target.value)}
+            />
+          </label>
+          <label>
+            종료일
+            <input
+              data-testid="recurrence-list-to-date-filter"
+              type="date"
+              value={toDate}
+              onChange={(event) => setParam('toDate', event.target.value)}
+            />
+          </label>
+          <label>
+            검색어
+            <input
+              data-testid="recurrence-list-keyword-filter"
+              type="search"
+              placeholder="태그, 신청자, 목적"
+              value={keyword}
+              onChange={(event) => setParam('keyword', event.target.value)}
+            />
+          </label>
+          <button type="submit" className="secondary-button" data-testid="recurrence-list-search-button">
+            <Search size={16} aria-hidden="true" />
+            조회
+          </button>
+        </form>
         {recurrences.isLoading ? <LoadingState /> : null}
         {recurrences.isError ? <ErrorState error={recurrences.error} /> : null}
-        {recurrences.data?.items.length === 0 ? <EmptyState message="등록된 반복 예약이 없습니다." /> : null}
+        {recurrences.data?.items.length === 0 ? <EmptyState message="조건에 맞는 반복 예약이 없습니다." /> : null}
         {recurrences.data?.items.length ? (
-          <div className="table-wrap">
-            <table className="data-table" data-testid="recurrences-table">
-              <caption className="sr-only">반복 예약 목록</caption>
-              <thead>
-                <tr>
-                  <th scope="col">상태</th>
-                  <th scope="col">강의실</th>
-                  <th scope="col">기간</th>
-                  <th scope="col">요일/시간</th>
-                  <th scope="col">목적</th>
-                  <th scope="col">등록 정책</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recurrences.data.items.map((item) => (
-                  <tr
-                    key={item.id}
-                    tabIndex={0}
-                    className="clickable-row"
-                    onClick={() => navigate(`/admin/recurrences/${item.id}`)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return;
-                      if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
-                    }}
-                  >
-                    <td>
-                      <span className={`plain-badge ${item.deleted ? 'muted-badge' : 'good'}`}>
-                        {item.deleted ? '취소됨' : '운영 중'}
-                      </span>
-                    </td>
-                    <td>
-                      <Link
-                        className="text-link"
-                        to={`/admin/recurrences/${item.id}`}
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {item.roomName}
-                      </Link>
-                    </td>
-                    <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
-                    <td>
-                      {formatDayCodes(item.daysOfWeek)}
-                      <br />
-                      <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
-                    </td>
-                    <td className="purpose-cell">
-                      {item.seriesLabel ? (
-                        <span
-                          className="series-chip"
-                          style={item.seriesColor ? { borderColor: item.seriesColor, color: item.seriesColor } : undefined}
-                        >
-                          {item.seriesLabel}
-                        </span>
-                      ) : null}
-                      {item.purpose}
-                    </td>
-                    <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
+          <>
+            <div className="table-wrap">
+              <table className="data-table" data-testid="recurrences-table">
+                <caption className="sr-only">반복 예약 목록</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">상태</th>
+                    <th scope="col">강의실</th>
+                    <th scope="col">기간</th>
+                    <th scope="col">요일/시간</th>
+                    <th scope="col">목적</th>
+                    <th scope="col">등록 정책</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recurrences.data.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      tabIndex={0}
+                      className="clickable-row"
+                      onClick={() => navigate(`/admin/recurrences/${item.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
+                      }}
+                    >
+                      <td>
+                        <span className={`plain-badge ${item.deleted ? 'muted-badge' : 'good'}`}>
+                          {item.deleted ? '취소됨' : '운영 중'}
+                        </span>
+                      </td>
+                      <td>
+                        <Link
+                          className="text-link"
+                          to={`/admin/recurrences/${item.id}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {item.roomName}
+                        </Link>
+                      </td>
+                      <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
+                      <td>
+                        {formatDayCodes(item.daysOfWeek)}
+                        <br />
+                        <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
+                      </td>
+                      <td className="purpose-cell">
+                        {item.seriesLabel ? (
+                          <span
+                            className="series-chip"
+                            style={item.seriesColor ? { borderColor: item.seriesColor, color: item.seriesColor } : undefined}
+                          >
+                            {item.seriesLabel}
+                          </span>
+                        ) : null}
+                        {item.purpose}
+                      </td>
+                      <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={recurrences.data.page}
+              totalPages={recurrences.data.totalPages}
+              totalItems={recurrences.data.totalItems}
+              size={recurrences.data.size}
+              onPageChange={(nextPage) => setParam('page', String(nextPage), { resetPage: false })}
+            />
+          </>
         ) : null}
       </section>
     </section>

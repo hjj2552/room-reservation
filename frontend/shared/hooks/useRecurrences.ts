@@ -6,17 +6,18 @@ import {
   listRecurrences,
   previewRecurrence,
 } from '../api/recurrences';
+import type { RecurrenceFilters } from '../api/types';
 
 export const recurrenceKeys = {
   all: ['recurrences'] as const,
-  list: (includeDeleted: boolean) => ['recurrences', 'list', includeDeleted] as const,
+  list: (filters: RecurrenceFilters) => ['recurrences', 'list', filters] as const,
   detail: (id: string) => ['recurrences', 'detail', id] as const,
 };
 
-export function useRecurrences(includeDeleted: boolean) {
+export function useRecurrences(filters: RecurrenceFilters = {}) {
   return useQuery({
-    queryKey: recurrenceKeys.list(includeDeleted),
-    queryFn: () => listRecurrences(includeDeleted),
+    queryKey: recurrenceKeys.list(filters),
+    queryFn: () => listRecurrences(filters),
   });
 }
 

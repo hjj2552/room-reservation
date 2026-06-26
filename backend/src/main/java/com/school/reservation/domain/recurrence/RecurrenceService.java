@@ -149,8 +149,24 @@ public class RecurrenceService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ReservationRecurrence> search(boolean includeDeleted, Pageable pageable) {
-        return recurrenceRepository.findRecurrences(includeDeleted, pageable);
+    public Page<ReservationRecurrence> search(
+        boolean includeDeleted,
+        String status,
+        UUID roomId,
+        LocalDate fromDate,
+        LocalDate toDate,
+        String keyword,
+        Pageable pageable
+    ) {
+        return recurrenceRepository.findRecurrences(
+            includeDeleted,
+            normalize(status),
+            roomId,
+            fromDate,
+            toDate,
+            keywordPattern(keyword),
+            pageable
+        );
     }
 
     @Transactional(readOnly = true)
@@ -226,6 +242,20 @@ public class RecurrenceService {
     private Room getRoom(UUID roomId) {
         return roomRepository.findByIdAndDeletedAtIsNull(roomId)
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
+    }
+
+    private String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toUpperCase();
+    }
+
+    private String keywordPattern(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        return "%" + keyword.trim().toLowerCase() + "%";
     }
 
     private List<Candidate> candidates(PreviewRecurrenceRequest request) {

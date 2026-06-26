@@ -10,9 +10,11 @@ import com.school.reservation.domain.recurrence.dto.response.RecurrenceListItemR
 import com.school.reservation.global.dto.PagedResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,11 +53,29 @@ public class AdminRecurrenceController {
     @GetMapping
     public PagedResponse<RecurrenceListItemResponse> getRecurrences(
         @RequestParam(defaultValue = "false") boolean includeDeleted,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) UUID roomId,
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        LocalDate fromDate,
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        LocalDate toDate,
+        @RequestParam(required = false) String keyword,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
+        boolean effectiveIncludeDeleted = includeDeleted || "CANCELLED".equalsIgnoreCase(status);
         return PagedResponse.from(recurrenceService
-            .search(includeDeleted, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+            .search(
+                effectiveIncludeDeleted,
+                status,
+                roomId,
+                fromDate,
+                toDate,
+                keyword,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+            )
             .map(RecurrenceListItemResponse::from));
     }
 

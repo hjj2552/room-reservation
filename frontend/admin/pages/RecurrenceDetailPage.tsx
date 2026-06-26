@@ -135,7 +135,7 @@ export function RecurrenceDetailPage() {
         </section>
       </div>
 
-      <section className="panel" aria-labelledby="recurrence-reservations-title">
+      <section className="panel recurrence-reservations-panel" aria-labelledby="recurrence-reservations-title">
         <h2 id="recurrence-reservations-title">생성된 개별 예약</h2>
         <div className="table-wrap compact">
           <table className="data-table" data-testid="recurrence-reservations-table">
