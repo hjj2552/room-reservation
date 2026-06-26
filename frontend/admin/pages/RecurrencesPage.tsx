@@ -231,6 +231,7 @@ export function RecurrencesPage() {
           <label>
             표시 색상
             <input
+              className="series-color-input"
               data-testid="recurrence-series-color-input"
               name="seriesColor"
               type="color"
