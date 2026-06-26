@@ -105,12 +105,14 @@ public class E2eTestDataCleanupService {
                     %s
                     or %s
                     or %s
+                    or %s
                     %s
                 )
                 """.formatted(
                     matchExpression(patterns, "purpose"),
                     matchExpression(patterns, "applicant_name"),
                     matchExpression(patterns, "applicant_email"),
+                    matchExpression(patterns, "series_label"),
                     roomPredicate
                 ),
             params,

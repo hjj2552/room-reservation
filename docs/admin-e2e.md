@@ -105,7 +105,7 @@ Useful environment variables:
 - `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`.
 - The cleanup endpoint can preview or hard-delete rows identified by the `e2e-` prefix:
   - rooms whose name starts with `e2e-`;
-  - recurrences whose purpose/applicant/email starts with `e2e-`, plus recurrences attached to an `e2e-` room;
+  - recurrences whose purpose/applicant/email/tag starts with `e2e-`, plus recurrences attached to an `e2e-` room;
   - reservations whose purpose/applicant/email starts with `e2e-`, plus reservations attached to an `e2e-` room or an `e2e-` recurrence;
   - reservation histories for those reservations, including hard-deleted reservation histories identified by E2E snapshot purpose or room name.
 - Recurring reservations are cleaned by deleting the recurrence row and every generated reservation linked by `recurrence_id`.
