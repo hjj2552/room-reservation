@@ -61,7 +61,10 @@ public class AdminRecurrenceController {
 
     @GetMapping("/{recurrenceId}")
     public RecurrenceDetailResponse getDetail(@PathVariable UUID recurrenceId) {
-        return RecurrenceDetailResponse.from(recurrenceService.getDetail(recurrenceId));
+        return RecurrenceDetailResponse.from(
+            recurrenceService.getDetail(recurrenceId),
+            recurrenceService.getReservations(recurrenceId)
+        );
     }
 
     @PostMapping("/{recurrenceId}/cancel")

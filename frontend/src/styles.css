@@ -426,6 +426,23 @@ button:disabled {
   max-width: 360px;
 }
 
+.series-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 180px;
+  margin-right: 6px;
+  border: 1px solid #7b8794;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -707,6 +724,15 @@ button:disabled {
   white-space: nowrap;
 }
 
+.reservation-block-series {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .reservation-block-meta {
   display: flex;
   gap: 5px;
@@ -766,6 +792,10 @@ button:disabled {
 .reservation-block-compact .reservation-block-meta {
   font-size: 11px;
   line-height: 1.3;
+}
+
+.reservation-block-compact .reservation-block-series {
+  display: none;
 }
 
 .reservation-block-compact .reservation-block-footer {

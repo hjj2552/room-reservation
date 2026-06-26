@@ -47,7 +47,7 @@ interface E2eDataFactory {
       dayOfWeek?: string;
       startTime?: string;
       endTime?: string;
-      conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL' | 'CREATE_AVAILABLE_ONLY';
+      conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL';
     },
   ): Promise<E2eRecurrence>;
   registerRoom(roomId: string): void;

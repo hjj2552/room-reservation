@@ -168,7 +168,11 @@ export function ReservationRoomTimetable({
                     key={reservation.id}
                     type="button"
                     className={blockClassName}
-                    style={{ top: position.top, height: position.height }}
+                    style={{
+                      top: position.top,
+                      height: position.height,
+                      borderColor: reservation.seriesColor || undefined,
+                    }}
                     onClick={() =>
                       onReservationClick ? onReservationClick(reservation) : navigate(`/admin/reservations/${reservation.id}`)
                     }
@@ -176,6 +180,11 @@ export function ReservationRoomTimetable({
                     data-testid="reservation-room-timetable-block"
                   >
                     <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
+                    {reservation.seriesLabel ? (
+                      <span className="reservation-block-series" style={reservation.seriesColor ? { color: reservation.seriesColor } : undefined}>
+                        {reservation.seriesLabel}
+                      </span>
+                    ) : null}
                     <span className="reservation-block-meta">
                       <span>
                         {position.startLabel}-{position.endLabel}

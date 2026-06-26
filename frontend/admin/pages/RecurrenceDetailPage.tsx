@@ -79,6 +79,19 @@ export function RecurrenceDetailPage() {
               <dd>{conflictPolicyLabels[detail.conflictPolicy]}</dd>
             </div>
             <div>
+              <dt>Series tag</dt>
+              <dd>
+                {detail.seriesLabel ? (
+                  <span
+                    className="series-chip"
+                    style={detail.seriesColor ? { borderColor: detail.seriesColor, color: detail.seriesColor } : undefined}
+                  >
+                    {detail.seriesLabel}
+                  </span>
+                ) : '-'}
+              </dd>
+            </div>
+            <div>
               <dt>신청자</dt>
               <dd>{detail.applicantName}</dd>
             </div>
@@ -119,6 +132,36 @@ export function RecurrenceDetailPage() {
           </form>
         </section>
       </div>
+
+      <section className="panel" aria-labelledby="recurrence-reservations-title">
+        <h2 id="recurrence-reservations-title">생성된 개별 예약</h2>
+        <div className="table-wrap compact">
+          <table className="data-table" data-testid="recurrence-reservations-table">
+            <thead>
+              <tr>
+                <th scope="col">시간</th>
+                <th scope="col">목적</th>
+                <th scope="col">상태</th>
+                <th scope="col">예약</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.reservations.map((reservation) => (
+                <tr key={reservation.id}>
+                  <td>{formatDateTime(reservation.startAt)} ~ {formatDateTime(reservation.endAt)}</td>
+                  <td>{reservation.purpose}{reservation.exception ? ' (exception)' : ''}</td>
+                  <td>{reservation.status}</td>
+                  <td>
+                    <Link className="text-link" to={`/admin/reservations/${reservation.id}`}>
+                      상세
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   );
 }

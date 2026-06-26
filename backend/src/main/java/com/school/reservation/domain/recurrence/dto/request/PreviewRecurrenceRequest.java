@@ -1,7 +1,9 @@
 package com.school.reservation.domain.recurrence.dto.request;
 
+import com.school.reservation.domain.recurrence.ReservationRecurrence;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -13,7 +15,8 @@ public record PreviewRecurrenceRequest(
     @NotNull LocalDate endDate,
     @NotEmpty List<String> daysOfWeek,
     @NotNull LocalTime startTime,
-    @NotNull LocalTime endTime
+    @NotNull LocalTime endTime,
+    @Size(max = 50) String applicantPhone,
+    @NotNull ReservationRecurrence.ConflictPolicy conflictPolicy
 ) {
 }
-

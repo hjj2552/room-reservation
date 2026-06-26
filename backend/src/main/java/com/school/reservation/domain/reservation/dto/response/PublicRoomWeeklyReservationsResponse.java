@@ -36,7 +36,10 @@ public record PublicRoomWeeklyReservationsResponse(
         OffsetDateTime startAt,
         OffsetDateTime endAt,
         Reservation.ReservationStatus status,
-        String purpose
+        String purpose,
+        UUID recurrenceId,
+        String seriesLabel,
+        String seriesColor
     ) {
         static ReservationBlock from(Reservation reservation) {
             return new ReservationBlock(
@@ -47,7 +50,10 @@ public record PublicRoomWeeklyReservationsResponse(
                 reservation.getStartAt(),
                 reservation.getEndAt(),
                 reservation.getStatus(),
-                reservation.getPurpose()
+                reservation.getPurpose(),
+                reservation.getRecurrenceId(),
+                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getSeriesLabel(),
+                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getSeriesColor()
             );
         }
     }

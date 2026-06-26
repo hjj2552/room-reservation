@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -17,6 +18,9 @@ public record CreateRecurrenceRequest(
     @NotBlank @Email @Size(max = 255) String applicantEmail,
     @NotBlank @Size(max = 50) String applicantPhone,
     @NotBlank @Size(max = 500) String purpose,
+    @Size(max = 100) String seriesLabel,
+    @Pattern(regexp = "^$|^#[0-9A-Fa-f]{6}$", message = "Series color must be a hex color.")
+    String seriesColor,
     @NotNull LocalDate startDate,
     @NotNull LocalDate endDate,
     @NotEmpty List<String> daysOfWeek,
@@ -25,6 +29,6 @@ public record CreateRecurrenceRequest(
     @NotNull ReservationRecurrence.ConflictPolicy conflictPolicy
 ) {
     public PreviewRecurrenceRequest toPreviewRequest() {
-        return new PreviewRecurrenceRequest(roomId, startDate, endDate, daysOfWeek, startTime, endTime);
+        return new PreviewRecurrenceRequest(roomId, startDate, endDate, daysOfWeek, startTime, endTime, applicantPhone, conflictPolicy);
     }
 }

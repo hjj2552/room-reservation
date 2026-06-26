@@ -1,5 +1,6 @@
 package com.school.reservation.domain.reservation;
 
+import com.school.reservation.domain.recurrence.ReservationRecurrence;
 import com.school.reservation.domain.room.Room;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,8 +52,12 @@ public class Reservation {
     @Column(name = "original_room_name", length = 100)
     private String originalRoomName;
 
-    @Column(name = "recurrence_id")
-    private UUID recurrenceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurrence_id")
+    private ReservationRecurrence recurrence;
+
+    @Column(name = "recurrence_exception", nullable = false)
+    private boolean recurrenceException;
 
     @Column(name = "applicant_name", nullable = false, length = 100)
     private String applicantName;
@@ -179,10 +184,13 @@ public class Reservation {
         this.updatedByActorType = actorType;
         this.updatedByActorId = actorId;
         this.updatedAt = OffsetDateTime.now();
+        if (recurrence != null) {
+            this.recurrenceException = true;
+        }
     }
 
-    public void attachRecurrence(UUID recurrenceId) {
-        this.recurrenceId = recurrenceId;
+    public void attachRecurrence(ReservationRecurrence recurrence) {
+        this.recurrence = recurrence;
     }
 
     public UUID getId() {
@@ -248,7 +256,15 @@ public class Reservation {
     }
 
     public UUID getRecurrenceId() {
-        return recurrenceId;
+        return recurrence == null ? null : recurrence.getId();
+    }
+
+    public ReservationRecurrence getRecurrence() {
+        return recurrence;
+    }
+
+    public boolean isRecurrenceException() {
+        return recurrenceException;
     }
 
     public String getCancelPasswordHash() {

@@ -36,8 +36,10 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(previewBody(startDate, startDate)))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.conflictPolicy").value("FAIL_ALL"))
             .andExpect(jsonPath("$.totalCandidates").value(1))
-            .andExpect(jsonPath("$.availableCount").value(1));
+            .andExpect(jsonPath("$.availableCount").value(1))
+            .andExpect(jsonPath("$.createAllowed").value(true));
 
         String response = mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
@@ -45,6 +47,8 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
                 .content(createBody(startDate, startDate, "FAIL_ALL")))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.createdCount").value(1))
+            .andExpect(jsonPath("$.seriesLabel").value("Regular Class"))
+            .andExpect(jsonPath("$.seriesColor").value("#2563eb"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -52,7 +56,20 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
         mockMvc.perform(get("/api/admin/recurrences/{recurrenceId}", recurrenceId).session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.deleted").value(false));
+            .andExpect(jsonPath("$.deleted").value(false))
+            .andExpect(jsonPath("$.seriesLabel").value("Regular Class"))
+            .andExpect(jsonPath("$.seriesColor").value("#2563eb"))
+            .andExpect(jsonPath("$.reservations[0].id").isNotEmpty())
+            .andExpect(jsonPath("$.reservations[0].exception").value(false));
+
+        UUID reservationId = generatedReservationId(recurrenceId);
+        mockMvc.perform(get("/api/admin/reservations/{reservationId}", reservationId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.recurrenceId").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.series.id").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.series.label").value("Regular Class"))
+            .andExpect(jsonPath("$.series.color").value("#2563eb"))
+            .andExpect(jsonPath("$.recurrenceException").value(false));
     }
 
     @Test
@@ -65,11 +82,12 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(post("/api/admin/recurrences/preview")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(previewBody(firstDate, secondDate)))
+                .content(previewBody(firstDate, secondDate, "SKIP_CONFLICTS")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.totalCandidates").value(2))
             .andExpect(jsonPath("$.availableCount").value(1))
             .andExpect(jsonPath("$.conflictCount").value(1))
+            .andExpect(jsonPath("$.createAllowed").value(true))
             .andExpect(jsonPath("$.items[0].available").value(false))
             .andExpect(jsonPath("$.items[0].reason").value("TIME_SLOT_CONFLICT"))
             .andExpect(jsonPath("$.items[1].available").value(true));
@@ -97,32 +115,16 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void createAvailableOnlyUsesSamePartialCreationContractAsSkipConflicts() throws Exception {
+    void createAvailableOnlyIsRejectedAsUnsupportedPolicy() throws Exception {
         MockHttpSession session = loginAdminSession();
         LocalDate firstDate = nextWeekdayAt(9, 0).toLocalDate();
         LocalDate secondDate = firstDate.plusDays(7);
-        createBlockingReservation(session, firstDate);
 
-        String response = mockMvc.perform(post("/api/admin/recurrences")
+        mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(createBody(firstDate, secondDate, "CREATE_AVAILABLE_ONLY")))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.recurrenceId").isNotEmpty())
-            .andExpect(jsonPath("$.createdCount").value(1))
-            .andExpect(jsonPath("$.skippedCount").value(1))
-            .andExpect(jsonPath("$.failedCount").value(0))
-            .andExpect(jsonPath("$.items[0].status").value("SKIPPED"))
-            .andExpect(jsonPath("$.items[0].reason").value("TIME_SLOT_CONFLICT"))
-            .andExpect(jsonPath("$.items[1].status").value("CREATED"))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-        UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
-
-        assertThat(generatedReservationCount()).isEqualTo(1);
-        assertThat(generatedReservationCount(recurrenceId)).isEqualTo(1);
-        assertThat(activeRecurrenceCount()).isEqualTo(1);
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -206,6 +208,10 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
     }
 
     private String previewBody(LocalDate startDate, LocalDate endDate) {
+        return previewBody(startDate, endDate, "FAIL_ALL");
+    }
+
+    private String previewBody(LocalDate startDate, LocalDate endDate, String conflictPolicy) {
         return """
             {
               "roomId": "%s",
@@ -213,9 +219,11 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
               "endDate": "%s",
               "daysOfWeek": ["%s"],
               "startTime": "09:00:00",
-              "endTime": "10:00:00"
+              "endTime": "10:00:00",
+              "applicantPhone": "010-5555-5555",
+              "conflictPolicy": "%s"
             }
-            """.formatted(firstRoomId(), startDate, endDate, dayCode(startDate));
+            """.formatted(firstRoomId(), startDate, endDate, dayCode(startDate), conflictPolicy);
     }
 
     private String createBody(LocalDate startDate, LocalDate endDate, String conflictPolicy) {
@@ -226,6 +234,8 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
               "applicantEmail": "class@example.com",
               "applicantPhone": "010-5555-5555",
               "purpose": "Weekly lecture",
+              "seriesLabel": "Regular Class",
+              "seriesColor": "#2563eb",
               "startDate": "%s",
               "endDate": "%s",
               "daysOfWeek": ["%s"],
@@ -276,5 +286,13 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
             recurrenceId
         );
         return count == null ? 0 : count;
+    }
+
+    private UUID generatedReservationId(UUID recurrenceId) {
+        return jdbcTemplate.queryForObject(
+            "select id from reservations where source = 'RECURRING_GENERATED' and recurrence_id = ?",
+            UUID.class,
+            recurrenceId
+        );
     }
 }

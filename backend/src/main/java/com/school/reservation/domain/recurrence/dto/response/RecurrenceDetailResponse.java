@@ -4,6 +4,7 @@ import com.school.reservation.domain.recurrence.ReservationRecurrence;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record RecurrenceDetailResponse(
@@ -13,6 +14,8 @@ public record RecurrenceDetailResponse(
     String applicantEmail,
     String applicantPhone,
     String purpose,
+    String seriesLabel,
+    String seriesColor,
     LocalDate startDate,
     LocalDate endDate,
     String daysOfWeek,
@@ -20,9 +23,13 @@ public record RecurrenceDetailResponse(
     LocalTime endTime,
     ReservationRecurrence.ConflictPolicy conflictPolicy,
     boolean deleted,
-    OffsetDateTime createdAt
+    OffsetDateTime createdAt,
+    List<RecurrenceReservationResponse> reservations
 ) {
-    public static RecurrenceDetailResponse from(ReservationRecurrence recurrence) {
+    public static RecurrenceDetailResponse from(
+        ReservationRecurrence recurrence,
+        List<RecurrenceReservationResponse> reservations
+    ) {
         return new RecurrenceDetailResponse(
             recurrence.getId(),
             new RoomSummary(recurrence.getRoom().getId(), recurrence.getDisplayRoomName(), recurrence.getRoom().getLocation()),
@@ -30,6 +37,8 @@ public record RecurrenceDetailResponse(
             recurrence.getApplicantEmail(),
             recurrence.getApplicantPhone(),
             recurrence.getPurpose(),
+            recurrence.getSeriesLabel(),
+            recurrence.getSeriesColor(),
             recurrence.getStartDate(),
             recurrence.getEndDate(),
             recurrence.getDaysOfWeek(),
@@ -37,7 +46,8 @@ public record RecurrenceDetailResponse(
             recurrence.getEndTime(),
             recurrence.getConflictPolicy(),
             recurrence.getDeletedAt() != null,
-            recurrence.getCreatedAt()
+            recurrence.getCreatedAt(),
+            reservations
         );
     }
 

@@ -4,6 +4,7 @@ import com.school.reservation.domain.recurrence.dto.request.CreateRecurrenceRequ
 import com.school.reservation.domain.recurrence.dto.request.PreviewRecurrenceRequest;
 import com.school.reservation.domain.recurrence.dto.response.CreateRecurrenceResponse;
 import com.school.reservation.domain.recurrence.dto.response.PreviewRecurrenceResponse;
+import com.school.reservation.domain.recurrence.dto.response.RecurrenceReservationResponse;
 import com.school.reservation.domain.reservation.Reservation;
 import com.school.reservation.domain.reservation.ReservationConflictService;
 import com.school.reservation.domain.reservation.ReservationHistory;
@@ -64,9 +65,9 @@ public class RecurrenceService {
     public PreviewRecurrenceResponse preview(PreviewRecurrenceRequest request) {
         Room room = getRoom(request.roomId());
         List<PreviewRecurrenceResponse.Item> items = candidates(request).stream()
-            .map(candidate -> previewItem(room, candidate, "preview"))
+            .map(candidate -> previewItem(room, candidate, request.applicantPhone()))
             .toList();
-        return PreviewRecurrenceResponse.from(items);
+        return PreviewRecurrenceResponse.from(request.conflictPolicy(), items);
     }
 
     @Transactional
@@ -92,6 +93,8 @@ public class RecurrenceService {
             request.applicantEmail(),
             request.applicantPhone(),
             request.purpose(),
+            request.seriesLabel(),
+            request.seriesColor(),
             request.startDate(),
             request.endDate(),
             normalizeDays(request.daysOfWeek()),
@@ -126,13 +129,23 @@ public class RecurrenceService {
                     Reservation.ReservationSource.RECURRING_GENERATED
                 ),
                 adminId,
-                recurrence.getId()
+                recurrence
             );
             createdCount++;
             resultItems.add(new CreateRecurrenceResponse.Item(candidate.date(), "CREATED", null));
         }
 
-        return new CreateRecurrenceResponse(recurrence.getId(), createdCount, skippedCount, 0, resultItems);
+        return new CreateRecurrenceResponse(
+            recurrence.getId(),
+            recurrence.getSeriesLabel(),
+            recurrence.getSeriesColor(),
+            request.conflictPolicy(),
+            candidates.size(),
+            createdCount,
+            skippedCount,
+            0,
+            resultItems
+        );
     }
 
     @Transactional(readOnly = true)
@@ -144,6 +157,13 @@ public class RecurrenceService {
     public ReservationRecurrence getDetail(UUID recurrenceId) {
         return recurrenceRepository.findDetailById(recurrenceId)
             .orElseThrow(() -> new EntityNotFoundException("Recurrence not found."));
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecurrenceReservationResponse> getReservations(UUID recurrenceId) {
+        return reservationRepository.findByRecurrenceIdOrderByStartAt(recurrenceId).stream()
+            .map(RecurrenceReservationResponse::from)
+            .toList();
     }
 
     @Transactional

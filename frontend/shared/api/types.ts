@@ -1,6 +1,6 @@
 export type ReservationStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
 export type ReservationSource = 'PUBLIC_FORM' | 'ADMIN_GRID' | 'ADMIN_MANUAL' | 'RECURRING_GENERATED';
-export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS' | 'CREATE_AVAILABLE_ONLY';
+export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS';
 
 export interface PagedResponse<T> {
   items: T[];
@@ -105,6 +105,9 @@ export interface PublicReservationBlock {
   endAt: string;
   status: ReservationStatus;
   purpose: string;
+  recurrenceId: string | null;
+  seriesLabel: string | null;
+  seriesColor: string | null;
 }
 
 export interface PublicWeeklyReservations {
@@ -172,6 +175,10 @@ export interface ReservationListItem {
   endAt: string;
   status: ReservationStatus;
   source: ReservationSource;
+  recurrenceId: string | null;
+  seriesLabel: string | null;
+  seriesColor: string | null;
+  recurrenceException: boolean;
   createdAt: string;
 }
 
@@ -183,6 +190,12 @@ export interface ReservationDetail {
     location: string | null;
   };
   recurrenceId: string | null;
+  series: {
+    id: string;
+    label: string | null;
+    color: string | null;
+  } | null;
+  recurrenceException: boolean;
   applicantName: string;
   applicantEmail: string;
   applicantPhone: string | null;
@@ -253,6 +266,8 @@ export interface RecurrencePreviewPayload {
   daysOfWeek: string[];
   startTime: string;
   endTime: string;
+  applicantPhone: string;
+  conflictPolicy: ConflictPolicy;
 }
 
 export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
@@ -260,13 +275,16 @@ export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
   applicantEmail: string;
   applicantPhone: string;
   purpose: string;
-  conflictPolicy: ConflictPolicy;
+  seriesLabel?: string;
+  seriesColor?: string;
 }
 
 export interface RecurrencePreview {
+  conflictPolicy: ConflictPolicy;
   totalCandidates: number;
   availableCount: number;
   conflictCount: number;
+  createAllowed: boolean;
   items: Array<{
     date: string;
     startAt: string;
@@ -279,6 +297,10 @@ export interface RecurrencePreview {
 
 export interface RecurrenceCreateResult {
   recurrenceId: string;
+  seriesLabel: string | null;
+  seriesColor: string | null;
+  conflictPolicy: ConflictPolicy;
+  totalCandidates: number;
   createdCount: number;
   skippedCount: number;
   failedCount: number;
@@ -294,6 +316,8 @@ export interface RecurrenceListItem {
   roomId: string;
   roomName: string;
   purpose: string;
+  seriesLabel: string | null;
+  seriesColor: string | null;
   startDate: string;
   endDate: string;
   daysOfWeek: string;
@@ -315,6 +339,8 @@ export interface RecurrenceDetail {
   applicantEmail: string;
   applicantPhone: string | null;
   purpose: string;
+  seriesLabel: string | null;
+  seriesColor: string | null;
   startDate: string;
   endDate: string;
   daysOfWeek: string;
@@ -323,4 +349,14 @@ export interface RecurrenceDetail {
   conflictPolicy: ConflictPolicy;
   deleted: boolean;
   createdAt: string;
+  reservations: Array<{
+    id: string;
+    roomId: string;
+    roomName: string;
+    purpose: string;
+    startAt: string;
+    endAt: string;
+    status: ReservationStatus;
+    exception: boolean;
+  }>;
 }
