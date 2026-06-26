@@ -5,7 +5,6 @@ import { errorMessage } from '../../shared/api/http';
 import type { ConflictPolicy } from '../../shared/api/types';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
-  useCancelRecurrence,
   useCreateRecurrence,
   usePreviewRecurrence,
   useRecurrences,
@@ -51,13 +50,10 @@ const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 export function RecurrencesPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
-  const [cancelTarget, setCancelTarget] = useState('');
-  const [cancelMemo, setCancelMemo] = useState('');
   const rooms = useRooms();
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
   const recurrences = useRecurrences(true);
-  const cancel = useCancelRecurrence();
 
   function basePayload() {
     return {
@@ -348,7 +344,6 @@ export function RecurrencesPage() {
                   <th scope="col">요일/시간</th>
                   <th scope="col">목적</th>
                   <th scope="col">등록 정책</th>
-                  <th scope="col">취소</th>
                 </tr>
               </thead>
               <tbody>
@@ -395,20 +390,6 @@ export function RecurrencesPage() {
                       {item.purpose}
                     </td>
                     <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        disabled={item.deleted}
-                        data-testid="recurrence-list-cancel-entry-button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setCancelTarget(item.id);
-                        }}
-                      >
-                        취소
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -416,45 +397,6 @@ export function RecurrencesPage() {
           </div>
         ) : null}
       </section>
-
-      {cancelTarget ? (
-        <section className="panel narrow-panel" aria-labelledby="cancel-recurrence-title">
-          <h2 id="cancel-recurrence-title">반복 예약 취소</h2>
-          <label>
-            취소 메모
-            <textarea
-              data-testid="recurrence-list-cancel-memo-input"
-              rows={3}
-              value={cancelMemo}
-              onChange={(event) => setCancelMemo(event.target.value)}
-              placeholder="반복 예약 취소 사유를 남깁니다."
-            />
-          </label>
-          {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
-          <div className="button-row">
-            <button type="button" className="ghost-button" onClick={() => setCancelTarget('')}>닫기</button>
-            <button
-              type="button"
-              className="danger-button"
-              data-testid="recurrence-list-cancel-confirm-button"
-              disabled={cancel.isPending}
-              onClick={() =>
-                cancel.mutate(
-                  { recurrenceId: cancelTarget, memo: cancelMemo || undefined },
-                  {
-                    onSuccess: () => {
-                      setCancelTarget('');
-                      setCancelMemo('');
-                    },
-                  },
-                )
-              }
-            >
-              {cancel.isPending ? '취소 중...' : '반복 예약 취소'}
-            </button>
-          </div>
-        </section>
-      ) : null}
     </section>
   );
 }
