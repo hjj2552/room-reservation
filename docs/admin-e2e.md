@@ -1,19 +1,19 @@
-# Admin Frontend E2E
+# Frontend E2E
 
-This document describes the Playwright E2E profile for the admin frontend.
+This document describes the Playwright E2E profile for the frontend.
 
 ## Covered Smoke Flows
 
 - Auth and protected route behavior.
 - Reservations list query persistence.
 - Audit query persistence.
-- Admin reservation create and detail/list reflection.
+- Admin reservation registration and detail/list reflection.
 - Admin reservation edit and detail/list reflection.
 - Public reservation timetable request, detail, and cancel-password cancellation.
 - Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
 - Settings smoke: settings load, save, and success feedback.
 
-The suite intentionally does not cover CSV download or full CRUD matrices for rooms/settings yet.
+현재 E2E 스위트는 CSV 내보내기와 rooms/settings 전체 CRUD matrix를 아직 다루지 않습니다.
 
 ## Local Run
 
@@ -53,7 +53,7 @@ The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull 
 Jobs:
 
 - `backend-test`: starts a PostgreSQL 16 service on host port `5433` and runs `backend/./gradlew test` with the backend test profile.
-- `frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the admin frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
+- `frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
 
 The E2E job reuses `frontend/scripts/run-e2e.mjs`. In CI, that runner starts the backend jar with the `e2e` profile and starts the Vite dev server if they are not already reachable.
 

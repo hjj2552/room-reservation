@@ -14,8 +14,8 @@ The public reservation page is available at `/public/reservations/new`. `/reques
 
 - Public submissions are stored as 승인 대기 상태(`REQUESTED`), not as 승인 상태(`CONFIRMED`) reservations.
 - The success message must say that the reservation request was received, not that the reservation is complete.
-- Admin approval, rejection, forced creation, recurrence creation, audit history, and admin memo fields are not exposed in the public UI.
-- Reservation state labels are `REQUESTED` = 승인 대기, `CONFIRMED` = 승인, and `CANCELLED` = 취소. `APPROVED` is not a reservation state; it is an audit/history action for 승인 처리.
+- Admin approval, rejection, forced registration, recurrence registration, audit history, and admin memo fields are not exposed in the public UI.
+- Reservation state labels are `REQUESTED` = 승인 대기, `CONFIRMED` = 승인, and `CANCELLED` = 취소. `APPROVED` is not a reservation state; it is an audit history action for 승인 처리.
 
 ## Public Edit Policy
 

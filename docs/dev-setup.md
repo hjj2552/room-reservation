@@ -30,7 +30,7 @@ room-reservation/
 - `backend`: Java 21, Spring Boot, Spring Web, Spring Security, Spring Data JPA, Bean Validation, Flyway 기반 API 서버입니다.
 - `frontend`: React, Vite, TypeScript, React Router, TanStack Query 기반 관리자 SPA입니다.
 - `docker-compose.yml`: 로컬 개발 DB와 테스트/E2E DB를 실행합니다.
-- `.github/workflows/ci.yml`: 백엔드 테스트와 관리자 프런트엔드 build/E2E를 검증합니다.
+- `.github/workflows/ci.yml`: 백엔드 테스트와 프런트엔드 build/E2E를 검증합니다.
 
 ## 사전 준비
 
@@ -113,7 +113,7 @@ cd backend
 
 로컬 관리자 계정은 `application-local.yml` 기준 `admin` / `admin1234`입니다.
 
-## 관리자 프런트엔드 실행
+## 프런트엔드 실행
 
 1. 의존성을 설치합니다.
 
@@ -128,7 +128,7 @@ npm ci
 npm run dev
 ```
 
-기본 Vite 주소는 `http://localhost:5173`입니다. 관리자 프런트엔드는 `/api` 요청을 백엔드로 프록시합니다. 백엔드는 `http://localhost:8080`에서 실행 중이어야 합니다.
+기본 Vite 주소는 `http://localhost:5173`입니다. 프런트엔드는 `/api` 요청을 백엔드로 프록시합니다. 백엔드는 `http://localhost:8080`에서 실행 중이어야 합니다.
 
 ## 백엔드 테스트 실행
 
@@ -177,7 +177,7 @@ cd backend
 .\gradlew.bat bootJar
 ```
 
-관리자 프런트엔드에서 E2E를 실행합니다.
+프런트엔드에서 E2E를 실행합니다.
 
 ```powershell
 cd ..\frontend
@@ -223,7 +223,7 @@ $env:E2E_CLEANUP_ENABLED="true"
 .\gradlew.bat bootRun --args="--spring.profiles.active=local"
 ```
 
-다른 터미널에서 관리자 프런트엔드 cleanup 명령을 실행합니다.
+다른 터미널에서 프런트엔드 cleanup 명령을 실행합니다.
 
 ```powershell
 cd <repo>\frontend

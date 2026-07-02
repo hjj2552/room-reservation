@@ -1,6 +1,6 @@
 # room-reservation
 
-강의실 예약 MVP입니다. 현재 저장소는 Spring Boot 백엔드와 React 기반 관리자 프런트엔드로 구성되어 있습니다.
+강의실 예약 MVP입니다. 현재 저장소는 Spring Boot 백엔드와 React 기반 프런트엔드로 구성되어 있습니다.
 
 ## 문서
 
@@ -26,7 +26,7 @@ cd backend
 .\gradlew.bat bootRun
 ```
 
-관리자 프런트엔드를 실행합니다.
+프런트엔드를 실행합니다.
 
 ```powershell
 cd frontend

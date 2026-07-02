@@ -6,7 +6,7 @@
 
 - `rooms.system_reserved = true`인 row를 삭제된 강의실 기록 보존용 sentinel room으로 사용합니다.
 - 기본 이름은 `(삭제된 강의실)`입니다.
-- sentinel room은 관리자/공개 강의실 목록과 예약 생성용 선택 목록에 노출하지 않습니다.
+- sentinel room은 관리자/공개 강의실 목록과 예약 등록용 선택 목록에 노출하지 않습니다.
 - sentinel room은 수정, 비활성화, 삭제할 수 없습니다.
 
 ## Delete Flow
