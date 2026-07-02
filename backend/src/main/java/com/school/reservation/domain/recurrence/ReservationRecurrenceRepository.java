@@ -33,6 +33,7 @@ public interface ReservationRecurrenceRepository extends JpaRepository<Reservati
         select rr
         from ReservationRecurrence rr
         join fetch rr.room
+        left join fetch rr.tag
         where rr.id = :id
         """)
     Optional<ReservationRecurrence> findDetailById(@Param("id") UUID id);
@@ -42,6 +43,7 @@ public interface ReservationRecurrenceRepository extends JpaRepository<Reservati
             select rr
             from ReservationRecurrence rr
             join fetch rr.room room
+            left join fetch rr.tag tag
             where (:includeDeleted = true or rr.deletedAt is null)
               and (:status is null
                 or (:status = 'ACTIVE' and rr.deletedAt is null)
@@ -53,12 +55,13 @@ public interface ReservationRecurrenceRepository extends JpaRepository<Reservati
                 or lower(rr.purpose) like :keyword
                 or lower(rr.applicantName) like :keyword
                 or lower(room.name) like :keyword
-                or lower(coalesce(rr.seriesLabel, '')) like :keyword)
+                or lower(coalesce(tag.name, '')) like :keyword)
             """,
         countQuery = """
             select count(rr)
             from ReservationRecurrence rr
             join rr.room room
+            left join rr.tag tag
             where (:includeDeleted = true or rr.deletedAt is null)
               and (:status is null
                 or (:status = 'ACTIVE' and rr.deletedAt is null)
@@ -70,7 +73,7 @@ public interface ReservationRecurrenceRepository extends JpaRepository<Reservati
                 or lower(rr.purpose) like :keyword
                 or lower(rr.applicantName) like :keyword
                 or lower(room.name) like :keyword
-                or lower(coalesce(rr.seriesLabel, '')) like :keyword)
+                or lower(coalesce(tag.name, '')) like :keyword)
             """
     )
     Page<ReservationRecurrence> findRecurrences(

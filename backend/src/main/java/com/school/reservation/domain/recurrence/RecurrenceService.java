@@ -14,6 +14,8 @@ import com.school.reservation.domain.reservation.ReservationRepository;
 import com.school.reservation.domain.reservation.ReservationService;
 import com.school.reservation.domain.room.Room;
 import com.school.reservation.domain.room.RoomRepository;
+import com.school.reservation.domain.tag.Tag;
+import com.school.reservation.domain.tag.TagRepository;
 import com.school.reservation.global.exception.ApiConflictException;
 import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDate;
@@ -42,6 +44,7 @@ public class RecurrenceService {
     private final ReservationRecurrenceRepository recurrenceRepository;
     private final ReservationRepository reservationRepository;
     private final ReservationHistoryRepository historyRepository;
+    private final TagRepository tagRepository;
 
     public RecurrenceService(
         RoomRepository roomRepository,
@@ -50,7 +53,8 @@ public class RecurrenceService {
         ReservationPolicyService policyService,
         ReservationRecurrenceRepository recurrenceRepository,
         ReservationRepository reservationRepository,
-        ReservationHistoryRepository historyRepository
+        ReservationHistoryRepository historyRepository,
+        TagRepository tagRepository
     ) {
         this.roomRepository = roomRepository;
         this.reservationService = reservationService;
@@ -59,6 +63,7 @@ public class RecurrenceService {
         this.recurrenceRepository = recurrenceRepository;
         this.reservationRepository = reservationRepository;
         this.historyRepository = historyRepository;
+        this.tagRepository = tagRepository;
     }
 
     @Transactional(readOnly = true)
@@ -93,8 +98,7 @@ public class RecurrenceService {
             request.applicantEmail(),
             request.applicantPhone(),
             request.purpose(),
-            request.seriesLabel(),
-            request.seriesColor(),
+            getTag(request.tagId()),
             request.startDate(),
             request.endDate(),
             normalizeDays(request.daysOfWeek()),
@@ -137,8 +141,9 @@ public class RecurrenceService {
 
         return new CreateRecurrenceResponse(
             recurrence.getId(),
-            recurrence.getSeriesLabel(),
-            recurrence.getSeriesColor(),
+            recurrence.getTagId(),
+            recurrence.getTagName(),
+            recurrence.getTagColor(),
             request.conflictPolicy(),
             candidates.size(),
             createdCount,
@@ -242,6 +247,14 @@ public class RecurrenceService {
     private Room getRoom(UUID roomId) {
         return roomRepository.findByIdAndDeletedAtIsNull(roomId)
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
+    }
+
+    private Tag getTag(UUID tagId) {
+        if (tagId == null) {
+            return null;
+        }
+        return tagRepository.findById(tagId)
+            .orElseThrow(() -> new EntityNotFoundException("Tag not found."));
     }
 
     private String normalize(String value) {

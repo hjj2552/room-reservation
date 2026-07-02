@@ -58,8 +58,8 @@ public record AdminReservationDetailResponse(
             }
             return new SeriesSummary(
                 reservation.getRecurrence().getId(),
-                reservation.getRecurrence().getSeriesLabel(),
-                reservation.getRecurrence().getSeriesColor()
+                reservation.getRecurrence().getTagName(),
+                reservation.getRecurrence().getTagColor()
             );
         }
     }

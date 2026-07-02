@@ -51,6 +51,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         from Reservation r
         join fetch r.room room
         left join fetch r.recurrence recurrence
+        left join fetch recurrence.tag
         where r.id = :id
         """)
     Optional<Reservation> findDetailById(@Param("id") UUID id);
@@ -101,6 +102,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         from Reservation r
         join fetch r.room room
         left join fetch r.recurrence recurrence
+        left join fetch recurrence.tag
         where room.id = :roomId
           and r.status in :statuses
           and r.startAt < :endAt
@@ -132,6 +134,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, UUID>,
         from Reservation r
         join fetch r.room room
         left join fetch r.recurrence recurrence
+        left join fetch recurrence.tag
         where r.recurrence.id = :recurrenceId
         order by r.startAt asc
         """)

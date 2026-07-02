@@ -10,6 +10,7 @@ import { ReservationsPage } from '../admin/pages/ReservationsPage';
 import { RecurrencesPage } from '../admin/pages/RecurrencesPage';
 import { RoomsPage } from '../admin/pages/RoomsPage';
 import { SettingsPage } from '../admin/pages/SettingsPage';
+import { TagSettingsPage } from '../admin/pages/TagSettingsPage';
 import { TimetablePage } from '../admin/pages/TimetablePage';
 import { PublicReservationDetailPage } from '../public/pages/PublicReservationDetailPage';
 import { PublicReservationEditPage } from '../public/pages/PublicReservationEditPage';
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: '/admin/recurrences/:recurrenceId', element: <RecurrenceDetailPage /> },
           { path: '/admin/rooms', element: <RoomsPage /> },
           { path: '/admin/settings', element: <SettingsPage /> },
+          { path: '/admin/settings/tags', element: <TagSettingsPage /> },
           { path: '/admin/audit', element: <AuditPage /> },
         ],
       },

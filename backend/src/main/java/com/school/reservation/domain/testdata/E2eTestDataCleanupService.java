@@ -29,11 +29,13 @@ public class E2eTestDataCleanupService {
         String normalizedPrefix = normalizePrefix(prefix);
         MatchPatterns patterns = new MatchPatterns(normalizedPrefix + "%", includeLegacy ? LEGACY_PREFIX + "%" : null);
         List<UUID> roomIds = findRoomIds(patterns);
+        List<UUID> tagIds = findTagIds(patterns);
         List<UUID> recurrenceIds = findRecurrenceIds(patterns, roomIds);
         List<UUID> reservationIds = findReservationIds(patterns, roomIds, recurrenceIds);
 
         if (dryRun) {
             int roomCount = countDeletableRooms(roomIds, reservationIds, recurrenceIds);
+            int tagCount = countDeletableTags(tagIds);
             return new E2eTestDataCleanupResponse(
                 normalizedPrefix,
                 true,
@@ -41,6 +43,8 @@ public class E2eTestDataCleanupService {
                 countHistories(patterns, reservationIds),
                 reservationIds.size(),
                 recurrenceIds.size(),
+                tagCount,
+                tagIds.size() - tagCount,
                 roomCount,
                 roomIds.size() - roomCount
             );
@@ -55,6 +59,7 @@ public class E2eTestDataCleanupService {
             "delete from reservation_recurrences where id in (:ids)",
             recurrenceIds
         );
+        int tagCount = deleteTags(tagIds);
         int roomCount = deleteRooms(roomIds);
 
         return new E2eTestDataCleanupResponse(
@@ -64,6 +69,8 @@ public class E2eTestDataCleanupService {
             historyCount,
             reservationCount,
             recurrenceCount,
+            tagCount,
+            tagIds.size() - tagCount,
             roomCount,
             roomIds.size() - roomCount
         );
@@ -93,6 +100,18 @@ public class E2eTestDataCleanupService {
         );
     }
 
+    private List<UUID> findTagIds(MatchPatterns patterns) {
+        return jdbcTemplate.queryForList(
+            """
+                select id
+                from tags
+                where %s
+                """.formatted(matchExpression(patterns, "name")),
+            params(patterns),
+            UUID.class
+        );
+    }
+
     private List<UUID> findRecurrenceIds(MatchPatterns patterns, List<UUID> roomIds) {
         String roomPredicate = roomIds.isEmpty() ? "" : "or room_id in (:roomIds)";
         MapSqlParameterSource params = params(patterns)
@@ -105,14 +124,12 @@ public class E2eTestDataCleanupService {
                     %s
                     or %s
                     or %s
-                    or %s
                     %s
                 )
                 """.formatted(
                     matchExpression(patterns, "purpose"),
                     matchExpression(patterns, "applicant_name"),
                     matchExpression(patterns, "applicant_email"),
-                    matchExpression(patterns, "series_label"),
                     roomPredicate
                 ),
             params,
@@ -198,6 +215,45 @@ public class E2eTestDataCleanupService {
                 """,
             Map.of("ids", roomIds)
         );
+    }
+
+    private int deleteTags(List<UUID> tagIds) {
+        if (tagIds.isEmpty()) {
+            return 0;
+        }
+        return jdbcTemplate.update(
+            """
+                delete from tags t
+                where t.id in (:ids)
+                  and not exists (
+                    select 1
+                    from reservation_recurrences recurrence
+                    where recurrence.tag_id = t.id
+                  )
+                """,
+            Map.of("ids", tagIds)
+        );
+    }
+
+    private int countDeletableTags(List<UUID> tagIds) {
+        if (tagIds.isEmpty()) {
+            return 0;
+        }
+        Integer count = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from tags t
+                where t.id in (:ids)
+                  and not exists (
+                    select 1
+                    from reservation_recurrences recurrence
+                    where recurrence.tag_id = t.id
+                  )
+                """,
+            Map.of("ids", tagIds),
+            Integer.class
+        );
+        return count == null ? 0 : count;
     }
 
     private int countDeletableRooms(List<UUID> roomIds, List<UUID> reservationIds, List<UUID> recurrenceIds) {

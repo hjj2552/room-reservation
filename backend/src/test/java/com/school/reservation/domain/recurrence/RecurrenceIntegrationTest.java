@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
     void recurrencePreviewAndCreateSucceed() throws Exception {
         MockHttpSession session = loginAdminSession();
         LocalDate startDate = nextWeekdayAt(9, 0).toLocalDate();
+        UUID tagId = createTag("Regular Class", "#2563eb");
 
         mockMvc.perform(post("/api/admin/recurrences/preview")
                 .session(session)
@@ -44,11 +46,12 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         String response = mockMvc.perform(post("/api/admin/recurrences")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(createBody(startDate, startDate, "FAIL_ALL")))
+                .content(createBody(startDate, startDate, "FAIL_ALL", tagId)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.createdCount").value(1))
-            .andExpect(jsonPath("$.seriesLabel").value("Regular Class"))
-            .andExpect(jsonPath("$.seriesColor").value("#2563eb"))
+            .andExpect(jsonPath("$.tagId").value(tagId.toString()))
+            .andExpect(jsonPath("$.tagName").value("Regular Class"))
+            .andExpect(jsonPath("$.tagColor").value("#2563eb"))
             .andReturn()
             .getResponse()
             .getContentAsString();
@@ -57,8 +60,9 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/admin/recurrences/{recurrenceId}", recurrenceId).session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.deleted").value(false))
-            .andExpect(jsonPath("$.seriesLabel").value("Regular Class"))
-            .andExpect(jsonPath("$.seriesColor").value("#2563eb"))
+            .andExpect(jsonPath("$.tagId").value(tagId.toString()))
+            .andExpect(jsonPath("$.tagName").value("Regular Class"))
+            .andExpect(jsonPath("$.tagColor").value("#2563eb"))
             .andExpect(jsonPath("$.reservations[0].id").isNotEmpty())
             .andExpect(jsonPath("$.reservations[0].exception").value(false));
 
@@ -112,6 +116,49 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         assertThat(generatedReservationCount()).isEqualTo(1);
         assertThat(generatedReservationCount(recurrenceId)).isEqualTo(1);
         assertThat(activeRecurrenceCount()).isEqualTo(1);
+    }
+
+    @Test
+    void recurrenceWithoutTagKeepsCompatibilityFieldsNull() throws Exception {
+        MockHttpSession session = loginAdminSession();
+        LocalDate startDate = nextWeekdayAt(11, 0).toLocalDate();
+        String purpose = "Weekly lecture without tag";
+
+        String response = mockMvc.perform(post("/api/admin/recurrences")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(startDate, startDate, "FAIL_ALL", null, purpose)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.tagId").value(nullValue()))
+            .andExpect(jsonPath("$.tagName").value(nullValue()))
+            .andExpect(jsonPath("$.tagColor").value(nullValue()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
+        UUID reservationId = generatedReservationId(recurrenceId);
+
+        mockMvc.perform(get("/api/admin/reservations/{reservationId}", reservationId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.series.id").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.series.label").value(nullValue()))
+            .andExpect(jsonPath("$.series.color").value(nullValue()))
+            .andExpect(jsonPath("$.recurrenceException").value(false));
+
+        mockMvc.perform(get("/api/admin/reservations")
+                .session(session)
+                .param("keyword", purpose))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.items[0].recurrenceId").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.items[0].seriesLabel").value(nullValue()))
+            .andExpect(jsonPath("$.items[0].seriesColor").value(nullValue()));
+
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+                .param("weekStart", startDate.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reservations[0].recurrenceId").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.reservations[0].seriesLabel").value(nullValue()))
+            .andExpect(jsonPath("$.reservations[0].seriesColor").value(nullValue()));
     }
 
     @Test
@@ -227,15 +274,22 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
     }
 
     private String createBody(LocalDate startDate, LocalDate endDate, String conflictPolicy) {
+        return createBody(startDate, endDate, conflictPolicy, null);
+    }
+
+    private String createBody(LocalDate startDate, LocalDate endDate, String conflictPolicy, UUID tagId) {
+        return createBody(startDate, endDate, conflictPolicy, tagId, "Weekly lecture");
+    }
+
+    private String createBody(LocalDate startDate, LocalDate endDate, String conflictPolicy, UUID tagId, String purpose) {
         return """
             {
               "roomId": "%s",
               "applicantName": "Recurring Class",
               "applicantEmail": "class@example.com",
               "applicantPhone": "010-5555-5555",
-              "purpose": "Weekly lecture",
-              "seriesLabel": "Regular Class",
-              "seriesColor": "#2563eb",
+              "purpose": "%s",
+              "tagId": %s,
               "startDate": "%s",
               "endDate": "%s",
               "daysOfWeek": ["%s"],
@@ -243,7 +297,24 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
               "endTime": "10:00:00",
               "conflictPolicy": "%s"
             }
-            """.formatted(firstRoomId(), startDate, endDate, dayCode(startDate), conflictPolicy);
+            """.formatted(
+                firstRoomId(),
+                purpose,
+                tagId == null ? "null" : "\"" + tagId + "\"",
+                startDate,
+                endDate,
+                dayCode(startDate),
+                conflictPolicy
+            );
+    }
+
+    private UUID createTag(String name, String color) {
+        return jdbcTemplate.queryForObject(
+            "insert into tags (name, color) values (?, ?) returning id",
+            UUID.class,
+            name,
+            color
+        );
     }
 
     private String dayCode(LocalDate date) {

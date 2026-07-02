@@ -4,23 +4,28 @@ import {
   createReservationByApi,
   createRecurrenceByApi,
   createRoomByApi,
+  createTagByApi,
   deleteReservationByApi,
+  deleteTagByApi,
   uniqueE2eName,
   type E2ePublicReservation,
   type E2eRecurrence,
   type E2eReservation,
   type E2eRoom,
+  type E2eTag,
 } from './helpers';
 
 interface E2eResourceRegistry {
   rooms: string[];
   reservations: string[];
   recurrences: string[];
+  tags: string[];
 }
 
 interface E2eDataFactory {
   name(label: string): string;
   createTestRoom(label: string): Promise<E2eRoom>;
+  createTestTag(label: string, options?: { color?: string }): Promise<E2eTag>;
   createTestReservation(
     roomId: string,
     label: string,
@@ -48,11 +53,13 @@ interface E2eDataFactory {
       startTime?: string;
       endTime?: string;
       conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL';
+      tagId?: string | null;
     },
   ): Promise<E2eRecurrence>;
   registerRoom(roomId: string): void;
   registerReservation(reservationId: string): void;
   registerRecurrence(recurrenceId: string): void;
+  registerTag(tagId: string): void;
 }
 
 interface E2eFixtures {
@@ -66,6 +73,7 @@ export const test = base.extend<E2eFixtures>({
       rooms: [],
       reservations: [],
       recurrences: [],
+      tags: [],
     };
 
     try {
@@ -81,6 +89,11 @@ export const test = base.extend<E2eFixtures>({
         const room = await createRoomByApi(request, uniqueE2eName(`room-${label}`));
         e2eRegistry.rooms.push(room.id);
         return room;
+      },
+      createTestTag: async (label, options) => {
+        const tag = await createTagByApi(request, uniqueE2eName(`tag-${label}`), options?.color);
+        e2eRegistry.tags.push(tag.id);
+        return tag;
       },
       createTestReservation: async (roomId, label, options) => {
         const purpose = uniqueE2eName(`reservation-${label}`);
@@ -109,6 +122,9 @@ export const test = base.extend<E2eFixtures>({
       registerRecurrence: (recurrenceId) => {
         e2eRegistry.recurrences.push(recurrenceId);
       },
+      registerTag: (tagId) => {
+        e2eRegistry.tags.push(tagId);
+      },
     });
   },
 });
@@ -121,6 +137,9 @@ async function cleanupRegisteredResources(request: APIRequestContext, registry: 
   }
   for (const reservationId of [...registry.reservations].reverse()) {
     await deleteReservationIgnoringFailures(request, reservationId);
+  }
+  for (const tagId of [...registry.tags].reverse()) {
+    await deleteTagIgnoringFailures(request, tagId);
   }
   for (const roomId of [...registry.rooms].reverse()) {
     await deleteIgnoringFailures(request, `/api/admin/rooms/${roomId}`);
@@ -138,6 +157,14 @@ async function deleteReservationIgnoringFailures(request: APIRequestContext, res
 async function postIgnoringFailures(request: APIRequestContext, url: string, data: unknown) {
   try {
     await request.post(url, { data });
+  } catch {
+    // Prefix cleanup runs next and handles any resources that are still present.
+  }
+}
+
+async function deleteTagIgnoringFailures(request: APIRequestContext, tagId: string) {
+  try {
+    await deleteTagByApi(request, tagId);
   } catch {
     // Prefix cleanup runs next and handles any resources that are still present.
   }

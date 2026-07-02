@@ -11,6 +11,7 @@ import {
   useRecurrences,
 } from '../../shared/hooks/useRecurrences';
 import { useRooms } from '../../shared/hooks/useRooms';
+import { useTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 
@@ -20,8 +21,7 @@ interface RecurrenceForm {
   applicantEmail: string;
   applicantPhone: string;
   purpose: string;
-  seriesLabel: string;
-  seriesColor: string;
+  tagId: string;
   startDate: string;
   endDate: string;
   daysOfWeek: string[];
@@ -36,8 +36,7 @@ const initialForm: RecurrenceForm = {
   applicantEmail: '',
   applicantPhone: '',
   purpose: '',
-  seriesLabel: '',
-  seriesColor: '#2563eb',
+  tagId: '',
   startDate: '',
   endDate: '',
   daysOfWeek: [],
@@ -60,6 +59,7 @@ export function RecurrencesPage() {
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const rooms = useRooms();
+  const tags = useTags({ size: 1000 });
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
 
@@ -115,8 +115,7 @@ export function RecurrencesPage() {
       applicantEmail: form.applicantEmail,
       applicantPhone: form.applicantPhone,
       purpose: form.purpose,
-      seriesLabel: form.seriesLabel || undefined,
-      seriesColor: form.seriesColor || undefined,
+      tagId: form.tagId || null,
     });
   }
 
@@ -219,27 +218,6 @@ export function RecurrencesPage() {
             />
           </label>
           <label>
-            태그
-            <input
-              data-testid="recurrence-series-label-input"
-              name="seriesLabel"
-              value={form.seriesLabel}
-              onChange={(event) => setForm((prev) => ({ ...prev, seriesLabel: event.target.value }))}
-              placeholder="예: 1학년, 2학년"
-            />
-          </label>
-          <label>
-            표시 색상
-            <input
-              className="series-color-input"
-              data-testid="recurrence-series-color-input"
-              name="seriesColor"
-              type="color"
-              value={form.seriesColor}
-              onChange={(event) => setForm((prev) => ({ ...prev, seriesColor: event.target.value }))}
-            />
-          </label>
-          <label>
             시작일
             <input
               data-testid="recurrence-start-date-input"
@@ -282,6 +260,20 @@ export function RecurrencesPage() {
               onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
               required
             />
+          </label>
+          <label>
+            태그
+            <select
+              data-testid="recurrence-tag-select"
+              name="tagId"
+              value={form.tagId}
+              onChange={(event) => setForm((prev) => ({ ...prev, tagId: event.target.value }))}
+            >
+              <option value="">없음</option>
+              {tags.data?.items.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
           </label>
           <fieldset className="full-span checkbox-group">
             <legend>반복 요일</legend>
@@ -497,12 +489,12 @@ export function RecurrencesPage() {
                         <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
                       </td>
                       <td className="purpose-cell">
-                        {item.seriesLabel ? (
+                        {item.tagName ? (
                           <span
                             className="series-chip"
-                            style={item.seriesColor ? { borderColor: item.seriesColor, color: item.seriesColor } : undefined}
+                            style={item.tagColor ? { borderColor: item.tagColor, color: item.tagColor } : undefined}
                           >
-                            {item.seriesLabel}
+                            {item.tagName}
                           </span>
                         ) : null}
                         {item.purpose}

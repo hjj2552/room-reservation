@@ -52,6 +52,8 @@ export async function cleanupE2eData({
       `E2E cleanup ${preview ? 'preview' : 'complete'} (${label}): ` +
         `${summary.reservationsDeleted} reservations, ` +
         `${summary.recurrencesDeleted} recurrences, ` +
+        `${summary.tagsDeleted} tags ${preview ? 'matched' : 'deleted'}, ` +
+        `${summary.tagsSkipped} tags skipped, ` +
         `${summary.roomsDeleted} rooms ${preview ? 'matched' : 'deleted'}, ` +
         `${summary.roomsSkipped} rooms skipped.`
     );
