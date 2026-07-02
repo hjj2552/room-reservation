@@ -470,6 +470,11 @@ button:disabled {
   margin-top: 16px;
 }
 
+.tag-list-panel .pagination,
+.tag-list-panel .result-summary {
+  margin-top: 12px;
+}
+
 .tag-table th:nth-child(3),
 .tag-table td:nth-child(3) {
   width: 180px;
