@@ -236,11 +236,6 @@ export function TagSettingsPage() {
               />
             </label>
             {formError ? <div className="inline-error full-span" role="alert">{errorMessage(formError)}</div> : null}
-            {editingTag ? (
-              <button type="button" className="ghost-button full-span" onClick={startCreate}>
-                새 태그 입력
-              </button>
-            ) : null}
             <div className="button-row request-form-actions full-span">
               <button type="button" className="ghost-button" onClick={resetForm}>
                 취소
