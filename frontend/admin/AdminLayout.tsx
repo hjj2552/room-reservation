@@ -6,6 +6,7 @@ import {
   LogOut,
   Repeat,
   SlidersHorizontal,
+  Tags,
   Table2,
 } from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
@@ -40,9 +41,13 @@ export function AdminLayout() {
             <Building2 size={18} aria-hidden="true" />
             강의실 관리
           </NavLink>
-          <NavLink to="/admin/settings">
+          <NavLink to="/admin/settings" end>
             <SlidersHorizontal size={18} aria-hidden="true" />
             운영 설정
+          </NavLink>
+          <NavLink to="/admin/settings/tags">
+            <Tags size={18} aria-hidden="true" />
+            태그 설정
           </NavLink>
           <NavLink to="/admin/audit">
             <FileClock size={18} aria-hidden="true" />

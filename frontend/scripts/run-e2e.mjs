@@ -168,6 +168,8 @@ function assertNoE2eDataLeft(summary) {
     summary.reservationHistoriesDeleted +
     summary.reservationsDeleted +
     summary.recurrencesDeleted +
+    summary.tagsDeleted +
+    summary.tagsSkipped +
     summary.roomsDeleted +
     summary.roomsSkipped;
   if (remaining > 0) {
@@ -176,6 +178,8 @@ function assertNoE2eDataLeft(summary) {
         `${summary.reservationHistoriesDeleted} histories, ` +
         `${summary.reservationsDeleted} reservations, ` +
         `${summary.recurrencesDeleted} recurrences, ` +
+        `${summary.tagsDeleted} tags, ` +
+        `${summary.tagsSkipped} skipped tags, ` +
         `${summary.roomsDeleted} rooms, ` +
         `${summary.roomsSkipped} skipped rooms.`
     );

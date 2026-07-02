@@ -99,18 +99,20 @@ Useful environment variables:
 ## Isolation and Data Cleanup
 
 - Playwright still uses browser context isolation per test.
-- Admin authentication is reused through `tests/e2e/.auth/admin.json`, but E2E-owned rooms, reservations, recurrences, applicant names, emails, memos, and purposes use the `e2e-` prefix.
-- Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence` over direct setup calls.
+- Admin authentication is reused through `tests/e2e/.auth/admin.json`, but E2E-owned rooms, tags, reservations, recurrences, applicant names, emails, memos, and purposes use the `e2e-` prefix.
+- Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestTag`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence`/`registerTag` over direct setup calls.
 - Public UI-created reservations use `e2e-` applicant names, emails, and purposes, then register returned ids for cleanup.
-- Data-creating specs use a Playwright fixture registry for created room, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, and deletion for rooms by id.
+- Data-creating specs use a Playwright fixture registry for created room, tag, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, deletion for tags, and deletion for rooms by id.
 - `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`. After the final cleanup, the runner performs a cleanup preview and fails if any matching E2E data remains.
 - The cleanup endpoint can preview or hard-delete rows identified by the `e2e-` prefix:
   - rooms whose name starts with `e2e-`;
-  - recurrences whose purpose/applicant/email/tag starts with `e2e-`, plus recurrences attached to an `e2e-` room;
+  - tags whose name starts with `e2e-` and are not still referenced by a remaining recurrence;
+  - recurrences whose purpose/applicant/email starts with `e2e-`, plus recurrences attached to an `e2e-` room;
   - reservations whose purpose/applicant/email starts with `e2e-`, plus reservations attached to an `e2e-` room or an `e2e-` recurrence;
   - reservation histories for those reservations, including hard-deleted reservation histories identified by E2E snapshot purpose or room name.
 - Recurring reservations are cleaned by deleting the recurrence row and every generated reservation linked by `recurrence_id`.
 - `e2e-` rooms are deleted only after their matching reservations and recurrences are removed. If any non-E2E row still references the room, the room is skipped instead of deleting or reassigning unrelated data.
+- `e2e-` tags are deleted only after matching recurrences are removed. If any remaining recurrence still references the tag, the tag is skipped instead of clearing that recurrence's tag.
 - For pre-rule data from older tests, manual cleanup can include old `E2E ...` names only when `includeLegacy=true`. Use preview first.
 - Settings are global state. The settings smoke test reads the original payload first and restores it in a `finally` block.
 - The cleanup controller is not loaded in the `prod` profile and is disabled by default in `local`/`dev` unless `E2E_CLEANUP_ENABLED=true` is set.

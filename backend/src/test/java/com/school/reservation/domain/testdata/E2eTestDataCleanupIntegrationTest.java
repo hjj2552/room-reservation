@@ -41,12 +41,6 @@ class E2eTestDataCleanupIntegrationTest {
               where lower(purpose) like 'e2e-%'
                  or lower(purpose) like 'e2e %'
                  or applicant_email in ('manual@example.test')
-                 or recurrence_id in (
-                   select id
-                   from reservation_recurrences
-                   where lower(series_label) like 'e2e-%'
-                      or lower(series_label) like 'e2e %'
-                 )
             )
             """);
         jdbcTemplate.update("""
@@ -54,21 +48,15 @@ class E2eTestDataCleanupIntegrationTest {
             where lower(purpose) like 'e2e-%'
                or lower(purpose) like 'e2e %'
                or applicant_email in ('manual@example.test')
-               or recurrence_id in (
-                 select id
-                 from reservation_recurrences
-                 where lower(series_label) like 'e2e-%'
-                    or lower(series_label) like 'e2e %'
-               )
             """);
         jdbcTemplate.update("""
             delete from reservation_recurrences
             where lower(purpose) like 'e2e-%'
                or lower(purpose) like 'e2e %'
-               or lower(series_label) like 'e2e-%'
-               or lower(series_label) like 'e2e %'
+               or applicant_email in ('manual-recurring-tag@example.test')
             """);
-        jdbcTemplate.update("delete from rooms where lower(name) like 'e2e-%' or lower(name) like 'e2e %' or name in ('Manual Acceptance Room', 'Series Label Cleanup Room')");
+        jdbcTemplate.update("delete from tags where lower(name) like 'e2e-%' or lower(name) like 'e2e %'");
+        jdbcTemplate.update("delete from rooms where lower(name) like 'e2e-%' or lower(name) like 'e2e %' or name in ('Manual Acceptance Room', 'Series Label Cleanup Room', 'Tag Cleanup Reference Room')");
     }
 
     @Test
@@ -80,9 +68,11 @@ class E2eTestDataCleanupIntegrationTest {
         UUID directReservationId = UUID.randomUUID();
         UUID generatedReservationId = UUID.randomUUID();
         UUID normalReservationId = UUID.randomUUID();
+        UUID e2eTagId = UUID.randomUUID();
 
         insertRoom(e2eRoomId, "e2e-room-cleanup");
         insertRoom(normalRoomId, "Manual Acceptance Room");
+        insertTag(e2eTagId, "e2e-tag-cleanup");
         insertRecurrence(recurrenceId, e2eRoomId, "e2e-reservation-recurring");
         insertReservation(directReservationId, e2eRoomId, null, "e2e-admin", "e2e-reservation-direct", "e2e-direct@example.test", 0);
         insertReservation(generatedReservationId, e2eRoomId, recurrenceId, "e2e-admin", "e2e-reservation-generated", "e2e-generated@example.test", 2);
@@ -101,12 +91,15 @@ class E2eTestDataCleanupIntegrationTest {
             .andExpect(jsonPath("$.reservationHistoriesDeleted").value(2))
             .andExpect(jsonPath("$.reservationsDeleted").value(2))
             .andExpect(jsonPath("$.recurrencesDeleted").value(1))
+            .andExpect(jsonPath("$.tagsDeleted").value(1))
+            .andExpect(jsonPath("$.tagsSkipped").value(0))
             .andExpect(jsonPath("$.roomsDeleted").value(1))
             .andExpect(jsonPath("$.roomsSkipped").value(0));
 
         assertThat(count("select count(*) from rooms where id = ?", e2eRoomId)).isZero();
         assertThat(count("select count(*) from reservations where id in (?, ?)", directReservationId, generatedReservationId)).isZero();
         assertThat(count("select count(*) from reservation_recurrences where id = ?", recurrenceId)).isZero();
+        assertThat(count("select count(*) from tags where id = ?", e2eTagId)).isZero();
         assertThat(count("select count(*) from rooms where id = ?", normalRoomId)).isEqualTo(1);
         assertThat(count("select count(*) from reservations where id = ?", normalReservationId)).isEqualTo(1);
         assertThat(count("select count(*) from reservation_histories where reservation_id = ?", normalReservationId)).isEqualTo(1);
@@ -130,6 +123,7 @@ class E2eTestDataCleanupIntegrationTest {
             .andExpect(jsonPath("$.includeLegacy").value(false))
             .andExpect(jsonPath("$.reservationHistoriesDeleted").value(1))
             .andExpect(jsonPath("$.reservationsDeleted").value(1))
+            .andExpect(jsonPath("$.tagsDeleted").value(0))
             .andExpect(jsonPath("$.roomsDeleted").value(1));
 
         assertThat(count("select count(*) from rooms where id = ?", e2eRoomId)).isEqualTo(1);
@@ -138,7 +132,7 @@ class E2eTestDataCleanupIntegrationTest {
     }
 
     @Test
-    void cleanupDeletesRecurrenceAndGeneratedReservationsIdentifiedBySeriesLabel() throws Exception {
+    void cleanupDeletesRecurrenceAndGeneratedReservationsIdentifiedByRecurrenceMarker() throws Exception {
         MockHttpSession session = loginAdminSession();
         UUID roomId = UUID.randomUUID();
         UUID recurrenceId = UUID.randomUUID();
@@ -150,8 +144,7 @@ class E2eTestDataCleanupIntegrationTest {
             roomId,
             "Manual Recurring Admin",
             "manual-recurring@example.test",
-            "Manual recurring reservation",
-            "e2e-series-label-cleanup"
+            "e2e-recurring-marker-cleanup"
         );
         insertReservation(
             generatedReservationId,
@@ -240,9 +233,41 @@ class E2eTestDataCleanupIntegrationTest {
             roomId,
             "e2e-recurring-admin",
             "e2e-recurring@example.test",
-            purpose,
-            null
+            purpose
         );
+    }
+
+    @Test
+    void cleanupSkipsE2eTagStillReferencedByNonE2eRecurrence() throws Exception {
+        MockHttpSession session = loginAdminSession();
+        UUID roomId = UUID.randomUUID();
+        UUID tagId = UUID.randomUUID();
+        UUID recurrenceId = UUID.randomUUID();
+
+        insertRoom(roomId, "Tag Cleanup Reference Room");
+        insertTag(tagId, "e2e-tag-referenced");
+        insertRecurrence(
+            recurrenceId,
+            roomId,
+            tagId,
+            "Manual Recurring Admin",
+            "manual-recurring-tag@example.test",
+            "Manual tagged recurrence"
+        );
+
+        mockMvc.perform(delete("/api/admin/test-data/e2e")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tagsDeleted").value(0))
+            .andExpect(jsonPath("$.tagsSkipped").value(1));
+
+        assertThat(count("select count(*) from tags where id = ?", tagId)).isEqualTo(1);
+        assertThat(count("select count(*) from reservation_recurrences where id = ?", recurrenceId)).isEqualTo(1);
+
+        jdbcTemplate.update("delete from reservation_recurrences where id = ?", recurrenceId);
+        jdbcTemplate.update("delete from tags where id = ?", tagId);
+        jdbcTemplate.update("delete from rooms where id = ?", roomId);
     }
 
     private void insertRecurrence(
@@ -250,14 +275,25 @@ class E2eTestDataCleanupIntegrationTest {
         UUID roomId,
         String applicantName,
         String applicantEmail,
-        String purpose,
-        String seriesLabel
+        String purpose
+    ) {
+        insertRecurrence(recurrenceId, roomId, null, applicantName, applicantEmail, purpose);
+    }
+
+    private void insertRecurrence(
+        UUID recurrenceId,
+        UUID roomId,
+        UUID tagId,
+        String applicantName,
+        String applicantEmail,
+        String purpose
     ) {
         jdbcTemplate.update(
             """
                 insert into reservation_recurrences (
                   id,
                   room_id,
+                  tag_id,
                   applicant_name,
                   applicant_email,
                   applicant_phone,
@@ -267,17 +303,27 @@ class E2eTestDataCleanupIntegrationTest {
                   days_of_week,
                   start_time,
                   end_time,
-                  conflict_policy,
-                  series_label
+                  conflict_policy
                 )
-                values (?, ?, ?, ?, '010-0000-0000', ?, current_date + interval '21 days', current_date + interval '35 days', 'MON', '10:00', '11:00', 'SKIP_CONFLICTS'::recurrence_conflict_policy, ?)
+                values (?, ?, ?, ?, ?, '010-0000-0000', ?, current_date + interval '21 days', current_date + interval '35 days', 'MON', '10:00', '11:00', 'SKIP_CONFLICTS'::recurrence_conflict_policy)
                 """,
             recurrenceId,
             roomId,
+            tagId,
             applicantName,
             applicantEmail,
-            purpose,
-            seriesLabel
+            purpose
+        );
+    }
+
+    private void insertTag(UUID tagId, String name) {
+        jdbcTemplate.update(
+            """
+                insert into tags (id, name, color)
+                values (?, ?, '#2563eb')
+                """,
+            tagId,
+            name
         );
     }
 

@@ -374,7 +374,8 @@ public class ReservationService {
         return (root, query, criteriaBuilder) -> {
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
                 root.fetch("room");
-                root.fetch("recurrence", jakarta.persistence.criteria.JoinType.LEFT);
+                root.fetch("recurrence", jakarta.persistence.criteria.JoinType.LEFT)
+                    .fetch("tag", jakarta.persistence.criteria.JoinType.LEFT);
             }
 
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();

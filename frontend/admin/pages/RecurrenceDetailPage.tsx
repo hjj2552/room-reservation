@@ -82,13 +82,13 @@ export function RecurrenceDetailPage() {
             </div>
             <div>
               <dt>태그</dt>
-              <dd>
-                {detail.seriesLabel ? (
+              <dd data-testid="recurrence-detail-tag">
+                {detail.tagName ? (
                   <span
                     className="series-chip"
-                    style={detail.seriesColor ? { borderColor: detail.seriesColor, color: detail.seriesColor } : undefined}
+                    style={detail.tagColor ? { borderColor: detail.tagColor, color: detail.tagColor } : undefined}
                   >
-                    {detail.seriesLabel}
+                    {detail.tagName}
                   </span>
                 ) : '-'}
               </dd>

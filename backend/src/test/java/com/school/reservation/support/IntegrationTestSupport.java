@@ -36,6 +36,7 @@ public abstract class IntegrationTestSupport {
         jdbcTemplate.update("delete from reservation_histories");
         jdbcTemplate.update("delete from reservations");
         jdbcTemplate.update("delete from reservation_recurrences");
+        jdbcTemplate.update("delete from tags");
         jdbcTemplate.update("delete from rooms where name not in ('Room 101', 'Seminar Room 201') and system_reserved = false");
         Integer roomCount = jdbcTemplate.queryForObject("select count(*) from rooms", Integer.class);
         if (roomCount != null && roomCount == 0) {

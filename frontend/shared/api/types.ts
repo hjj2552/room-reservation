@@ -84,6 +84,25 @@ export interface OperationSettings {
   version: number;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TagFilters {
+  keyword?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface TagPayload {
+  name: string;
+  color: string;
+}
+
 export type PublicSettings = Omit<
   OperationSettings,
   'adminContactName' | 'adminContactPhone' | 'version'
@@ -287,8 +306,7 @@ export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
   applicantEmail: string;
   applicantPhone: string;
   purpose: string;
-  seriesLabel?: string;
-  seriesColor?: string;
+  tagId?: string | null;
 }
 
 export interface RecurrencePreview {
@@ -309,8 +327,9 @@ export interface RecurrencePreview {
 
 export interface RecurrenceCreateResult {
   recurrenceId: string;
-  seriesLabel: string | null;
-  seriesColor: string | null;
+  tagId: string | null;
+  tagName: string | null;
+  tagColor: string | null;
   conflictPolicy: ConflictPolicy;
   totalCandidates: number;
   createdCount: number;
@@ -328,8 +347,9 @@ export interface RecurrenceListItem {
   roomId: string;
   roomName: string;
   purpose: string;
-  seriesLabel: string | null;
-  seriesColor: string | null;
+  tagId: string | null;
+  tagName: string | null;
+  tagColor: string | null;
   startDate: string;
   endDate: string;
   daysOfWeek: string;
@@ -351,8 +371,9 @@ export interface RecurrenceDetail {
   applicantEmail: string;
   applicantPhone: string | null;
   purpose: string;
-  seriesLabel: string | null;
-  seriesColor: string | null;
+  tagId: string | null;
+  tagName: string | null;
+  tagColor: string | null;
   startDate: string;
   endDate: string;
   daysOfWeek: string;

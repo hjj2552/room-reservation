@@ -27,6 +27,12 @@ export interface E2eRecurrence {
   skippedCount?: number;
 }
 
+export interface E2eTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface E2eSettings {
   organizationName: string;
   publicNotice: string | null;
@@ -87,6 +93,22 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
 export async function deleteRoomByApi(request: APIRequestContext, roomId: string) {
   const response = await request.delete(`/api/admin/rooms/${roomId}`);
   expect([204, 404, 409]).toContain(response.status());
+}
+
+export async function createTagByApi(request: APIRequestContext, name: string, color = '#2563eb') {
+  const response = await request.post('/api/admin/tags', {
+    data: {
+      name,
+      color,
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json() as Promise<E2eTag>;
+}
+
+export async function deleteTagByApi(request: APIRequestContext, tagId: string) {
+  const response = await request.delete(`/api/admin/tags/${tagId}`);
+  expect([204, 404]).toContain(response.status());
 }
 
 export async function createReservationByApi(
@@ -194,6 +216,7 @@ export async function createRecurrenceByApi(
     startTime?: string;
     endTime?: string;
     conflictPolicy?: 'SKIP_CONFLICTS' | 'FAIL_ALL';
+    tagId?: string | null;
   } = {},
 ) {
   const recurrenceTime = nextWeekdayRecurrenceInputs();
@@ -210,8 +233,7 @@ export async function createRecurrenceByApi(
       startTime: options.startTime || recurrenceTime.startTime,
       endTime: options.endTime || recurrenceTime.endTime,
       conflictPolicy: options.conflictPolicy || 'FAIL_ALL',
-      seriesLabel: `${E2E_TEST_DATA_PREFIX}series-${Date.now()}`,
-      seriesColor: '#2563eb',
+      tagId: options.tagId ?? null,
     },
   });
   expect(response.ok()).toBeTruthy();

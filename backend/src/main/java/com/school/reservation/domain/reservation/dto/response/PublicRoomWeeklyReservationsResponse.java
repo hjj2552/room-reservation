@@ -52,8 +52,8 @@ public record PublicRoomWeeklyReservationsResponse(
                 reservation.getStatus(),
                 reservation.getPurpose(),
                 reservation.getRecurrenceId(),
-                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getSeriesLabel(),
-                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getSeriesColor()
+                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getTagName(),
+                reservation.getRecurrence() == null ? null : reservation.getRecurrence().getTagColor()
             );
         }
     }

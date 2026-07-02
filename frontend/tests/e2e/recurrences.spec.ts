@@ -168,6 +168,68 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
   }
 });
 
+test('recurrence create can select a configured tag', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('recurrence-tag-room');
+  const tag = await e2eData.createTestTag('recurrence-create', { color: '#dc2626' });
+  const purpose = e2eData.name('recurring-tagged');
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42 });
+  let recurrenceId: string | undefined;
+
+  try {
+    await page.goto('/admin/recurrences');
+    await page.getByTestId('recurrence-room-select').selectOption(room.id);
+    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-tag-admin');
+    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-tag-${Date.now()}@example.test`);
+    await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
+    await page.getByTestId('recurrence-purpose-input').fill(purpose);
+    await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
+    await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
+    await page.getByTestId('recurrence-start-time-input').fill(recurrenceTime.startTime);
+    await page.getByTestId('recurrence-end-time-input').fill(recurrenceTime.endTime);
+    await expect(page.getByTestId('recurrence-tag-select')).toContainText(tag.name);
+    await page.getByTestId('recurrence-tag-select').selectOption(tag.id);
+    await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
+    await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
+
+    const previewResponsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/recurrences/preview') &&
+      response.request().method() === 'POST',
+    );
+    await page.getByTestId('recurrence-preview-button').click();
+    const previewResponse = await previewResponsePromise;
+    const previewBody = await previewResponse.text();
+    expect(previewResponse.ok(), previewBody).toBeTruthy();
+
+    const createResponsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/admin/recurrences' && response.request().method() === 'POST';
+    });
+    await expect(page.getByTestId('recurrence-create-button')).toBeEnabled();
+    await page.getByTestId('recurrence-create-button').click();
+    const createResponse = await createResponsePromise;
+    const createBody = await createResponse.text();
+    expect(createResponse.ok(), createBody).toBeTruthy();
+    const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
+    recurrenceId = created.recurrenceId;
+    e2eData.registerRecurrence(recurrenceId);
+    expect(created.createdCount, createBody).toBeGreaterThan(0);
+
+    await page.goto(`/admin/recurrences/${recurrenceId}`);
+    await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
+    await expect(page.getByTestId('recurrence-detail-tag')).toContainText(tag.name);
+
+    await page.goto('/admin/recurrences');
+    const row = page.getByRole('row').filter({ hasText: purpose });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(tag.name);
+  } finally {
+    if (recurrenceId) {
+      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
+    }
+  }
+});
+
 function dayLabel(day: string) {
   const labels: Record<string, string> = {
     MON: '월',

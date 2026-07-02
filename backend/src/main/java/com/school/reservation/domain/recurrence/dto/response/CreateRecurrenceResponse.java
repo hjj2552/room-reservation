@@ -7,8 +7,9 @@ import java.util.UUID;
 
 public record CreateRecurrenceResponse(
     UUID recurrenceId,
-    String seriesLabel,
-    String seriesColor,
+    UUID tagId,
+    String tagName,
+    String tagColor,
     ReservationRecurrence.ConflictPolicy conflictPolicy,
     int totalCandidates,
     int createdCount,
