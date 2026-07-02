@@ -2,6 +2,7 @@ package com.school.reservation.domain.recurrence;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -159,6 +160,56 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.reservations[0].recurrenceId").value(recurrenceId.toString()))
             .andExpect(jsonPath("$.reservations[0].seriesLabel").value(nullValue()))
             .andExpect(jsonPath("$.reservations[0].seriesColor").value(nullValue()));
+    }
+
+    @Test
+    void updatingTagIsImmediatelyReflectedInRecurrenceDetailAndTimetable() throws Exception {
+        MockHttpSession session = loginAdminSession();
+        LocalDate startDate = nextWeekdayAt(13, 0).toLocalDate();
+        UUID tagId = createTag("Before Update", "#2563eb");
+
+        String response = mockMvc.perform(post("/api/admin/recurrences")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(createBody(startDate, startDate, "FAIL_ALL", tagId, "Tagged lecture")))
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+        UUID recurrenceId = UUID.fromString(objectMapper.readTree(response).get("recurrenceId").asText());
+        UUID reservationId = generatedReservationId(recurrenceId);
+
+        mockMvc.perform(put("/api/admin/tags/{tagId}", tagId)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "After Update",
+                      "color": "#dc2626"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("After Update"))
+            .andExpect(jsonPath("$.color").value("#dc2626"));
+
+        mockMvc.perform(get("/api/admin/recurrences/{recurrenceId}", recurrenceId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tagId").value(tagId.toString()))
+            .andExpect(jsonPath("$.tagName").value("After Update"))
+            .andExpect(jsonPath("$.tagColor").value("#dc2626"));
+
+        mockMvc.perform(get("/api/admin/reservations/{reservationId}", reservationId).session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.series.id").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.series.label").value("After Update"))
+            .andExpect(jsonPath("$.series.color").value("#dc2626"));
+
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+                .param("weekStart", startDate.toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.reservations[0].recurrenceId").value(recurrenceId.toString()))
+            .andExpect(jsonPath("$.reservations[0].seriesLabel").value("After Update"))
+            .andExpect(jsonPath("$.reservations[0].seriesColor").value("#dc2626"));
     }
 
     @Test
