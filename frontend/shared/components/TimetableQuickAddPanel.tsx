@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import type { ReservationStatus } from '../api/types';
+import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { statusLabels } from '../utils/labels';
 
@@ -34,13 +34,31 @@ interface ReservationRequestPanelProps {
   variant: 'admin' | 'public';
   rooms: RequestRoom[];
   selection: TimetableSlotSelection;
+  initialValues?: ReservationRequestValues;
   submitError?: unknown;
   isPending?: boolean;
   onClose: () => void;
   onSubmit: (values: ReservationRequestValues) => void;
 }
 
-function initialValues(selection: TimetableSlotSelection, variant: 'admin' | 'public'): ReservationRequestValues {
+const duplicateExcludedFields = new Set([
+  'startAt',
+  'endAt',
+  'recurrenceId',
+  'recurrenceException',
+  'series',
+  'seriesId',
+  'seriesLabel',
+  'seriesColor',
+  'tagId',
+  'tagName',
+  'tagColor',
+]);
+
+export function initialReservationRequestValues(
+  selection: TimetableSlotSelection,
+  variant: 'admin' | 'public',
+): ReservationRequestValues {
   return {
     roomId: selection.roomId,
     applicantName: '',
@@ -53,6 +71,37 @@ function initialValues(selection: TimetableSlotSelection, variant: 'admin' | 'pu
     memo: '',
     cancelPassword: '',
   };
+}
+
+export function duplicateReservationRequestValues(
+  defaults: ReservationRequestValues,
+  source: ReservationDetail,
+): ReservationRequestValues {
+  const sourceRecord = source as unknown as Record<string, unknown>;
+  return (Object.keys(defaults) as Array<keyof ReservationRequestValues>).reduce<ReservationRequestValues>(
+    (values, key) => {
+      if (duplicateExcludedFields.has(key)) {
+        return values;
+      }
+
+      if (key === 'roomId') {
+        return { ...values, roomId: source.room.id };
+      }
+
+      if (key in sourceRecord) {
+        const value = sourceRecord[key];
+        if (value === null && typeof defaults[key] === 'string') {
+          return { ...values, [key]: '' };
+        }
+        if (typeof value === typeof defaults[key]) {
+          return { ...values, [key]: value };
+        }
+      }
+
+      return values;
+    },
+    { ...defaults },
+  );
 }
 
 const testIds = {
@@ -90,22 +139,25 @@ export function ReservationRequestPanel({
   variant,
   rooms,
   selection,
+  initialValues,
   submitError,
   isPending = false,
   onClose,
   onSubmit,
 }: ReservationRequestPanelProps) {
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [values, setValues] = useState<ReservationRequestValues>(() => initialValues(selection, variant));
+  const [values, setValues] = useState<ReservationRequestValues>(
+    () => initialValues ?? initialReservationRequestValues(selection, variant),
+  );
   const [errors, setErrors] = useState<Partial<Record<keyof ReservationRequestValues, string>>>({});
   const ids = testIds[variant];
   const isAdmin = variant === 'admin';
 
   useEffect(() => {
-    setValues(initialValues(selection, variant));
+    setValues(initialValues ?? initialReservationRequestValues(selection, variant));
     setErrors({});
     window.setTimeout(() => closeButtonRef.current?.focus(), 0);
-  }, [selection.date, selection.endAt, selection.roomId, selection.startAt, variant]);
+  }, [initialValues, selection.date, selection.endAt, selection.roomId, selection.startAt, variant]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -166,6 +218,8 @@ export function ReservationRequestPanel({
       </span>
     );
   }
+
+  const submitErrorMessage = submitError ? errorMessage(submitError) : '';
 
   return (
     <aside
@@ -325,7 +379,13 @@ export function ReservationRequestPanel({
             {fieldError('cancelPassword')}
           </label>
         )}
-        {submitError ? <div className="inline-error full-span" role="alert">{errorMessage(submitError)}</div> : null}
+        <div
+          className="inline-error quick-add-submit-error full-span"
+          role={submitError ? 'alert' : undefined}
+          aria-hidden={submitError ? undefined : true}
+        >
+          {submitErrorMessage}
+        </div>
         <div className="button-row full-span request-form-actions">
           <button type="button" className="ghost-button" onClick={onClose}>
             취소

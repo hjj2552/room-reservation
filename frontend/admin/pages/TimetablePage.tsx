@@ -8,10 +8,12 @@ import { EmptyState, ErrorState, LoadingState } from '../../shared/components/St
 import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
 import {
   ReservationRequestPanel,
+  duplicateReservationRequestValues,
+  initialReservationRequestValues,
   type ReservationRequestValues,
   type TimetableSlotSelection,
 } from '../../shared/components/TimetableQuickAddPanel';
-import { useCreateReservation, useReservations } from '../../shared/hooks/useReservations';
+import { useCreateReservation, useReservation, useReservations } from '../../shared/hooks/useReservations';
 import { useRooms } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { fromDateTimeLocal, toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
@@ -63,13 +65,10 @@ function newRequestSelection(slotMinutes = 30, openTime?: string, closeTime?: st
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   const date = local.toISOString().slice(0, 10);
-  const currentMinutes = local.getHours() * 60 + local.getMinutes();
   const step = Math.max(slotMinutes || 30, 30);
   const openMinutes = timeValueToMinutes(openTime) ?? 0;
   const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
-  const latestStartMinutes = Math.max(openMinutes, closeMinutes - step);
-  const roundedStartMinutes = Math.ceil(currentMinutes / step) * step;
-  const startMinutes = Math.min(Math.max(roundedStartMinutes, openMinutes), latestStartMinutes);
+  const startMinutes = openMinutes;
   const endMinutes = Math.min(startMinutes + step, closeMinutes);
 
   return {
@@ -113,6 +112,7 @@ export function TimetablePage() {
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [quickAddSelection, setQuickAddSelection] = useState<TimetableSlotSelection | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
+  const duplicateQuickAddAppliedRef = useRef<string | null>(null);
   const rooms = useRooms();
   const settings = useSettings();
   const createReservation = useCreateReservation();
@@ -127,6 +127,8 @@ export function TimetablePage() {
   const selectedDate = searchParams.get('date') || todayInputValue();
   const selectedWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || todayInputValue());
   const keyword = searchParams.get('keyword') || '';
+  const duplicateReservationId = searchParams.get('duplicateReservationId') || '';
+  const duplicateReservation = useReservation(duplicateReservationId);
 
   const dateTimetableFilters = useMemo<ReservationFilters>(
     () => ({
@@ -166,12 +168,37 @@ export function TimetablePage() {
   const roomTimetableReservations = useReservations(roomTimetableFilters, {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
+  const duplicateQuickAddInitialValues = useMemo(() => {
+    if (!duplicateReservationId || !quickAddSelection || !duplicateReservation.data) {
+      return undefined;
+    }
+    return duplicateReservationRequestValues(
+      initialReservationRequestValues(quickAddSelection, 'admin'),
+      duplicateReservation.data,
+    );
+  }, [duplicateReservation.data, duplicateReservationId, quickAddSelection]);
 
   useEffect(() => {
     if (!highlightedReservationId) return;
     const timer = window.setTimeout(() => setHighlightedReservationId(null), 5000);
     return () => window.clearTimeout(timer);
   }, [highlightedReservationId]);
+
+  useEffect(() => {
+    if (!duplicateReservationId) {
+      duplicateQuickAddAppliedRef.current = null;
+      return;
+    }
+    if (duplicateQuickAddAppliedRef.current === duplicateReservationId) {
+      return;
+    }
+    if (!settings.data || !duplicateReservation.data) {
+      return;
+    }
+
+    setQuickAddSelection(newRequestSelection(settings.data.slotMinutes, settings.data.openTime, settings.data.closeTime));
+    duplicateQuickAddAppliedRef.current = duplicateReservationId;
+  }, [duplicateReservation.data, duplicateReservationId, settings.data]);
 
   function updateSearchParams(updater: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(searchParamsRef.current);
@@ -212,17 +239,31 @@ export function TimetablePage() {
     });
   }
 
+  function clearDuplicateReservationParam() {
+    updateSearchParams((next) => {
+      next.delete('duplicateReservationId');
+    });
+  }
+
   function handleEmptySlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+    clearDuplicateReservationParam();
     setQuickAddSelection(slotToSelection(slot));
   }
 
   function handleNewRequestClick() {
+    clearDuplicateReservationParam();
     setQuickAddSelection(newRequestSelection(settings.data?.slotMinutes, settings.data?.openTime, settings.data?.closeTime));
   }
 
   function handleQuickAddCreated(reservationId: string) {
     setHighlightedReservationId(reservationId);
     setQuickAddSelection(null);
+    clearDuplicateReservationParam();
+  }
+
+  function handleQuickAddClose() {
+    setQuickAddSelection(null);
+    clearDuplicateReservationParam();
   }
 
   function handleReservationRequest(values: ReservationRequestValues) {
@@ -412,7 +453,8 @@ export function TimetablePage() {
           variant="admin"
           rooms={roomViewRooms}
           selection={quickAddSelection}
-          onClose={() => setQuickAddSelection(null)}
+          initialValues={duplicateQuickAddInitialValues}
+          onClose={handleQuickAddClose}
           onSubmit={handleReservationRequest}
           submitError={createReservation.error}
           isPending={createReservation.isPending}

@@ -1,6 +1,6 @@
 # Public Reservation Requests
 
-The public reservation page is available at `/public/reservations/new`. `/request` redirects to the same page.
+The public reservation timetable is available at `/timetable`; `/reserve` opens the same Quick Add based flow.
 
 ## User Flow
 

@@ -17,3 +17,10 @@ export function timetableReservationUrl({ startAt, roomId }: { startAt: string; 
   });
   return `/admin/timetable?${params.toString()}`;
 }
+
+export function timetableDuplicateReservationUrl(reservationId: string) {
+  const params = new URLSearchParams({
+    duplicateReservationId: reservationId,
+  });
+  return `/admin/timetable?${params.toString()}`;
+}

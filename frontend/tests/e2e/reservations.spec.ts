@@ -112,32 +112,46 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
     applicantPhone: string;
     purpose: string;
     status: string;
+    startAt: string;
+    endAt: string;
   };
-  const duplicateTime = nextWeekdayReservationLocalInputs({ daysAhead: 42, startHour: 15, endHour: 16 });
   let duplicatedReservationId: string | undefined;
+  const toolbarDefaultDate = await page.evaluate(() => {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 10);
+  });
+
+  async function expectDuplicateQuickAddPrefill() {
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-room-select')).toHaveValue(source.room.id);
+    await expect(page.getByTestId('quick-add-applicant-name-input')).toHaveValue(source.applicantName);
+    await expect(page.getByTestId('quick-add-email-input')).toHaveValue(source.applicantEmail);
+    await expect(page.getByTestId('quick-add-phone-input')).toHaveValue(source.applicantPhone);
+    await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(source.purpose);
+    await expect(page.getByTestId('quick-add-status-select')).toHaveValue(source.status);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${toolbarDefaultDate}T09:00`);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${toolbarDefaultDate}T09:30`);
+    await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue(source.startAt.slice(0, 16));
+    await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue(source.endAt.slice(0, 16));
+  }
 
   await page.goto(`/admin/reservations/${sourceReservationId}`);
   await page.getByTestId('reservation-duplicate-link').click();
 
-  await expect(page).toHaveURL(/\/admin\/reservations\/new$/);
-  await expect(page.getByTestId('reservation-room-select')).toHaveValue(source.room.id);
-  await expect(page.getByTestId('reservation-applicant-name-input')).toHaveValue(source.applicantName);
-  await expect(page.getByTestId('reservation-email-input')).toHaveValue(source.applicantEmail);
-  await expect(page.getByTestId('reservation-phone-input')).toHaveValue(source.applicantPhone);
-  await expect(page.getByTestId('reservation-purpose-input')).toHaveValue(source.purpose);
-  await expect(page.getByTestId('reservation-status-select')).toHaveValue(source.status);
-  await expect(page.getByTestId('reservation-start-input')).toHaveValue('');
-  await expect(page.getByTestId('reservation-end-input')).toHaveValue('');
+  await expect(page).toHaveURL(new RegExp(`/admin/timetable\\?duplicateReservationId=${sourceReservationId}$`));
+  await expectDuplicateQuickAddPrefill();
 
-  await page.getByTestId('reservation-start-input').fill(duplicateTime.startAt);
-  await page.getByTestId('reservation-end-input').fill(duplicateTime.endAt);
-  await page.getByTestId('reservation-memo-input').fill('e2e-duplicate-create');
+  await page.reload();
+  await expect(page).toHaveURL(new RegExp(`/admin/timetable\\?duplicateReservationId=${sourceReservationId}$`));
+  await expectDuplicateQuickAddPrefill();
+  await page.getByTestId('quick-add-memo-input').fill('e2e-duplicate-create');
 
   const createResponsePromise = page.waitForResponse((response) =>
     response.url().includes('/api/admin/reservations') &&
     response.request().method() === 'POST',
   );
-  await page.getByTestId('reservation-save-button').click();
+  await page.getByTestId('quick-add-save-button').click();
   const createResponse = await createResponsePromise;
   const createResponseBody = await createResponse.text();
   expect(createResponse.ok(), createResponseBody).toBeTruthy();
@@ -153,6 +167,10 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
   expect(duplicated.recurrenceId).toBeNull();
   expect(duplicated.series).toBeNull();
   expect(duplicated.recurrenceException).toBe(false);
+  await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+  await expect(page.getByTestId('reservation-date-timetable')).toContainText(source.purpose);
+
+  await page.goto(`/admin/reservations/${duplicatedReservationId}`);
   await expect(page).toHaveURL(new RegExp(`/admin/reservations/${duplicatedReservationId}$`));
   await expect(page.getByTestId('reservation-purpose')).toHaveText(source.purpose);
   await expect(page.getByRole('heading', { name: source.room.name })).toBeVisible();
