@@ -40,7 +40,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/admin/reservations', element: <ReservationsPage /> },
           { path: '/admin/timetable', element: <TimetablePage /> },
-          { path: '/admin/reservations/new', element: <Navigate to="/admin/timetable" replace /> },
+          { path: '/admin/reservations/new', element: <ReservationFormPage mode="create" /> },
           { path: '/admin/reservations/:reservationId', element: <ReservationDetailPage /> },
           { path: '/admin/reservations/:reservationId/edit', element: <ReservationFormPage mode="edit" /> },
           { path: '/admin/recurrences', element: <RecurrencesPage /> },
