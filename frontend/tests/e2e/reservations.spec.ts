@@ -91,6 +91,76 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
+test('reservation duplicate pre-fills non-time fields and creates an independent reservation', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('reservation-duplicate-room');
+  const tag = await e2eData.createTestTag('reservation-duplicate-series', { color: '#0f766e' });
+  const recurrence = await e2eData.createTestRecurringReservation(room.id, 'reservation-duplicate-source', {
+    tagId: tag.id,
+  });
+  const recurrenceResponse = await request.get(`/api/admin/recurrences/${recurrence.recurrenceId}`);
+  expect(recurrenceResponse.ok(), await recurrenceResponse.text()).toBeTruthy();
+  const recurrenceDetail = await recurrenceResponse.json() as { reservations: Array<{ id: string }> };
+  const sourceReservationId = recurrenceDetail.reservations[0]?.id;
+  expect(sourceReservationId, JSON.stringify(recurrenceDetail)).toBeTruthy();
+  const sourceResponse = await request.get(`/api/admin/reservations/${sourceReservationId}`);
+  expect(sourceResponse.ok(), await sourceResponse.text()).toBeTruthy();
+  const source = await sourceResponse.json() as {
+    room: { id: string; name: string };
+    applicantName: string;
+    applicantEmail: string;
+    applicantPhone: string;
+    purpose: string;
+    status: string;
+  };
+  const duplicateTime = nextWeekdayReservationLocalInputs({ daysAhead: 42, startHour: 15, endHour: 16 });
+  let duplicatedReservationId: string | undefined;
+
+  await page.goto(`/admin/reservations/${sourceReservationId}`);
+  await page.getByTestId('reservation-duplicate-link').click();
+
+  await expect(page).toHaveURL(/\/admin\/reservations\/new$/);
+  await expect(page.getByTestId('reservation-room-select')).toHaveValue(source.room.id);
+  await expect(page.getByTestId('reservation-applicant-name-input')).toHaveValue(source.applicantName);
+  await expect(page.getByTestId('reservation-email-input')).toHaveValue(source.applicantEmail);
+  await expect(page.getByTestId('reservation-phone-input')).toHaveValue(source.applicantPhone);
+  await expect(page.getByTestId('reservation-purpose-input')).toHaveValue(source.purpose);
+  await expect(page.getByTestId('reservation-status-select')).toHaveValue(source.status);
+  await expect(page.getByTestId('reservation-start-input')).toHaveValue('');
+  await expect(page.getByTestId('reservation-end-input')).toHaveValue('');
+
+  await page.getByTestId('reservation-start-input').fill(duplicateTime.startAt);
+  await page.getByTestId('reservation-end-input').fill(duplicateTime.endAt);
+  await page.getByTestId('reservation-memo-input').fill('e2e-duplicate-create');
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/admin/reservations') &&
+    response.request().method() === 'POST',
+  );
+  await page.getByTestId('reservation-save-button').click();
+  const createResponse = await createResponsePromise;
+  const createResponseBody = await createResponse.text();
+  expect(createResponse.ok(), createResponseBody).toBeTruthy();
+  const duplicated = JSON.parse(createResponseBody) as {
+    id: string;
+    recurrenceId: string | null;
+    series: unknown | null;
+    recurrenceException: boolean;
+  };
+  duplicatedReservationId = duplicated.id;
+  e2eData.registerReservation(duplicatedReservationId);
+
+  expect(duplicated.recurrenceId).toBeNull();
+  expect(duplicated.series).toBeNull();
+  expect(duplicated.recurrenceException).toBe(false);
+  await expect(page).toHaveURL(new RegExp(`/admin/reservations/${duplicatedReservationId}$`));
+  await expect(page.getByTestId('reservation-purpose')).toHaveText(source.purpose);
+  await expect(page.getByRole('heading', { name: source.room.name })).toBeVisible();
+
+  await page.goto(`/admin/reservations?keyword=${encodeURIComponent(source.purpose)}`);
+  await expect(page.getByTestId('reservations-table')).toContainText(source.purpose);
+});
+
 test('deleted reservation audit row is read-only and detail URL shows domain guidance', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-delete-room');

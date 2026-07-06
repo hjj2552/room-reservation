@@ -1,4 +1,4 @@
-import { CalendarDays, Check, PenLine, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Copy, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ReservationHistory } from '../../shared/api/types';
@@ -164,6 +164,15 @@ export function ReservationDetailPage() {
               >
                 <PenLine size={16} aria-hidden="true" />
                 예약 수정
+              </Link>
+              <Link
+                className="secondary-button reservation-edit-action"
+                data-testid="reservation-duplicate-link"
+                to="/admin/reservations/new"
+                state={{ duplicateSource: detail }}
+              >
+                <Copy size={16} aria-hidden="true" />
+                복제
               </Link>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}

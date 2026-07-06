@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
-import type { ReservationPayload, ReservationStatus } from '../../shared/api/types';
+import type { ReservationDetail, ReservationPayload, ReservationStatus } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCreateReservation,
@@ -29,10 +29,44 @@ interface ReservationFormValues {
   memo: string;
 }
 
+interface DuplicateReservationState {
+  duplicateSource?: ReservationDetail;
+}
+
+const defaultReservationFormValues: ReservationFormValues = {
+  roomId: '',
+  applicantName: '',
+  applicantEmail: '',
+  applicantPhone: '',
+  purpose: '',
+  startAt: '',
+  endAt: '',
+  status: 'CONFIRMED',
+  memo: '',
+};
+
+const duplicateExcludedFields = new Set([
+  'startAt',
+  'endAt',
+  'memo',
+  'recurrenceId',
+  'recurrenceException',
+  'series',
+  'seriesId',
+  'seriesLabel',
+  'seriesColor',
+  'tagId',
+  'tagName',
+  'tagColor',
+]);
+
 export function ReservationFormPage({ mode }: ReservationFormPageProps) {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const duplicateSource = (location.state as DuplicateReservationState | null)?.duplicateSource;
   const rooms = useRooms();
+  const duplicatePrefilledRef = useRef(false);
   const reservation = useReservation(mode === 'edit' ? reservationId : undefined);
   const create = useCreateReservation();
   const update = useUpdateReservation(reservationId);
@@ -42,20 +76,22 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
     reset,
     formState: { errors },
   } = useForm<ReservationFormValues>({
-    defaultValues: {
-      roomId: '',
-      applicantName: '',
-      applicantEmail: '',
-      applicantPhone: '',
-      purpose: '',
-      startAt: '',
-      endAt: '',
-      status: 'CONFIRMED',
-      memo: '',
-    },
+    defaultValues: defaultReservationFormValues,
   });
 
   useEffect(() => {
+    if (mode === 'create' && duplicateSource) {
+      if (duplicatePrefilledRef.current) {
+        return;
+      }
+      const sourceRoomLoaded = rooms.data?.items.some((room) => room.id === duplicateSource.room.id);
+      if (!sourceRoomLoaded) {
+        return;
+      }
+      reset(prefillDuplicateReservationFormValues(defaultReservationFormValues, duplicateSource));
+      duplicatePrefilledRef.current = true;
+      return;
+    }
     if (mode === 'edit' && reservation.data) {
       reset({
         roomId: reservation.data.room.id,
@@ -69,7 +105,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         memo: '',
       });
     }
-  }, [mode, reservation.data, reset]);
+  }, [duplicateSource, mode, reservation.data, reset, rooms.data]);
 
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {
@@ -218,5 +254,36 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </div>
       </form>
     </section>
+  );
+}
+
+function prefillDuplicateReservationFormValues(
+  defaults: ReservationFormValues,
+  source: ReservationDetail,
+): ReservationFormValues {
+  const sourceRecord = source as unknown as Record<string, unknown>;
+  return (Object.keys(defaults) as Array<keyof ReservationFormValues>).reduce<ReservationFormValues>(
+    (values, key) => {
+      if (duplicateExcludedFields.has(key)) {
+        return values;
+      }
+
+      if (key === 'roomId') {
+        return { ...values, roomId: source.room.id };
+      }
+
+      if (key in sourceRecord) {
+        const value = sourceRecord[key];
+        if (typeof value === 'string') {
+          return { ...values, [key]: value };
+        }
+        if (value === null) {
+          return { ...values, [key]: '' };
+        }
+      }
+
+      return values;
+    },
+    { ...defaults },
   );
 }
