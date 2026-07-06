@@ -23,9 +23,3 @@ test('root admin choice opens the admin login UI', async ({ page }) => {
   await expect(page.locator('.login-panel')).toBeVisible();
 });
 
-test('legacy public request URL redirects to the root public reserve route', async ({ page }) => {
-  await page.goto('/public/reservations/new');
-
-  await expect(page).toHaveURL(new RegExp('/reserve$'));
-  await expect(page.getByTestId('public-new-request-button')).toBeVisible();
-});

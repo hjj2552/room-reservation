@@ -1,21 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
-import type { ReservationDetail, ReservationPayload, ReservationStatus } from '../../shared/api/types';
+import type { ReservationPayload, ReservationStatus } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
-  useCreateReservation,
   useReservation,
   useUpdateReservation,
 } from '../../shared/hooks/useReservations';
 import { useRooms } from '../../shared/hooks/useRooms';
 import { fromDateTimeLocal, toDateTimeLocal } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
-
-interface ReservationFormPageProps {
-  mode: 'create' | 'edit';
-}
 
 interface ReservationFormValues {
   roomId: string;
@@ -27,10 +22,6 @@ interface ReservationFormValues {
   endAt: string;
   status: ReservationStatus;
   memo: string;
-}
-
-interface DuplicateReservationState {
-  duplicateSource?: ReservationDetail;
 }
 
 const defaultReservationFormValues: ReservationFormValues = {
@@ -45,30 +36,11 @@ const defaultReservationFormValues: ReservationFormValues = {
   memo: '',
 };
 
-const duplicateExcludedFields = new Set([
-  'startAt',
-  'endAt',
-  'memo',
-  'recurrenceId',
-  'recurrenceException',
-  'series',
-  'seriesId',
-  'seriesLabel',
-  'seriesColor',
-  'tagId',
-  'tagName',
-  'tagColor',
-]);
-
-export function ReservationFormPage({ mode }: ReservationFormPageProps) {
+export function ReservationFormPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
-  const duplicateSource = (location.state as DuplicateReservationState | null)?.duplicateSource;
   const rooms = useRooms();
-  const duplicatePrefilledRef = useRef(false);
-  const reservation = useReservation(mode === 'edit' ? reservationId : undefined);
-  const create = useCreateReservation();
+  const reservation = useReservation(reservationId);
   const update = useUpdateReservation(reservationId);
   const {
     register,
@@ -80,19 +52,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
   });
 
   useEffect(() => {
-    if (mode === 'create' && duplicateSource) {
-      if (duplicatePrefilledRef.current) {
-        return;
-      }
-      const sourceRoomLoaded = rooms.data?.items.some((room) => room.id === duplicateSource.room.id);
-      if (!sourceRoomLoaded) {
-        return;
-      }
-      reset(prefillDuplicateReservationFormValues(defaultReservationFormValues, duplicateSource));
-      duplicatePrefilledRef.current = true;
-      return;
-    }
-    if (mode === 'edit' && reservation.data) {
+    if (reservation.data) {
       reset({
         roomId: reservation.data.room.id,
         applicantName: reservation.data.applicantName,
@@ -105,7 +65,7 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         memo: '',
       });
     }
-  }, [duplicateSource, mode, reservation.data, reset, rooms.data]);
+  }, [reservation.data, reset]);
 
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {
@@ -123,33 +83,25 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
 
   function onSubmit(values: ReservationFormValues) {
     const payload = toPayload(values);
-    if (mode === 'create') {
-      create.mutate(payload, {
-        onSuccess: (created) => navigate(`/admin/reservations/${created.id}`),
-      });
-      return;
-    }
     update.mutate(payload, {
       onSuccess: (updated) => navigate(`/admin/reservations/${updated.id}`),
     });
   }
 
-  if (mode === 'edit' && reservation.isLoading) return <LoadingState />;
-  if (mode === 'edit' && reservation.isError) return <ErrorState error={reservation.error} />;
+  if (reservation.isLoading) return <LoadingState />;
+  if (reservation.isError) return <ErrorState error={reservation.error} />;
 
-  const mutationError = create.error || update.error;
-  const isPending = create.isPending || update.isPending;
+  const mutationError = update.error;
+  const isPending = update.isPending;
 
   return (
     <section className="page-section" aria-labelledby="reservation-form-title">
       <div className="page-header">
         <div>
           <p className="eyebrow">관리자 메뉴</p>
-          <h1 id="reservation-form-title">{mode === 'create' ? '예약 신청' : '예약 수정'}</h1>
+          <h1 id="reservation-form-title">예약 수정</h1>
           <p className="muted">
-            {mode === 'edit'
-              ? '운영자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.'
-              : '운영자가 직접 예약 정보를 입력하고 저장합니다.'}
+            운영자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.
           </p>
         </div>
       </div>
@@ -254,36 +206,5 @@ export function ReservationFormPage({ mode }: ReservationFormPageProps) {
         </div>
       </form>
     </section>
-  );
-}
-
-function prefillDuplicateReservationFormValues(
-  defaults: ReservationFormValues,
-  source: ReservationDetail,
-): ReservationFormValues {
-  const sourceRecord = source as unknown as Record<string, unknown>;
-  return (Object.keys(defaults) as Array<keyof ReservationFormValues>).reduce<ReservationFormValues>(
-    (values, key) => {
-      if (duplicateExcludedFields.has(key)) {
-        return values;
-      }
-
-      if (key === 'roomId') {
-        return { ...values, roomId: source.room.id };
-      }
-
-      if (key in sourceRecord) {
-        const value = sourceRecord[key];
-        if (typeof value === 'string') {
-          return { ...values, [key]: value };
-        }
-        if (value === null) {
-          return { ...values, [key]: '' };
-        }
-      }
-
-      return values;
-    },
-    { ...defaults },
   );
 }

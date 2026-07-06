@@ -939,6 +939,14 @@ button:disabled {
   padding-top: 2px;
 }
 
+.quick-add-submit-error {
+  min-height: 48px;
+}
+
+.quick-add-submit-error[aria-hidden='true'] {
+  visibility: hidden;
+}
+
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
@@ -987,6 +995,11 @@ button:disabled {
 
 .reservation-edit-action {
   justify-self: start;
+}
+
+.reservation-management-actions {
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .reservation-delete-modal {

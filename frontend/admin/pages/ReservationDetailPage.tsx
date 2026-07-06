@@ -13,7 +13,7 @@ import {
 } from '../../shared/hooks/useReservations';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
-import { timetableReservationUrl } from '../../shared/utils/timetable';
+import { timetableDuplicateReservationUrl, timetableReservationUrl } from '../../shared/utils/timetable';
 
 export function ReservationDetailPage() {
   const { reservationId = '' } = useParams();
@@ -157,23 +157,24 @@ export function ReservationDetailPage() {
                   취소
                 </button>
               </div>
-              <Link
-                className="secondary-button reservation-edit-action"
-                data-testid="reservation-edit-link"
-                to={`/admin/reservations/${detail.id}/edit`}
-              >
-                <PenLine size={16} aria-hidden="true" />
-                예약 수정
-              </Link>
-              <Link
-                className="secondary-button reservation-edit-action"
-                data-testid="reservation-duplicate-link"
-                to="/admin/reservations/new"
-                state={{ duplicateSource: detail }}
-              >
-                <Copy size={16} aria-hidden="true" />
-                복제
-              </Link>
+              <div className="button-row reservation-management-actions" aria-label="예약 관리">
+                <Link
+                  className="secondary-button reservation-edit-action"
+                  data-testid="reservation-edit-link"
+                  to={`/admin/reservations/${detail.id}/edit`}
+                >
+                  <PenLine size={16} aria-hidden="true" />
+                  예약 수정
+                </Link>
+                <Link
+                  className="secondary-button reservation-edit-action"
+                  data-testid="reservation-duplicate-link"
+                  to={timetableDuplicateReservationUrl(detail.id)}
+                >
+                  <Copy size={16} aria-hidden="true" />
+                  복제
+                </Link>
+              </div>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
             {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
