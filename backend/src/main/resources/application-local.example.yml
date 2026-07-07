@@ -1,0 +1,25 @@
+# Copy this file to application-local.yml for local development only.
+# Real credentials belong in .env, not in this YAML file.
+spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: true
+
+app:
+  admin:
+    username: ${ADMIN_USERNAME}
+    password: ${ADMIN_PASSWORD}
+  e2e-cleanup:
+    enabled: ${E2E_CLEANUP_ENABLED:false}

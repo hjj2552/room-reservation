@@ -57,8 +57,8 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService(
-        @Value("${app.admin.username:admin}") String username,
-        @Value("${app.admin.password:admin1234}") String password,
+        @Value("${app.admin.username}") String username,
+        @Value("${app.admin.password}") String password,
         PasswordEncoder passwordEncoder
     ) {
         return new InMemoryUserDetailsManager(User.withUsername(username)
@@ -72,4 +72,3 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
-
