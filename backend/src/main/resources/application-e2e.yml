@@ -1,3 +1,4 @@
+# Disposable E2E-only values. Never reuse these values for operations or production.
 spring:
   datasource:
     url: ${E2E_DB_URL:jdbc:postgresql://localhost:5433/room_reservation_test}

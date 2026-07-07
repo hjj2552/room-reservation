@@ -1,8 +1,6 @@
 spring:
   application:
     name: room-reservation
-  profiles:
-    active: local
   jpa:
     open-in-view: false
     hibernate:
