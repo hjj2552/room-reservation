@@ -28,7 +28,8 @@ interface ReservationRoomTimetableProps {
   weekStart: string;
   openTime?: string;
   closeTime?: string;
-  slotMinutes?: number;
+  reservationSlotMinutes?: number;
+  minReservationMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
   onReservationClick?: (reservation: TimetableReservation) => void;
@@ -62,6 +63,8 @@ export function ReservationRoomTimetable({
   weekStart,
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
+  reservationSlotMinutes = TIMETABLE_GRID_MINUTES,
+  minReservationMinutes = TIMETABLE_GRID_MINUTES,
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
@@ -73,6 +76,12 @@ export function ReservationRoomTimetable({
   const slots = useMemo(
     () => buildSlots(openMinutes, closeMinutes, TIMETABLE_GRID_MINUTES),
     [openMinutes, closeMinutes],
+  );
+  // Empty-slot buttons may be coarser than the visual grid so shortcuts never create invalid reservations.
+  const emptySlotStepMinutes = Math.max(TIMETABLE_GRID_MINUTES, reservationSlotMinutes || TIMETABLE_GRID_MINUTES);
+  const emptySlots = useMemo(
+    () => buildSlots(openMinutes, closeMinutes, emptySlotStepMinutes),
+    [openMinutes, closeMinutes, emptySlotStepMinutes],
   );
   const days = useMemo(
     () => dayLabels.map((label, index) => ({ label, date: addDays(weekStart, index) })),
@@ -126,8 +135,9 @@ export function ReservationRoomTimetable({
           </div>
           {days.map((day) => (
             <div key={day.date} className="timetable-room-column" style={{ height: bodyHeight }}>
-              {slots.slice(0, -1).map((slot, index) => {
-                const nextSlot = slots[index + 1];
+              {emptySlots.slice(0, -1).map((slot, index) => {
+                if (slot + minReservationMinutes > closeMinutes) return null;
+                const nextSlot = emptySlots[index + 1];
                 return (
                   <button
                     key={`empty-${slot}`}

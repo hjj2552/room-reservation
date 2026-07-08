@@ -51,6 +51,79 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void reservationDurationSettingsMustMatchUpdatedSlotMinutes() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        long version = currentSettingsVersion(session);
+
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Invalid min duration", 5, 31, 240)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        version = currentSettingsVersion(session);
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Invalid min duration", 10, 35, 240)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        version = currentSettingsVersion(session);
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Valid updated slot", 5, 35, 240)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slotMinutes").value(5))
+            .andExpect(jsonPath("$.minReservationMinutes").value(35));
+    }
+
+    @Test
+    void operatingHoursMustMatchUpdatedSlotMinutes() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        long version = currentSettingsVersion(session);
+
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Invalid open time", 5, 30, 240, "09:31", "18:00")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        version = currentSettingsVersion(session);
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Invalid open time", 10, 30, 240, "09:35", "18:00")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        version = currentSettingsVersion(session);
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Valid updated open time", 5, 30, 240, "09:35", "18:00")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.slotMinutes").value(5))
+            .andExpect(jsonPath("$.openTime").value("09:35:00"));
+    }
+
+    @Test
+    void minimumReservationDurationMustFitOperatingHours() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        long version = currentSettingsVersion(session);
+
+        mockMvc.perform(put("/api/admin/settings")
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(updateBody(version, "Invalid operating window", 30, 120, 240, "09:00", "10:00")))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     void staleSettingsVersionFailsWithConflict() throws Exception {
         MockHttpSession session = loginAsAdmin();
         long version = currentSettingsVersion(session);
@@ -80,6 +153,22 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
     }
 
     private String updateBody(long version, String notice, int slotMinutes) {
+        return updateBody(version, notice, slotMinutes, 30, 240);
+    }
+
+    private String updateBody(long version, String notice, int slotMinutes, int minReservationMinutes, int maxReservationMinutes) {
+        return updateBody(version, notice, slotMinutes, minReservationMinutes, maxReservationMinutes, "09:00", "18:00");
+    }
+
+    private String updateBody(
+        long version,
+        String notice,
+        int slotMinutes,
+        int minReservationMinutes,
+        int maxReservationMinutes,
+        String openTime,
+        String closeTime
+    ) {
         return """
             {
               "organizationName": "Room Reservation",
@@ -88,19 +177,19 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
               "reservationDisabledMessage": "Reservation is currently disabled.",
               "semesterStartDate": "2026-01-01",
               "semesterEndDate": "2026-12-31",
-              "openTime": "09:00",
-              "closeTime": "18:00",
+              "openTime": "%s",
+              "closeTime": "%s",
               "slotMinutes": %d,
               "availableDaysOfWeek": ["MON", "TUE", "WED", "THU", "FRI"],
-              "minReservationMinutes": 30,
-              "maxReservationMinutes": 240,
+              "minReservationMinutes": %d,
+              "maxReservationMinutes": %d,
               "adminContactName": "Admin",
               "adminContactEmail": "admin@example.edu",
               "adminContactPhone": "02-0000-0000",
               "completionMessage": "Done",
               "version": %d
             }
-            """.formatted(notice, slotMinutes, version);
+            """.formatted(notice, openTime, closeTime, slotMinutes, minReservationMinutes, maxReservationMinutes, version);
     }
 
     private MockHttpSession loginAsAdmin() throws Exception {

@@ -158,6 +158,15 @@ function validationErrorMessage(message?: string) {
   if (normalized.includes('invalid day of week')) {
     return '반복 요일 값을 다시 확인해 주세요.';
   }
+  if (normalized.includes('reservation minutes') && normalized.includes('slot minutes')) {
+    return '최소/최대 예약 시간은 예약 단위에 맞아야 합니다.';
+  }
+  if (normalized.includes('open and close time') && normalized.includes('slot minutes')) {
+    return '운영 시작/종료 시간은 예약 단위에 맞아야 합니다.';
+  }
+  if (normalized.includes('fit within operating hours')) {
+    return '최소 예약 시간은 운영 시간 범위 안에서 가능해야 합니다.';
+  }
   if (normalized.includes('parse') || normalized.includes('format')) {
     return '날짜 또는 시간 형식을 다시 확인해 주세요.';
   }
