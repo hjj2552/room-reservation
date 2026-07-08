@@ -4,6 +4,7 @@ out/
 
 backend/.gradle/
 backend/build/
+backend/uploads/
 
 *.log
 *.tmp

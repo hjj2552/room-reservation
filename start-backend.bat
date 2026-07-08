@@ -12,6 +12,7 @@ if errorlevel 1 (
 )
 
 echo Starting Spring Boot backend...
+set SPRING_PROFILES_ACTIVE=local
 pushd backend
 call gradlew.bat bootRun
 set BACKEND_EXIT=%ERRORLEVEL%
