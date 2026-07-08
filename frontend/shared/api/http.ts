@@ -1,4 +1,4 @@
-import type { ApiErrorResponse } from './types';
+import type { ApiErrorCode, ApiErrorResponse } from './types';
 
 export class ApiError extends Error {
   status: number;
@@ -90,6 +90,7 @@ function apiErrorMessage(error: ApiError) {
   if (code) {
     const mapped = messageByCode(code, error);
     if (mapped) return mapped;
+    return `알 수 없는 오류입니다. 관리자에게 에러 코드를 전달해 주세요. (에러 코드: ${code})`;
   }
 
   if (error.status === 400 && error.body?.message) {
@@ -103,29 +104,33 @@ function apiErrorMessage(error: ApiError) {
   return messageByStatus(error.status) || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-function messageByCode(code: string, error: ApiError) {
-  const messages: Record<string, string> = {
-    ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
-    PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
-    TIME_SLOT_CONFLICT: '같은 강의실의 같은 시간대에 이미 예약이 있습니다.',
-    RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
-    VERSION_CONFLICT: '다른 사용자가 먼저 수정했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.',
-    ROOM_DISABLED: '선택한 강의실은 현재 예약할 수 없습니다.',
-    RESERVATION_DISABLED: '현재 예약 접수가 중지되어 있습니다.',
-    POLICY_NOT_CONFIGURED: '운영 설정이 아직 준비되지 않았습니다. 운영 설정을 확인해 주세요.',
-    OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',
-    OUTSIDE_OPERATING_DAYS: '예약 가능한 요일이 아닙니다. 운영 설정의 예약 가능 요일을 확인해 주세요.',
-    OUTSIDE_OPERATING_HOURS: '운영 시간 안에서만 예약할 수 있습니다.',
-    INVALID_DURATION: '예약 시간이 허용된 최소/최대 예약 시간을 벗어났습니다.',
-    INVALID_SLOT_UNIT: '예약 시간이 설정된 예약 단위와 맞지 않습니다.',
-    ROOM_NAME_DUPLICATED: '같은 이름의 강의실이 이미 있습니다.',
-    ROOM_DELETE_BLOCKED: '강의실 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
-    DATA_INTEGRITY_VIOLATION: '입력한 내용이 시스템 제약 조건과 맞지 않습니다. 값을 다시 확인해 주세요.',
-  };
+type CommonApiErrorCode = Exclude<ApiErrorCode, 'PUBLIC_CANCEL_PASSWORD_MISMATCH' | 'VALIDATION_ERROR' | 'NOT_FOUND'>;
 
+const commonErrorMessages: Record<CommonApiErrorCode, string> = {
+  ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
+  DATA_INTEGRITY_VIOLATION: '입력한 내용이 시스템 제약 조건과 맞지 않습니다. 값을 다시 확인해 주세요.',
+  INVALID_DURATION: '예약 시간이 허용된 최소/최대 예약 시간을 벗어났습니다.',
+  INVALID_SLOT_UNIT: '예약 시간이 설정된 예약 단위와 맞지 않습니다.',
+  OUTSIDE_OPERATING_DAYS: '예약 가능한 요일이 아닙니다. 운영 설정의 예약 가능 요일을 확인해 주세요.',
+  OUTSIDE_OPERATING_HOURS: '운영 시간 안에서만 예약할 수 있습니다.',
+  OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',
+  POLICY_NOT_CONFIGURED: '운영 설정이 아직 준비되지 않았습니다. 운영 설정을 확인해 주세요.',
+  PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
+  RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
+  RESERVATION_DISABLED: '현재 예약 접수가 중지되어 있습니다.',
+  ROOM_DELETE_BLOCKED: '강의실 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
+  ROOM_DISABLED: '선택한 강의실은 현재 예약할 수 없습니다.',
+  ROOM_NAME_DUPLICATED: '같은 이름의 강의실이 이미 있습니다.',
+  SYSTEM_ROOM_PROTECTED: '시스템 보존용 강의실은 수정하거나 삭제할 수 없습니다.',
+  TAG_NAME_DUPLICATED: '같은 이름의 태그가 이미 있습니다.',
+  TIME_SLOT_CONFLICT: '같은 강의실의 같은 시간대에 이미 예약이 있습니다.',
+  VERSION_CONFLICT: '다른 사용자가 먼저 수정했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.',
+};
+
+function messageByCode(code: string, error: ApiError) {
   if (code === 'VALIDATION_ERROR') return validationErrorMessage(error.body?.message);
   if (code === 'NOT_FOUND') return notFoundMessage(error.body?.message);
-  return messages[code];
+  return commonErrorMessages[code as CommonApiErrorCode];
 }
 
 function messageByStatus(status: number) {

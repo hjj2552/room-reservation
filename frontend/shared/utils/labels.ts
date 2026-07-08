@@ -30,10 +30,8 @@ export const dayLabels: Record<string, string> = {
 
 export function historyActionLabel(action: string) {
   const labels: Record<string, string> = {
-    CREATED: '신청',
+    CREATED: '공개 신청',
     CREATED_BY_ADMIN: '관리자 신청',
-    CREATED_BY_PUBLIC: '공개 신청',
-    RECURRENCE_CREATED: '반복 예약 등록',
     RECURRENCE_GENERATED: '반복 예약 등록',
     UPDATED: '수정',
     APPROVED: '승인 처리',
