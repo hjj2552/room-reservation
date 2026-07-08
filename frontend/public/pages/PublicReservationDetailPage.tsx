@@ -11,6 +11,7 @@ import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMaskin
 
 function publicErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
+    // Keep this form-specific so the cancel password error appears beside the cancel action.
     if (error.body?.code === 'PUBLIC_CANCEL_PASSWORD_MISMATCH') {
       return '취소 비밀번호가 일치하지 않습니다. 다시 입력해 주세요.';
     }

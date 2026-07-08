@@ -2,6 +2,28 @@ export type ReservationStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
 export type ReservationSource = 'PUBLIC_FORM' | 'ADMIN_GRID' | 'ADMIN_MANUAL' | 'RECURRING_GENERATED';
 export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS';
 export type RecurrenceStatus = 'ACTIVE' | 'CANCELLED';
+export type ApiErrorCode =
+  | 'ADMIN_UNAUTHORIZED'
+  | 'DATA_INTEGRITY_VIOLATION'
+  | 'INVALID_DURATION'
+  | 'INVALID_SLOT_UNIT'
+  | 'NOT_FOUND'
+  | 'OUTSIDE_OPERATING_DAYS'
+  | 'OUTSIDE_OPERATING_HOURS'
+  | 'OUTSIDE_SEMESTER_PERIOD'
+  | 'POLICY_NOT_CONFIGURED'
+  | 'PUBLIC_CANCEL_PASSWORD_MISMATCH'
+  | 'PUBLIC_RESERVATION_PASSWORD_MISMATCH'
+  | 'RECURRENCE_CONFLICT'
+  | 'RESERVATION_DISABLED'
+  | 'ROOM_DELETE_BLOCKED'
+  | 'ROOM_DISABLED'
+  | 'ROOM_NAME_DUPLICATED'
+  | 'SYSTEM_ROOM_PROTECTED'
+  | 'TAG_NAME_DUPLICATED'
+  | 'TIME_SLOT_CONFLICT'
+  | 'VALIDATION_ERROR'
+  | 'VERSION_CONFLICT';
 
 export interface PagedResponse<T> {
   items: T[];
@@ -12,7 +34,7 @@ export interface PagedResponse<T> {
 }
 
 export interface ApiErrorResponse {
-  code?: string;
+  code?: ApiErrorCode | (string & {});
   message?: string;
   details?: Record<string, unknown>;
   fieldErrors?: Array<{ field: string; message: string }>;
