@@ -6,6 +6,7 @@ import { statusLabels } from '../utils/labels';
 import { StatusBadge } from './StatusBadge';
 
 export const TIMETABLE_MINUTE_HEIGHT = 1.6;
+// Reservation slotMinutes controls valid time alignment; timetable grids stay 30-minute for readability.
 export const TIMETABLE_GRID_MINUTES = 30;
 export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
 export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
@@ -39,7 +40,8 @@ interface ReservationDateTimetableProps {
   selectedDate: string;
   openTime?: string;
   closeTime?: string;
-  slotMinutes?: number;
+  reservationSlotMinutes?: number;
+  minReservationMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
   onReservationClick?: (reservation: TimetableReservation) => void;
@@ -110,6 +112,8 @@ export function ReservationDateTimetable({
   selectedDate,
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
+  reservationSlotMinutes = TIMETABLE_GRID_MINUTES,
+  minReservationMinutes = TIMETABLE_GRID_MINUTES,
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
@@ -121,6 +125,12 @@ export function ReservationDateTimetable({
   const slots = useMemo(
     () => buildSlots(openMinutes, closeMinutes, TIMETABLE_GRID_MINUTES),
     [openMinutes, closeMinutes],
+  );
+  // Empty-slot buttons may be coarser than the visual grid so shortcuts never create invalid reservations.
+  const emptySlotStepMinutes = Math.max(TIMETABLE_GRID_MINUTES, reservationSlotMinutes || TIMETABLE_GRID_MINUTES);
+  const emptySlots = useMemo(
+    () => buildSlots(openMinutes, closeMinutes, emptySlotStepMinutes),
+    [openMinutes, closeMinutes, emptySlotStepMinutes],
   );
   const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const roomIds = useMemo(() => new Set(rooms.map((room) => room.id)), [rooms]);
@@ -172,8 +182,9 @@ export function ReservationDateTimetable({
           </div>
           {rooms.map((room) => (
             <div key={room.id} className="timetable-room-column" style={{ height: bodyHeight }}>
-              {slots.slice(0, -1).map((slot, index) => {
-                const nextSlot = slots[index + 1];
+              {emptySlots.slice(0, -1).map((slot, index) => {
+                if (slot + minReservationMinutes > closeMinutes) return null;
+                const nextSlot = emptySlots[index + 1];
                 return (
                   <button
                     key={`empty-${slot}`}

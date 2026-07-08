@@ -17,6 +17,7 @@ import { useCreateReservation, useReservation, useReservations } from '../../sha
 import { useRooms } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { fromDateTimeLocal, toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
+import { defaultReservationDurationMinutes } from '../../shared/utils/reservationTime';
 
 const timetablePageSize = 500;
 const timetableViewModes = ['date', 'room'] as const;
@@ -51,25 +52,35 @@ function timeValueToMinutes(value?: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-function slotToSelection(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+function slotToSelection(
+  slot: { date: string; startMinutes: number; endMinutes: number; roomId: string },
+  minReservationMinutes = 30,
+) {
+  const endMinutes = slot.startMinutes + defaultReservationDurationMinutes(minReservationMinutes);
+
   return {
     source: 'slot' as const,
     roomId: slot.roomId,
     date: slot.date,
     startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
-    endAt: `${slot.date}T${minutesToTimeInput(slot.endMinutes)}`,
+    endAt: `${slot.date}T${minutesToTimeInput(endMinutes)}`,
   };
 }
 
-function newRequestSelection(slotMinutes = 30, openTime?: string, closeTime?: string): TimetableSlotSelection {
+function newRequestSelection(
+  openTime?: string,
+  closeTime?: string,
+  minReservationMinutes = 30,
+): TimetableSlotSelection {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   const date = local.toISOString().slice(0, 10);
-  const step = Math.max(slotMinutes || 30, 30);
+  // The default quick-create duration follows the configurable minimum reservation time.
+  const durationMinutes = defaultReservationDurationMinutes(minReservationMinutes);
   const openMinutes = timeValueToMinutes(openTime) ?? 0;
   const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
   const startMinutes = openMinutes;
-  const endMinutes = Math.min(startMinutes + step, closeMinutes);
+  const endMinutes = Math.min(startMinutes + durationMinutes, closeMinutes);
 
   return {
     source: 'toolbar',
@@ -196,7 +207,11 @@ export function TimetablePage() {
       return;
     }
 
-    setQuickAddSelection(newRequestSelection(settings.data.slotMinutes, settings.data.openTime, settings.data.closeTime));
+    setQuickAddSelection(newRequestSelection(
+      settings.data.openTime,
+      settings.data.closeTime,
+      settings.data.minReservationMinutes,
+    ));
     duplicateQuickAddAppliedRef.current = duplicateReservationId;
   }, [duplicateReservation.data, duplicateReservationId, settings.data]);
 
@@ -247,12 +262,19 @@ export function TimetablePage() {
 
   function handleEmptySlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     clearDuplicateReservationParam();
-    setQuickAddSelection(slotToSelection(slot));
+    setQuickAddSelection(slotToSelection(
+      slot,
+      settings.data?.minReservationMinutes,
+    ));
   }
 
   function handleNewRequestClick() {
     clearDuplicateReservationParam();
-    setQuickAddSelection(newRequestSelection(settings.data?.slotMinutes, settings.data?.openTime, settings.data?.closeTime));
+    setQuickAddSelection(newRequestSelection(
+      settings.data?.openTime,
+      settings.data?.closeTime,
+      settings.data?.minReservationMinutes,
+    ));
   }
 
   function handleQuickAddCreated(reservationId: string) {
@@ -357,7 +379,8 @@ export function TimetablePage() {
               selectedDate={selectedDate}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
-              slotMinutes={settings.data.slotMinutes}
+              reservationSlotMinutes={settings.data.slotMinutes}
+              minReservationMinutes={settings.data.minReservationMinutes}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
             />
@@ -436,7 +459,8 @@ export function TimetablePage() {
               weekStart={selectedWeekStart}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
-              slotMinutes={settings.data.slotMinutes}
+              reservationSlotMinutes={settings.data.slotMinutes}
+              minReservationMinutes={settings.data.minReservationMinutes}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
             />

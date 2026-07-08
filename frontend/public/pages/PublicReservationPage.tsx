@@ -23,6 +23,7 @@ import {
 import { fromDateTimeLocal } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskName } from '../../shared/utils/privacyMasking';
+import { defaultReservationDurationMinutes, reservationSlotUnitMinutes } from '../../shared/utils/reservationTime';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
@@ -65,28 +66,40 @@ function timeValueToMinutes(value?: string) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-function slotToSelection(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+function slotToSelection(
+  slot: { date: string; startMinutes: number; endMinutes: number; roomId: string },
+  minReservationMinutes = 30,
+) {
+  const endMinutes = slot.startMinutes + defaultReservationDurationMinutes(minReservationMinutes);
+
   return {
     source: 'slot' as const,
     roomId: slot.roomId,
     date: slot.date,
     startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
-    endAt: `${slot.date}T${minutesToTimeInput(slot.endMinutes)}`,
+    endAt: `${slot.date}T${minutesToTimeInput(endMinutes)}`,
   };
 }
 
-function newRequestSelection(slotMinutes = 30, openTime?: string, closeTime?: string): TimetableSlotSelection {
+function newRequestSelection(
+  slotMinutes = 30,
+  openTime?: string,
+  closeTime?: string,
+  minReservationMinutes = 30,
+): TimetableSlotSelection {
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
   const date = local.toISOString().slice(0, 10);
   const currentMinutes = local.getHours() * 60 + local.getMinutes();
-  const step = Math.max(slotMinutes || 30, 30);
+  const unitMinutes = reservationSlotUnitMinutes(slotMinutes);
+  // The default quick-create duration follows the configurable minimum reservation time.
+  const durationMinutes = defaultReservationDurationMinutes(minReservationMinutes);
   const openMinutes = timeValueToMinutes(openTime) ?? 0;
   const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
-  const latestStartMinutes = Math.max(openMinutes, closeMinutes - step);
-  const roundedStartMinutes = Math.ceil(currentMinutes / step) * step;
+  const latestStartMinutes = Math.max(openMinutes, closeMinutes - durationMinutes);
+  const roundedStartMinutes = Math.ceil(currentMinutes / unitMinutes) * unitMinutes;
   const startMinutes = Math.min(Math.max(roundedStartMinutes, openMinutes), latestStartMinutes);
-  const endMinutes = Math.min(startMinutes + step, closeMinutes);
+  const endMinutes = Math.min(startMinutes + durationMinutes, closeMinutes);
 
   return {
     source: 'toolbar',
@@ -176,12 +189,20 @@ export function PublicReservationPage() {
 
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     if (isUnavailable) return;
-    setQuickSelection(slotToSelection(slot));
+    setQuickSelection(slotToSelection(
+      slot,
+      settings.data?.minReservationMinutes,
+    ));
   }
 
   function handleNewRequestClick() {
     if (isUnavailable) return;
-    setQuickSelection(newRequestSelection(settings.data?.slotMinutes, settings.data?.openTime, settings.data?.closeTime));
+    setQuickSelection(newRequestSelection(
+      settings.data?.slotMinutes,
+      settings.data?.openTime,
+      settings.data?.closeTime,
+      settings.data?.minReservationMinutes,
+    ));
   }
 
   function handleReservationClick(reservation: TimetableReservation) {
@@ -304,7 +325,8 @@ export function PublicReservationPage() {
                 selectedDate={selectedDate}
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
-                slotMinutes={settings.data.slotMinutes}
+                reservationSlotMinutes={settings.data.slotMinutes}
+                minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
@@ -366,7 +388,8 @@ export function PublicReservationPage() {
                 weekStart={selectedWeekStart}
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
-                slotMinutes={settings.data.slotMinutes}
+                reservationSlotMinutes={settings.data.slotMinutes}
+                minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}

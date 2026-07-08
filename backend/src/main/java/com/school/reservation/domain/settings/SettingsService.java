@@ -123,8 +123,19 @@ public class SettingsService {
         if (!ALLOWED_SLOT_MINUTES.contains(request.slotMinutes())) {
             throw new IllegalArgumentException("Slot minutes must be one of 5, 10, 15, 30, 60.");
         }
+        if (!isAlignedToSlot(request.openTime().getMinute(), request.slotMinutes())
+            || !isAlignedToSlot(request.closeTime().getMinute(), request.slotMinutes())) {
+            throw new IllegalArgumentException("Open and close time must match slot minutes.");
+        }
         if (request.maxReservationMinutes() < request.minReservationMinutes()) {
             throw new IllegalArgumentException("Max reservation minutes must be greater than or equal to min.");
+        }
+        if (!isAlignedToSlot(request.minReservationMinutes(), request.slotMinutes())
+            || !isAlignedToSlot(request.maxReservationMinutes(), request.slotMinutes())) {
+            throw new IllegalArgumentException("Min and max reservation minutes must match slot minutes.");
+        }
+        if (Duration.between(request.openTime(), request.closeTime()).toMinutes() < request.minReservationMinutes()) {
+            throw new IllegalArgumentException("Min reservation minutes must fit within operating hours.");
         }
         boolean hasInvalidDay = request.availableDaysOfWeek().stream()
             .map(String::trim)
@@ -132,5 +143,9 @@ public class SettingsService {
         if (hasInvalidDay) {
             throw new IllegalArgumentException("Available days must use MON,TUE,WED,THU,FRI,SAT,SUN.");
         }
+    }
+
+    private boolean isAlignedToSlot(int minutes, int slotMinutes) {
+        return minutes % slotMinutes == 0;
     }
 }

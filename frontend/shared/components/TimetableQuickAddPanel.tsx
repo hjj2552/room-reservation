@@ -300,6 +300,7 @@ export function ReservationRequestPanel({
             {fieldError('status')}
           </label>
         )}
+        {/* Keep datetime inputs free-form for keyboard entry; backend policy enforces slot alignment. */}
         <label>
           시작
           <input
