@@ -8,6 +8,14 @@ spring:
   jpa:
     show-sql: false
 
+# Session cookie Secure/HttpOnly are defined in application.yml.
+# Decide SameSite after the dev deployment domain structure is finalized.
+# server:
+#   servlet:
+#     session:
+#       cookie:
+#         same-site: none
+
 app:
   admin:
     username: ${ADMIN_USERNAME}

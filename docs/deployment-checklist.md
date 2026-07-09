@@ -25,6 +25,10 @@ repository.
 | `LOGO_CLEANUP_ZONE` | `Asia/Seoul` | Time zone for the logo cleanup schedule. |
 | `E2E_CLEANUP_ENABLED` | `false` for local/dev | Enables guarded E2E cleanup endpoints. Never enable this in production. |
 
+Session cookie `Secure` and `HttpOnly` are fixed in `application.yml`. Decide
+`server.servlet.session.cookie.same-site` in the active profile after the
+frontend/backend domain structure is finalized.
+
 ## Handover Checks
 
 - Confirm who owns access to the deployment platform, database, DNS, and mail account.

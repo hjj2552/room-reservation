@@ -15,12 +15,24 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
 };
 
+const csrfCookieName = 'XSRF-TOKEN';
+const csrfHeaderName = 'X-XSRF-TOKEN';
+const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
+  const method = (options.method || 'GET').toUpperCase();
 
   if (options.body !== undefined && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
+  }
+
+  if (!safeMethods.has(method) && !headers.has(csrfHeaderName)) {
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) {
+      headers.set(csrfHeaderName, csrfToken);
+    }
   }
 
   const response = await fetch(path, {
@@ -54,6 +66,40 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return response.text() as Promise<T>;
+}
+
+async function getCsrfToken() {
+  const existingToken = readCookie(csrfCookieName);
+  if (existingToken) {
+    return existingToken;
+  }
+
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+
+  const response = await fetch('/api/auth/csrf', {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    return undefined;
+  }
+  const body = await response.json().catch(() => undefined) as { token?: string } | undefined;
+  return body?.token || readCookie(csrfCookieName);
+}
+
+function readCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+  const prefix = `${name}=`;
+  const item = document.cookie
+    .split('; ')
+    .find((value) => value.startsWith(prefix));
+  if (!item) {
+    return undefined;
+  }
+  return decodeURIComponent(item.slice(prefix.length));
 }
 
 export function buildQuery(params: Record<string, string | number | boolean | undefined | null>) {

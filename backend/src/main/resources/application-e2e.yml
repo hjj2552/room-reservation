@@ -10,6 +10,14 @@ spring:
   jpa:
     show-sql: false
 
+# Session cookie Secure/HttpOnly are defined in application.yml.
+# SameSite is profile-owned and intentionally inactive in E2E unless needed.
+# server:
+#   servlet:
+#     session:
+#       cookie:
+#         same-site: lax
+
 app:
   admin:
     username: ${ADMIN_USERNAME:admin}

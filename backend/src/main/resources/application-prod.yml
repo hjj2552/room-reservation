@@ -13,9 +13,14 @@ spring:
 
 server:
   forward-headers-strategy: framework
+  # Session cookie Secure/HttpOnly are defined in application.yml.
+  # Decide SameSite after the production frontend/backend domains are finalized.
+  # servlet:
+  #   session:
+  #     cookie:
+  #       same-site: none
 
 app:
   admin:
     username: ${ADMIN_USERNAME}
     password: ${ADMIN_PASSWORD}
-

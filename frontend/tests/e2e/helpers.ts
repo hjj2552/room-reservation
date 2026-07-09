@@ -71,6 +71,7 @@ export async function loginByUi(page: Page) {
 
 export async function loginByApi(request: APIRequestContext) {
   const response = await request.post('/api/auth/admin/login', {
+    headers: await csrfHeaders(request),
     data: adminCredentials,
   });
   expect(response.ok()).toBeTruthy();
@@ -78,6 +79,7 @@ export async function loginByApi(request: APIRequestContext) {
 
 export async function createRoomByApi(request: APIRequestContext, name: string) {
   const response = await request.post('/api/admin/rooms', {
+    headers: await csrfHeaders(request),
     data: {
       name,
       location: `${E2E_TEST_DATA_PREFIX}test-building`,
@@ -91,12 +93,15 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
 }
 
 export async function deleteRoomByApi(request: APIRequestContext, roomId: string) {
-  const response = await request.delete(`/api/admin/rooms/${roomId}`);
+  const response = await request.delete(`/api/admin/rooms/${roomId}`, {
+    headers: await csrfHeaders(request),
+  });
   expect([204, 404, 409]).toContain(response.status());
 }
 
 export async function createTagByApi(request: APIRequestContext, name: string, color = '#2563eb') {
   const response = await request.post('/api/admin/tags', {
+    headers: await csrfHeaders(request),
     data: {
       name,
       color,
@@ -107,7 +112,9 @@ export async function createTagByApi(request: APIRequestContext, name: string, c
 }
 
 export async function deleteTagByApi(request: APIRequestContext, tagId: string) {
-  const response = await request.delete(`/api/admin/tags/${tagId}`);
+  const response = await request.delete(`/api/admin/tags/${tagId}`, {
+    headers: await csrfHeaders(request),
+  });
   expect([204, 404]).toContain(response.status());
 }
 
@@ -119,6 +126,7 @@ export async function createReservationByApi(
 ) {
   const startAt = options.startAt || nextWeekdayAtOffset(12, 0);
   const response = await request.post('/api/admin/reservations', {
+    headers: await csrfHeaders(request),
     data: {
       roomId,
       applicantName: `${E2E_TEST_DATA_PREFIX}admin`,
@@ -154,6 +162,7 @@ export async function createPublicReservationByApi(
   const applicantPhone = options.applicantPhone || '010-3000-4000';
   const cancelPassword = options.cancelPassword || 'e2e-public-password';
   const response = await request.post('/api/public/reservations', {
+    headers: await csrfHeaders(request),
     data: {
       roomId,
       applicantName,
@@ -179,6 +188,7 @@ export async function createPublicReservationByApi(
 
 export async function approveReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
   const response = await request.post(`/api/admin/reservations/${reservationId}/approve`, {
+    headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
   expect(response.ok()).toBeTruthy();
@@ -186,6 +196,7 @@ export async function approveReservationByApi(request: APIRequestContext, reserv
 
 export async function cancelReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
   const response = await request.post(`/api/admin/reservations/${reservationId}/cancel`, {
+    headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
   expect([200, 404, 409]).toContain(response.status());
@@ -193,6 +204,7 @@ export async function cancelReservationByApi(request: APIRequestContext, reserva
 
 export async function deleteReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
   const response = await request.delete(`/api/admin/reservations/${reservationId}`, {
+    headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
   expect([204, 404]).toContain(response.status());
@@ -200,6 +212,7 @@ export async function deleteReservationByApi(request: APIRequestContext, reserva
 
 export async function cancelRecurrenceByApi(request: APIRequestContext, recurrenceId: string, memo?: string) {
   const response = await request.post(`/api/admin/recurrences/${recurrenceId}/cancel`, {
+    headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
   expect([204, 404, 409]).toContain(response.status());
@@ -221,6 +234,7 @@ export async function createRecurrenceByApi(
 ) {
   const recurrenceTime = nextWeekdayRecurrenceInputs();
   const response = await request.post('/api/admin/recurrences', {
+    headers: await csrfHeaders(request),
     data: {
       roomId,
       applicantName: `${E2E_TEST_DATA_PREFIX}recurring-admin`,
@@ -241,7 +255,9 @@ export async function createRecurrenceByApi(
 }
 
 export async function cleanupE2eDataByApi(request: APIRequestContext) {
-  const response = await request.delete(`/api/admin/test-data/e2e?prefix=${encodeURIComponent(E2E_TEST_DATA_PREFIX)}`);
+  const response = await request.delete(`/api/admin/test-data/e2e?prefix=${encodeURIComponent(E2E_TEST_DATA_PREFIX)}`, {
+    headers: await csrfHeaders(request),
+  });
   expect([200, 404]).toContain(response.status());
   return response.status() === 200 ? response.json() : null;
 }
@@ -254,10 +270,21 @@ export async function getSettingsByApi(request: APIRequestContext) {
 
 export async function updateSettingsByApi(request: APIRequestContext, settings: E2eSettings) {
   const response = await request.put('/api/admin/settings', {
+    headers: await csrfHeaders(request),
     data: settings,
   });
   expect(response.ok()).toBeTruthy();
   return response.json() as Promise<E2eSettings>;
+}
+
+export async function csrfHeaders(request: APIRequestContext) {
+  const response = await request.get('/api/auth/csrf');
+  expect(response.ok()).toBeTruthy();
+  const csrf = await response.json() as { headerName?: string; token?: string };
+  const token = csrf.token || '';
+  return {
+    [csrf.headerName || 'X-XSRF-TOKEN']: token,
+  };
 }
 
 export function uniqueE2eName(label: string) {

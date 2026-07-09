@@ -17,6 +17,14 @@ spring:
         format_sql: true
     show-sql: true
 
+# Session cookie Secure/HttpOnly are defined in application.yml.
+# Decide SameSite after the local access pattern is finalized.
+# server:
+#   servlet:
+#     session:
+#       cookie:
+#         same-site: lax
+
 app:
   admin:
     username: ${ADMIN_USERNAME}
