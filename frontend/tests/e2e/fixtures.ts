@@ -5,6 +5,7 @@ import {
   createRecurrenceByApi,
   createRoomByApi,
   createTagByApi,
+  csrfHeaders,
   deleteReservationByApi,
   deleteTagByApi,
   uniqueE2eName,
@@ -156,7 +157,10 @@ async function deleteReservationIgnoringFailures(request: APIRequestContext, res
 
 async function postIgnoringFailures(request: APIRequestContext, url: string, data: unknown) {
   try {
-    await request.post(url, { data });
+    await request.post(url, {
+      headers: await csrfHeaders(request),
+      data,
+    });
   } catch {
     // Prefix cleanup runs next and handles any resources that are still present.
   }
@@ -172,7 +176,9 @@ async function deleteTagIgnoringFailures(request: APIRequestContext, tagId: stri
 
 async function deleteIgnoringFailures(request: APIRequestContext, url: string) {
   try {
-    await request.delete(url);
+    await request.delete(url, {
+      headers: await csrfHeaders(request),
+    });
   } catch {
     // Prefix cleanup runs next and handles any resources that are still present.
   }

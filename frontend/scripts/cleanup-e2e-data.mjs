@@ -12,7 +12,11 @@ export async function cleanupE2eData({
   try {
     const apiBaseUrl = resolveApiBaseUrl();
     const prefix = process.env.E2E_TEST_DATA_PREFIX || defaultPrefix;
-    const cookie = await login(apiBaseUrl);
+    let csrf = await getCsrf(apiBaseUrl);
+    let cookie = csrf.cookie;
+    cookie = mergeCookieHeaders(cookie, await login(apiBaseUrl, cookie, csrf.token));
+    csrf = await getCsrf(apiBaseUrl, cookie);
+    cookie = mergeCookieHeaders(cookie, csrf.cookie);
     const params = new URLSearchParams({
       prefix,
       includeLegacy: String(includeLegacy),
@@ -23,6 +27,7 @@ export async function cleanupE2eData({
       method: preview ? 'GET' : 'DELETE',
       headers: {
         Cookie: cookie,
+        ...(preview ? {} : csrfHeaderValues(csrf)),
       },
     });
 
@@ -78,11 +83,30 @@ function resolveApiBaseUrl() {
   return `${backendUrl.protocol}//${backendUrl.host}`;
 }
 
-async function login(apiBaseUrl) {
+async function getCsrf(apiBaseUrl, cookie = '') {
+  const response = await fetch(`${apiBaseUrl}/api/auth/csrf`, {
+    headers: cookie ? { Cookie: cookie } : undefined,
+  });
+
+  if (!response.ok) {
+    throw new Error(`CSRF token request failed with ${response.status}: ${await response.text()}`);
+  }
+
+  const body = await response.json();
+  return {
+    headerName: body.headerName || 'X-XSRF-TOKEN',
+    token: body.token,
+    cookie: extractCookieHeader(response.headers),
+  };
+}
+
+async function login(apiBaseUrl, cookie, csrfToken) {
   const response = await fetch(`${apiBaseUrl}/api/auth/admin/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Cookie: cookie,
+      ...csrfHeaderValues({ headerName: 'X-XSRF-TOKEN', token: csrfToken }),
     },
     body: JSON.stringify({
       username: process.env.ADMIN_USERNAME || 'admin',
@@ -94,11 +118,33 @@ async function login(apiBaseUrl) {
     throw new Error(`Admin login for E2E cleanup failed with ${response.status}: ${await response.text()}`);
   }
 
-  const cookie = extractCookieHeader(response.headers);
-  if (!cookie) {
+  const loginCookie = extractCookieHeader(response.headers);
+  if (!loginCookie) {
     throw new Error('Admin login for E2E cleanup did not return a session cookie.');
   }
-  return cookie;
+  return loginCookie;
+}
+
+function mergeCookieHeaders(...headers) {
+  const cookies = new Map();
+  for (const header of headers) {
+    for (const item of (header || '').split(';')) {
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      const separatorIndex = trimmed.indexOf('=');
+      if (separatorIndex <= 0) continue;
+      cookies.set(trimmed.slice(0, separatorIndex), trimmed.slice(separatorIndex + 1));
+    }
+  }
+  return Array.from(cookies.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join('; ');
+}
+
+function csrfHeaderValues(csrf) {
+  return {
+    [csrf.headerName || 'X-XSRF-TOKEN']: csrf.token,
+  };
 }
 
 function extractCookieHeader(headers) {
