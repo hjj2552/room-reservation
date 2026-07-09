@@ -162,6 +162,7 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',
   POLICY_NOT_CONFIGURED: '운영 설정이 아직 준비되지 않았습니다. 운영 설정을 확인해 주세요.',
   PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
+  RATE_LIMIT_EXCEEDED: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
   RESERVATION_DISABLED: '현재 예약 접수가 중지되어 있습니다.',
   ROOM_DELETE_BLOCKED: '강의실 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',

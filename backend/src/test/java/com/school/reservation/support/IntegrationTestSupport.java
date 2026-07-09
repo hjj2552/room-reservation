@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpSession;
@@ -33,8 +34,12 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected MockMvc mockMvc;
 
+    @Autowired
+    ApplicationContext applicationContext;
+
     @BeforeEach
     void resetDatabaseState() {
+        clearRateLimitBuckets();
         jdbcTemplate.update("delete from reservation_histories");
         jdbcTemplate.update("delete from reservations");
         jdbcTemplate.update("delete from reservation_recurrences");
@@ -135,5 +140,14 @@ public abstract class IntegrationTestSupport {
                     }
                     """.formatted(roomId, applicantName, applicantEmail, purpose, startAt, endAt)))
             .andExpect(status().isCreated());
+    }
+
+    private void clearRateLimitBuckets() {
+        Object store = applicationContext.getBean("inMemoryRateLimitBucketStore");
+        try {
+            store.getClass().getMethod("clear").invoke(store);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Failed to clear rate limit buckets for integration test.", exception);
+        }
     }
 }

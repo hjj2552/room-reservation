@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
 
 export interface E2eRoom {
   id: string;
@@ -74,7 +74,7 @@ export async function loginByApi(request: APIRequestContext) {
     headers: await csrfHeaders(request),
     data: adminCredentials,
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'admin login');
 }
 
 export async function createRoomByApi(request: APIRequestContext, name: string) {
@@ -88,7 +88,7 @@ export async function createRoomByApi(request: APIRequestContext, name: string) 
       enabled: true,
     },
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'create room');
   return response.json() as Promise<E2eRoom>;
 }
 
@@ -107,7 +107,7 @@ export async function createTagByApi(request: APIRequestContext, name: string, c
       color,
     },
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'create tag');
   return response.json() as Promise<E2eTag>;
 }
 
@@ -139,7 +139,7 @@ export async function createReservationByApi(
       memo: options.memo || `${E2E_TEST_DATA_PREFIX}audit-seed`,
     },
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'create admin reservation');
   return response.json() as Promise<E2eReservation>;
 }
 
@@ -174,7 +174,7 @@ export async function createPublicReservationByApi(
       cancelPassword,
     },
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'create public reservation');
   const reservation = await response.json() as E2eReservation;
   return {
     ...reservation,
@@ -191,7 +191,7 @@ export async function approveReservationByApi(request: APIRequestContext, reserv
     headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'approve reservation');
 }
 
 export async function cancelReservationByApi(request: APIRequestContext, reservationId: string, memo?: string) {
@@ -250,7 +250,7 @@ export async function createRecurrenceByApi(
       tagId: options.tagId ?? null,
     },
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'create recurrence');
   return response.json() as Promise<E2eRecurrence>;
 }
 
@@ -264,7 +264,7 @@ export async function cleanupE2eDataByApi(request: APIRequestContext) {
 
 export async function getSettingsByApi(request: APIRequestContext) {
   const response = await request.get('/api/admin/settings');
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'get settings');
   return response.json() as Promise<E2eSettings>;
 }
 
@@ -273,18 +273,26 @@ export async function updateSettingsByApi(request: APIRequestContext, settings: 
     headers: await csrfHeaders(request),
     data: settings,
   });
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'update settings');
   return response.json() as Promise<E2eSettings>;
 }
 
 export async function csrfHeaders(request: APIRequestContext) {
   const response = await request.get('/api/auth/csrf');
-  expect(response.ok()).toBeTruthy();
+  await expectApiOk(response, 'get csrf token');
   const csrf = await response.json() as { headerName?: string; token?: string };
   const token = csrf.token || '';
   return {
     [csrf.headerName || 'X-XSRF-TOKEN']: token,
   };
+}
+
+async function expectApiOk(response: APIResponse, label: string) {
+  if (response.ok()) {
+    return;
+  }
+  const body = await response.text().catch(() => '<unreadable body>');
+  throw new Error(`${label} failed with ${response.status()} ${response.statusText()}: ${body}`);
 }
 
 export function uniqueE2eName(label: string) {
