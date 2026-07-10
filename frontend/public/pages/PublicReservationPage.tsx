@@ -234,7 +234,7 @@ export function PublicReservationPage() {
     <div className="public-shell" aria-labelledby="timetable-title">
       <TimetablePageHeader
         eyebrow="일반 사용자"
-        helperText="신청은 승인 대기 상태로 저장되며 운영자 승인 후 예약됩니다."
+        helperText="신청은 승인 대기 상태로 저장되며 관리자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
         buttonDisabled={Boolean(isUnavailable)}
         onNewRequest={handleNewRequestClick}

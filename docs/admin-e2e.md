@@ -9,7 +9,7 @@ This document describes the Playwright E2E profile for the frontend.
 - Audit query persistence.
 - Admin reservation registration and detail/list reflection.
 - Admin reservation edit and detail/list reflection.
-- Public reservation timetable request, detail, and cancel-password cancellation.
+- Public reservation timetable request, detail, and reservation-password cancellation.
 - Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
 - Settings smoke: settings load, save, and success feedback.
 

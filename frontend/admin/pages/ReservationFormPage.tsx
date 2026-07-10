@@ -101,7 +101,7 @@ export function ReservationFormPage() {
           <p className="eyebrow">관리자 메뉴</p>
           <h1 id="reservation-form-title">예약 수정</h1>
           <p className="muted">
-            운영자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.
+            관리자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.
           </p>
         </div>
       </div>

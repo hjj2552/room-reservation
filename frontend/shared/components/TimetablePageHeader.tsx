@@ -11,7 +11,7 @@ interface TimetablePageHeaderProps {
 export const timetableCopy = {
   title: '시간표',
   description: '빈 슬롯을 누르면 해당 날짜, 시간, 강의실로 예약 신청 패널이 열립니다.',
-  adminHelper: '운영자는 신청을 바로 승인 상태로 저장할 수 있습니다.',
+  adminHelper: '관리자는 신청을 바로 승인 상태로 저장할 수 있습니다.',
   dateTitle: '날짜별 보기',
   dateDescription: '선택한 날짜의 강의실 예약 현황을 시간순으로 보여줍니다.',
   roomTitle: '강의실별 보기',

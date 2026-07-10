@@ -1179,6 +1179,14 @@ button:disabled {
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.24);
 }
 
+.reservation-password-modal {
+  width: min(440px, 100%);
+}
+
+.reservation-password-modal > .muted {
+  margin: 0;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;

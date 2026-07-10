@@ -187,7 +187,7 @@ export function ReservationRequestPanel({
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
     if (!isAdmin && (!values.cancelPassword || values.cancelPassword.length < 4)) {
-      nextErrors.cancelPassword = '취소 비밀번호를 4자 이상 입력해 주세요.';
+      nextErrors.cancelPassword = '예약 비밀번호를 4자 이상 입력해 주세요.';
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -368,7 +368,7 @@ export function ReservationRequestPanel({
           </label>
         ) : (
           <label>
-            취소 비밀번호
+            예약 비밀번호
             <input
               type="password"
               data-testid="public-request-cancel-password-input"

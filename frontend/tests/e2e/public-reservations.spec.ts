@@ -131,12 +131,15 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(page.getByRole('heading', { name: '감사 이력' })).toHaveCount(0);
 
     await page.getByRole('button', { name: '예약 신청 취소' }).click();
+    await expect(page.getByRole('dialog', { name: '예약 비밀번호 확인' })).toBeVisible();
     await page.getByTestId('public-cancel-password-input').fill('wrong-password');
     await page.getByTestId('public-cancel-submit-button').click();
-    await expect(page.getByRole('alert')).toContainText('취소 비밀번호가 일치하지 않습니다');
+    await expect(page.getByRole('alert')).toContainText('예약 비밀번호가 일치하지 않습니다');
 
     await page.getByTestId('public-cancel-password-input').fill(cancelPassword);
     await page.getByTestId('public-cancel-submit-button').click();
+    await expect(page.getByRole('dialog', { name: '예약 신청을 취소할까요?' })).toBeVisible();
+    await page.getByTestId('public-cancel-confirm-button').click();
     await expect(page.getByRole('status')).toContainText('예약 신청을 취소했습니다');
 
     await page.goto('/reserve');
@@ -175,10 +178,13 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.goto(`/reservations/${reservation.id}`);
     await expect(page.locator('.status-badge')).toContainText('승인');
     await page.getByTestId('public-reservation-edit-link').click();
-    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
-
+    await expect(page.getByRole('dialog', { name: '예약 비밀번호 확인' })).toBeVisible();
+    await page.getByTestId('public-edit-password-input').fill('wrong-password');
+    await page.getByTestId('public-edit-verify-button').click();
+    await expect(page.getByRole('alert')).toContainText('예약 비밀번호가 일치하지 않습니다');
     await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
     await page.getByTestId('public-edit-verify-button').click();
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
     await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
     await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
 
