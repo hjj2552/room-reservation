@@ -44,3 +44,10 @@ The backend is the final authority for overlap checks.
 The public frontend maps `TIME_SLOT_CONFLICT` to:
 
 > 이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 강의실이나 시간을 선택해 주세요.
+
+## Request Protection
+
+- Public users do not need an administrator session, but state-changing requests are protected by CSRF validation.
+- The frontend obtains a CSRF token from `GET /api/auth/csrf` and automatically sends `X-XSRF-TOKEN` when creating, editing, or cancelling a reservation.
+- Public and unauthenticated GET requests are limited to 120 requests per IP per minute. State-changing requests are limited to 24 requests per IP per minute.
+- A limit excess returns HTTP `429`, error code `RATE_LIMIT_EXCEEDED`, and a `Retry-After` header.
