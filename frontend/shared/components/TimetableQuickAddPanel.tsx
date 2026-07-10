@@ -373,7 +373,7 @@ export function ReservationRequestPanel({
               type="password"
               data-testid="public-request-cancel-password-input"
               value={values.cancelPassword}
-              placeholder="4자리 이상"
+              placeholder="4자리 이상, 수정 및 취소 시 사용"
               onChange={(event) => updateField('cancelPassword', event.target.value)}
               {...inputErrorProps('cancelPassword')}
             />
