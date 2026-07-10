@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
 import type { PublicReservationBlock } from '../../shared/api/types';
 import { ReservationDateTimetable, type TimetableReservation } from '../../shared/components/ReservationDateTimetable';
@@ -33,6 +33,10 @@ const publicStatusLabels = {
   CONFIRMED: statusLabels.CONFIRMED,
   CANCELLED: statusLabels.CANCELLED,
 };
+
+function isPublicTimetableViewMode(value: string | null): value is PublicTimetableViewMode {
+  return value === 'date' || value === 'room';
+}
 
 function todayInputValue() {
   const now = new Date();
@@ -136,21 +140,28 @@ function toTimetableReservation(reservation: PublicReservationBlock): TimetableR
 
 export function PublicReservationPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const rooms = usePublicRooms();
   const settings = usePublicSettings();
   const create = useCreatePublicReservation();
-  const [viewMode, setViewMode] = useState<PublicTimetableViewMode>('date');
-  const [selectedDate, setSelectedDate] = useState(todayInputValue());
-  const [selectedRoomId, setSelectedRoomId] = useState('');
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
 
+  useEffect(() => {
+    searchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
+
+  const viewMode = isPublicTimetableViewMode(searchParams.get('view')) ? searchParams.get('view') : 'date';
+  const selectedDate = searchParams.get('date') || todayInputValue();
+
   const activeRooms = rooms.data || [];
-  const roomViewRoomId = activeRooms.some((room) => room.id === selectedRoomId)
-    ? selectedRoomId
+  const roomViewRoomIdParam = searchParams.get('roomViewRoomId') || '';
+  const roomViewRoomId = activeRooms.some((room) => room.id === roomViewRoomIdParam)
+    ? roomViewRoomIdParam
     : activeRooms[0]?.id || '';
   const selectedRoom = activeRooms.find((room) => room.id === roomViewRoomId);
-  const selectedWeekStart = startOfWeekInputValue(selectedDate);
+  const selectedWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || selectedDate);
   const roomWeekly = usePublicWeeklyReservations(roomViewRoomId, selectedWeekStart);
   const dateWeeklyQueries = useQueries({
     queries: activeRooms.map((room) => ({
@@ -159,10 +170,6 @@ export function PublicReservationPage() {
       enabled: viewMode === 'date',
     })),
   });
-
-  useEffect(() => {
-    if (!selectedRoomId && activeRooms[0]) setSelectedRoomId(activeRooms[0].id);
-  }, [activeRooms, selectedRoomId]);
 
   useEffect(() => {
     if (!highlightedReservationId) return;
@@ -186,6 +193,44 @@ export function PublicReservationPage() {
   const isUnavailable = settings.data && !settings.data.reservationEnabled;
   const dateIsLoading = viewMode === 'date' && dateWeeklyQueries.some((query) => query.isLoading);
   const dateError = viewMode === 'date' ? dateWeeklyQueries.find((query) => query.isError)?.error : null;
+
+  function updateSearchParams(updater: (next: URLSearchParams) => void) {
+    const next = new URLSearchParams(searchParamsRef.current);
+    updater(next);
+    searchParamsRef.current = next;
+    setSearchParams(new URLSearchParams(next));
+  }
+
+  function setViewMode(nextMode: PublicTimetableViewMode) {
+    updateSearchParams((next) => {
+      next.set('view', nextMode);
+      if (nextMode === 'room') {
+        if (!next.get('weekStart')) next.set('weekStart', startOfWeekInputValue(selectedDate));
+        if (!next.get('roomViewRoomId') && activeRooms[0]) next.set('roomViewRoomId', activeRooms[0].id);
+      }
+    });
+  }
+
+  function setSelectedDate(nextDate: string) {
+    updateSearchParams((next) => {
+      next.set('date', nextDate);
+    });
+  }
+
+  function setRoomViewRoomId(nextRoomId: string) {
+    updateSearchParams((next) => {
+      next.set('view', 'room');
+      if (nextRoomId) next.set('roomViewRoomId', nextRoomId);
+      else next.delete('roomViewRoomId');
+    });
+  }
+
+  function setWeekStart(nextDate: string) {
+    updateSearchParams((next) => {
+      next.set('view', 'room');
+      next.set('weekStart', startOfWeekInputValue(nextDate));
+    });
+  }
 
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     if (isUnavailable) return;
@@ -342,7 +387,7 @@ export function PublicReservationPage() {
                   강의실
                   <select
                     value={roomViewRoomId}
-                    onChange={(event) => setSelectedRoomId(event.target.value)}
+                    onChange={(event) => setRoomViewRoomId(event.target.value)}
                     data-testid="public-timetable-room-select"
                   >
                     {activeRooms.map((room) => (
@@ -356,7 +401,7 @@ export function PublicReservationPage() {
                   <button
                     type="button"
                     className="secondary-button icon-button"
-                    onClick={() => setSelectedDate(addDaysInputValue(selectedWeekStart, -7))}
+                    onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, -7))}
                     aria-label="이전 주"
                   >
                     <ChevronLeft size={16} aria-hidden="true" />
@@ -366,14 +411,14 @@ export function PublicReservationPage() {
                     <input
                       type="date"
                       value={selectedWeekStart}
-                      onChange={(event) => setSelectedDate(event.target.value)}
+                      onChange={(event) => setWeekStart(event.target.value)}
                       data-testid="public-timetable-week-input"
                     />
                   </label>
                   <button
                     type="button"
                     className="secondary-button icon-button"
-                    onClick={() => setSelectedDate(addDaysInputValue(selectedWeekStart, 7))}
+                    onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, 7))}
                     aria-label="다음 주"
                   >
                     <ChevronRight size={16} aria-hidden="true" />

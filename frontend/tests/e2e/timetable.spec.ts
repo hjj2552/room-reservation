@@ -32,6 +32,13 @@ test('date view reads URL context and opens the reservation detail page', async 
 
     await page.getByTestId('reservation-timetable-block').click();
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
+
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
+    await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
+    await expect(page.getByTestId('timetable-date-input')).toHaveValue(reservationDay);
+    await expect(page.getByTestId('timetable-date-room-select')).toHaveValue(room.id);
+    await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
   } finally {
     await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);

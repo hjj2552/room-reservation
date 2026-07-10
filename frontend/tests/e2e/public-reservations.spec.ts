@@ -44,12 +44,37 @@ test('public toolbar request opens the shared panel without slot room context', 
     await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue('');
     await expect(page.getByTestId('public-request-email-input')).toHaveValue('');
     await expect(page.getByTestId('public-request-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
-    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveAttribute('placeholder', '4자리 이상');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveAttribute(
+      'placeholder',
+      '4자리 이상, 수정 및 취소 시 사용',
+    );
     await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('');
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
   }
+});
+
+test('public date timetable preserves its URL context after browser back from detail', async ({ page, e2eData }) => {
+  const room = await e2eData.createTestRoom('public-history-room');
+  const reservationTime = nextWeekdayReservationLocalInputs({ daysAhead: 42, startHour: 14, endHour: 15 });
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-history-reservation', {
+    startAt: `${reservationTime.startAt}:00+09:00`,
+    endAt: `${reservationTime.endAt}:00+09:00`,
+  });
+
+  await page.goto('/reserve');
+  await page.getByTestId('public-timetable-date-input').fill(reservationTime.date);
+  await expect(page).toHaveURL(new RegExp(`date=${reservationTime.date}`));
+  await expect(page.getByText(reservation.purpose || '')).toBeVisible();
+
+  await page.getByText(reservation.purpose || '').click();
+  await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/reserve\\?.*date=${reservationTime.date}`));
+  await expect(page.getByTestId('public-timetable-date-input')).toHaveValue(reservationTime.date);
+  await expect(page.getByText(reservation.purpose || '')).toBeVisible();
 });
 
 test('public timetable supports slot-based request, masked detail page, and password cancellation', async ({ page, request, e2eData }) => {
