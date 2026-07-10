@@ -150,7 +150,7 @@ function apiErrorMessage(error: ApiError) {
   return messageByStatus(error.status) || '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-type CommonApiErrorCode = Exclude<ApiErrorCode, 'PUBLIC_CANCEL_PASSWORD_MISMATCH' | 'VALIDATION_ERROR' | 'NOT_FOUND'>;
+type CommonApiErrorCode = Exclude<ApiErrorCode, 'VALIDATION_ERROR' | 'NOT_FOUND'>;
 
 const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
@@ -161,6 +161,7 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   OUTSIDE_OPERATING_HOURS: '운영 시간 안에서만 예약할 수 있습니다.',
   OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',
   POLICY_NOT_CONFIGURED: '운영 설정이 아직 준비되지 않았습니다. 운영 설정을 확인해 주세요.',
+  PUBLIC_CANCEL_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
   PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
   RATE_LIMIT_EXCEEDED: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
@@ -257,6 +258,7 @@ const fieldLabels: Record<string, string> = {
   applicantName: '신청자 이름',
   applicantEmail: '이메일',
   applicantPhone: '전화번호',
+  cancelPassword: '예약 비밀번호',
   purpose: '예약 목적',
   startAt: '시작 시간',
   endAt: '종료 시간',
@@ -279,9 +281,9 @@ const fieldLabels: Record<string, string> = {
   availableDaysOfWeek: '예약 가능 요일',
   minReservationMinutes: '최소 예약 시간',
   maxReservationMinutes: '최대 예약 시간',
-  adminContactName: '담당자 이름',
-  adminContactEmail: '담당자 이메일',
-  adminContactPhone: '담당자 전화번호',
+  adminContactName: '관리자 이름',
+  adminContactEmail: '관리자 이메일',
+  adminContactPhone: '관리자 전화번호',
   completionMessage: '예약 완료 안내',
   version: '현재 버전',
 };

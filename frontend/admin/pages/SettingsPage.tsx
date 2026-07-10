@@ -225,14 +225,14 @@ export function SettingsPage() {
           ))}
         </fieldset>
         <label>
-          담당자 이름
+          관리자 이름
           <input
             value={form.adminContactName || ''}
             onChange={(event) => updateField('adminContactName', event.target.value)}
           />
         </label>
         <label>
-          담당자 이메일
+          관리자 이메일
           <input
             type="email"
             value={form.adminContactEmail || ''}
@@ -240,7 +240,7 @@ export function SettingsPage() {
           />
         </label>
         <label>
-          담당자 전화번호
+          관리자 전화번호
           <input
             value={form.adminContactPhone || ''}
             onChange={(event) => updateField('adminContactPhone', event.target.value)}

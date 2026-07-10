@@ -1,10 +1,11 @@
-import { KeyRound, Save } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail } from '../../shared/api/types';
+import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
+import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   usePublicReservationDetail,
@@ -14,6 +15,7 @@ import {
 } from '../../shared/hooks/usePublicReservation';
 import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
+import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMasking';
 
 interface PublicReservationEditValues {
   roomId: string;
@@ -23,6 +25,11 @@ interface PublicReservationEditValues {
   purpose: string;
   startAt: string;
   endAt: string;
+}
+
+interface PublicReservationEditRouteState {
+  verifiedReservation?: PublicReservationEditDetail;
+  reservationPassword?: string;
 }
 
 function valuesFromReservation(reservation: PublicReservationEditDetail): PublicReservationEditValues {
@@ -40,17 +47,23 @@ function valuesFromReservation(reservation: PublicReservationEditDetail): Public
 export function PublicReservationEditPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = location.state as PublicReservationEditRouteState | null;
   const rooms = usePublicRooms();
   const detail = usePublicReservationDetail(reservationId);
   const verify = useVerifyPublicReservationForEdit(reservationId);
   const update = useUpdatePublicReservation(reservationId);
-  const [cancelPassword, setCancelPassword] = useState('');
-  const [verifiedReservation, setVerifiedReservation] = useState<PublicReservationEditDetail | null>(null);
+  const [reservationPassword, setReservationPassword] = useState(routeState?.reservationPassword || '');
+  const [verifiedReservation, setVerifiedReservation] = useState<PublicReservationEditDetail | null>(
+    routeState?.verifiedReservation || null,
+  );
+  const [showPasswordDialog, setShowPasswordDialog] = useState(!routeState?.verifiedReservation);
   const [successMessage, setSuccessMessage] = useState('');
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<PublicReservationEditValues>({
     defaultValues: {
@@ -69,12 +82,23 @@ export function PublicReservationEditPage() {
     reset(valuesFromReservation(verifiedReservation));
   }, [reset, verifiedReservation]);
 
-  function onVerifySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    if (!verifiedReservation) return;
+    if (!rooms.data?.some((room) => room.id === verifiedReservation.room.id)) return;
+    setValue('roomId', verifiedReservation.room.id);
+  }, [rooms.data, setValue, verifiedReservation]);
+
+  useEffect(() => {
+    if (!routeState?.verifiedReservation) return;
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, navigate, routeState?.verifiedReservation]);
+
+  function verifyReservationPassword() {
     setSuccessMessage('');
-    verify.mutate(cancelPassword, {
+    verify.mutate(reservationPassword, {
       onSuccess: (reservation) => {
         setVerifiedReservation(reservation);
+        setShowPasswordDialog(false);
       },
     });
   }
@@ -91,7 +115,7 @@ export function PublicReservationEditPage() {
         purpose: values.purpose,
         startAt: fromDateTimeLocal(values.startAt),
         endAt: fromDateTimeLocal(values.endAt),
-        cancelPassword,
+        cancelPassword: reservationPassword,
       },
       {
         onSuccess: () => {
@@ -141,35 +165,33 @@ export function PublicReservationEditPage() {
       ) : null}
 
       {isEditable ? (
-        <section className="panel form-stack" aria-labelledby="public-edit-password-title">
-          <div className="panel-header">
-            <h2 id="public-edit-password-title">본인 확인</h2>
-          </div>
-          <form className="form-stack" onSubmit={onVerifySubmit}>
-            <label>
-              예약 비밀번호
-              <input
-                type="password"
-                value={cancelPassword}
-                onChange={(event) => setCancelPassword(event.target.value)}
-                data-testid="public-edit-password-input"
-              />
-            </label>
-            {verify.isError ? <div className="inline-error" role="alert">{errorMessage(verify.error)}</div> : null}
-            <div className="button-row">
-              <button
-                type="submit"
-                className="secondary-button"
-                disabled={verify.isPending || cancelPassword.length < 4}
-                data-testid="public-edit-verify-button"
-              >
-                <KeyRound size={16} aria-hidden="true" />
-                {verify.isPending ? '확인 중...' : '예약 정보 불러오기'}
-              </button>
-            </div>
-          </form>
-        </section>
+        !verifiedReservation ? (
+          <ReservationDetailView
+            status={reservation.status}
+            sections={reservationCoreSections({
+              room: reservation.room,
+              startAt: reservation.startAt,
+              endAt: reservation.endAt,
+              applicantName: maskName(reservation.applicantName) || '',
+              applicantEmail: maskEmail(reservation.applicantEmail),
+              applicantPhone: maskPhone(reservation.applicantPhone),
+              purpose: reservation.purpose,
+            })}
+          />
+        ) : null
       ) : null}
+
+      <ReservationPasswordDialog
+        open={isEditable && showPasswordDialog}
+        password={reservationPassword}
+        isPending={verify.isPending}
+        errorMessage={verify.isError ? errorMessage(verify.error) : undefined}
+        inputTestId="public-edit-password-input"
+        submitTestId="public-edit-verify-button"
+        onPasswordChange={setReservationPassword}
+        onClose={() => navigate(`/reservations/${reservation.id}`)}
+        onSubmit={verifyReservationPassword}
+      />
 
       {verifiedReservation ? (
         <form className="panel form-grid" onSubmit={handleSubmit(onSubmit)} aria-label="예약 수정 입력">

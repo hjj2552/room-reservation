@@ -1,37 +1,76 @@
 import { PenLine, X } from 'lucide-react';
-import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ApiError } from '../../shared/api/http';
+import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
+import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
-import { useCancelPublicReservation, usePublicReservationDetail } from '../../shared/hooks/usePublicReservation';
+import {
+  useCancelPublicReservation,
+  usePublicReservationDetail,
+  useVerifyPublicReservationForEdit,
+} from '../../shared/hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
 import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMasking';
 
-function publicErrorMessage(error: unknown) {
-  if (error instanceof ApiError) {
-    // Keep this form-specific so the cancel password error appears beside the cancel action.
-    if (error.body?.code === 'PUBLIC_CANCEL_PASSWORD_MISMATCH') {
-      return '취소 비밀번호가 일치하지 않습니다. 다시 입력해 주세요.';
-    }
-    if (error.status === 400) return '입력한 정보를 다시 확인해 주세요.';
-    if (error.status === 404) return '예약 정보를 찾을 수 없습니다.';
-  }
-  return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
-}
+type PasswordAction = 'edit' | 'cancel';
 
 export function PublicReservationDetailPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
   const detail = usePublicReservationDetail(reservationId);
   const cancel = useCancelPublicReservation(reservationId);
-  const [cancelPassword, setCancelPassword] = useState('');
-  const [showCancelForm, setShowCancelForm] = useState(false);
+  const verify = useVerifyPublicReservationForEdit(reservationId);
+  const [reservationPassword, setReservationPassword] = useState('');
+  const [passwordAction, setPasswordAction] = useState<PasswordAction | null>(null);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
 
-  function onCancelSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    cancel.mutate(cancelPassword);
+  function openPasswordDialog(action: PasswordAction) {
+    verify.reset();
+    cancel.reset();
+    setCancelSuccess(false);
+    setReservationPassword('');
+    setPasswordAction(action);
+  }
+
+  function closePasswordDialog() {
+    verify.reset();
+    setPasswordAction(null);
+    setReservationPassword('');
+  }
+
+  function verifyReservationPassword() {
+    if (!passwordAction) return;
+    verify.mutate(reservationPassword, {
+      onSuccess: (verifiedReservation) => {
+        if (passwordAction === 'edit') {
+          navigate(`/reservations/${verifiedReservation.id}/edit`, {
+            state: { verifiedReservation, reservationPassword },
+          });
+          return;
+        }
+        cancel.reset();
+        setPasswordAction(null);
+        setShowCancelConfirmation(true);
+      },
+    });
+  }
+
+  function confirmCancellation() {
+    cancel.mutate(reservationPassword, {
+      onSuccess: () => {
+        setShowCancelConfirmation(false);
+        setReservationPassword('');
+        setCancelSuccess(true);
+      },
+    });
+  }
+
+  function closeCancelConfirmation() {
+    cancel.reset();
+    setShowCancelConfirmation(false);
+    setReservationPassword('');
   }
 
   if (detail.isLoading) return <LoadingState />;
@@ -73,19 +112,20 @@ export function PublicReservationDetailPage() {
         />
         <section className="panel public-detail-actions" aria-labelledby="public-actions-title">
           <h2 id="public-actions-title">상태 처리</h2>
-          {reservation.cancellable && !showCancelForm ? (
+          {reservation.cancellable ? (
             <div className="button-row">
               {reservation.editable ? (
-                <Link
+                <button
+                  type="button"
                   className="secondary-button"
-                  to={`/reservations/${reservation.id}/edit`}
+                  onClick={() => openPasswordDialog('edit')}
                   data-testid="public-reservation-edit-link"
                 >
                   <PenLine size={16} aria-hidden="true" />
                   예약 수정
-                </Link>
+                </button>
               ) : null}
-              <button type="button" className="danger-button" onClick={() => setShowCancelForm(true)}>
+              <button type="button" className="danger-button" onClick={() => openPasswordDialog('cancel')}>
                 <X size={16} aria-hidden="true" />
                 예약 신청 취소
               </button>
@@ -93,31 +133,64 @@ export function PublicReservationDetailPage() {
           ) : null}
           {!reservation.editable ? <p className="muted">취소된 예약은 수정할 수 없습니다.</p> : null}
           {!reservation.cancellable ? <p className="muted">현재 상태에서는 취소할 수 없습니다.</p> : null}
-          {showCancelForm ? (
-            <form className="form-stack" onSubmit={onCancelSubmit}>
-              <label>
-                취소 비밀번호
-                <input
-                  type="password"
-                  value={cancelPassword}
-                  onChange={(event) => setCancelPassword(event.target.value)}
-                  data-testid="public-cancel-password-input"
-                />
-              </label>
-              {cancel.isError ? <div className="inline-error" role="alert">{publicErrorMessage(cancel.error)}</div> : null}
-              {cancel.isSuccess ? <div className="success-box" role="status">예약 신청을 취소했습니다.</div> : null}
-              <div className="button-row">
-                <button type="button" className="ghost-button" onClick={() => setShowCancelForm(false)}>
-                  돌아가기
-                </button>
-                <button type="submit" className="danger-button" disabled={cancel.isPending} data-testid="public-cancel-submit-button">
-                  {cancel.isPending ? '취소 중' : '비밀번호 확인 후 취소'}
-                </button>
-              </div>
-            </form>
-          ) : null}
+          {cancelSuccess ? <div className="success-box" role="status">예약 신청을 취소했습니다.</div> : null}
         </section>
       </div>
+
+      <ReservationPasswordDialog
+        open={passwordAction !== null}
+        password={reservationPassword}
+        isPending={verify.isPending}
+        errorMessage={verify.isError ? errorMessage(verify.error) : undefined}
+        inputTestId={passwordAction === 'edit' ? 'public-edit-password-input' : 'public-cancel-password-input'}
+        submitTestId={passwordAction === 'edit' ? 'public-edit-verify-button' : 'public-cancel-submit-button'}
+        onPasswordChange={setReservationPassword}
+        onClose={closePasswordDialog}
+        onSubmit={verifyReservationPassword}
+      />
+
+      {showCancelConfirmation ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="modal-panel reservation-password-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="public-cancel-confirm-title"
+            aria-describedby="public-cancel-confirm-description"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !cancel.isPending) closeCancelConfirmation();
+            }}
+          >
+            <div className="modal-header">
+              <h2 id="public-cancel-confirm-title">예약 신청을 취소할까요?</h2>
+            </div>
+            <p id="public-cancel-confirm-description" className="muted">
+              취소하면 공개 화면에서 이 예약을 수정하거나 다시 활성화할 수 없습니다.
+            </p>
+            {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={closeCancelConfirmation}
+                disabled={cancel.isPending}
+                autoFocus
+              >
+                돌아가기
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                onClick={confirmCancellation}
+                disabled={cancel.isPending}
+                data-testid="public-cancel-confirm-button"
+              >
+                {cancel.isPending ? '취소 중...' : '예약 신청 취소'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
