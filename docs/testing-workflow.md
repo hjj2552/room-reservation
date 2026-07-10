@@ -26,7 +26,7 @@ cd backend
 
 | 변경 영역 | 우선 실행 |
 | --- | --- |
-| 공개 예약 등록, 충돌, 정책 | `.\gradlew.bat test --tests "*PublicReservationIntegrationTest" --tests "*ReservationConflictServiceTest" --tests "*ReservationPolicyServiceTest"` |
+| 공개 예약 등록·수정·취소, 가용성, 충돌, 정책 | `.\gradlew.bat test --tests "*PublicReservationIntegrationTest" --tests "*PublicAvailabilityIntegrationTest" --tests "*ReservationConflictServiceTest" --tests "*ReservationPolicyServiceTest"` |
 | 관리자 예약 목록/승인/취소 | `.\gradlew.bat test --tests "*AdminReservationIntegrationTest"` |
 | 관리자 예약 등록/상세/수정 | `.\gradlew.bat test --tests "*AdminReservationWriteIntegrationTest"` |
 | 반복 예약 미리보기/등록/취소 | `.\gradlew.bat test --tests "*RecurrenceIntegrationTest"` |
@@ -34,7 +34,11 @@ cd backend
 | CSV 내보내기 | `.\gradlew.bat test --tests "*ReservationCsvExportIntegrationTest"` |
 | 강의실 운영 API | `.\gradlew.bat test --tests "*AdminRoomIntegrationTest" --tests "*PublicRoomQueryIntegrationTest"` |
 | 운영 설정 API | `.\gradlew.bat test --tests "*AdminSettingsIntegrationTest"` |
-| 인증/세션/Security | `.\gradlew.bat test --tests "*AdminAuthIntegrationTest"` |
+| 태그 CRUD와 반복 예약 참조 | `.\gradlew.bat test --tests "*AdminTagIntegrationTest"` |
+| 인증/세션 | `.\gradlew.bat test --tests "*AdminAuthIntegrationTest"` |
+| CSRF 보호 | `.\gradlew.bat test --tests "*CsrfProtectionIntegrationTest"` |
+| IP별 Rate Limiting과 관리자 우회 | `.\gradlew.bat test --tests "*RateLimitIntegrationTest"` |
+| E2E cleanup 활성·비활성 보호 | `.\gradlew.bat test --tests "*E2eTestDataCleanupIntegrationTest" --tests "*E2eTestDataCleanupDisabledIntegrationTest"` |
 | Flyway 또는 DB 제약조건 | `.\gradlew.bat test` |
 
 ## 회귀 위험이 큰 계약
@@ -46,6 +50,10 @@ cd backend
 - `SKIP_CONFLICTS`는 가능한 회차만 등록하고 skipped 응답을 돌려준다.
 - 반복 예약 취소는 반복 예약 묶음 soft delete, 연결 예약 `CANCELLED`, `RECURRENCE_CANCELLED` 감사 이력 저장을 함께 반영한다.
 - `reservation_histories.action`은 enum 문자열로 저장하고 API에서도 같은 값으로 응답한다.
+- 예약 영구 삭제는 예약 row를 제거하지만 `DELETED` 감사 이력과 삭제 당시 스냅샷은 보존한다.
+- 운영 설정의 예약 단위는 `5`, `10`, `15`, `30`, `60` 중 하나이며 운영 시작·종료 시간과 최소·최대 예약 시간은 해당 단위에 맞아야 한다.
+- 상태 변경 API는 공개 엔드포인트를 포함해 CSRF 토큰이 없으면 `403`을 반환한다.
+- 비관리자 API는 GET 분당 120회, 그 밖의 메서드 분당 24회로 제한되며 인증된 `ROLE_ADMIN`은 제한을 건너뛴다.
 - CSV 내보내기는 Excel 호환을 위해 UTF-8 BOM을 포함하고, 시간은 KST `yyyy-MM-dd HH:mm:ss` 문자열로 내보낸다.
 
 ## Codex 작업 후 체크

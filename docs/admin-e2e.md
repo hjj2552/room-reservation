@@ -5,15 +5,21 @@ This document describes the Playwright E2E profile for the frontend.
 ## Covered Smoke Flows
 
 - Auth and protected route behavior.
+- Root entry choices for the public timetable and admin login.
 - Reservations list query persistence.
-- Audit query persistence.
-- Admin reservation registration and detail/list reflection.
-- Admin reservation edit and detail/list reflection.
+- Audit query persistence and deleted reservation snapshot rendering.
+- Admin reservation registration, edit, detail/list reflection, timetable links, duplication, and hard deletion.
+- Admin timetable date/room views and reservation creation from empty slots or the toolbar.
 - Public reservation timetable request, detail, and reservation-password cancellation.
+- Public edit of a confirmed reservation and transition back to `REQUESTED`.
 - Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
 - Settings smoke: settings load, save, and success feedback.
+- Recurrence list, preview, create, detail, cancel, `SKIP_CONFLICTS`, and tag selection.
+- Tag create, update, and delete.
 
 현재 E2E 스위트는 CSV 내보내기와 rooms/settings 전체 CRUD matrix를 아직 다루지 않습니다.
+
+Playwright는 전역 운영 설정처럼 singleton 데이터를 바꾸는 테스트 사이의 충돌을 피하기 위해 `workers: 1`, `fullyParallel: false`로 실행합니다.
 
 ## Local Run
 
@@ -48,7 +54,7 @@ If a backend is already reachable on `E2E_BACKEND_URL`, the runner reuses it. Ma
 
 ## GitHub Actions CI
 
-The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull requests and pushes to `main`.
+The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull requests, pushes to any branch, and manual `workflow_dispatch` runs.
 
 Jobs:
 
@@ -100,7 +106,7 @@ Useful environment variables:
 
 - Playwright still uses browser context isolation per test.
 - Admin authentication is reused through `tests/e2e/.auth/admin.json`, but E2E-owned rooms, tags, reservations, recurrences, applicant names, emails, memos, and purposes use the `e2e-` prefix.
-- Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestTag`, `e2eData.createTestReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and `e2eData.registerReservation`/`registerRecurrence`/`registerTag` over direct setup calls.
+- Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestTag`, `e2eData.createTestReservation`, `e2eData.createTestPublicReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and the id registration helpers over direct setup calls.
 - Public UI-created reservations use `e2e-` applicant names, emails, and purposes, then register returned ids for cleanup.
 - Data-creating specs use a Playwright fixture registry for created room, tag, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, deletion for tags, and deletion for rooms by id.
 - `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`. After the final cleanup, the runner performs a cleanup preview and fails if any matching E2E data remains.
