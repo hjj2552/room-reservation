@@ -22,6 +22,22 @@ function maskPhone(value: string) {
   return `${digits.slice(0, 4)}${'*'.repeat(digits.length - 5)}${digits.at(-1)}`;
 }
 
+test('legacy public routes fall through to the current root fallback', async ({ page }) => {
+  const legacyPaths = [
+    '/reserve',
+    '/public',
+    '/cancel',
+    '/cancel/legacy-reservation',
+    '/public/reservations/legacy-reservation',
+    '/public/reservations/legacy-reservation/edit',
+  ];
+
+  for (const path of legacyPaths) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/);
+  }
+});
+
 test('public toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -32,7 +48,7 @@ test('public toolbar request opens the shared panel without slot room context', 
   const room = await e2eData.createTestRoom('public-toolbar-request-room');
 
   try {
-    await page.goto('/reserve');
+    await page.goto('/timetable');
     await page.getByTestId('public-timetable-view-room').click();
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
     await page.getByTestId('public-new-request-button').click();
@@ -63,7 +79,7 @@ test('public date timetable preserves its URL context after browser back from de
     endAt: `${reservationTime.endAt}:00+09:00`,
   });
 
-  await page.goto('/reserve');
+  await page.goto('/timetable');
   await page.getByTestId('public-timetable-date-input').fill(reservationTime.date);
   await expect(page).toHaveURL(new RegExp(`date=${reservationTime.date}`));
   await expect(page.getByText(reservation.purpose || '')).toBeVisible();
@@ -72,7 +88,7 @@ test('public date timetable preserves its URL context after browser back from de
   await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
 
   await page.goBack();
-  await expect(page).toHaveURL(new RegExp(`/reserve\\?.*date=${reservationTime.date}`));
+  await expect(page).toHaveURL(new RegExp(`/timetable\\?.*date=${reservationTime.date}`));
   await expect(page.getByTestId('public-timetable-date-input')).toHaveValue(reservationTime.date);
   await expect(page.getByText(reservation.purpose || '')).toBeVisible();
 });
@@ -93,7 +109,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
   const cancelPassword = 'e2e-public-password';
 
   try {
-    await page.goto('/reserve');
+    await page.goto('/timetable');
     await page.getByTestId('public-timetable-view-room').click();
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
     await page.getByTestId('public-timetable-week-input').fill(reservationTime.date);
@@ -154,8 +170,11 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(detailPanel).not.toContainText('반복 예약');
     await expect(detailPanel).not.toContainText('예약 요약');
     await expect(page.getByRole('heading', { name: '감사 이력' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '이전으로', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '시간표로 돌아가기', exact: true })).toHaveCount(0);
+    await expect(page.getByTestId('public-detail-action-buttons').getByRole('button')).toHaveText(['취소', '수정']);
 
-    await page.getByRole('button', { name: '예약 신청 취소' }).click();
+    await page.getByRole('button', { name: '취소', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '예약 비밀번호 확인' })).toBeVisible();
     await page.getByTestId('public-cancel-password-input').fill('wrong-password');
     await page.getByTestId('public-cancel-submit-button').click();
@@ -163,11 +182,12 @@ test('public timetable supports slot-based request, masked detail page, and pass
 
     await page.getByTestId('public-cancel-password-input').fill(cancelPassword);
     await page.getByTestId('public-cancel-submit-button').click();
-    await expect(page.getByRole('dialog', { name: '예약 신청을 취소할까요?' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '취소할까요?' })).toBeVisible();
+    await expect(page.getByTestId('public-cancel-confirm-button')).toHaveText('취소');
     await page.getByTestId('public-cancel-confirm-button').click();
-    await expect(page.getByRole('status')).toContainText('예약 신청을 취소했습니다');
+    await expect(page.getByRole('status')).toContainText('예약을 취소했습니다');
 
-    await page.goto('/reserve');
+    await page.goto('/timetable');
     await page.getByTestId('public-timetable-view-room').click();
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
     await page.getByTestId('public-timetable-week-input').fill(reservationTime.date);

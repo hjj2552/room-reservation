@@ -50,12 +50,44 @@ test('reservation list and detail expose timetable links with reservation date a
     await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
 
     await page.goto(`/admin/reservations/${reservation.id}`);
+    await expect(page.getByRole('button', { name: '목록으로', exact: true })).toHaveCount(0);
+    const detailActions = page.getByTestId('reservation-primary-actions').locator('button, a');
+    await expect(detailActions).toHaveText([
+      '승인',
+      '취소',
+      '수정',
+      '복제',
+    ]);
+    const actionTops = await detailActions.evaluateAll((elements) =>
+      elements.map((element) => Math.round(element.getBoundingClientRect().top)),
+    );
+    expect(new Set(actionTops).size).toBe(1);
     await page.getByTestId('reservation-detail-timetable-link').click();
 
     await expect(page).toHaveURL(/\/admin\/timetable/);
     await expect(page).toHaveURL(/view=date/);
     await expect(page).toHaveURL(new RegExp(`date=${reservationDay}`));
     await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
+  } finally {
+    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
+test('reservation detail action groups remain distinct without horizontal overflow on mobile', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('reservation-mobile-actions-room');
+  const reservation = await e2eData.createTestReservation(room.id, 'reservation-mobile-actions');
+
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/admin/reservations/${reservation.id}`);
+
+    const actions = page.getByTestId('reservation-primary-actions');
+    await expect(actions.locator('button, a')).toHaveText(['승인', '취소', '수정', '복제']);
+    await expect(page.getByTestId('reservation-edit-link')).toBeVisible();
+    await expect(page.getByTestId('reservation-duplicate-link')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   } finally {
     await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
     await deleteRoomByApi(request, room.id);

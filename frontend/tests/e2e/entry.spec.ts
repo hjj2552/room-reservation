@@ -23,3 +23,21 @@ test('root admin choice opens the admin login UI', async ({ page }) => {
   await expect(page.locator('.login-panel')).toBeVisible();
 });
 
+test('prefixless admin aliases fall through to the public root', async ({ page }) => {
+  const removedAdminAliases = [
+    '/login',
+    '/reservations',
+    '/recurrences',
+    '/recurrences/legacy-recurrence',
+    '/rooms',
+    '/settings',
+    '/audit?status=UPDATED',
+  ];
+
+  for (const path of removedAdminAliases) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('entry-public-link')).toBeVisible();
+  }
+});
+
