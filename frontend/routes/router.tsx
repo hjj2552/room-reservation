@@ -16,12 +16,18 @@ import { PublicReservationDetailPage } from '../public/pages/PublicReservationDe
 import { PublicReservationEditPage } from '../public/pages/PublicReservationEditPage';
 import { EntryChoicePage } from '../public/pages/EntryChoicePage';
 import { PublicReservationPage } from '../public/pages/PublicReservationPage';
+import { PublicLayout } from '../public/PublicLayout';
 
 export const router = createBrowserRouter([
-  { path: '/', element: <EntryChoicePage /> },
-  { path: '/timetable', element: <PublicReservationPage /> },
-  { path: '/reservations/:reservationId', element: <PublicReservationDetailPage /> },
-  { path: '/reservations/:reservationId/edit', element: <PublicReservationEditPage /> },
+  {
+    element: <PublicLayout />,
+    children: [
+      { path: '/', element: <EntryChoicePage /> },
+      { path: '/timetable', element: <PublicReservationPage /> },
+      { path: '/reservations/:reservationId', element: <PublicReservationDetailPage /> },
+      { path: '/reservations/:reservationId/edit', element: <PublicReservationEditPage /> },
+    ],
+  },
   { path: '/admin/login', element: <LoginPage /> },
   {
     element: <ProtectedRoute />,

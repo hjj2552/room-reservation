@@ -99,7 +99,6 @@ export interface OperationSettings {
   availableDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
-  adminContactName: string | null;
   adminContactEmail: string | null;
   adminContactPhone: string | null;
   completionMessage: string | null;
@@ -128,7 +127,7 @@ export interface TagPayload {
 
 export type PublicSettings = Omit<
   OperationSettings,
-  'adminContactName' | 'adminContactPhone' | 'version'
+  'version'
 >;
 
 export interface PublicRoom {
