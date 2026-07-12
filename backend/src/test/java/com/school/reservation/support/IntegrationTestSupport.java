@@ -7,6 +7,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -28,6 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(MockMvcCsrfTestConfiguration.class)
 public abstract class IntegrationTestSupport {
 
+    private UUID primaryTestRoomId;
+
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
@@ -39,28 +42,13 @@ public abstract class IntegrationTestSupport {
 
     @BeforeEach
     void resetDatabaseState() {
+        primaryTestRoomId = null;
         clearRateLimitBuckets();
         jdbcTemplate.update("delete from reservation_histories");
         jdbcTemplate.update("delete from reservations");
         jdbcTemplate.update("delete from reservation_recurrences");
         jdbcTemplate.update("delete from tags");
-        jdbcTemplate.update("delete from rooms where name not in ('Room 101', 'Seminar Room 201') and system_reserved = false");
-        Integer roomCount = jdbcTemplate.queryForObject("select count(*) from rooms", Integer.class);
-        if (roomCount != null && roomCount == 0) {
-            jdbcTemplate.update("""
-                insert into rooms (name, location, capacity, description, enabled)
-                values
-                ('Room 101', 'Main Building 1F', 40, 'General classroom', true),
-                ('Seminar Room 201', 'Main Building 2F', 20, 'Small seminar room', true)
-                """);
-        }
-        jdbcTemplate.update("""
-            update rooms
-            set enabled = true,
-                deleted_at = null,
-                system_reserved = false
-            where name in ('Room 101', 'Seminar Room 201')
-            """);
+        jdbcTemplate.update("delete from rooms where system_reserved = false");
         jdbcTemplate.update("""
             insert into rooms (name, location, capacity, description, enabled, system_reserved)
             select '(삭제된 강의실)', 'SYSTEM', 0, 'System sentinel room for preserved reservation records.', false, true
@@ -84,10 +72,40 @@ public abstract class IntegrationTestSupport {
             """);
     }
 
-    protected UUID firstRoomId() {
+    @AfterEach
+    void cleanupDatabaseState() {
+        jdbcTemplate.update("delete from reservation_histories");
+        jdbcTemplate.update("delete from reservations");
+        jdbcTemplate.update("delete from reservation_recurrences");
+        jdbcTemplate.update("delete from tags");
+        jdbcTemplate.update("delete from rooms where system_reserved = false");
+        primaryTestRoomId = null;
+    }
+
+    protected UUID testRoomId() {
+        if (primaryTestRoomId == null) {
+            primaryTestRoomId = createTestRoom("primary");
+        }
+        return primaryTestRoomId;
+    }
+
+    protected UUID createTestRoom(String label) {
         return jdbcTemplate.queryForObject(
-            "select id from rooms where name = 'Room 101' and enabled = true and deleted_at is null",
-            UUID.class
+            """
+                insert into rooms (name, location, capacity, description, enabled, system_reserved)
+                values (?, 'testing-building', 40, 'testing-room-created-by-integration-test', true, false)
+                returning id
+                """,
+            UUID.class,
+            "testing-room-" + label + "-" + UUID.randomUUID()
+        );
+    }
+
+    protected String testRoomName() {
+        return jdbcTemplate.queryForObject(
+            "select name from rooms where id = ?",
+            String.class,
+            testRoomId()
         );
     }
 

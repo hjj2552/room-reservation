@@ -12,9 +12,9 @@ These rules apply to every Codex/agent task in this repository.
 
 - Any data created by Playwright E2E must be identifiable as test data.
 - Use the current naming rule:
-  - rooms: `e2e-room-*`
-  - reservations: `e2e-reservation-*`
-  - recurring reservations: `e2e-recurring-*` or another `e2e-` purpose/applicant/email generated through the shared fixture
+  - rooms: `testing-room-*`
+  - reservations: `testing-reservation-*`
+  - recurring reservations: `testing-recurring-*` or another `testing-` purpose/applicant/email generated through the shared fixture
 - New E2E code must use shared helpers/fixtures/factories first. Do not create rooms, reservations, or recurrences with raw API calls unless the helper cannot support the case yet.
 - If a new data-creating flow needs a new helper, add it to the shared E2E fixture/helper layer instead of embedding local setup/teardown in one spec.
 - Tests must register created resource ids for best-effort teardown whenever ids are available.
@@ -27,8 +27,7 @@ These rules apply to every Codex/agent task in this repository.
 ## Safe Cleanup Policy
 
 - The guarded E2E cleanup path is allowed only outside `prod` and only when `app.e2e-cleanup.enabled=true`.
-- Manual cleanup should be previewed before deleting legacy data.
-- Legacy cleanup for old `E2E ...` data is only for dev/UAT cleanup before launch or acceptance testing. Do not broaden legacy matching rules without a concrete review of affected rows.
+- Manual cleanup should be previewed before deleting test data.
 - If cleanup cannot prove a row is E2E-owned, leave it in place and document the residual risk.
 
 ## Documentation Expectations

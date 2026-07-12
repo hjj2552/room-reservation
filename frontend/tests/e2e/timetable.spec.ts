@@ -13,7 +13,7 @@ test('date view reads URL context and opens the reservation detail page', async 
   const reservation = await e2eData.createTestReservation(room.id, 'date-timetable', {
     startAt: `${reservationDay}T10:00:00+09:00`,
     endAt: `${reservationDay}T11:00:00+09:00`,
-    memo: 'e2e-date-timetable-seed',
+    memo: 'testing-date-timetable-seed',
   });
   const purpose = reservation.purpose || '';
 
@@ -40,7 +40,7 @@ test('date view reads URL context and opens the reservation detail page', async 
     await expect(page.getByTestId('timetable-date-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
   } finally {
-    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
+    await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });
@@ -53,7 +53,7 @@ test('room view shows a weekly timetable block and opens the reservation detail 
   const reservation = await e2eData.createTestReservation(room.id, 'room-timetable', {
     startAt: `${reservationDay}T15:00:00+09:00`,
     endAt: `${reservationDay}T16:00:00+09:00`,
-    memo: 'e2e-room-timetable-seed',
+    memo: 'testing-room-timetable-seed',
   });
   const purpose = reservation.purpose || '';
 
@@ -74,7 +74,7 @@ test('room view shows a weekly timetable block and opens the reservation detail 
     await page.getByTestId('reservation-room-timetable-block').click();
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
   } finally {
-    await cancelReservationByApi(request, reservation.id, 'e2e-cleanup');
+    await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });
@@ -97,8 +97,8 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
 
-    await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
-    await page.getByTestId('quick-add-email-input').fill(`e2e-quick-add-${Date.now()}@example.test`);
+    await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
+    await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-${Date.now()}@example.test`);
     await page.getByTestId('quick-add-phone-input').fill('010-3333-4444');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
 
@@ -119,7 +119,7 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
   } finally {
     if (createdReservationId) {
-      await cancelReservationByApi(request, createdReservationId, 'e2e-cleanup');
+      await cancelReservationByApi(request, createdReservationId, 'testing-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }
@@ -163,8 +163,8 @@ test('date view quick add defaults to the clicked room column', async ({ page, r
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
 
-    await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
-    await page.getByTestId('quick-add-email-input').fill(`e2e-quick-add-select-room-${Date.now()}@example.test`);
+    await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
+    await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-select-room-${Date.now()}@example.test`);
     await page.getByTestId('quick-add-phone-input').fill('010-7777-8888');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
 
@@ -185,7 +185,7 @@ test('date view quick add defaults to the clicked room column', async ({ page, r
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
   } finally {
     if (createdReservationId) {
-      await cancelReservationByApi(request, createdReservationId, 'e2e-cleanup');
+      await cancelReservationByApi(request, createdReservationId, 'testing-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }
@@ -211,8 +211,8 @@ test('room view can create a reservation from an empty weekly slot', async ({ pa
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${weekStart}T09:00`);
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${weekStart}T09:30`);
 
-    await page.getByTestId('quick-add-applicant-name-input').fill('e2e-admin');
-    await page.getByTestId('quick-add-email-input').fill(`e2e-quick-add-room-${Date.now()}@example.test`);
+    await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
+    await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-room-${Date.now()}@example.test`);
     await page.getByTestId('quick-add-phone-input').fill('010-5555-6666');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
 
@@ -231,7 +231,7 @@ test('room view can create a reservation from an empty weekly slot', async ({ pa
     await expect(page.getByTestId('reservation-room-timetable')).toContainText(purpose);
   } finally {
     if (createdReservationId) {
-      await cancelReservationByApi(request, createdReservationId, 'e2e-cleanup');
+      await cancelReservationByApi(request, createdReservationId, 'testing-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }

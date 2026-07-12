@@ -159,7 +159,7 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.items[0].action").value("DELETED"))
             .andExpect(jsonPath("$.items[0].memo").value("deleted in test"))
             .andExpect(jsonPath("$.items[0].reservationPurpose").value("Study"))
-            .andExpect(jsonPath("$.items[0].reservationRoomName").value("Room 101"));
+            .andExpect(jsonPath("$.items[0].reservationRoomName").value(testRoomName()));
 
         Integer detachedHistoryCount = jdbcTemplate.queryForObject(
             "select count(*) from reservation_histories where reservation_deleted_id = ? and reservation_id is null",
@@ -187,7 +187,7 @@ class AdminReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), purpose, startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), purpose, startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()

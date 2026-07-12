@@ -97,7 +97,7 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
     await expect(page.getByTestId('settings-form')).toBeVisible();
 
     await page.getByTestId('settings-organization-input').fill(updatedOrganizationName);
-    await page.getByTestId('settings-public-notice-input').fill('e2e-settings-smoke-notice');
+    await page.getByTestId('settings-public-notice-input').fill('testing-settings-smoke-notice');
     await page.getByTestId('settings-slot-minutes-select').selectOption('5');
     await page.getByTestId('settings-save-button').click();
 

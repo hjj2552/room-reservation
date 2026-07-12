@@ -22,7 +22,7 @@ class PublicAvailabilityIntegrationTest extends IntegrationTestSupport {
         OffsetDateTime startAt = nextWeekdayAt(14, 0);
 
         mockMvc.perform(get("/api/public/availability")
-                .param("roomId", firstRoomId().toString())
+                .param("roomId", testRoomId().toString())
                 .param("startAt", startAt.toString())
                 .param("endAt", startAt.plusHours(1).toString()))
             .andExpect(status().isOk())
@@ -35,7 +35,7 @@ class PublicAvailabilityIntegrationTest extends IntegrationTestSupport {
         createPublicReservation(startAt);
 
         mockMvc.perform(get("/api/public/availability")
-                .param("roomId", firstRoomId().toString())
+                .param("roomId", testRoomId().toString())
                 .param("startAt", startAt.toString())
                 .param("endAt", startAt.plusHours(1).toString()))
             .andExpect(status().isOk())
@@ -57,7 +57,7 @@ class PublicAvailabilityIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated());
     }
 }

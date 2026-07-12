@@ -41,25 +41,22 @@ class E2eTestDataCleanupIntegrationTest {
             where reservation_id in (
               select id
               from reservations
-              where lower(purpose) like 'e2e-%'
-                 or lower(purpose) like 'e2e %'
+              where lower(purpose) like 'testing-%'
                  or applicant_email in ('manual@example.test')
             )
             """);
         jdbcTemplate.update("""
             delete from reservations
-            where lower(purpose) like 'e2e-%'
-               or lower(purpose) like 'e2e %'
+            where lower(purpose) like 'testing-%'
                or applicant_email in ('manual@example.test')
             """);
         jdbcTemplate.update("""
             delete from reservation_recurrences
-            where lower(purpose) like 'e2e-%'
-               or lower(purpose) like 'e2e %'
+            where lower(purpose) like 'testing-%'
                or applicant_email in ('manual-recurring-tag@example.test')
             """);
-        jdbcTemplate.update("delete from tags where lower(name) like 'e2e-%' or lower(name) like 'e2e %'");
-        jdbcTemplate.update("delete from rooms where lower(name) like 'e2e-%' or lower(name) like 'e2e %' or name in ('Manual Acceptance Room', 'Series Label Cleanup Room', 'Tag Cleanup Reference Room')");
+        jdbcTemplate.update("delete from tags where lower(name) like 'testing-%'");
+        jdbcTemplate.update("delete from rooms where lower(name) like 'testing-%' or name in ('Manual Acceptance Room', 'Series Label Cleanup Room', 'Tag Cleanup Reference Room')");
     }
 
     @Test
@@ -73,12 +70,12 @@ class E2eTestDataCleanupIntegrationTest {
         UUID normalReservationId = UUID.randomUUID();
         UUID e2eTagId = UUID.randomUUID();
 
-        insertRoom(e2eRoomId, "e2e-room-cleanup");
+        insertRoom(e2eRoomId, "testing-room-cleanup");
         insertRoom(normalRoomId, "Manual Acceptance Room");
-        insertTag(e2eTagId, "e2e-tag-cleanup");
-        insertRecurrence(recurrenceId, e2eRoomId, "e2e-reservation-recurring");
-        insertReservation(directReservationId, e2eRoomId, null, "e2e-admin", "e2e-reservation-direct", "e2e-direct@example.test", 0);
-        insertReservation(generatedReservationId, e2eRoomId, recurrenceId, "e2e-admin", "e2e-reservation-generated", "e2e-generated@example.test", 2);
+        insertTag(e2eTagId, "testing-tag-cleanup");
+        insertRecurrence(recurrenceId, e2eRoomId, "testing-reservation-recurring");
+        insertReservation(directReservationId, e2eRoomId, null, "testing-admin", "testing-reservation-direct", "testing-direct@example.test", 0);
+        insertReservation(generatedReservationId, e2eRoomId, recurrenceId, "testing-admin", "testing-reservation-generated", "testing-generated@example.test", 2);
         insertReservation(normalReservationId, normalRoomId, null, "Manual User", "Manual reservation", "manual@example.test", 0);
         insertHistory(directReservationId);
         insertHistory(generatedReservationId);
@@ -88,9 +85,8 @@ class E2eTestDataCleanupIntegrationTest {
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.prefix").value("e2e-"))
+            .andExpect(jsonPath("$.prefix").value("testing-"))
             .andExpect(jsonPath("$.dryRun").value(false))
-            .andExpect(jsonPath("$.includeLegacy").value(false))
             .andExpect(jsonPath("$.reservationHistoriesDeleted").value(2))
             .andExpect(jsonPath("$.reservationsDeleted").value(2))
             .andExpect(jsonPath("$.recurrencesDeleted").value(1))
@@ -114,8 +110,8 @@ class E2eTestDataCleanupIntegrationTest {
         UUID e2eRoomId = UUID.randomUUID();
         UUID reservationId = UUID.randomUUID();
 
-        insertRoom(e2eRoomId, "e2e-room-preview");
-        insertReservation(reservationId, e2eRoomId, null, "e2e-admin", "e2e-reservation-preview", "e2e-preview@example.test", 0);
+        insertRoom(e2eRoomId, "testing-room-preview");
+        insertReservation(reservationId, e2eRoomId, null, "testing-admin", "testing-reservation-preview", "testing-preview@example.test", 0);
         insertHistory(reservationId);
 
         mockMvc.perform(get("/api/admin/test-data/e2e/preview")
@@ -123,7 +119,6 @@ class E2eTestDataCleanupIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.dryRun").value(true))
-            .andExpect(jsonPath("$.includeLegacy").value(false))
             .andExpect(jsonPath("$.reservationHistoriesDeleted").value(1))
             .andExpect(jsonPath("$.reservationsDeleted").value(1))
             .andExpect(jsonPath("$.tagsDeleted").value(0))
@@ -147,7 +142,7 @@ class E2eTestDataCleanupIntegrationTest {
             roomId,
             "Manual Recurring Admin",
             "manual-recurring@example.test",
-            "e2e-recurring-marker-cleanup"
+            "testing-recurring-marker-cleanup"
         );
         insertReservation(
             generatedReservationId,
@@ -179,36 +174,6 @@ class E2eTestDataCleanupIntegrationTest {
     }
 
     @Test
-    void includeLegacyDeletesOldE2eSpaceNamedDataOnlyWhenRequested() throws Exception {
-        MockHttpSession session = loginAdminSession();
-        UUID legacyRoomId = UUID.randomUUID();
-        UUID legacyReservationId = UUID.randomUUID();
-
-        insertRoom(legacyRoomId, "E2E Legacy Room");
-        insertReservation(legacyReservationId, legacyRoomId, null, "E2E Admin", "E2E legacy reservation", "legacy@example.test", 0);
-        insertHistory(legacyReservationId);
-
-        mockMvc.perform(get("/api/admin/test-data/e2e/preview")
-                .session(session))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.includeLegacy").value(false))
-            .andExpect(jsonPath("$.reservationsDeleted").value(0))
-            .andExpect(jsonPath("$.roomsDeleted").value(0));
-
-        mockMvc.perform(delete("/api/admin/test-data/e2e")
-                .session(session)
-                .param("includeLegacy", "true"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.includeLegacy").value(true))
-            .andExpect(jsonPath("$.reservationHistoriesDeleted").value(1))
-            .andExpect(jsonPath("$.reservationsDeleted").value(1))
-            .andExpect(jsonPath("$.roomsDeleted").value(1));
-
-        assertThat(count("select count(*) from rooms where id = ?", legacyRoomId)).isZero();
-        assertThat(count("select count(*) from reservations where id = ?", legacyReservationId)).isZero();
-    }
-
-    @Test
     void cleanupRejectsUnsafePrefix() throws Exception {
         MockHttpSession session = loginAdminSession();
 
@@ -234,8 +199,8 @@ class E2eTestDataCleanupIntegrationTest {
         insertRecurrence(
             recurrenceId,
             roomId,
-            "e2e-recurring-admin",
-            "e2e-recurring@example.test",
+            "testing-recurring-admin",
+            "testing-recurring@example.test",
             purpose
         );
     }
@@ -248,7 +213,7 @@ class E2eTestDataCleanupIntegrationTest {
         UUID recurrenceId = UUID.randomUUID();
 
         insertRoom(roomId, "Tag Cleanup Reference Room");
-        insertTag(tagId, "e2e-tag-referenced");
+        insertTag(tagId, "testing-tag-referenced");
         insertRecurrence(
             recurrenceId,
             roomId,

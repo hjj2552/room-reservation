@@ -24,14 +24,14 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void publicCanGetRoomDetail() throws Exception {
-        mockMvc.perform(get("/api/public/rooms/{roomId}", firstRoomId()))
+        mockMvc.perform(get("/api/public/rooms/{roomId}", testRoomId()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(firstRoomId().toString()));
+            .andExpect(jsonPath("$.id").value(testRoomId().toString()));
     }
 
     @Test
     void disabledRoomIsBlockedFromPublicDetail() throws Exception {
-        UUID roomId = firstRoomId();
+        UUID roomId = testRoomId();
         jdbcTemplate.update("update rooms set enabled = false where id = ?", roomId);
 
         mockMvc.perform(get("/api/public/rooms/{roomId}", roomId))
@@ -43,10 +43,10 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
         OffsetDateTime startAt = nextWeekdayAt(10, 0);
         createPublicReservation(startAt);
 
-        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", testRoomId())
                 .param("weekStart", startAt.toLocalDate().toString()))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.room.id").value(firstRoomId().toString()))
+            .andExpect(jsonPath("$.room.id").value(testRoomId().toString()))
             .andExpect(jsonPath("$.reservations[0].purpose").value("Study"));
     }
 
@@ -65,7 +65,7 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", testRoomId())
                 .param("weekStart", startAt.toLocalDate().toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.reservations.length()").value(0));
@@ -85,7 +85,7 @@ class PublicRoomQueryIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated())
             .andReturn()
             .getResponse()

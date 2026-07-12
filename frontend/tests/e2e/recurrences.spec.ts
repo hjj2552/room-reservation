@@ -21,8 +21,8 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
-    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-admin');
-    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-${Date.now()}@example.test`);
+    await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
+    await page.getByTestId('recurrence-email-input').fill(`testing-recurrence-${Date.now()}@example.test`);
     await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
@@ -65,7 +65,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
 
-    await page.getByTestId('recurrence-detail-cancel-memo-input').fill('e2e-recurrence-cancel');
+    await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>
       response.url().includes(`/api/admin/recurrences/${recurrenceId}/cancel`) &&
       response.request().method() === 'POST',
@@ -85,7 +85,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(row).toContainText('취소');
   } finally {
     if (recurrenceId && !cancelled) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
+      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }
@@ -99,15 +99,15 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
   const blocker = await e2eData.createTestReservation(room.id, 'recurrence-blocker', {
     startAt: recurrenceTime.firstStartAt,
     endAt: recurrenceTime.firstEndAt,
-    memo: 'e2e-recurrence-conflict-blocker',
+    memo: 'testing-recurrence-conflict-blocker',
   });
   let recurrenceId: string | undefined;
 
   try {
     await page.goto('/admin/recurrences');
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
-    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-admin');
-    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-skip-${Date.now()}@example.test`);
+    await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
+    await page.getByTestId('recurrence-email-input').fill(`testing-recurrence-skip-${Date.now()}@example.test`);
     await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
@@ -161,9 +161,9 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
   } finally {
     if (recurrenceId) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
+      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
-    await cancelReservationByApi(request, blocker.id, 'e2e-cleanup');
+    await cancelReservationByApi(request, blocker.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
   }
 });
@@ -179,8 +179,8 @@ test('recurrence create can select a configured tag', async ({ page, request, e2
   try {
     await page.goto('/admin/recurrences');
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
-    await page.getByTestId('recurrence-applicant-name-input').fill('e2e-recurrence-tag-admin');
-    await page.getByTestId('recurrence-email-input').fill(`e2e-recurrence-tag-${Date.now()}@example.test`);
+    await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-tag-admin');
+    await page.getByTestId('recurrence-email-input').fill(`testing-recurrence-tag-${Date.now()}@example.test`);
     await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
@@ -225,7 +225,7 @@ test('recurrence create can select a configured tag', async ({ page, request, e2
     await expect(row).toContainText(tag.name);
   } finally {
     if (recurrenceId) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'e2e-cleanup');
+      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
   }
 });

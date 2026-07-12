@@ -35,7 +35,7 @@ class RateLimitIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void writeEndpointReturnsTooManyRequestsAfterLimitExceeded() throws Exception {
-        UUID roomId = firstRoomId();
+        UUID roomId = testRoomId();
         String clientIp = "192.0.2.20";
 
         for (int i = 0; i < 24; i++) {

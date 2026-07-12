@@ -33,14 +33,14 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
     @Test
     void adminCanCreateUpdateToggleAndHardDeleteRoom() throws Exception {
         MockHttpSession session = loginAsAdmin();
-        UUID roomId = createRoom(session, "Room Test A");
+        UUID roomId = createRoom(session, "testing-room-admin-a");
 
         mockMvc.perform(put("/api/admin/rooms/{roomId}", roomId)
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "name": "Room Test A Updated",
+                      "name": "testing-room-admin-a-updated",
                       "location": "Annex 1F",
                       "capacity": 24,
                       "description": "Updated room",
@@ -48,7 +48,7 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
                     }
                     """))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.name").value("Room Test A Updated"))
+            .andExpect(jsonPath("$.name").value("testing-room-admin-a-updated"))
             .andExpect(jsonPath("$.capacity").value(24));
 
         mockMvc.perform(patch("/api/admin/rooms/{roomId}/enabled", roomId)
@@ -80,13 +80,13 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/public/rooms/{roomId}", roomId))
             .andExpect(status().isNotFound());
 
-        createRoom(session, "Room Test A Updated");
+        createRoom(session, "testing-room-admin-a-updated");
     }
 
     @Test
     void referencedRoomDeletionPreservesReservationAndMovesReferenceToSentinel() throws Exception {
         MockHttpSession session = loginAsAdmin();
-        String roomName = "Room Deleted With Reservation";
+        String roomName = "testing-room-deleted-with-reservation";
         UUID roomId = createRoom(session, roomName);
         createAdminReservation(
             session,
@@ -128,7 +128,7 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
     @Test
     void referencedRoomDeletionPreservesRecurrenceAndMovesReferenceToSentinel() throws Exception {
         MockHttpSession session = loginAsAdmin();
-        String roomName = "Room Deleted With Recurrence";
+        String roomName = "testing-room-deleted-with-recurrence";
         UUID roomId = createRoom(session, roomName);
         jdbcTemplate.update("""
             insert into reservation_recurrences (
@@ -208,14 +208,14 @@ class AdminRoomIntegrationTest extends IntegrationTestSupport {
     @Test
     void duplicateRoomNameFailsWithConflict() throws Exception {
         MockHttpSession session = loginAsAdmin();
-        createRoom(session, "Room Duplicate A");
+        createRoom(session, "testing-room-duplicate-a");
 
         mockMvc.perform(post("/api/admin/rooms")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
-                      "name": "Room Duplicate A",
+                      "name": "testing-room-duplicate-a",
                       "location": "Annex 2F",
                       "capacity": 12,
                       "description": "Duplicate",

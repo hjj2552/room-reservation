@@ -59,13 +59,13 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
     void adminCanFilterReservationHistoriesByServerSideConditions() throws Exception {
         MockHttpSession session = loginAsAdmin();
         OffsetDateTime fromAt = OffsetDateTime.now().minusMinutes(1);
-        UUID firstReservationId = createReservation(session, firstRoomId(), nextWeekdayAt(10, 0), "Audit first room");
+        UUID firstReservationId = createReservation(session, testRoomId(), nextWeekdayAt(10, 0), "Audit first room");
         UUID secondReservationId = createReservation(session, secondRoomId(), nextWeekdayAt(11, 0), "Audit second room");
         OffsetDateTime toAt = OffsetDateTime.now().plusMinutes(1);
 
         mockMvc.perform(get("/api/admin/audit/reservation-histories")
                 .session(session)
-                .param("roomId", firstRoomId().toString())
+                .param("roomId", testRoomId().toString())
                 .param("action", "CREATED_BY_ADMIN")
                 .param("from", fromAt.toString())
                 .param("to", toAt.toString())
@@ -124,7 +124,7 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
                       "status": "REQUESTED",
                       "memo": "enum update"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+                    """.formatted(testRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/admin/reservations/{reservationId}/approve", reservationId)
@@ -161,8 +161,8 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$[2].action").value("UPDATED"))
             .andExpect(jsonPath("$[2].beforeReservationPurpose").value("History enum"))
             .andExpect(jsonPath("$[2].reservationPurpose").value("History enum updated"))
-            .andExpect(jsonPath("$[2].beforeReservationRoomName").value("Room 101"))
-            .andExpect(jsonPath("$[2].reservationRoomName").value("Room 101"))
+            .andExpect(jsonPath("$[2].beforeReservationRoomName").value(testRoomName()))
+            .andExpect(jsonPath("$[2].reservationRoomName").value(testRoomName()))
             .andExpect(jsonPath("$[2].beforeReservationApplicantName").value("History User"))
             .andExpect(jsonPath("$[2].reservationApplicantName").value("History Updated"))
             .andExpect(jsonPath("$[2].beforeReservationApplicantEmail").value("history@example.com"))
@@ -176,7 +176,7 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
     }
 
     private UUID createReservation(MockHttpSession session, OffsetDateTime startAt, String purpose) throws Exception {
-        return createReservation(session, firstRoomId(), startAt, purpose);
+        return createReservation(session, testRoomId(), startAt, purpose);
     }
 
     private UUID createReservation(MockHttpSession session, UUID roomId, OffsetDateTime startAt, String purpose) throws Exception {
@@ -204,10 +204,7 @@ class ReservationHistoryIntegrationTest extends IntegrationTestSupport {
     }
 
     private UUID secondRoomId() {
-        return jdbcTemplate.queryForObject(
-            "select id from rooms where name = 'Seminar Room 201' and enabled = true and deleted_at is null",
-            UUID.class
-        );
+        return createTestRoom("secondary");
     }
 
     private MockHttpSession loginAsAdmin() throws Exception {

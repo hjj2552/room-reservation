@@ -56,7 +56,7 @@ class CsrfProtectionIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void publicStateChangingRequestRequiresCsrfToken() throws Exception {
-        UUID roomId = firstRoomId();
+        UUID roomId = testRoomId();
 
         rawMockMvc().perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)

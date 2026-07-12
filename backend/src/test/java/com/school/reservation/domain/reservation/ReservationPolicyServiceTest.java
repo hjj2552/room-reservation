@@ -33,7 +33,7 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), startAt, startAt.plusHours(1))))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("OUTSIDE_OPERATING_HOURS"));
     }

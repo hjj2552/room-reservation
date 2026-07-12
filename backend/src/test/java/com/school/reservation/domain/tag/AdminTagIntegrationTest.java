@@ -121,7 +121,7 @@ class AdminTagIntegrationTest extends IntegrationTestSupport {
                 values (?, ?, ?, 'Recurring User', 'recurring-tag-delete@example.com', '010-0000-0000', 'Tagged recurring reservation', current_date, current_date + interval '14 days', 'MON', '10:00', '11:00', 'SKIP_CONFLICTS'::recurrence_conflict_policy)
                 """,
             recurrenceId,
-            firstRoomId(),
+            testRoomId(),
             tagId
         );
 

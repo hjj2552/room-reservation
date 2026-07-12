@@ -47,7 +47,11 @@ async function main() {
     try {
       await cleanupE2eData({ required: cleanupRequired, label: 'after-suite' });
       if (cleanupRequired) {
-        const preview = await cleanupE2eData({ required: true, label: 'after-suite-preview', preview: true });
+        const preview = await cleanupE2eData({
+          required: true,
+          label: 'after-suite-preview',
+          preview: true,
+        });
         assertNoE2eDataLeft(preview);
       }
     } finally {
