@@ -42,7 +42,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt, endAt)))
+                    """.formatted(testRoomId(), startAt, endAt)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id", notNullValue()))
             .andExpect(jsonPath("$.status").value("REQUESTED"));
@@ -68,7 +68,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt.plusMinutes(30), endAt.plusMinutes(30))))
+                    """.formatted(testRoomId(), startAt.plusMinutes(30), endAt.plusMinutes(30))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
     }
@@ -94,7 +94,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "status": "CONFIRMED",
                       "memo": "created in public reservation conflict test"
                     }
-                    """.formatted(firstRoomId(), startAt, endAt)))
+                    """.formatted(testRoomId(), startAt, endAt)))
             .andExpect(status().isCreated());
 
         mockMvc.perform(post("/api/public/reservations")
@@ -110,7 +110,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt.plusMinutes(30), endAt)))
+                    """.formatted(testRoomId(), startAt.plusMinutes(30), endAt)))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
     }
@@ -133,7 +133,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), startAt, startAt.plusHours(1))))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("RESERVATION_DISABLED"));
     }
@@ -211,7 +211,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
+                    """.formatted(testRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
             .andExpect(jsonPath("$.purpose").value("Edited requested purpose"));
@@ -251,7 +251,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
+                    """.formatted(testRoomId(), updatedStartAt, updatedStartAt.plusHours(1))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
             .andExpect(jsonPath("$.purpose").value("Edited confirmed status purpose"));
@@ -282,7 +282,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
         approveReservation(reservationId);
         createAdminReservation(
             session,
-            firstRoomId(),
+            testRoomId(),
             "Admin Conflict User",
             "admin-conflict@example.com",
             conflictingStartAt,
@@ -303,7 +303,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), conflictingStartAt.plusMinutes(30), conflictingStartAt.plusHours(1))))
+                    """.formatted(testRoomId(), conflictingStartAt.plusMinutes(30), conflictingStartAt.plusHours(1))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
 
@@ -352,7 +352,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+                    """.formatted(testRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -371,7 +371,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), purpose, startAt, endAt)))
+                    """.formatted(testRoomId(), purpose, startAt, endAt)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("REQUESTED"));
     }
@@ -390,7 +390,7 @@ class PublicReservationIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "cancelPassword": "test-password"
                     }
-                    """.formatted(firstRoomId(), purpose, startAt, endAt)))
+                    """.formatted(testRoomId(), purpose, startAt, endAt)))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
             .andReturn()

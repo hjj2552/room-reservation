@@ -22,17 +22,15 @@ public class E2eTestDataCleanupController {
 
     @DeleteMapping
     public E2eTestDataCleanupResponse cleanup(
-        @RequestParam(defaultValue = "e2e-") String prefix,
-        @RequestParam(defaultValue = "false") boolean includeLegacy
+        @RequestParam(defaultValue = "testing-") String prefix
     ) {
-        return cleanupService.cleanup(prefix, includeLegacy, false);
+        return cleanupService.cleanup(prefix, false);
     }
 
     @GetMapping("/preview")
     public E2eTestDataCleanupResponse preview(
-        @RequestParam(defaultValue = "e2e-") String prefix,
-        @RequestParam(defaultValue = "false") boolean includeLegacy
+        @RequestParam(defaultValue = "testing-") String prefix
     ) {
-        return cleanupService.cleanup(prefix, includeLegacy, true);
+        return cleanupService.cleanup(prefix, true);
     }
 }

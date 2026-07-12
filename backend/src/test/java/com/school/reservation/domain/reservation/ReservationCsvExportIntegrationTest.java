@@ -69,7 +69,7 @@ class ReservationCsvExportIntegrationTest extends IntegrationTestSupport {
                       "endAt": "%s",
                       "status": "CONFIRMED"
                     }
-                    """.formatted(firstRoomId(), applicantName, email, startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), applicantName, email, startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated());
     }
 

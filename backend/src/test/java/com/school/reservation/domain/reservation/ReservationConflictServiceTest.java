@@ -32,7 +32,7 @@ class ReservationConflictServiceTest extends IntegrationTestSupport {
               "endAt": "%s",
               "cancelPassword": "test-password"
             }
-            """.formatted(firstRoomId(), startAt, endAt);
+            """.formatted(testRoomId(), startAt, endAt);
 
         mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)

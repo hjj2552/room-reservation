@@ -187,7 +187,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
   const purpose = e2eData.name('public-purpose');
   const email = `${e2eData.name('public-email')}@example.test`;
   const phone = '010-3333-4444';
-  const cancelPassword = 'e2e-public-password';
+  const cancelPassword = 'testing-public-password';
 
   try {
     await page.goto('/timetable');
@@ -301,9 +301,9 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
   const reservation = await e2eData.createTestPublicReservation(room.id, 'public-edit-approved', {
     startAt: `${createTime.startAt}:00+09:00`,
     endAt: `${createTime.endAt}:00+09:00`,
-    cancelPassword: 'e2e-public-edit-password',
+    cancelPassword: 'testing-public-edit-password',
   });
-  await approveReservationByApi(request, reservation.id, 'e2e-approve-public-edit');
+  await approveReservationByApi(request, reservation.id, 'testing-approve-public-edit');
   const editedPurpose = e2eData.name('reservation-public-edit-updated');
   const editedName = e2eData.name('public-edit-applicant-updated');
   const editedEmail = `${e2eData.name('public-edit-email-updated')}@example.test`;

@@ -58,7 +58,7 @@ export const adminCredentials = {
   password: process.env.ADMIN_PASSWORD || 'admin1234',
 };
 
-export const E2E_TEST_DATA_PREFIX = 'e2e-';
+export const E2E_TEST_DATA_PREFIX = 'testing-';
 
 export async function loginByUi(page: Page) {
   await page.goto('/admin/login');
@@ -166,7 +166,7 @@ export async function createPublicReservationByApi(
   const applicantName = options.applicantName || uniqueE2eName('public-applicant');
   const applicantEmail = options.applicantEmail || `${uniqueE2eName('public-email')}@example.test`;
   const applicantPhone = options.applicantPhone || '010-3000-4000';
-  const cancelPassword = options.cancelPassword || 'e2e-public-password';
+  const cancelPassword = options.cancelPassword || 'testing-public-password';
   const response = await request.post('/api/public/reservations', {
     headers: await csrfHeaders(request),
     data: {

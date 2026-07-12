@@ -211,21 +211,14 @@ npm run e2e:ci
 ```
 
 E2E runner는 기본적으로 백엔드 readiness URL이 열려 있지 않으면 `e2e` profile로 백엔드 jar를 실행하고, 프런트엔드 URL이 열려 있지 않으면 Vite 개발 서버를 실행합니다.
-E2E가 만든 강의실, 태그, 예약, 반복 예약은 `e2e-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
+E2E가 만든 강의실, 태그, 예약, 반복 예약은 `testing-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
 
 ```powershell
 npm run e2e:cleanup:preview
 npm run e2e:cleanup
 ```
 
-기존 구버전 E2E가 남긴 `E2E ...` 형식의 dev/UAT 데이터까지 정리해야 하면 preview 후 legacy cleanup을 실행합니다.
-
-```powershell
-npm run e2e:cleanup:legacy:preview
-npm run e2e:cleanup:legacy
-```
-
-`local` 또는 `dev` profile 백엔드에 대해 이 명령을 쓰려면 백엔드를 `E2E_CLEANUP_ENABLED=true`로 실행해야 합니다. cleanup은 `e2e-` prefix가 붙은 데이터와 그 반복예약 하위 예약만 삭제하며, legacy 옵션은 구버전 `E2E ...` 테스트 데이터만 추가로 대상으로 삼습니다. `prod` profile에서는 endpoint가 로드되지 않습니다.
+`local` 또는 `dev` profile 백엔드에 대해 이 명령을 쓰려면 백엔드를 `E2E_CLEANUP_ENABLED=true`로 실행해야 합니다. cleanup은 `testing-` prefix가 붙은 데이터와 그 반복예약 하위 예약만 삭제합니다. `prod` profile에서는 endpoint가 로드되지 않습니다.
 
 로컬 백엔드에서 수동 cleanup endpoint를 열어 실행하는 예시는 다음과 같습니다.
 

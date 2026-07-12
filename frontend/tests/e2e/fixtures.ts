@@ -137,7 +137,7 @@ export { expect };
 
 async function cleanupRegisteredResources(request: APIRequestContext, registry: E2eResourceRegistry) {
   for (const recurrenceId of [...registry.recurrences].reverse()) {
-    await postIgnoringFailures(request, `/api/admin/recurrences/${recurrenceId}/cancel`, { memo: 'e2e-fixture-cleanup' });
+    await postIgnoringFailures(request, `/api/admin/recurrences/${recurrenceId}/cancel`, { memo: 'testing-fixture-cleanup' });
   }
   for (const reservationId of [...registry.reservations].reverse()) {
     await deleteReservationIgnoringFailures(request, reservationId);
@@ -152,7 +152,7 @@ async function cleanupRegisteredResources(request: APIRequestContext, registry: 
 
 async function deleteReservationIgnoringFailures(request: APIRequestContext, reservationId: string) {
   try {
-    await deleteReservationByApi(request, reservationId, 'e2e-fixture-cleanup');
+    await deleteReservationByApi(request, reservationId, 'testing-fixture-cleanup');
   } catch {
     // Prefix cleanup runs next and handles any resources that are still present.
   }

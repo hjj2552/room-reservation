@@ -1,13 +1,12 @@
 import { pathToFileURL } from 'node:url';
 
 const defaultBackendUrl = 'http://127.0.0.1:8080/api/public/settings';
-const defaultPrefix = 'e2e-';
+const defaultPrefix = 'testing-';
 
 export async function cleanupE2eData({
   required = true,
   label = 'manual',
   preview = false,
-  includeLegacy = false,
 } = {}) {
   try {
     const apiBaseUrl = resolveApiBaseUrl();
@@ -19,7 +18,6 @@ export async function cleanupE2eData({
     cookie = mergeCookieHeaders(cookie, csrf.cookie);
     const params = new URLSearchParams({
       prefix,
-      includeLegacy: String(includeLegacy),
     });
     const path = preview ? '/api/admin/test-data/e2e/preview' : '/api/admin/test-data/e2e';
     const cleanupUrl = `${apiBaseUrl}${path}?${params.toString()}`;
@@ -173,7 +171,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const args = new Set(process.argv.slice(2));
   cleanupE2eData({
     preview: args.has('--preview'),
-    includeLegacy: args.has('--include-legacy'),
   }).catch((error) => {
     console.error(error);
     process.exitCode = 1;

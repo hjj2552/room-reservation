@@ -45,7 +45,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "CONFIRMED",
                       "memo": "update in test"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+                    """.formatted(testRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(reservationId.toString()))
             .andExpect(jsonPath("$.applicantName").value("Admin Updated"))
@@ -83,7 +83,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "REQUESTED",
                       "memo": "reactivate as requested"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
+                    """.formatted(testRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("REQUESTED"))
             .andExpect(jsonPath("$.purpose").value("Reactivated as requested"));
@@ -120,7 +120,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "CONFIRMED",
                       "memo": "reactivate as confirmed status"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
+                    """.formatted(testRoomId(), startAt.plusHours(2), startAt.plusHours(3))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("CONFIRMED"))
             .andExpect(jsonPath("$.purpose").value("Reactivated as confirmed status"));
@@ -158,7 +158,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "REQUESTED",
                       "memo": "reactivate conflict"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+                    """.formatted(testRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
     }
@@ -195,7 +195,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "CONFIRMED",
                       "memo": "reactivate confirmed status conflict"
                     }
-                    """.formatted(firstRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
+                    """.formatted(testRoomId(), startAt.plusHours(1), startAt.plusHours(2))))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("TIME_SLOT_CONFLICT"));
     }
@@ -216,7 +216,7 @@ class AdminReservationWriteIntegrationTest extends IntegrationTestSupport {
                       "status": "CONFIRMED",
                       "memo": "created in test"
                     }
-                    """.formatted(firstRoomId(), purpose, startAt, startAt.plusHours(1))))
+                    """.formatted(testRoomId(), purpose, startAt, startAt.plusHours(1))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.source").value("ADMIN_MANUAL"))
             .andReturn()

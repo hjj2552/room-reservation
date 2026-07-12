@@ -15,8 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(prefix = "app.e2e-cleanup", name = "enabled", havingValue = "true")
 public class E2eTestDataCleanupService {
 
-    private static final String DEFAULT_PREFIX = "e2e-";
-    private static final String LEGACY_PREFIX = "e2e ";
+    private static final String DEFAULT_PREFIX = "testing-";
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
@@ -25,9 +24,9 @@ public class E2eTestDataCleanupService {
     }
 
     @Transactional
-    public E2eTestDataCleanupResponse cleanup(String prefix, boolean includeLegacy, boolean dryRun) {
+    public E2eTestDataCleanupResponse cleanup(String prefix, boolean dryRun) {
         String normalizedPrefix = normalizePrefix(prefix);
-        MatchPatterns patterns = new MatchPatterns(normalizedPrefix + "%", includeLegacy ? LEGACY_PREFIX + "%" : null);
+        MatchPatterns patterns = new MatchPatterns(normalizedPrefix + "%");
         List<UUID> roomIds = findRoomIds(patterns);
         List<UUID> tagIds = findTagIds(patterns);
         List<UUID> recurrenceIds = findRecurrenceIds(patterns, roomIds);
@@ -39,7 +38,6 @@ public class E2eTestDataCleanupService {
             return new E2eTestDataCleanupResponse(
                 normalizedPrefix,
                 true,
-                includeLegacy,
                 countHistories(patterns, reservationIds),
                 reservationIds.size(),
                 recurrenceIds.size(),
@@ -65,7 +63,6 @@ public class E2eTestDataCleanupService {
         return new E2eTestDataCleanupResponse(
             normalizedPrefix,
             false,
-            includeLegacy,
             historyCount,
             reservationCount,
             recurrenceCount,
@@ -79,7 +76,7 @@ public class E2eTestDataCleanupService {
     private String normalizePrefix(String prefix) {
         String normalized = prefix == null || prefix.isBlank() ? DEFAULT_PREFIX : prefix.trim().toLowerCase();
         if (!normalized.startsWith(DEFAULT_PREFIX) || normalized.length() < DEFAULT_PREFIX.length()) {
-            throw new IllegalArgumentException("E2E cleanup prefix must start with e2e-.");
+            throw new IllegalArgumentException("E2E cleanup prefix must start with testing-.");
         }
         if (normalized.contains("%") || normalized.contains("_")) {
             throw new IllegalArgumentException("E2E cleanup prefix cannot contain SQL wildcard characters.");
@@ -295,16 +292,11 @@ public class E2eTestDataCleanupService {
     }
 
     private MapSqlParameterSource params(MatchPatterns patterns) {
-        return new MapSqlParameterSource("prefix", patterns.prefixPattern())
-            .addValue("legacyPrefix", patterns.legacyPrefixPattern());
+        return new MapSqlParameterSource("prefix", patterns.prefixPattern());
     }
 
     private String matchExpression(MatchPatterns patterns, String column) {
-        String expression = "lower(" + column + ") like :prefix";
-        if (patterns.legacyPrefixPattern() != null) {
-            expression += " or lower(" + column + ") like :legacyPrefix";
-        }
-        return "(" + expression + ")";
+        return "(lower(" + column + ") like :prefix)";
     }
 
     private String historyMatchExpression(MatchPatterns patterns, List<UUID> reservationIds) {
@@ -316,6 +308,6 @@ public class E2eTestDataCleanupService {
         return "(" + expression + ")";
     }
 
-    private record MatchPatterns(String prefixPattern, String legacyPrefixPattern) {
+    private record MatchPatterns(String prefixPattern) {
     }
 }

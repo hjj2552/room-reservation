@@ -154,7 +154,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.items[0].seriesLabel").value(nullValue()))
             .andExpect(jsonPath("$.items[0].seriesColor").value(nullValue()));
 
-        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", testRoomId())
                 .param("weekStart", startDate.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.reservations[0].recurrenceId").value(recurrenceId.toString()))
@@ -204,7 +204,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
             .andExpect(jsonPath("$.series.label").value("After Update"))
             .andExpect(jsonPath("$.series.color").value("#dc2626"));
 
-        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", firstRoomId())
+        mockMvc.perform(get("/api/public/rooms/{roomId}/weekly-reservations", testRoomId())
                 .param("weekStart", startDate.toString()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.reservations[0].recurrenceId").value(recurrenceId.toString()))
@@ -321,7 +321,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
               "applicantPhone": "010-5555-5555",
               "conflictPolicy": "%s"
             }
-            """.formatted(firstRoomId(), startDate, endDate, dayCode(startDate), conflictPolicy);
+            """.formatted(testRoomId(), startDate, endDate, dayCode(startDate), conflictPolicy);
     }
 
     private String createBody(LocalDate startDate, LocalDate endDate, String conflictPolicy) {
@@ -349,7 +349,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
               "conflictPolicy": "%s"
             }
             """.formatted(
-                firstRoomId(),
+                testRoomId(),
                 purpose,
                 tagId == null ? "null" : "\"" + tagId + "\"",
                 startDate,
@@ -376,7 +376,7 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
         OffsetDateTime startAt = date.atTime(9, 0).atOffset(java.time.ZoneOffset.ofHours(9));
         createAdminReservation(
             session,
-            firstRoomId(),
+            testRoomId(),
             "Blocker",
             "blocker@example.com",
             startAt,
