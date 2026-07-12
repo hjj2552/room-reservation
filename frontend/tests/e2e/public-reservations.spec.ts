@@ -38,6 +38,87 @@ test('legacy public routes fall through to the current root fallback', async ({ 
   }
 });
 
+test('public timetable exposes room descriptions without changing timetable context', async ({ page, e2eData }) => {
+  const description = [
+    '프로젝터와 HDMI 케이블을 사용할 수 있습니다.',
+    '음식물 반입은 허용되지 않습니다.',
+    '퇴실 전 냉난방기 전원을 확인해 주세요.',
+  ].join('\n');
+  const informedRoom = await e2eData.createTestRoom('public-room-info', {
+    location: '본관 2층',
+    description,
+  });
+  const blankRoom = await e2eData.createTestRoom('public-room-info-blank', {
+    description: '   ',
+  });
+
+  await page.goto('/timetable?view=date&date=2026-09-10');
+  const timetableScroll = page.getByRole('region', { name: '2026-09-10 날짜별 예약 시간표' });
+  const informedHeader = page.locator('.timetable-room-header').filter({ hasText: informedRoom.name });
+  const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 강의실 안내 보기` });
+  const blankHeader = page.locator('.timetable-room-header').filter({ hasText: blankRoom.name });
+
+  await expect(infoTrigger).toBeVisible();
+  await expect(blankHeader.getByRole('button')).toHaveCount(0);
+  await infoTrigger.scrollIntoViewIfNeeded();
+  await timetableScroll.evaluate((element) => {
+    element.scrollTop = 120;
+  });
+  const urlBeforeModal = page.url();
+  const scrollBeforeModal = await timetableScroll.evaluate((element) => ({
+    left: element.scrollLeft,
+    top: element.scrollTop,
+  }));
+
+  await infoTrigger.click();
+  const dialog = page.getByRole('dialog', { name: '강의실 안내' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(informedRoom.name);
+  await expect(dialog).toContainText('본관 2층');
+  await expect(dialog.locator('.room-info-description')).toHaveCSS('white-space', 'pre-wrap');
+  await expect(dialog.locator('.room-info-description')).toContainText('음식물 반입은 허용되지 않습니다.');
+  await expect(dialog.getByRole('button', { name: '접기' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '강의실 안내 닫기' })).toBeFocused();
+  await page.getByRole('button', { name: '강의실 안내 닫기' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(infoTrigger).toBeFocused();
+  expect(page.url()).toBe(urlBeforeModal);
+  expect(await timetableScroll.evaluate((element) => ({ left: element.scrollLeft, top: element.scrollTop })))
+    .toEqual(scrollBeforeModal);
+
+  await infoTrigger.click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(infoTrigger).toBeFocused();
+
+  await infoTrigger.click();
+  await page.getByTestId('room-info-backdrop').click({ position: { x: 4, y: 4 } });
+  await expect(dialog).toBeHidden();
+
+  await page.getByTestId('public-timetable-view-room').click();
+  await page.getByTestId('public-timetable-room-select').selectOption(informedRoom.id);
+  const roomTimetable = page.getByTestId('reservation-room-timetable');
+  await expect(roomTimetable.locator('.timetable-room-summary-title')).toContainText(informedRoom.name);
+  const moreButton = page.getByTestId('room-info-more-button');
+  await expect(moreButton).toBeVisible();
+  await moreButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('본관 2층');
+  await page.getByRole('button', { name: '강의실 안내 닫기' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(moreButton).toBeFocused();
+
+  await page.getByTestId('public-timetable-room-select').selectOption(blankRoom.id);
+  await expect(page.getByTestId('room-info-more-button')).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByTestId('public-timetable-room-select').selectOption(informedRoom.id);
+  await expect(page.getByTestId('room-info-more-button')).toBeVisible();
+  await page.getByTestId('room-info-more-button').click();
+  await expect(dialog).toContainText('퇴실 전 냉난방기 전원을 확인해 주세요.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('public toolbar request opens the shared panel without slot room context', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -174,8 +255,17 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(page.getByRole('link', { name: '시간표로 돌아가기', exact: true })).toHaveCount(0);
     await expect(page.getByTestId('public-detail-action-buttons').getByRole('button')).toHaveText(['취소', '수정']);
 
-    await page.getByRole('button', { name: '취소', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: '예약 비밀번호 확인' })).toBeVisible();
+    const cancelButton = page.getByRole('button', { name: '취소', exact: true });
+    await cancelButton.click();
+    const passwordDialog = page.getByRole('dialog', { name: '예약 비밀번호 확인' });
+    await expect(passwordDialog).toBeVisible();
+    await expect(passwordDialog.locator('.modal-close-button')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(passwordDialog).toBeHidden();
+    await expect(cancelButton).toBeFocused();
+
+    await cancelButton.click();
+    await expect(passwordDialog).toBeVisible();
     await page.getByTestId('public-cancel-password-input').fill('wrong-password');
     await page.getByTestId('public-cancel-submit-button').click();
     await expect(page.getByRole('alert')).toContainText('예약 비밀번호가 일치하지 않습니다');

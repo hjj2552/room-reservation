@@ -19,6 +19,7 @@ export interface TimetableRoom {
   id: string;
   name: string;
   location?: string | null;
+  description?: string | null;
 }
 
 export interface TimetableReservation {
@@ -45,6 +46,7 @@ interface ReservationDateTimetableProps {
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
   onReservationClick?: (reservation: TimetableReservation) => void;
+  onRoomInfoClick?: (room: TimetableRoom) => void;
   statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
 }
 
@@ -117,6 +119,7 @@ export function ReservationDateTimetable({
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
+  onRoomInfoClick,
   statusLabelOverride,
 }: ReservationDateTimetableProps) {
   const navigate = useNavigate();
@@ -161,12 +164,31 @@ export function ReservationDateTimetable({
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>
         <div className="timetable-grid" style={timetableGridStyle(rooms.length)}>
           <div className="timetable-corner">시간</div>
-          {rooms.map((room) => (
-            <div key={room.id} className="timetable-room-header">
-              <strong>{room.name}</strong>
-              {room.location ? <span>{room.location}</span> : null}
-            </div>
-          ))}
+          {rooms.map((room) => {
+            const canShowRoomInfo = Boolean(onRoomInfoClick && room.description?.trim());
+
+            return (
+              <div key={room.id} className="timetable-room-header">
+                {canShowRoomInfo ? (
+                  <button
+                    type="button"
+                    className="timetable-room-info-trigger"
+                    onClick={() => onRoomInfoClick?.(room)}
+                    aria-label={`${room.name} 강의실 안내 보기`}
+                    data-testid="timetable-room-info-trigger"
+                  >
+                    <strong>{room.name}</strong>
+                    {room.location ? <span>{room.location}</span> : null}
+                  </button>
+                ) : (
+                  <>
+                    <strong>{room.name}</strong>
+                    {room.location ? <span>{room.location}</span> : null}
+                  </>
+                )}
+              </div>
+            );
+          })}
           <div className="timetable-time-column" style={{ height: bodyHeight }}>
             {slots.map((slot) => (
               <div

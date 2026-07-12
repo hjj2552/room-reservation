@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
@@ -142,46 +143,39 @@ export function PublicReservationDetailPage() {
       />
 
       {showCancelConfirmation ? (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="modal-panel reservation-password-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="public-cancel-confirm-title"
-            aria-describedby="public-cancel-confirm-description"
-            onKeyDown={(event) => {
-              if (event.key === 'Escape' && !cancel.isPending) closeCancelConfirmation();
-            }}
-          >
-            <div className="modal-header">
-              <h2 id="public-cancel-confirm-title">취소할까요?</h2>
-            </div>
-            <p id="public-cancel-confirm-description" className="muted">
-              취소하면 공개 화면에서 이 예약을 수정하거나 다시 활성화할 수 없습니다.
-            </p>
-            {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={closeCancelConfirmation}
-                disabled={cancel.isPending}
-                autoFocus
-              >
-                돌아가기
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                onClick={confirmCancellation}
-                disabled={cancel.isPending}
-                data-testid="public-cancel-confirm-button"
-              >
-                {cancel.isPending ? '취소 중...' : '취소'}
-              </button>
-            </div>
-          </section>
-        </div>
+        <ModalDialog
+          title="취소할까요?"
+          titleId="public-cancel-confirm-title"
+          ariaDescribedBy="public-cancel-confirm-description"
+          className="reservation-password-modal"
+          onClose={closeCancelConfirmation}
+          closeDisabled={cancel.isPending}
+        >
+          <p id="public-cancel-confirm-description" className="muted">
+            취소하면 공개 화면에서 이 예약을 수정하거나 다시 활성화할 수 없습니다.
+          </p>
+          {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={closeCancelConfirmation}
+              disabled={cancel.isPending}
+              autoFocus
+            >
+              돌아가기
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              onClick={confirmCancellation}
+              disabled={cancel.isPending}
+              data-testid="public-cancel-confirm-button"
+            >
+              {cancel.isPending ? '취소 중...' : '취소'}
+            </button>
+          </div>
+        </ModalDialog>
       ) : null}
     </main>
   );

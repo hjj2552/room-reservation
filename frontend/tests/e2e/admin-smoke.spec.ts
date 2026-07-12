@@ -21,6 +21,7 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
 
     const updatedLocation = e2eData.name('updated-location');
     await expect(page.getByTestId('room-name-input')).toHaveValue(room.name);
+    await expect(page.getByLabel('강의실 안내')).toBeVisible();
     await page.getByTestId('room-location-input').fill(updatedLocation);
     await page.getByTestId('room-save-button').click();
 
@@ -39,8 +40,16 @@ test('rooms smoke: deletion requires matching room name and server checks', asyn
   await expect(row).toBeVisible();
 
   await row.getByTestId('room-delete-button').click();
-  await expect(page.getByTestId('room-delete-modal')).toBeVisible();
+  const deleteModal = page.getByTestId('room-delete-modal');
+  await expect(deleteModal).toBeVisible();
   await expect(page.getByRole('heading', { name: '강의실 영구 삭제' })).toBeVisible();
+  await expect(deleteModal.locator('.modal-close-button')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(deleteModal).toBeHidden();
+  await expect(row.getByTestId('room-delete-button')).toBeFocused();
+
+  await row.getByTestId('room-delete-button').click();
+  await expect(deleteModal).toBeVisible();
   await expect(page.getByText('삭제 후 복구할 수 없습니다')).toBeVisible();
   await expect(page.getByTestId('room-delete-checks')).toHaveCount(0);
 

@@ -33,6 +33,7 @@ interface ReservationRoomTimetableProps {
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
   onReservationClick?: (reservation: TimetableReservation) => void;
+  onRoomInfoClick?: () => void;
   statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
 }
 
@@ -68,6 +69,7 @@ export function ReservationRoomTimetable({
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
+  onRoomInfoClick,
   statusLabelOverride,
 }: ReservationRoomTimetableProps) {
   const navigate = useNavigate();
@@ -105,7 +107,19 @@ export function ReservationRoomTimetable({
   return (
     <div className="timetable-card" data-testid="reservation-room-timetable">
       <div className="timetable-summary" aria-live="polite">
-        <strong>{room.name}</strong>
+        <div className="timetable-room-summary-title">
+          <strong>{room.name}</strong>
+          {onRoomInfoClick ? (
+            <button
+              type="button"
+              className="ghost-button timetable-room-more-button"
+              onClick={onRoomInfoClick}
+              data-testid="room-info-more-button"
+            >
+              더 보기
+            </button>
+          ) : null}
+        </div>
         <span>
           {weekStart}-{addDays(weekStart, 6)} · {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 예약{' '}
           {reservations.length}건
