@@ -25,7 +25,10 @@ interface E2eResourceRegistry {
 
 interface E2eDataFactory {
   name(label: string): string;
-  createTestRoom(label: string): Promise<E2eRoom>;
+  createTestRoom(
+    label: string,
+    options?: { location?: string | null; description?: string | null },
+  ): Promise<E2eRoom>;
   createTestTag(label: string, options?: { color?: string }): Promise<E2eTag>;
   createTestReservation(
     roomId: string,
@@ -86,8 +89,8 @@ export const test = base.extend<E2eFixtures>({
   e2eData: async ({ request, e2eRegistry }, use) => {
     await use({
       name: uniqueE2eName,
-      createTestRoom: async (label) => {
-        const room = await createRoomByApi(request, uniqueE2eName(`room-${label}`));
+      createTestRoom: async (label, options) => {
+        const room = await createRoomByApi(request, uniqueE2eName(`room-${label}`), options);
         e2eRegistry.rooms.push(room.id);
         return room;
       },

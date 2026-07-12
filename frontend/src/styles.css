@@ -658,6 +658,30 @@ button:disabled {
   white-space: nowrap;
 }
 
+.timetable-room-info-trigger {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  width: calc(100% + 8px);
+  min-width: 0;
+  margin: -3px -4px;
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.timetable-room-info-trigger:hover {
+  background: #e6edf3;
+}
+
+.timetable-room-info-trigger:focus-visible {
+  background: #ffffff;
+}
+
 .timetable-day-header {
   position: sticky;
   top: 0;
@@ -1218,6 +1242,77 @@ button:disabled {
   margin: 0;
   font-size: 20px;
   letter-spacing: 0;
+}
+
+.modal-close-button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0;
+  background: transparent;
+  color: #475466;
+  cursor: pointer;
+}
+
+.modal-close-button:hover {
+  border-color: #d9e0e8;
+  background: #eef3f8;
+}
+
+.room-info-modal {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.room-info-modal-body {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.room-info-heading {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid #d9e0e8;
+  padding-bottom: 14px;
+}
+
+.room-info-heading strong {
+  font-size: 18px;
+}
+
+.room-info-heading span {
+  color: #687484;
+  font-size: 14px;
+}
+
+.room-info-description {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.room-info-description {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.timetable-room-summary-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timetable-room-more-button {
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 13px;
 }
 
 .modal-actions {

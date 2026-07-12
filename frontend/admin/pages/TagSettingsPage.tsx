@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { errorMessage } from '../../shared/api/http';
 import type { Tag, TagFilters } from '../../shared/api/types';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '../../shared/hooks/useTags';
@@ -249,25 +250,26 @@ export function TagSettingsPage() {
       ) : null}
 
       {deletingTag ? (
-        <div className="modal-backdrop" role="presentation">
-          <section className="modal-panel reservation-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-tag-title">
-            <div className="modal-header">
-              <h2 id="delete-tag-title">태그 삭제</h2>
-            </div>
-            <p className="danger-copy">
-              {deletingTag.name} 태그를 삭제하면 참조 중인 반복 예약의 태그가 없음으로 변경됩니다.
-            </p>
-            {deleteTag.isError ? <div className="inline-error" role="alert">{errorMessage(deleteTag.error)}</div> : null}
-            <div className="modal-actions">
-              <button type="button" className="ghost-button" onClick={() => setDeletingTag(null)}>
-                취소
-              </button>
-              <button type="button" className="danger-button" onClick={handleDelete} disabled={deleteTag.isPending}>
-                {deleteTag.isPending ? '삭제 중...' : '삭제'}
-              </button>
-            </div>
-          </section>
-        </div>
+        <ModalDialog
+          title="태그 삭제"
+          titleId="delete-tag-title"
+          className="reservation-delete-modal"
+          onClose={() => setDeletingTag(null)}
+          closeDisabled={deleteTag.isPending}
+        >
+          <p className="danger-copy">
+            {deletingTag.name} 태그를 삭제하면 참조 중인 반복 예약의 태그가 없음으로 변경됩니다.
+          </p>
+          {deleteTag.isError ? <div className="inline-error" role="alert">{errorMessage(deleteTag.error)}</div> : null}
+          <div className="modal-actions">
+            <button type="button" className="ghost-button" onClick={() => setDeletingTag(null)} autoFocus>
+              돌아가기
+            </button>
+            <button type="button" className="danger-button" onClick={handleDelete} disabled={deleteTag.isPending}>
+              {deleteTag.isPending ? '삭제 중...' : '삭제'}
+            </button>
+          </div>
+        </ModalDialog>
       ) : null}
     </section>
   );

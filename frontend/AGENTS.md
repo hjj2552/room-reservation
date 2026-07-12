@@ -7,7 +7,7 @@ These rules apply to `frontend`, especially Playwright E2E work.
 - Import `test` and `expect` from `tests/e2e/fixtures.ts`, not directly from `@playwright/test`, for any admin spec that creates data.
 - Use the `e2eData` fixture for E2E-owned data:
   - `e2eData.name(label)` for unique `e2e-` names.
-  - `e2eData.createTestRoom(label)` for rooms; it prefixes and registers the room id.
+  - `e2eData.createTestRoom(label, options)` for rooms; it prefixes and registers the room id, and supports location/description display cases.
   - `e2eData.createTestTag(label, options)` for tags; it prefixes and registers the tag id.
   - `e2eData.createTestReservation(roomId, label, options)` for API-seeded reservations; it prefixes and registers the reservation id.
   - `e2eData.createTestPublicReservation(roomId, label, options)` for API-seeded public reservations; it prefixes, keeps the public password in the returned object, and registers the reservation id.

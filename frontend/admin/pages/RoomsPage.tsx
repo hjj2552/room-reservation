@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { errorMessage } from '../../shared/api/http';
 import type { AdminRoom, RoomPayload } from '../../shared/api/types';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCreateRoom,
@@ -272,7 +273,7 @@ export function RoomsPage() {
               예약 대상으로 사용
             </label>
             <label>
-              설명
+              강의실 안내
               <textarea
                 data-testid="room-description-input"
                 rows={4}
@@ -294,70 +295,63 @@ export function RoomsPage() {
       </div>
 
       {deleteTarget ? (
-        <div className="modal-backdrop" role="presentation">
-          <section
-            className="modal-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="room-delete-title"
-            data-testid="room-delete-modal"
-          >
-            <div className="modal-header">
-              <div>
-                <h2 id="room-delete-title">강의실 영구 삭제</h2>
-              </div>
+        <ModalDialog
+          title="강의실 영구 삭제"
+          titleId="room-delete-title"
+          onClose={closeDeleteModal}
+          closeDisabled={deleteRoom.isPending}
+          testId="room-delete-modal"
+        >
+          <p className="danger-copy">
+            삭제 후 복구할 수 없습니다. 강의실은 목록에서 제거되며 기존 예약 기록은 삭제된 강의실로 보존됩니다.
+          </p>
+
+          {deletionCheck.isLoading ? <LoadingState /> : null}
+          {deletionCheck.isError ? <ErrorState error={deletionCheck.error} /> : null}
+          {visibleDeletionChecks.length ? (
+            <ul className="check-list" data-testid="room-delete-checks">
+              {visibleDeletionChecks.map((check) => (
+                <li key={check.code} className={check.passed ? 'check-passed' : 'check-failed'}>
+                  <span>{deletionCheckSummary(check)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {deletionCheck.data?.blockers.length ? (
+            <div className="inline-error" role="alert" data-testid="room-delete-blockers">
+              {deletionCheck.data.blockers.map((blocker) => (
+                <p key={blocker.code}>{blocker.message} ({blocker.count}건)</p>
+              ))}
             </div>
-            <p className="danger-copy">
-              삭제 후 복구할 수 없습니다. 강의실은 목록에서 제거되며 기존 예약 기록은 삭제된 강의실로 보존됩니다.
-            </p>
+          ) : null}
 
-            {deletionCheck.isLoading ? <LoadingState /> : null}
-            {deletionCheck.isError ? <ErrorState error={deletionCheck.error} /> : null}
-            {visibleDeletionChecks.length ? (
-              <ul className="check-list" data-testid="room-delete-checks">
-                {visibleDeletionChecks.map((check) => (
-                  <li key={check.code} className={check.passed ? 'check-passed' : 'check-failed'}>
-                    <span>{deletionCheckSummary(check)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+          <label>
+            삭제하려면 강의실명 <strong>{deleteTarget.name}</strong>을 다시 입력하세요.
+            <input
+              data-testid="room-delete-confirm-input"
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              autoComplete="off"
+            />
+          </label>
+          {deleteRoom.error ? <div className="inline-error" role="alert">{errorMessage(deleteRoom.error)}</div> : null}
 
-            {deletionCheck.data?.blockers.length ? (
-              <div className="inline-error" role="alert" data-testid="room-delete-blockers">
-                {deletionCheck.data.blockers.map((blocker) => (
-                  <p key={blocker.code}>{blocker.message} ({blocker.count}건)</p>
-                ))}
-              </div>
-            ) : null}
-
-            <label>
-              삭제하려면 강의실명 <strong>{deleteTarget.name}</strong>을 다시 입력하세요.
-              <input
-                data-testid="room-delete-confirm-input"
-                value={deleteConfirmation}
-                onChange={(event) => setDeleteConfirmation(event.target.value)}
-                autoComplete="off"
-              />
-            </label>
-            {deleteRoom.error ? <div className="inline-error" role="alert">{errorMessage(deleteRoom.error)}</div> : null}
-
-            <div className="modal-actions">
-              <button type="button" className="secondary-button" onClick={closeDeleteModal} autoFocus>
-                취소
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                data-testid="room-delete-confirm-button"
-                disabled={!canDelete}
-                onClick={handleDelete}
-              >
-                영구 삭제
-              </button>
-            </div>
-          </section>
-        </div>
+          <div className="modal-actions">
+            <button type="button" className="secondary-button" onClick={closeDeleteModal} autoFocus>
+              돌아가기
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              data-testid="room-delete-confirm-button"
+              disabled={!canDelete}
+              onClick={handleDelete}
+            >
+              영구 삭제
+            </button>
+          </div>
+        </ModalDialog>
       ) : null}
     </section>
   );

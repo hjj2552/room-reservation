@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
 import type { PublicReservationBlock } from '../../shared/api/types';
-import { ReservationDateTimetable, type TimetableReservation } from '../../shared/components/ReservationDateTimetable';
+import { ReservationDateTimetable, type TimetableReservation, type TimetableRoom } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
+import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
 import {
   ReservationRequestPanel,
   type ReservationRequestValues,
@@ -26,6 +27,10 @@ import { maskName } from '../../shared/utils/privacyMasking';
 import { defaultReservationDurationMinutes, reservationSlotUnitMinutes } from '../../shared/utils/reservationTime';
 
 type PublicTimetableViewMode = 'date' | 'room';
+
+interface RoomInfoDialogState {
+  room: RoomInfoRoom;
+}
 
 const timetablePageSizeNote = '표시된 신청/예약은 승인 대기 또는 승인 상태입니다.';
 const publicStatusLabels = {
@@ -147,6 +152,7 @@ export function PublicReservationPage() {
   const create = useCreatePublicReservation();
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
+  const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(searchParams);
@@ -252,6 +258,10 @@ export function PublicReservationPage() {
 
   function handleReservationClick(reservation: TimetableReservation) {
     navigate(`/reservations/${reservation.id}`);
+  }
+
+  function openRoomInfo(room: TimetableRoom) {
+    setRoomInfoDialog({ room });
   }
 
   function handlePublicRequest(values: ReservationRequestValues) {
@@ -375,6 +385,7 @@ export function PublicReservationPage() {
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
+                onRoomInfoClick={(room) => openRoomInfo(room)}
                 statusLabelOverride={publicStatusLabels}
               />
             </>
@@ -438,6 +449,9 @@ export function PublicReservationPage() {
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
+                onRoomInfoClick={hasRoomDescription(selectedRoom?.description) && selectedRoom
+                  ? () => openRoomInfo(selectedRoom)
+                  : undefined}
                 statusLabelOverride={publicStatusLabels}
               />
             </>
@@ -456,6 +470,11 @@ export function PublicReservationPage() {
           isPending={create.isPending}
         />
       ) : null}
+
+      <RoomInfoModal
+        room={roomInfoDialog?.room || null}
+        onClose={() => setRoomInfoDialog(null)}
+      />
 
     </div>
   );

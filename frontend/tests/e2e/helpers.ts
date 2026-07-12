@@ -77,14 +77,20 @@ export async function loginByApi(request: APIRequestContext) {
   await expectApiOk(response, 'admin login');
 }
 
-export async function createRoomByApi(request: APIRequestContext, name: string) {
+export async function createRoomByApi(
+  request: APIRequestContext,
+  name: string,
+  options?: { location?: string | null; description?: string | null },
+) {
   const response = await request.post('/api/admin/rooms', {
     headers: await csrfHeaders(request),
     data: {
       name,
-      location: `${E2E_TEST_DATA_PREFIX}test-building`,
+      location: options?.location === undefined ? `${E2E_TEST_DATA_PREFIX}test-building` : options.location,
       capacity: 12,
-      description: `${E2E_TEST_DATA_PREFIX}created-by-frontend-e2e`,
+      description: options?.description === undefined
+        ? `${E2E_TEST_DATA_PREFIX}created-by-frontend-e2e`
+        : options.description,
       enabled: true,
     },
   });

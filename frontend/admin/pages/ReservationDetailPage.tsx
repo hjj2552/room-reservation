@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ReservationHistory } from '../../shared/api/types';
 import { ApiError, errorMessage } from '../../shared/api/http';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
@@ -237,38 +238,34 @@ export function ReservationDetailPage() {
       </div>
 
       {showDeleteModal ? (
-        <div className="modal-backdrop" role="presentation">
-          <div
-            className="modal-panel reservation-delete-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="reservation-delete-modal-title"
-            aria-describedby="reservation-delete-modal-description"
-            data-testid="reservation-delete-modal"
-          >
-            <div className="modal-header">
-              <h2 id="reservation-delete-modal-title">예약을 영구 삭제할까요?</h2>
-            </div>
-            <p id="reservation-delete-modal-description" className="danger-copy">
-              삭제하면 이 예약의 상세 정보는 더 이상 조회할 수 없습니다. 감사 로그에는 삭제 기록과 처리 메모가 남습니다.
-            </p>
-            <div className="modal-actions">
-              <button type="button" className="secondary-button" onClick={() => setShowDeleteModal(false)} autoFocus>
-                돌아가기
-              </button>
-              <button
-                type="button"
-                className="danger-button"
-                disabled={deleteReservation.isPending}
-                onClick={performDelete}
-                data-testid="reservation-delete-confirm-button"
-              >
-                <Trash2 size={16} aria-hidden="true" />
-                {deleteReservation.isPending ? '삭제 중...' : '예약 삭제'}
-              </button>
-            </div>
+        <ModalDialog
+          title="예약을 영구 삭제할까요?"
+          titleId="reservation-delete-modal-title"
+          ariaDescribedBy="reservation-delete-modal-description"
+          className="reservation-delete-modal"
+          onClose={() => setShowDeleteModal(false)}
+          closeDisabled={deleteReservation.isPending}
+          testId="reservation-delete-modal"
+        >
+          <p id="reservation-delete-modal-description" className="danger-copy">
+            삭제하면 이 예약의 상세 정보는 더 이상 조회할 수 없습니다. 감사 로그에는 삭제 기록과 처리 메모가 남습니다.
+          </p>
+          <div className="modal-actions">
+            <button type="button" className="secondary-button" onClick={() => setShowDeleteModal(false)} autoFocus>
+              돌아가기
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              disabled={deleteReservation.isPending}
+              onClick={performDelete}
+              data-testid="reservation-delete-confirm-button"
+            >
+              <Trash2 size={16} aria-hidden="true" />
+              {deleteReservation.isPending ? '삭제 중...' : '예약 삭제'}
+            </button>
           </div>
-        </div>
+        </ModalDialog>
       ) : null}
     </section>
   );
