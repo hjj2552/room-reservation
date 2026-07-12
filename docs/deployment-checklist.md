@@ -43,8 +43,8 @@ Session cookie `HttpOnly=true` and the production/common `Secure=true` default a
 - Confirm who owns access to the deployment platform, database, DNS, and mail account.
 - Confirm production secrets are stored only in the deployment platform or a secret manager.
 - Confirm no production value is present in `.env`, committed YAML, shell scripts, screenshots, issue comments, or chat logs.
-- Rotate `ADMIN_PASSWORD` whenever the operator changes.
-- If email sending is enabled later, reissue the Gmail app password or mail-provider credential during operator handover.
+- Rotate `ADMIN_PASSWORD` whenever the administrator changes.
+- If email sending is enabled later, reissue the Gmail app password or mail-provider credential during administrator handover.
 - Keep `SPRING_PROFILES_ACTIVE=prod` set in production so the app never starts with local settings.
 
 ## Before First Production Deployment
@@ -56,4 +56,4 @@ Session cookie `HttpOnly=true` and the production/common `Secure=true` default a
 5. Verify the configured administrator can log in.
 6. Verify a state-changing request without a CSRF token returns `403` and a valid SPA request succeeds.
 7. Verify rate-limited responses return `429` and `Retry-After` through the deployment proxy.
-8. Store the final environment-variable list in the operator handover notes, not in Git.
+8. Store the final environment-variable list in the administrator handover notes, not in Git.

@@ -971,6 +971,10 @@ button:disabled {
   gap: 28px;
 }
 
+.reservation-detail-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.8fr);
+}
+
 .public-detail-actions {
   display: grid;
   gap: 24px;
@@ -1001,8 +1005,10 @@ button:disabled {
 }
 
 .reservation-primary-actions {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 14px;
   padding-top: 2px;
 }
 
@@ -1013,6 +1019,8 @@ button:disabled {
 .reservation-management-actions {
   align-items: center;
   justify-content: flex-start;
+  border-left: 1px solid #d9e0e8;
+  padding-left: 14px;
 }
 
 .reservation-delete-modal {
@@ -1744,6 +1752,12 @@ button:disabled {
   border: 0;
 }
 
+@media (max-width: 1180px) {
+  .reservation-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1799,6 +1813,18 @@ button:disabled {
   .button-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .reservation-primary-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reservation-management-actions {
+    border-top: 1px solid #d9e0e8;
+    border-left: 0;
+    padding-top: 14px;
+    padding-left: 0;
   }
 
   .nav-list {

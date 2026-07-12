@@ -1,6 +1,6 @@
 import { PenLine, X } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
@@ -87,14 +87,6 @@ export function PublicReservationDetailPage() {
           <h1 id="public-reservation-detail-title">{reservation.room.name}</h1>
           <p className="muted">{formatDateTime(reservation.startAt)} 예약</p>
         </div>
-        <div className="header-actions">
-          <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
-            이전으로
-          </button>
-          <Link className="secondary-button" to="/reserve">
-            시간표로 돌아가기
-          </Link>
-        </div>
       </div>
 
       <div className="detail-grid public-detail-grid">
@@ -113,7 +105,11 @@ export function PublicReservationDetailPage() {
         <section className="panel public-detail-actions" aria-labelledby="public-actions-title">
           <h2 id="public-actions-title">상태 처리</h2>
           {reservation.cancellable ? (
-            <div className="button-row">
+            <div className="button-row" data-testid="public-detail-action-buttons">
+              <button type="button" className="danger-button" onClick={() => openPasswordDialog('cancel')}>
+                <X size={16} aria-hidden="true" />
+                취소
+              </button>
               {reservation.editable ? (
                 <button
                   type="button"
@@ -122,18 +118,14 @@ export function PublicReservationDetailPage() {
                   data-testid="public-reservation-edit-link"
                 >
                   <PenLine size={16} aria-hidden="true" />
-                  예약 수정
+                  수정
                 </button>
               ) : null}
-              <button type="button" className="danger-button" onClick={() => openPasswordDialog('cancel')}>
-                <X size={16} aria-hidden="true" />
-                예약 신청 취소
-              </button>
             </div>
           ) : null}
           {!reservation.editable ? <p className="muted">취소된 예약은 수정할 수 없습니다.</p> : null}
           {!reservation.cancellable ? <p className="muted">현재 상태에서는 취소할 수 없습니다.</p> : null}
-          {cancelSuccess ? <div className="success-box" role="status">예약 신청을 취소했습니다.</div> : null}
+          {cancelSuccess ? <div className="success-box" role="status">예약을 취소했습니다.</div> : null}
         </section>
       </div>
 
@@ -162,7 +154,7 @@ export function PublicReservationDetailPage() {
             }}
           >
             <div className="modal-header">
-              <h2 id="public-cancel-confirm-title">예약 신청을 취소할까요?</h2>
+              <h2 id="public-cancel-confirm-title">취소할까요?</h2>
             </div>
             <p id="public-cancel-confirm-description" className="muted">
               취소하면 공개 화면에서 이 예약을 수정하거나 다시 활성화할 수 없습니다.
@@ -185,7 +177,7 @@ export function PublicReservationDetailPage() {
                 disabled={cancel.isPending}
                 data-testid="public-cancel-confirm-button"
               >
-                {cancel.isPending ? '취소 중...' : '예약 신청 취소'}
+                {cancel.isPending ? '취소 중...' : '취소'}
               </button>
             </div>
           </section>

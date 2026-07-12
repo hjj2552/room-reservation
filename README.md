@@ -4,7 +4,7 @@
 
 ## 문서
 
-- [운영자용 관리자 매뉴얼](docs/operator-manual.md)
+- [관리자 매뉴얼](docs/admin-manual.md)
 - [개발자 실행/검증 문서](docs/dev-setup.md)
 - [현재 제한 사항](docs/known-limitations.md)
 - [공개 예약 신청 흐름](docs/public-reservation.md)

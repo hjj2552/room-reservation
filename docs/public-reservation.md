@@ -1,6 +1,6 @@
 # Public Reservation Requests
 
-The public reservation timetable is available at `/timetable`; `/reserve` opens the same Quick Add based flow.
+The public reservation timetable and Quick Add flow are available at `/timetable`.
 
 ## User Flow
 

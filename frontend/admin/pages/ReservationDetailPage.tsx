@@ -97,9 +97,6 @@ export function ReservationDetailPage() {
           <p className="muted">{formatDateTime(detail.startAt)} 예약</p>
         </div>
         <div className="header-actions reservation-navigation-actions" aria-label="예약 상세 이동">
-          <button type="button" className="ghost-button" onClick={() => navigate('/admin/reservations')}>
-            목록으로
-          </button>
           <Link
             className="secondary-button"
             to={timetableReservationUrl({ startAt: detail.startAt, roomId: detail.room.id })}
@@ -111,7 +108,7 @@ export function ReservationDetailPage() {
         </div>
       </div>
 
-      <div className="detail-grid">
+      <div className="detail-grid reservation-detail-grid">
         <ReservationDetailView
           status={detail.status}
           sections={coreSections}
@@ -137,7 +134,7 @@ export function ReservationDetailPage() {
                 placeholder="승인 또는 취소 사유를 남깁니다."
               />
             </label>
-            <div className="reservation-primary-actions">
+            <div className="reservation-primary-actions" data-testid="reservation-primary-actions">
               <div className="button-row" aria-label="주요 상태 처리">
                 <button
                   type="submit"
@@ -164,7 +161,7 @@ export function ReservationDetailPage() {
                   to={`/admin/reservations/${detail.id}/edit`}
                 >
                   <PenLine size={16} aria-hidden="true" />
-                  예약 수정
+                  수정
                 </Link>
                 <Link
                   className="secondary-button reservation-edit-action"
