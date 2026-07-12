@@ -281,9 +281,8 @@ const fieldLabels: Record<string, string> = {
   availableDaysOfWeek: '예약 가능 요일',
   minReservationMinutes: '최소 예약 시간',
   maxReservationMinutes: '최대 예약 시간',
-  adminContactName: '관리자 이름',
-  adminContactEmail: '관리자 이메일',
-  adminContactPhone: '관리자 전화번호',
+  adminContactEmail: '문의 이메일',
+  adminContactPhone: '문의 전화번호',
   completionMessage: '예약 완료 안내',
   version: '현재 버전',
 };

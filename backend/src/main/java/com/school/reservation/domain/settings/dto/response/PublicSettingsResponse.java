@@ -20,7 +20,8 @@ public record PublicSettingsResponse(
     Integer maxReservationMinutes,
     String completionMessage,
     String logoUrl,
-    String adminContactEmail
+    String adminContactEmail,
+    String adminContactPhone
 ) {
     public static PublicSettingsResponse from(OperationSettings settings) {
         return new PublicSettingsResponse(
@@ -38,7 +39,8 @@ public record PublicSettingsResponse(
             settings.getMaxReservationMinutes(),
             settings.getCompletionMessage(),
             settings.getLogoUrl(),
-            settings.getAdminContactEmail()
+            settings.getAdminContactEmail(),
+            settings.getAdminContactPhone()
         );
     }
 }

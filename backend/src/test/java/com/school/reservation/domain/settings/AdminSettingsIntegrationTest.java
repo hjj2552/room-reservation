@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +36,40 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.publicNotice").value("Updated Reservation Notice"))
             .andExpect(jsonPath("$.version").value((int) version + 1));
+    }
+
+    @Test
+    void settingsContractsExcludeAdminContactNameAndExposePublicContactDetails() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        jdbcTemplate.update(
+            "update operation_settings set admin_contact_email = ?, admin_contact_phone = ? where id = 1",
+            "contact@example.test",
+            "02-1234-5678"
+        );
+
+        mockMvc.perform(get("/api/admin/settings").session(session))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.adminContactName").doesNotExist())
+            .andExpect(jsonPath("$.adminContactEmail").value("contact@example.test"))
+            .andExpect(jsonPath("$.adminContactPhone").value("02-1234-5678"));
+
+        mockMvc.perform(get("/api/public/settings"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.adminContactName").doesNotExist())
+            .andExpect(jsonPath("$.adminContactEmail").value("contact@example.test"))
+            .andExpect(jsonPath("$.adminContactPhone").value("02-1234-5678"));
+
+        Integer columnCount = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = 'operation_settings'
+                  and column_name = 'admin_contact_name'
+                """,
+            Integer.class
+        );
+        assertThat(columnCount).isZero();
     }
 
     @Test
@@ -183,7 +218,6 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
               "availableDaysOfWeek": ["MON", "TUE", "WED", "THU", "FRI"],
               "minReservationMinutes": %d,
               "maxReservationMinutes": %d,
-              "adminContactName": "Admin",
               "adminContactEmail": "admin@example.edu",
               "adminContactPhone": "02-0000-0000",
               "completionMessage": "Done",

@@ -47,7 +47,6 @@ export function SettingsPage() {
       ...form,
       publicNotice: form.publicNotice || null,
       reservationDisabledMessage: form.reservationDisabledMessage || null,
-      adminContactName: form.adminContactName || null,
       adminContactEmail: form.adminContactEmail || null,
       adminContactPhone: form.adminContactPhone || null,
       completionMessage: form.completionMessage || null,
@@ -225,14 +224,7 @@ export function SettingsPage() {
           ))}
         </fieldset>
         <label>
-          관리자 이름
-          <input
-            value={form.adminContactName || ''}
-            onChange={(event) => updateField('adminContactName', event.target.value)}
-          />
-        </label>
-        <label>
-          관리자 이메일
+          문의 이메일
           <input
             type="email"
             value={form.adminContactEmail || ''}
@@ -240,7 +232,7 @@ export function SettingsPage() {
           />
         </label>
         <label>
-          관리자 전화번호
+          문의 전화번호
           <input
             value={form.adminContactPhone || ''}
             onChange={(event) => updateField('adminContactPhone', event.target.value)}

@@ -91,13 +91,20 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
   await loginByApi(request);
   const originalSettings = await getSettingsByApi(request);
   const updatedOrganizationName = e2eData.name('settings-org');
+  const contactEmail = 'testing-contact@example.test';
+  const contactPhone = '02-1234-5678';
 
   try {
     await page.goto('/admin/settings');
     await expect(page.getByTestId('settings-form')).toBeVisible();
+    await expect(page.getByLabel('관리자 이름')).toHaveCount(0);
+    await expect(page.getByLabel('문의 이메일')).toBeVisible();
+    await expect(page.getByLabel('문의 전화번호')).toBeVisible();
 
     await page.getByTestId('settings-organization-input').fill(updatedOrganizationName);
     await page.getByTestId('settings-public-notice-input').fill('testing-settings-smoke-notice');
+    await page.getByLabel('문의 이메일').fill(contactEmail);
+    await page.getByLabel('문의 전화번호').fill(contactPhone);
     await page.getByTestId('settings-slot-minutes-select').selectOption('5');
     await page.getByTestId('settings-save-button').click();
 
@@ -106,6 +113,24 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
     await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
     await page.reload();
     await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const footer = page.getByTestId('public-contact-footer');
+    await expect(footer).toContainText(updatedOrganizationName);
+    await expect(footer.getByRole('link', { name: /문의 이메일/ })).toHaveAttribute('href', `mailto:${contactEmail}`);
+    await expect(footer.getByRole('link', { name: /문의 전화번호/ })).toHaveAttribute('href', 'tel:0212345678');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    const latestSettings = await getSettingsByApi(request);
+    await updateSettingsByApi(request, {
+      ...latestSettings,
+      adminContactEmail: null,
+      adminContactPhone: null,
+    });
+    await page.reload();
+    await expect(footer).toContainText(updatedOrganizationName);
+    await expect(footer.getByRole('link')).toHaveCount(0);
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, {

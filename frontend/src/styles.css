@@ -1638,6 +1638,54 @@ button:disabled {
   padding: 24px 28px;
 }
 
+.public-site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f5f7fa;
+}
+
+.public-site-content {
+  flex: 1;
+}
+
+.public-contact-footer {
+  border-top: 1px solid #d9e0e8;
+  background: #ffffff;
+  color: #344050;
+}
+
+.public-contact-footer-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.public-contact-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px 20px;
+}
+
+.public-contact-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #344050;
+  text-decoration: none;
+}
+
+.public-contact-links a:hover {
+  color: #0f6b55;
+  text-decoration: underline;
+}
+
 .timetable-entry-header {
   align-items: flex-end;
 }
@@ -1941,6 +1989,17 @@ button:disabled {
 
   .entry-options {
     grid-template-columns: 1fr;
+  }
+
+  .public-contact-footer-inner {
+    padding: 16px 20px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .public-contact-links {
+    justify-content: flex-start;
+    flex-direction: column;
   }
 
   .entry-heading h1 {

@@ -58,9 +58,6 @@ public class OperationSettings {
     @Column(name = "max_reservation_minutes", nullable = false)
     private Integer maxReservationMinutes;
 
-    @Column(name = "admin_contact_name", length = 100)
-    private String adminContactName;
-
     @Column(name = "admin_contact_email", length = 255)
     private String adminContactEmail;
 
@@ -102,7 +99,6 @@ public class OperationSettings {
         String availableDaysOfWeek,
         Integer minReservationMinutes,
         Integer maxReservationMinutes,
-        String adminContactName,
         String adminContactEmail,
         String adminContactPhone,
         String completionMessage,
@@ -121,7 +117,6 @@ public class OperationSettings {
         this.availableDaysOfWeek = availableDaysOfWeek;
         this.minReservationMinutes = minReservationMinutes;
         this.maxReservationMinutes = maxReservationMinutes;
-        this.adminContactName = adminContactName;
         this.adminContactEmail = adminContactEmail;
         this.adminContactPhone = adminContactPhone;
         this.completionMessage = completionMessage;
@@ -191,10 +186,6 @@ public class OperationSettings {
 
     public String getAdminContactEmail() {
         return adminContactEmail;
-    }
-
-    public String getAdminContactName() {
-        return adminContactName;
     }
 
     public String getAdminContactPhone() {
