@@ -2,6 +2,7 @@ import { expect, test } from './fixtures';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
+  getSettingsByApi,
   loginByApi,
   nextWeekdayReservationLocalInputs,
 } from './helpers';
@@ -123,8 +124,9 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
-test('reservation duplicate pre-fills non-time fields and creates an independent reservation', async ({ page, request, e2eData }) => {
+test('reservation duplicate pre-fills fields and handles unavailable operating days', async ({ page, request, e2eData }) => {
   await loginByApi(request);
+  const settings = await getSettingsByApi(request);
   const room = await e2eData.createTestRoom('reservation-duplicate-room');
   const tag = await e2eData.createTestTag('reservation-duplicate-series', { color: '#0f766e' });
   const recurrence = await e2eData.createTestRecurringReservation(room.id, 'reservation-duplicate-source', {
@@ -153,6 +155,8 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
     const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
     return local.toISOString().slice(0, 10);
   });
+  const defaultDateIsOperating = settings.availableDaysOfWeek.includes(weekdayCode(toolbarDefaultDate));
+  let createdDate = toolbarDefaultDate;
 
   async function expectDuplicateQuickAddPrefill() {
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
@@ -179,14 +183,50 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
   await expectDuplicateQuickAddPrefill();
   await page.getByTestId('quick-add-memo-input').fill('e2e-duplicate-create');
 
-  const createResponsePromise = page.waitForResponse((response) =>
-    response.url().includes('/api/admin/reservations') &&
-    response.request().method() === 'POST',
-  );
-  await page.getByTestId('quick-add-save-button').click();
-  const createResponse = await createResponsePromise;
-  const createResponseBody = await createResponse.text();
-  expect(createResponse.ok(), createResponseBody).toBeTruthy();
+  async function submitDuplicate() {
+    const responsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/admin/reservations') &&
+      response.request().method() === 'POST',
+    );
+    await page.getByTestId('quick-add-save-button').click();
+    return responsePromise;
+  }
+
+  let createResponseBody: string;
+  if (defaultDateIsOperating) {
+    const createResponse = await submitDuplicate();
+    createResponseBody = await createResponse.text();
+    expect(createResponse.ok(), createResponseBody).toBeTruthy();
+  } else {
+    const unavailableResponse = await submitDuplicate();
+    const unavailableResponseBody = await unavailableResponse.text();
+    const unavailableError = JSON.parse(unavailableResponseBody) as { code?: string; message?: string };
+
+    expect(unavailableResponse.ok(), unavailableResponseBody).toBeFalsy();
+    expect(unavailableError.code).toBe('OUTSIDE_OPERATING_DAYS');
+    expect(unavailableError.message).toMatch(/requested day|not available/i);
+
+    const quickAddPanel = page.getByTestId('timetable-quick-add-panel');
+    await expect(quickAddPanel).toBeVisible();
+    await expect(quickAddPanel.getByRole('alert')).toContainText('예약 가능한 요일');
+    await expect(page.getByTestId('quick-add-start-input')).toBeEditable();
+    await expect(page.getByTestId('quick-add-end-input')).toBeEditable();
+
+    createdDate = nextOperatingDate(
+      toolbarDefaultDate,
+      settings.availableDaysOfWeek,
+      settings.semesterEndDate,
+    );
+    await page.getByTestId('quick-add-start-input').fill(`${createdDate}T09:00`);
+    await page.getByTestId('quick-add-end-input').fill(`${createdDate}T09:30`);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${createdDate}T09:00`);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${createdDate}T09:30`);
+
+    const createResponse = await submitDuplicate();
+    createResponseBody = await createResponse.text();
+    expect(createResponse.ok(), createResponseBody).toBeTruthy();
+  }
+
   const duplicated = JSON.parse(createResponseBody) as {
     id: string;
     recurrenceId: string | null;
@@ -200,6 +240,9 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
   expect(duplicated.series).toBeNull();
   expect(duplicated.recurrenceException).toBe(false);
   await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+  if (createdDate !== toolbarDefaultDate) {
+    await page.getByTestId('timetable-date-input').fill(createdDate);
+  }
   await expect(page.getByTestId('reservation-date-timetable')).toContainText(source.purpose);
 
   await page.goto(`/admin/reservations/${duplicatedReservationId}`);
@@ -210,6 +253,28 @@ test('reservation duplicate pre-fills non-time fields and creates an independent
   await page.goto(`/admin/reservations?keyword=${encodeURIComponent(source.purpose)}`);
   await expect(page.getByTestId('reservations-table')).toContainText(source.purpose);
 });
+
+function nextOperatingDate(currentDate: string, availableDays: string[], semesterEndDate: string) {
+  let candidate = addDays(currentDate, 1);
+  while (candidate <= semesterEndDate) {
+    if (availableDays.includes(weekdayCode(candidate))) {
+      return candidate;
+    }
+    candidate = addDays(candidate, 1);
+  }
+  throw new Error(`No operating day is available after ${currentDate} through ${semesterEndDate}.`);
+}
+
+function weekdayCode(date: string) {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][day];
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
 
 test('deleted reservation audit row is read-only and detail URL shows domain guidance', async ({ page, request, e2eData }) => {
   await loginByApi(request);
