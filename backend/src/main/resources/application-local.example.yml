@@ -23,8 +23,7 @@ server:
       cookie:
         # Local development commonly runs over HTTP. Keep production-like Secure cookies in non-local profiles.
         secure: false
-        # Decide SameSite after the local access pattern is finalized.
-        # same-site: lax
+        # HttpOnly and SameSite=Lax are inherited from application.yml.
 
 app:
   admin:

@@ -13,12 +13,7 @@ spring:
 
 server:
   forward-headers-strategy: framework
-  # Session cookie Secure/HttpOnly are defined in application.yml.
-  # Decide SameSite after the production frontend/backend domains are finalized.
-  # servlet:
-  #   session:
-  #     cookie:
-  #       same-site: none
+  # Session cookie Secure/HttpOnly/SameSite=Lax are defined in application.yml.
 
 app:
   admin:

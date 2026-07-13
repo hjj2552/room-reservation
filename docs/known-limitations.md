@@ -67,7 +67,7 @@ local/dev/prod profile은 `ADMIN_USERNAME`, `ADMIN_PASSWORD` 환경변수가 없
 
 공개·비로그인 API 요청은 인메모리 토큰 버킷으로 IP별 제한됩니다. GET은 분당 120회, 그 밖의 메서드는 분당 24회이며 인증된 `ROLE_ADMIN` 요청은 제외됩니다. 현재 버킷은 서버 인스턴스별 메모리에 있으므로 다중 인스턴스 배포에서는 전역 제한을 보장하지 않습니다.
 
-세션 쿠키의 `SameSite` 값은 배포 도메인 구조가 확정될 때 profile별로 결정해야 합니다. common/prod 기본은 `Secure=true`, `HttpOnly=true`이고 local/E2E의 HTTP 실행만 `Secure=false`로 덮어씁니다.
+세션 쿠키는 모든 profile에서 `SameSite=Lax`, `HttpOnly=true`를 사용합니다. common/prod 기본은 `Secure=true`이고 local/E2E의 HTTP 실행만 `Secure=false`로 덮어씁니다.
 
 시간대는 서비스 로직과 CSV 내보내기에서 `Asia/Seoul` 기준으로 처리합니다. 해외 사용자 또는 다른 시간대 운영은 별도 검토가 필요합니다.
 

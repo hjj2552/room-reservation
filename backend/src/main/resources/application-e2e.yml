@@ -16,8 +16,7 @@ server:
       cookie:
         # E2E runs over local HTTP, so Secure cookies would not be stored by browsers/API clients.
         secure: false
-        # SameSite is profile-owned and intentionally inactive in E2E unless needed.
-        # same-site: lax
+        # HttpOnly and SameSite=Lax are inherited from application.yml.
 
 app:
   admin:
