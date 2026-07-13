@@ -183,6 +183,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
   });
   const room = await e2eData.createTestRoom('public-request-room');
   const reservationTime = nextWeekdayReservationLocalInputs({ daysAhead: 21, startHour: 10, endHour: 11 });
+  const selectedWeekStart = mondayOf(reservationTime.date);
   const applicantName = e2eData.name('public-applicant');
   const purpose = e2eData.name('public-purpose');
   const email = `${e2eData.name('public-email')}@example.test`;
@@ -198,8 +199,8 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await page.getByTestId('timetable-empty-slot').first().click();
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expect(page.getByTestId('public-request-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('public-request-start-input')).not.toHaveValue('');
-    await expect(page.getByTestId('public-request-end-input')).not.toHaveValue('');
+    await expect(page.getByTestId('public-request-start-input')).toHaveValue(`${selectedWeekStart}T09:00`);
+    await expect(page.getByTestId('public-request-end-input')).toHaveValue(`${selectedWeekStart}T09:30`);
 
     await page.getByTestId('public-request-applicant-name-input').fill(applicantName);
     await page.getByTestId('public-request-email-input').fill(email);
@@ -287,6 +288,14 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
   }
 });
+
+function mondayOf(dateString: string) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  const day = date.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
 
 test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
