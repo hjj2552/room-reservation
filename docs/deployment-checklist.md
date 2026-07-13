@@ -15,6 +15,7 @@ repository.
 | `DB_PASSWORD` | `local`, `dev`, `prod` | Database login password. |
 | `ADMIN_USERNAME` | `local`, `dev`, `prod` | Username for the single configured administrator login. |
 | `ADMIN_PASSWORD` | `local`, `dev`, `prod` | Password for the single configured administrator login. Use a strong unique value before deployment. |
+| `BACKEND_ORIGIN` | Cloudflare Pages production | Absolute HTTPS origin of the deployed backend. Local Pages Functions development may use HTTP only with `localhost` or `127.0.0.1`. |
 
 ## Optional Environment Variables
 
@@ -23,6 +24,15 @@ repository.
 | `E2E_CLEANUP_ENABLED` | `false` for local/dev | Enables guarded E2E cleanup endpoints. Never enable this in production. |
 
 Session cookie `HttpOnly=true` and the production/common `Secure=true` default are defined in `application.yml`. Local and E2E profiles explicitly override `Secure=false` because they run over HTTP. Decide `server.servlet.session.cookie.same-site` in each deployed profile after the frontend/backend domain structure is finalized.
+
+## Cloudflare Pages Frontend
+
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Configure `BACKEND_ORIGIN` in the Cloudflare Pages environment without a path, query, fragment, or credentials. Do not commit the real backend URL.
+- Browser requests keep using relative `/api/...` URLs. The `functions/api/[[path]].ts` Pages Function forwards `/api` and `/api/*` to `BACKEND_ORIGIN` while preserving the API path and query string.
+- The local Vite `/api` proxy remains independent and continues to use `VITE_API_PROXY_TARGET` when configured.
 
 ## Session, CSRF, and Rate Limiting
 
