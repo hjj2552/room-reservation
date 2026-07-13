@@ -18,7 +18,6 @@ const publicSettings = {
   adminContactEmail: null,
   adminContactPhone: null,
   completionMessage: null,
-  logoUrl: null,
 };
 
 test('immediate readiness success shows the entry choices and reuses the settings cache', async ({ page }) => {
@@ -36,8 +35,16 @@ test('immediate readiness success shows the entry choices and reuses the setting
 
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
+  await expect(page.locator('.entry-organization-name')).toHaveText(publicSettings.organizationName);
+  await expect(page.locator('.entry-organization-name')).toHaveCSS('font-size', '34px');
   await expect(page.getByText(loadingMessage)).toHaveCount(0);
   await expect.poll(() => settingsRequests).toBe(1);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator('.entry-organization-name')).toHaveCSS('font-size', '26px');
+  await expect(page.getByTestId('entry-public-link')).toBeVisible();
+  await expect(page.getByTestId('entry-admin-link')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test('readiness retries two 503 responses before showing the entry choices', async ({ page }) => {

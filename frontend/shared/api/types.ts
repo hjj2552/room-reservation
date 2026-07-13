@@ -102,7 +102,6 @@ export interface OperationSettings {
   adminContactEmail: string | null;
   adminContactPhone: string | null;
   completionMessage: string | null;
-  logoUrl: string | null;
   version: number;
 }
 

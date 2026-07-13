@@ -19,7 +19,6 @@ public record PublicSettingsResponse(
     Integer minReservationMinutes,
     Integer maxReservationMinutes,
     String completionMessage,
-    String logoUrl,
     String adminContactEmail,
     String adminContactPhone
 ) {
@@ -38,7 +37,6 @@ public record PublicSettingsResponse(
             settings.getMinReservationMinutes(),
             settings.getMaxReservationMinutes(),
             settings.getCompletionMessage(),
-            settings.getLogoUrl(),
             settings.getAdminContactEmail(),
             settings.getAdminContactPhone()
         );

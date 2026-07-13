@@ -39,7 +39,7 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void settingsContractsExcludeAdminContactNameAndExposePublicContactDetails() throws Exception {
+    void settingsContractsExcludeRemovedFieldsAndExposePublicContactDetails() throws Exception {
         MockHttpSession session = loginAsAdmin();
         jdbcTemplate.update(
             "update operation_settings set admin_contact_email = ?, admin_contact_phone = ? where id = 1",
@@ -50,12 +50,14 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(get("/api/admin/settings").session(session))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.adminContactName").doesNotExist())
+            .andExpect(jsonPath("$.logoUrl").doesNotExist())
             .andExpect(jsonPath("$.adminContactEmail").value("contact@example.test"))
             .andExpect(jsonPath("$.adminContactPhone").value("02-1234-5678"));
 
         mockMvc.perform(get("/api/public/settings"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.adminContactName").doesNotExist())
+            .andExpect(jsonPath("$.logoUrl").doesNotExist())
             .andExpect(jsonPath("$.adminContactEmail").value("contact@example.test"))
             .andExpect(jsonPath("$.adminContactPhone").value("02-1234-5678"));
 
@@ -70,6 +72,18 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
             Integer.class
         );
         assertThat(columnCount).isZero();
+
+        Integer logoColumnCount = jdbcTemplate.queryForObject(
+            """
+                select count(*)
+                from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = 'operation_settings'
+                  and column_name = 'logo_url'
+                """,
+            Integer.class
+        );
+        assertThat(logoColumnCount).isZero();
     }
 
     @Test
