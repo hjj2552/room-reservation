@@ -20,9 +20,6 @@ repository.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `LOGO_CLEANUP_ENABLED` | `true` | Enables scheduled cleanup of unused uploaded logo files. |
-| `LOGO_CLEANUP_CRON` | `0 0 4 * * *` | Cron expression for logo cleanup. |
-| `LOGO_CLEANUP_ZONE` | `Asia/Seoul` | Time zone for the logo cleanup schedule. |
 | `E2E_CLEANUP_ENABLED` | `false` for local/dev | Enables guarded E2E cleanup endpoints. Never enable this in production. |
 
 Session cookie `HttpOnly=true` and the production/common `Secure=true` default are defined in `application.yml`. Local and E2E profiles explicitly override `Secure=false` because they run over HTTP. Decide `server.servlet.session.cookie.same-site` in each deployed profile after the frontend/backend domain structure is finalized.

@@ -67,9 +67,6 @@ public class OperationSettings {
     @Column(name = "completion_message", columnDefinition = "text")
     private String completionMessage;
 
-    @Column(name = "logo_url", length = 500)
-    private String logoUrl;
-
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -102,7 +99,6 @@ public class OperationSettings {
         String adminContactEmail,
         String adminContactPhone,
         String completionMessage,
-        String logoUrl,
         UUID actorId
     ) {
         this.organizationName = organizationName;
@@ -120,7 +116,6 @@ public class OperationSettings {
         this.adminContactEmail = adminContactEmail;
         this.adminContactPhone = adminContactPhone;
         this.completionMessage = completionMessage;
-        this.logoUrl = logoUrl;
         this.updatedBy = actorId;
         this.updatedAt = OffsetDateTime.now();
     }
@@ -178,10 +173,6 @@ public class OperationSettings {
 
     public String getCompletionMessage() {
         return completionMessage;
-    }
-
-    public String getLogoUrl() {
-        return logoUrl;
     }
 
     public String getAdminContactEmail() {

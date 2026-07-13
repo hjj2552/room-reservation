@@ -26,7 +26,6 @@ public record UpdateOperationSettingsRequest(
     @Email @Size(max = 255) String adminContactEmail,
     @Size(max = 50) String adminContactPhone,
     String completionMessage,
-    @Size(max = 500) String logoUrl,
     @NotNull Long version
 ) {
 }

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { OperationSettings } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
-import { useSettings, useUpdateSettings, useUploadSettingsLogo } from '../../shared/hooks/useSettings';
+import { useSettings, useUpdateSettings } from '../../shared/hooks/useSettings';
 import { dayLabels } from '../../shared/utils/labels';
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -11,7 +11,6 @@ const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 export function SettingsPage() {
   const settings = useSettings();
   const updateSettings = useUpdateSettings();
-  const uploadLogo = useUploadSettingsLogo();
   const [form, setForm] = useState<OperationSettings | null>(null);
 
   useEffect(() => {
@@ -50,14 +49,6 @@ export function SettingsPage() {
       adminContactEmail: form.adminContactEmail || null,
       adminContactPhone: form.adminContactPhone || null,
       completionMessage: form.completionMessage || null,
-      logoUrl: form.logoUrl || null,
-    });
-  }
-
-  function handleLogoChange(file: File | undefined) {
-    if (!file) return;
-    uploadLogo.mutate(file, {
-      onSuccess: ({ logoUrl }) => updateField('logoUrl', logoUrl),
     });
   }
 
@@ -88,32 +79,6 @@ export function SettingsPage() {
             required
           />
         </label>
-        <div className="full-span settings-logo-field">
-          <div>
-            <span className="field-label">기관 로고</span>
-            <p className="field-helper">정사각형 로고 이미지를 업로드해 주세요. 512x512 이상 PNG를 권장합니다.</p>
-          </div>
-          <div className="settings-logo-row">
-            <div className="settings-logo-preview" aria-label="현재 기관 로고 미리보기">
-              {form.logoUrl ? <img src={form.logoUrl} alt="기관 로고 미리보기" /> : <span>로고 없음</span>}
-            </div>
-            <div className="settings-logo-controls">
-              <input
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={(event) => handleLogoChange(event.target.files?.[0])}
-                data-testid="settings-logo-input"
-              />
-              {form.logoUrl ? (
-                <button type="button" className="ghost-button" onClick={() => updateField('logoUrl', null)}>
-                  로고 제거
-                </button>
-              ) : null}
-              {uploadLogo.isPending ? <p className="muted">로고를 업로드하는 중입니다.</p> : null}
-              {uploadLogo.isError ? <div className="inline-error" role="alert">{errorMessage(uploadLogo.error)}</div> : null}
-            </div>
-          </div>
-        </div>
         <label className="toggle-label settings-toggle">
           <input
             type="checkbox"
