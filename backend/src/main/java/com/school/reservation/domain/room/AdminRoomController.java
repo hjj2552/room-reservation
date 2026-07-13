@@ -6,10 +6,10 @@ import com.school.reservation.domain.room.dto.request.UpdateRoomRequest;
 import com.school.reservation.domain.room.dto.response.AdminRoomResponse;
 import com.school.reservation.domain.room.dto.response.RoomDeletionCheckResponse;
 import com.school.reservation.global.dto.PagedResponse;
+import com.school.reservation.global.pagination.AdminPageRequestFactory;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -43,7 +43,7 @@ public class AdminRoomController {
         @RequestParam(defaultValue = "name,asc") String sort
     ) {
         return PagedResponse.from(roomService
-            .search(enabled, includeDeleted, keyword, PageRequest.of(page, size, parseSort(sort)))
+            .search(enabled, includeDeleted, keyword, AdminPageRequestFactory.create(page, size, parseSort(sort)))
             .map(AdminRoomResponse::from));
     }
 
