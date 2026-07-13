@@ -16,8 +16,12 @@ import {
 import { useCreateReservation, useReservation, useReservations } from '../../shared/hooks/useReservations';
 import { useRooms } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
-import { fromDateTimeLocal, toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
-import { defaultReservationDurationMinutes } from '../../shared/utils/reservationTime';
+import { toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
+import {
+  fromServiceDateTimeLocal,
+  newRequestSelection,
+  slotToReservationSelection,
+} from '../../shared/utils/reservationTime';
 
 const timetablePageSize = 500;
 const timetableViewModes = ['date', 'room'] as const;
@@ -38,57 +42,6 @@ function addDaysInputValue(value: string, days: number) {
   const date = new Date(`${value}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-function minutesToTimeInput(minutes: number) {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-function timeValueToMinutes(value?: string) {
-  const match = value?.match(/^(\d{2}):(\d{2})/);
-  if (!match) return undefined;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function slotToSelection(
-  slot: { date: string; startMinutes: number; endMinutes: number; roomId: string },
-  minReservationMinutes = 30,
-) {
-  const endMinutes = slot.startMinutes + defaultReservationDurationMinutes(minReservationMinutes);
-
-  return {
-    source: 'slot' as const,
-    roomId: slot.roomId,
-    date: slot.date,
-    startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
-    endAt: `${slot.date}T${minutesToTimeInput(endMinutes)}`,
-  };
-}
-
-function newRequestSelection(
-  openTime?: string,
-  closeTime?: string,
-  minReservationMinutes = 30,
-): TimetableSlotSelection {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  const date = local.toISOString().slice(0, 10);
-  // The default quick-create duration follows the configurable minimum reservation time.
-  const durationMinutes = defaultReservationDurationMinutes(minReservationMinutes);
-  const openMinutes = timeValueToMinutes(openTime) ?? 0;
-  const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
-  const startMinutes = openMinutes;
-  const endMinutes = Math.min(startMinutes + durationMinutes, closeMinutes);
-
-  return {
-    source: 'toolbar',
-    roomId: '',
-    date,
-    startAt: `${date}T${minutesToTimeInput(startMinutes)}`,
-    endAt: `${date}T${minutesToTimeInput(endMinutes)}`,
-  };
 }
 
 function startOfWeekInputValue(value: string) {
@@ -122,6 +75,7 @@ export function TimetablePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [quickAddSelection, setQuickAddSelection] = useState<TimetableSlotSelection | null>(null);
+  const [quickAddUnavailableMessage, setQuickAddUnavailableMessage] = useState<string>();
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const duplicateQuickAddAppliedRef = useRef<string | null>(null);
   const rooms = useRooms();
@@ -207,11 +161,9 @@ export function TimetablePage() {
       return;
     }
 
-    setQuickAddSelection(newRequestSelection(
-      settings.data.openTime,
-      settings.data.closeTime,
-      settings.data.minReservationMinutes,
-    ));
+    const nextSelection = newRequestSelection(settings.data);
+    setQuickAddSelection(nextSelection.selection);
+    setQuickAddUnavailableMessage(nextSelection.unavailableMessage);
     duplicateQuickAddAppliedRef.current = duplicateReservationId;
   }, [duplicateReservation.data, duplicateReservationId, settings.data]);
 
@@ -262,7 +214,8 @@ export function TimetablePage() {
 
   function handleEmptySlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     clearDuplicateReservationParam();
-    setQuickAddSelection(slotToSelection(
+    setQuickAddUnavailableMessage(undefined);
+    setQuickAddSelection(slotToReservationSelection(
       slot,
       settings.data?.minReservationMinutes,
     ));
@@ -270,21 +223,22 @@ export function TimetablePage() {
 
   function handleNewRequestClick() {
     clearDuplicateReservationParam();
-    setQuickAddSelection(newRequestSelection(
-      settings.data?.openTime,
-      settings.data?.closeTime,
-      settings.data?.minReservationMinutes,
-    ));
+    if (!settings.data) return;
+    const nextSelection = newRequestSelection(settings.data);
+    setQuickAddSelection(nextSelection.selection);
+    setQuickAddUnavailableMessage(nextSelection.unavailableMessage);
   }
 
   function handleQuickAddCreated(reservationId: string) {
     setHighlightedReservationId(reservationId);
     setQuickAddSelection(null);
+    setQuickAddUnavailableMessage(undefined);
     clearDuplicateReservationParam();
   }
 
   function handleQuickAddClose() {
     setQuickAddSelection(null);
+    setQuickAddUnavailableMessage(undefined);
     clearDuplicateReservationParam();
   }
 
@@ -296,8 +250,8 @@ export function TimetablePage() {
         applicantEmail: values.applicantEmail,
         applicantPhone: values.applicantPhone,
         purpose: values.purpose,
-        startAt: fromDateTimeLocal(values.startAt),
-        endAt: fromDateTimeLocal(values.endAt),
+        startAt: fromServiceDateTimeLocal(values.startAt),
+        endAt: fromServiceDateTimeLocal(values.endAt),
         status: values.status,
         memo: values.memo || undefined,
       },
@@ -313,6 +267,7 @@ export function TimetablePage() {
         eyebrow="관리자 메뉴"
         helperText={timetableCopy.adminHelper}
         buttonTestId="timetable-new-request-button"
+        buttonDisabled={!settings.data}
         onNewRequest={handleNewRequestClick}
       />
 
@@ -477,6 +432,7 @@ export function TimetablePage() {
           variant="admin"
           rooms={roomViewRooms}
           selection={quickAddSelection}
+          unavailableMessage={quickAddUnavailableMessage}
           initialValues={duplicateQuickAddInitialValues}
           onClose={handleQuickAddClose}
           onSubmit={handleReservationRequest}

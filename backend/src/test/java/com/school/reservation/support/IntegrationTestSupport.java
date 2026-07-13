@@ -110,7 +110,7 @@ public abstract class IntegrationTestSupport {
     }
 
     protected OffsetDateTime nextWeekdayAt(int hour, int minute) {
-        LocalDate date = LocalDate.now();
+        LocalDate date = LocalDate.now().plusDays(1);
         while (date.getDayOfWeek() == DayOfWeek.SATURDAY || date.getDayOfWeek() == DayOfWeek.SUNDAY) {
             date = date.plusDays(1);
         }

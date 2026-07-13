@@ -3,14 +3,9 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { statusLabels } from '../utils/labels';
+import type { ReservationTimeSelection } from '../utils/reservationTime';
 
-export interface TimetableSlotSelection {
-  source: 'slot' | 'toolbar';
-  roomId: string;
-  date: string;
-  startAt: string;
-  endAt: string;
-}
+export type TimetableSlotSelection = ReservationTimeSelection;
 
 export interface ReservationRequestValues {
   roomId: string;
@@ -35,6 +30,7 @@ interface ReservationRequestPanelProps {
   rooms: RequestRoom[];
   selection: TimetableSlotSelection;
   initialValues?: ReservationRequestValues;
+  unavailableMessage?: string;
   submitError?: unknown;
   isPending?: boolean;
   onClose: () => void;
@@ -140,6 +136,7 @@ export function ReservationRequestPanel({
   rooms,
   selection,
   initialValues,
+  unavailableMessage,
   submitError,
   isPending = false,
   onClose,
@@ -231,7 +228,11 @@ export function ReservationRequestPanel({
         <div>
           <h2 id="reservation-request-title">예약 신청</h2>
           <p className="muted">
-            {selection.source === 'slot' ? `${selection.date} 선택 슬롯` : `${selection.date} 새 신청`}
+            {selection.source === 'slot'
+              ? `${selection.date} 선택 슬롯`
+              : selection.date
+                ? `${selection.date} 새 신청`
+                : '예약 가능한 미래 시간 없음'}
             {isAdmin ? ' · 관리자는 승인 상태로 저장할 수 있습니다.' : ' · 신청은 승인 대기 상태로 저장됩니다.'}
           </p>
         </div>
@@ -246,6 +247,12 @@ export function ReservationRequestPanel({
           <X size={16} aria-hidden="true" />
         </button>
       </div>
+
+      {unavailableMessage ? (
+        <div className="inline-error" role="alert" data-testid="reservation-time-unavailable">
+          {unavailableMessage}
+        </div>
+      ) : null}
 
       <form className="quick-add-form compact-request-form" onSubmit={handleSubmit}>
         <label className="full-span request-title-field">
@@ -391,7 +398,12 @@ export function ReservationRequestPanel({
           <button type="button" className="ghost-button" onClick={onClose}>
             취소
           </button>
-          <button type="submit" className="primary-button" data-testid={ids.submit} disabled={isPending}>
+          <button
+            type="submit"
+            className="primary-button"
+            data-testid={ids.submit}
+            disabled={isPending || Boolean(unavailableMessage)}
+          >
             {isPending ? '신청 중...' : isAdmin ? '예약 신청 저장' : '예약 신청'}
           </button>
         </div>

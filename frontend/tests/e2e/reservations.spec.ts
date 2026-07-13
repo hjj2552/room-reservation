@@ -6,6 +6,7 @@ import {
   loginByApi,
   nextWeekdayReservationLocalInputs,
 } from './helpers';
+import { newRequestSelection } from '../../shared/utils/reservationTime';
 
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
   await loginByApi(request);
@@ -150,13 +151,8 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
     endAt: string;
   };
   let duplicatedReservationId: string | undefined;
-  const toolbarDefaultDate = await page.evaluate(() => {
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-    return local.toISOString().slice(0, 10);
-  });
-  const defaultDateIsOperating = settings.availableDaysOfWeek.includes(weekdayCode(toolbarDefaultDate));
-  let createdDate = toolbarDefaultDate;
+  const toolbarDefault = newRequestSelection(settings, new Date());
+  expect(toolbarDefault.unavailableMessage).toBeUndefined();
 
   async function expectDuplicateQuickAddPrefill() {
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
@@ -166,8 +162,8 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
     await expect(page.getByTestId('quick-add-phone-input')).toHaveValue(source.applicantPhone);
     await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(source.purpose);
     await expect(page.getByTestId('quick-add-status-select')).toHaveValue(source.status);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${toolbarDefaultDate}T09:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${toolbarDefaultDate}T09:30`);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(toolbarDefault.selection.startAt);
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(toolbarDefault.selection.endAt);
     await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue(source.startAt.slice(0, 16));
     await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue(source.endAt.slice(0, 16));
   }
@@ -192,40 +188,9 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
     return responsePromise;
   }
 
-  let createResponseBody: string;
-  if (defaultDateIsOperating) {
-    const createResponse = await submitDuplicate();
-    createResponseBody = await createResponse.text();
-    expect(createResponse.ok(), createResponseBody).toBeTruthy();
-  } else {
-    const unavailableResponse = await submitDuplicate();
-    const unavailableResponseBody = await unavailableResponse.text();
-    const unavailableError = JSON.parse(unavailableResponseBody) as { code?: string; message?: string };
-
-    expect(unavailableResponse.ok(), unavailableResponseBody).toBeFalsy();
-    expect(unavailableError.code).toBe('OUTSIDE_OPERATING_DAYS');
-    expect(unavailableError.message).toMatch(/requested day|not available/i);
-
-    const quickAddPanel = page.getByTestId('timetable-quick-add-panel');
-    await expect(quickAddPanel).toBeVisible();
-    await expect(quickAddPanel.getByRole('alert')).toContainText('예약 가능한 요일');
-    await expect(page.getByTestId('quick-add-start-input')).toBeEditable();
-    await expect(page.getByTestId('quick-add-end-input')).toBeEditable();
-
-    createdDate = nextOperatingDate(
-      toolbarDefaultDate,
-      settings.availableDaysOfWeek,
-      settings.semesterEndDate,
-    );
-    await page.getByTestId('quick-add-start-input').fill(`${createdDate}T09:00`);
-    await page.getByTestId('quick-add-end-input').fill(`${createdDate}T09:30`);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${createdDate}T09:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${createdDate}T09:30`);
-
-    const createResponse = await submitDuplicate();
-    createResponseBody = await createResponse.text();
-    expect(createResponse.ok(), createResponseBody).toBeTruthy();
-  }
+  const createResponse = await submitDuplicate();
+  const createResponseBody = await createResponse.text();
+  expect(createResponse.ok(), createResponseBody).toBeTruthy();
 
   const duplicated = JSON.parse(createResponseBody) as {
     id: string;
@@ -240,9 +205,7 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
   expect(duplicated.series).toBeNull();
   expect(duplicated.recurrenceException).toBe(false);
   await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
-  if (createdDate !== toolbarDefaultDate) {
-    await page.getByTestId('timetable-date-input').fill(createdDate);
-  }
+  await page.getByTestId('timetable-date-input').fill(toolbarDefault.selection.date);
   await expect(page.getByTestId('reservation-date-timetable')).toContainText(source.purpose);
 
   await page.goto(`/admin/reservations/${duplicatedReservationId}`);
@@ -253,28 +216,6 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
   await page.goto(`/admin/reservations?keyword=${encodeURIComponent(source.purpose)}`);
   await expect(page.getByTestId('reservations-table')).toContainText(source.purpose);
 });
-
-function nextOperatingDate(currentDate: string, availableDays: string[], semesterEndDate: string) {
-  let candidate = addDays(currentDate, 1);
-  while (candidate <= semesterEndDate) {
-    if (availableDays.includes(weekdayCode(candidate))) {
-      return candidate;
-    }
-    candidate = addDays(candidate, 1);
-  }
-  throw new Error(`No operating day is available after ${currentDate} through ${semesterEndDate}.`);
-}
-
-function weekdayCode(date: string) {
-  const day = new Date(`${date}T00:00:00Z`).getUTCDay();
-  return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][day];
-}
-
-function addDays(date: string, days: number) {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
 
 test('deleted reservation audit row is read-only and detail URL shows domain guidance', async ({ page, request, e2eData }) => {
   await loginByApi(request);
