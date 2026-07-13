@@ -38,7 +38,7 @@ public class SecurityConfig {
             )
             .addFilterAfter(rateLimitFilter, AnonymousAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/public/**", "/api/auth/csrf", "/api/auth/admin/login").permitAll()
+                .requestMatchers("/health", "/api/public/**", "/api/auth/csrf", "/api/auth/admin/login").permitAll()
                 .requestMatchers("/api/admin/**", "/api/auth/admin/me", "/api/auth/admin/logout").authenticated()
                 .anyRequest().permitAll()
             )
