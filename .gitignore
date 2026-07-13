@@ -18,6 +18,7 @@ backend/src/main/resources/application-local.properties
 backend/src/main/resources/application-*.local.yml
 backend/src/main/resources/application-*.local.yaml
 backend/src/main/resources/application-*.local.properties
+backend/uploads/
 
 node_modules/
 dist/

@@ -10,6 +10,11 @@ logs
 .env
 .env.*
 src/main/resources/application-local.yml
+src/main/resources/application-local.yaml
+src/main/resources/application-local.properties
+src/main/resources/application-*.local.yml
+src/main/resources/application-*.local.yaml
+src/main/resources/application-*.local.properties
 src/main/resources/application-local.example.yml
 src/main/resources/application-dev.yml
 src/main/resources/application-test.yml
