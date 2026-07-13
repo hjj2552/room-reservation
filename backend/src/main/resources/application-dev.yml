@@ -8,13 +8,7 @@ spring:
   jpa:
     show-sql: false
 
-# Session cookie Secure/HttpOnly are defined in application.yml.
-# Decide SameSite after the dev deployment domain structure is finalized.
-# server:
-#   servlet:
-#     session:
-#       cookie:
-#         same-site: none
+# Session cookie Secure/HttpOnly/SameSite=Lax are defined in application.yml.
 
 app:
   admin:

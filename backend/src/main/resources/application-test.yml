@@ -10,13 +10,7 @@ spring:
   jpa:
     show-sql: false
 
-# Session cookie Secure/HttpOnly are defined in application.yml.
-# SameSite is profile-owned and intentionally inactive in tests unless needed.
-# server:
-#   servlet:
-#     session:
-#       cookie:
-#         same-site: lax
+# Session cookie Secure/HttpOnly/SameSite=Lax are inherited from application.yml.
 
 app:
   admin:

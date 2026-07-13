@@ -23,7 +23,7 @@ repository.
 |---|---|---|
 | `E2E_CLEANUP_ENABLED` | `false` for local/dev | Enables guarded E2E cleanup endpoints. Never enable this in production. |
 
-Session cookie `HttpOnly=true` and the production/common `Secure=true` default are defined in `application.yml`. Local and E2E profiles explicitly override `Secure=false` because they run over HTTP. Decide `server.servlet.session.cookie.same-site` in each deployed profile after the frontend/backend domain structure is finalized.
+Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in `application.yml`. Local and E2E profiles explicitly override only `Secure=false` because they run over HTTP. `SameSite=Lax` matches the production browser flow through the same-origin Cloudflare Pages `/api` proxy.
 
 ## Cloudflare Pages Frontend
 

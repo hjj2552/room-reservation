@@ -23,6 +23,7 @@ public class CsrfController {
             .path("/")
             .httpOnly(false)
             .secure(request.isSecure())
+            .sameSite("Lax")
             .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 

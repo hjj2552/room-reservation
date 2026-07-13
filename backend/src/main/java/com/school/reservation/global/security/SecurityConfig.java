@@ -96,6 +96,7 @@ public class SecurityConfig {
         repository.setHeaderName("X-XSRF-TOKEN");
         repository.setCookieCustomizer(cookie -> cookie
             .path("/")
+            .sameSite("Lax")
         );
         return repository;
     }
