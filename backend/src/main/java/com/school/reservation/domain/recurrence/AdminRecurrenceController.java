@@ -8,11 +8,11 @@ import com.school.reservation.domain.recurrence.dto.response.PreviewRecurrenceRe
 import com.school.reservation.domain.recurrence.dto.response.RecurrenceDetailResponse;
 import com.school.reservation.domain.recurrence.dto.response.RecurrenceListItemResponse;
 import com.school.reservation.global.dto.PagedResponse;
+import com.school.reservation.global.pagination.AdminPageRequestFactory;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.UUID;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -74,7 +74,7 @@ public class AdminRecurrenceController {
                 fromDate,
                 toDate,
                 keyword,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+                AdminPageRequestFactory.create(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
             )
             .map(RecurrenceListItemResponse::from));
     }

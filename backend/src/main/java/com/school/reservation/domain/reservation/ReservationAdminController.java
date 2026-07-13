@@ -7,11 +7,11 @@ import com.school.reservation.domain.reservation.dto.response.AdminReservationDe
 import com.school.reservation.domain.reservation.dto.response.AdminReservationListItemResponse;
 import com.school.reservation.domain.reservation.dto.response.ReservationHistoryResponse;
 import com.school.reservation.global.dto.PagedResponse;
+import com.school.reservation.global.pagination.AdminPageRequestFactory;
 import jakarta.validation.Valid;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import java.net.URI;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -54,7 +54,7 @@ public class ReservationAdminController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        var pageable = AdminPageRequestFactory.create(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return PagedResponse.from(reservationService
             .searchAdminReservations(fromAt, toAt, roomId, status, source, keyword, excludeCancelled, pageable)
             .map(AdminReservationListItemResponse::from));

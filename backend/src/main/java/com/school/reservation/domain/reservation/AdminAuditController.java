@@ -2,9 +2,9 @@ package com.school.reservation.domain.reservation;
 
 import com.school.reservation.domain.reservation.dto.response.ReservationHistoryResponse;
 import com.school.reservation.global.dto.PagedResponse;
+import com.school.reservation.global.pagination.AdminPageRequestFactory;
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,7 +43,7 @@ public class AdminAuditController {
                 action,
                 fromAt,
                 toAt,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+                AdminPageRequestFactory.create(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
             )
             .map(ReservationHistoryResponse::from));
     }
