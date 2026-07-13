@@ -1551,6 +1551,21 @@ button:disabled {
   background: #eef3f8;
 }
 
+.app-readiness-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: #eef3f8;
+  color: #202936;
+  text-align: center;
+}
+
+.app-readiness-page p {
+  margin: 0;
+  line-height: 1.6;
+}
+
 .entry-panel {
   display: grid;
   gap: 22px;
