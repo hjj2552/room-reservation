@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.mjs --configLoader native",
-    "build": "tsc --noEmit && vite build --config vite.config.mjs --configLoader native",
+    "build": "tsc --noEmit && tsc --noEmit -p functions/tsconfig.json && vite build --config vite.config.mjs --configLoader native",
     "e2e": "node scripts/run-e2e.mjs",
     "e2e:cleanup": "node scripts/cleanup-e2e-data.mjs",
     "e2e:cleanup:preview": "node scripts/cleanup-e2e-data.mjs --preview",
     "e2e:ci": "node scripts/run-e2e.mjs",
     "e2e:ui": "playwright test --ui",
+    "test:functions": "node --test tests/functions/api-proxy.test.mjs",
     "preview": "vite preview --config vite.config.mjs --configLoader native"
   },
   "dependencies": {
