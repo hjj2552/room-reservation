@@ -21,10 +21,13 @@ import {
   usePublicSettings,
   usePublicWeeklyReservations,
 } from '../../shared/hooks/usePublicReservation';
-import { fromDateTimeLocal } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskName } from '../../shared/utils/privacyMasking';
-import { defaultReservationDurationMinutes, reservationSlotUnitMinutes } from '../../shared/utils/reservationTime';
+import {
+  fromServiceDateTimeLocal,
+  newRequestSelection,
+  slotToReservationSelection,
+} from '../../shared/utils/reservationTime';
 
 type PublicTimetableViewMode = 'date' | 'room';
 
@@ -63,62 +66,6 @@ function startOfWeekInputValue(value: string) {
   return date.toISOString().slice(0, 10);
 }
 
-function minutesToTimeInput(minutes: number) {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-}
-
-function timeValueToMinutes(value?: string) {
-  const match = value?.match(/^(\d{2}):(\d{2})/);
-  if (!match) return undefined;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-function slotToSelection(
-  slot: { date: string; startMinutes: number; endMinutes: number; roomId: string },
-  minReservationMinutes = 30,
-) {
-  const endMinutes = slot.startMinutes + defaultReservationDurationMinutes(minReservationMinutes);
-
-  return {
-    source: 'slot' as const,
-    roomId: slot.roomId,
-    date: slot.date,
-    startAt: `${slot.date}T${minutesToTimeInput(slot.startMinutes)}`,
-    endAt: `${slot.date}T${minutesToTimeInput(endMinutes)}`,
-  };
-}
-
-function newRequestSelection(
-  slotMinutes = 30,
-  openTime?: string,
-  closeTime?: string,
-  minReservationMinutes = 30,
-): TimetableSlotSelection {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  const date = local.toISOString().slice(0, 10);
-  const currentMinutes = local.getHours() * 60 + local.getMinutes();
-  const unitMinutes = reservationSlotUnitMinutes(slotMinutes);
-  // The default quick-create duration follows the configurable minimum reservation time.
-  const durationMinutes = defaultReservationDurationMinutes(minReservationMinutes);
-  const openMinutes = timeValueToMinutes(openTime) ?? 0;
-  const closeMinutes = timeValueToMinutes(closeTime) ?? 24 * 60;
-  const latestStartMinutes = Math.max(openMinutes, closeMinutes - durationMinutes);
-  const roundedStartMinutes = Math.ceil(currentMinutes / unitMinutes) * unitMinutes;
-  const startMinutes = Math.min(Math.max(roundedStartMinutes, openMinutes), latestStartMinutes);
-  const endMinutes = Math.min(startMinutes + durationMinutes, closeMinutes);
-
-  return {
-    source: 'toolbar',
-    roomId: '',
-    date,
-    startAt: `${date}T${minutesToTimeInput(startMinutes)}`,
-    endAt: `${date}T${minutesToTimeInput(endMinutes)}`,
-  };
-}
-
 function dateInKst(value: string) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Seoul',
@@ -151,6 +98,7 @@ export function PublicReservationPage() {
   const settings = usePublicSettings();
   const create = useCreatePublicReservation();
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
+  const [quickSelectionUnavailableMessage, setQuickSelectionUnavailableMessage] = useState<string>();
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
@@ -240,20 +188,18 @@ export function PublicReservationPage() {
 
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     if (isUnavailable) return;
-    setQuickSelection(slotToSelection(
+    setQuickSelectionUnavailableMessage(undefined);
+    setQuickSelection(slotToReservationSelection(
       slot,
       settings.data?.minReservationMinutes,
     ));
   }
 
   function handleNewRequestClick() {
-    if (isUnavailable) return;
-    setQuickSelection(newRequestSelection(
-      settings.data?.slotMinutes,
-      settings.data?.openTime,
-      settings.data?.closeTime,
-      settings.data?.minReservationMinutes,
-    ));
+    if (isUnavailable || !settings.data) return;
+    const nextSelection = newRequestSelection(settings.data);
+    setQuickSelection(nextSelection.selection);
+    setQuickSelectionUnavailableMessage(nextSelection.unavailableMessage);
   }
 
   function handleReservationClick(reservation: TimetableReservation) {
@@ -272,14 +218,15 @@ export function PublicReservationPage() {
         applicantEmail: values.applicantEmail,
         applicantPhone: values.applicantPhone,
         purpose: values.purpose,
-        startAt: fromDateTimeLocal(values.startAt),
-        endAt: fromDateTimeLocal(values.endAt),
+        startAt: fromServiceDateTimeLocal(values.startAt),
+        endAt: fromServiceDateTimeLocal(values.endAt),
         cancelPassword: values.cancelPassword,
       },
       {
         onSuccess: (created) => {
           setHighlightedReservationId(created.id);
           setQuickSelection(null);
+          setQuickSelectionUnavailableMessage(undefined);
         },
       },
     );
@@ -291,7 +238,7 @@ export function PublicReservationPage() {
         eyebrow="일반 사용자"
         helperText="신청은 승인 대기 상태로 저장되며 관리자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
-        buttonDisabled={Boolean(isUnavailable)}
+        buttonDisabled={Boolean(isUnavailable) || !settings.data}
         onNewRequest={handleNewRequestClick}
       />
 
@@ -464,7 +411,11 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          onClose={() => setQuickSelection(null)}
+          unavailableMessage={quickSelectionUnavailableMessage}
+          onClose={() => {
+            setQuickSelection(null);
+            setQuickSelectionUnavailableMessage(undefined);
+          }}
           onSubmit={handlePublicRequest}
           submitError={create.error}
           isPending={create.isPending}

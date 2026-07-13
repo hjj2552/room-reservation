@@ -3,6 +3,7 @@ package com.school.reservation.domain.reservation;
 import com.school.reservation.domain.room.Room;
 import com.school.reservation.domain.settings.OperationSettings;
 import com.school.reservation.domain.settings.OperationSettingsRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -14,9 +15,11 @@ public class ReservationPolicyService {
     private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final OperationSettingsRepository operationSettingsRepository;
+    private final Clock clock;
 
-    public ReservationPolicyService(OperationSettingsRepository operationSettingsRepository) {
+    public ReservationPolicyService(OperationSettingsRepository operationSettingsRepository, Clock clock) {
         this.operationSettingsRepository = operationSettingsRepository;
+        this.clock = clock;
     }
 
     public void validate(Room room, OffsetDateTime startAt, OffsetDateTime endAt, String applicantPhone) {
@@ -26,6 +29,10 @@ public class ReservationPolicyService {
 
         if (!startAt.isBefore(endAt)) {
             throw new PolicyViolationException("VALIDATION_ERROR", "Start time must be before end time.");
+        }
+
+        if (startAt.toInstant().isBefore(clock.instant())) {
+            throw new PolicyViolationException("PAST_RESERVATION_TIME", "Reservation start time must not be in the past.");
         }
 
         OperationSettings settings = operationSettingsRepository.findById(OperationSettings.SINGLETON_ID)
