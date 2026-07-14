@@ -8,7 +8,7 @@ import {
 } from '../api/readiness';
 import { publicReservationKeys } from '../hooks/usePublicReservation';
 
-const loadingMessage = '데이터를 불러오는 중입니다. 잠시만 기다려주세요...';
+const loadingMessage = '데이터를 불러오는 중입니다. 최대 3분 정도 걸릴 수 있습니다.';
 const failureMessage = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.';
 
 type ReadinessState = 'checking' | 'ready' | 'failed';
@@ -20,19 +20,36 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const lifecycleController = new AbortController();
+    const deadline = Date.now() + appReadinessPolicy.maxWaitMs;
     let active = true;
-    const loadingTimer = window.setTimeout(() => {
-      if (active) setShowLoading(true);
-    }, appReadinessPolicy.loadingDelayMs);
+    let loadingTimer: number | undefined;
+    let deadlineTimer: number | undefined;
+
+    const clearTimers = () => {
+      if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
+      if (deadlineTimer !== undefined) window.clearTimeout(deadlineTimer);
+    };
 
     const finish = (state: Exclude<ReadinessState, 'checking'>) => {
-      if (!active) return;
-      window.clearTimeout(loadingTimer);
+      if (!active || lifecycleController.signal.aborted) return;
+      clearTimers();
+      lifecycleController.abort();
+      setShowLoading(false);
       setReadinessState(state);
     };
 
+    loadingTimer = window.setTimeout(() => {
+      if (active) setShowLoading(true);
+    }, appReadinessPolicy.loadingDelayMs);
+    deadlineTimer = window.setTimeout(() => finish('failed'), appReadinessPolicy.maxWaitMs);
+
+    const finishReady = (settings: Awaited<ReturnType<typeof fetchReadinessSettings>>) => {
+      if (!active || lifecycleController.signal.aborted) return;
+      queryClient.setQueryData(publicReservationKeys.settings, settings);
+      finish('ready');
+    };
+
     const checkReadiness = async () => {
-      const deadline = Date.now() + appReadinessPolicy.maxWaitMs;
       let failedAttempts = 0;
 
       while (active && !lifecycleController.signal.aborted) {
@@ -48,12 +65,11 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
             Math.min(appReadinessPolicy.requestTimeoutMs, remainingMs),
           );
           if (!active || lifecycleController.signal.aborted) return;
-          if (Date.now() > deadline) {
+          if (Date.now() >= deadline) {
             finish('failed');
             return;
           }
-          queryClient.setQueryData(publicReservationKeys.settings, settings);
-          finish('ready');
+          finishReady(settings);
           return;
         } catch (error) {
           if (!active || lifecycleController.signal.aborted) return;
@@ -83,7 +99,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
-      window.clearTimeout(loadingTimer);
+      clearTimers();
       lifecycleController.abort();
     };
   }, [queryClient]);
