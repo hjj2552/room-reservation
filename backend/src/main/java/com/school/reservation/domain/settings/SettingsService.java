@@ -12,7 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SettingsService {
 
-    private static final Set<Integer> ALLOWED_SLOT_MINUTES = Set.of(5, 10, 15, 30, 60);
+    private static final int TIMETABLE_GRID_MINUTES = 30;
+    private static final Set<Integer> ALLOWED_SLOT_MINUTES = Set.of(5, 10, 15, 30);
     private static final Set<String> ALLOWED_DAYS = Set.of("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN");
 
     private final OperationSettingsRepository operationSettingsRepository;
@@ -65,11 +66,17 @@ public class SettingsService {
             throw new IllegalArgumentException("Open time must be before close time.");
         }
         if (!ALLOWED_SLOT_MINUTES.contains(request.slotMinutes())) {
-            throw new IllegalArgumentException("Slot minutes must be one of 5, 10, 15, 30, 60.");
+            throw new IllegalArgumentException("Slot minutes must be one of 5, 10, 15, 30.");
         }
-        if (!isAlignedToSlot(request.openTime().getMinute(), request.slotMinutes())
-            || !isAlignedToSlot(request.closeTime().getMinute(), request.slotMinutes())) {
-            throw new IllegalArgumentException("Open and close time must match slot minutes.");
+        if (!hasMinutePrecision(request.openTime()) || !hasMinutePrecision(request.closeTime())) {
+            throw new IllegalArgumentException("Open and close time must not include seconds or fractional seconds.");
+        }
+        if (!isAlignedToSlot(request.openTime().getMinute(), TIMETABLE_GRID_MINUTES)
+            || !isAlignedToSlot(request.closeTime().getMinute(), TIMETABLE_GRID_MINUTES)) {
+            throw new IllegalArgumentException("Open and close time must align to 30-minute timetable boundaries.");
+        }
+        if (request.minReservationMinutes() <= 0) {
+            throw new IllegalArgumentException("Min reservation minutes must be greater than zero.");
         }
         if (request.maxReservationMinutes() < request.minReservationMinutes()) {
             throw new IllegalArgumentException("Max reservation minutes must be greater than or equal to min.");
@@ -77,6 +84,9 @@ public class SettingsService {
         if (!isAlignedToSlot(request.minReservationMinutes(), request.slotMinutes())
             || !isAlignedToSlot(request.maxReservationMinutes(), request.slotMinutes())) {
             throw new IllegalArgumentException("Min and max reservation minutes must match slot minutes.");
+        }
+        if (request.maxReservationMinutes() < Math.max(TIMETABLE_GRID_MINUTES, request.minReservationMinutes())) {
+            throw new IllegalArgumentException("Max reservation minutes must allow the default suggested duration.");
         }
         if (Duration.between(request.openTime(), request.closeTime()).toMinutes() < request.minReservationMinutes()) {
             throw new IllegalArgumentException("Min reservation minutes must fit within operating hours.");
@@ -91,5 +101,9 @@ public class SettingsService {
 
     private boolean isAlignedToSlot(int minutes, int slotMinutes) {
         return minutes % slotMinutes == 0;
+    }
+
+    private boolean hasMinutePrecision(java.time.LocalTime value) {
+        return value.getSecond() == 0 && value.getNano() == 0;
     }
 }

@@ -9,8 +9,9 @@ import {
   useUpdateReservation,
 } from '../../shared/hooks/useReservations';
 import { useRooms } from '../../shared/hooks/useRooms';
-import { fromDateTimeLocal, toDateTimeLocal } from '../../shared/utils/date';
+import { useSettings } from '../../shared/hooks/useSettings';
 import { statusLabels } from '../../shared/utils/labels';
+import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 
 interface ReservationFormValues {
   roomId: string;
@@ -40,6 +41,7 @@ export function ReservationFormPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
   const rooms = useRooms();
+  const settings = useSettings();
   const reservation = useReservation(reservationId);
   const update = useUpdateReservation(reservationId);
   const {
@@ -59,8 +61,8 @@ export function ReservationFormPage() {
         applicantEmail: reservation.data.applicantEmail,
         applicantPhone: reservation.data.applicantPhone || '',
         purpose: reservation.data.purpose,
-        startAt: toDateTimeLocal(reservation.data.startAt),
-        endAt: toDateTimeLocal(reservation.data.endAt),
+        startAt: toServiceDateTimeLocal(reservation.data.startAt),
+        endAt: toServiceDateTimeLocal(reservation.data.endAt),
         status: reservation.data.status,
         memo: '',
       });
@@ -74,8 +76,8 @@ export function ReservationFormPage() {
       applicantEmail: values.applicantEmail,
       applicantPhone: values.applicantPhone,
       purpose: values.purpose,
-      startAt: fromDateTimeLocal(values.startAt),
-      endAt: fromDateTimeLocal(values.endAt),
+      startAt: fromServiceDateTimeLocal(values.startAt),
+      endAt: fromServiceDateTimeLocal(values.endAt),
       status: values.status,
       memo: values.memo || undefined,
     };
@@ -88,8 +90,9 @@ export function ReservationFormPage() {
     });
   }
 
-  if (reservation.isLoading) return <LoadingState />;
+  if (reservation.isLoading || settings.isLoading) return <LoadingState />;
   if (reservation.isError) return <ErrorState error={reservation.error} />;
+  if (settings.isError) return <ErrorState error={settings.error} />;
 
   const mutationError = update.error;
   const isPending = update.isPending;
@@ -168,6 +171,7 @@ export function ReservationFormPage() {
           <input
             data-testid="reservation-start-input"
             type="datetime-local"
+            step={(settings.data?.slotMinutes || 30) * 60}
             {...register('startAt', { required: '시작 시간을 입력하세요.' })}
           />
           {errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
@@ -177,6 +181,7 @@ export function ReservationFormPage() {
           <input
             data-testid="reservation-end-input"
             type="datetime-local"
+            step={(settings.data?.slotMinutes || 30) * 60}
             {...register('endAt', { required: '종료 시간을 입력하세요.' })}
           />
           {errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}

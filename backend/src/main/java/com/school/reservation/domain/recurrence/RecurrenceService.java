@@ -213,7 +213,7 @@ public class RecurrenceService {
 
     private PreviewRecurrenceResponse.Item previewItem(Room room, Candidate candidate, String applicantPhone) {
         try {
-            policyService.validate(room, candidate.startAt(), candidate.endAt(), applicantPhone);
+            policyService.validateAdminReservation(room, candidate.startAt(), candidate.endAt(), applicantPhone);
             if (conflictService.existsConflict(room.getId(), candidate.startAt(), candidate.endAt(), null)) {
                 return new PreviewRecurrenceResponse.Item(
                     candidate.date(),

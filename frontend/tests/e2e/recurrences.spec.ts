@@ -3,6 +3,7 @@ import {
   cancelRecurrenceByApi,
   cancelReservationByApi,
   deleteRoomByApi,
+  getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
 } from './helpers';
@@ -12,12 +13,19 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
   const room = await e2eData.createTestRoom('recurrence-room');
   const purpose = e2eData.name('recurring-smoke');
   const recurrenceTime = nextWeekdayRecurrenceInputs();
+  const settings = await getSettingsByApi(request);
   let recurrenceId: string | undefined;
   let cancelled = false;
 
   try {
     await page.goto('/admin/recurrences');
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
+    await expect(page.getByTestId('recurrence-start-time-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
+    await expect(page.getByTestId('recurrence-end-time-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
+    await expect(page.getByTestId('recurrence-start-time-input')).toHaveValue(settings.openTime.slice(0, 5));
+    await expect(page.getByTestId('recurrence-end-time-input')).toHaveValue(
+      addMinutesToTime(settings.openTime, Math.max(30, settings.minReservationMinutes)),
+    );
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
@@ -241,4 +249,10 @@ function dayLabel(day: string) {
     SUN: '일',
   };
   return labels[day] || day;
+}
+
+function addMinutesToTime(value: string, minutesToAdd: number) {
+  const [hour, minute] = value.slice(0, 5).split(':').map(Number);
+  const total = hour * 60 + minute + minutesToAdd;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }

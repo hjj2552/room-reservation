@@ -25,7 +25,10 @@ import { statusLabels } from '../../shared/utils/labels';
 import { maskName } from '../../shared/utils/privacyMasking';
 import {
   fromServiceDateTimeLocal,
+  isPublicReservationCandidateInPast,
   newRequestSelection,
+  publicPastReservationMessage,
+  serviceDateInputValue,
   slotToReservationSelection,
 } from '../../shared/utils/reservationTime';
 
@@ -47,9 +50,7 @@ function isPublicTimetableViewMode(value: string | null): value is PublicTimetab
 }
 
 function todayInputValue() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
+  return serviceDateInputValue();
 }
 
 function addDaysInputValue(value: string, days: number) {
@@ -187,12 +188,9 @@ export function PublicReservationPage() {
   }
 
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
-    if (isUnavailable) return;
+    if (isUnavailable || isPublicReservationCandidateInPast(slot.date, slot.startMinutes)) return;
     setQuickSelectionUnavailableMessage(undefined);
-    setQuickSelection(slotToReservationSelection(
-      slot,
-      settings.data?.minReservationMinutes,
-    ));
+    setQuickSelection(slotToReservationSelection(slot));
   }
 
   function handleNewRequestClick() {
@@ -327,10 +325,11 @@ export function PublicReservationPage() {
                 selectedDate={selectedDate}
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
-                reservationSlotMinutes={settings.data.slotMinutes}
                 minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
+                isEmptySlotDisabled={(slot) => isPublicReservationCandidateInPast(slot.date, slot.startMinutes)}
+                emptySlotDisabledMessage={publicPastReservationMessage}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={(room) => openRoomInfo(room)}
                 statusLabelOverride={publicStatusLabels}
@@ -391,10 +390,11 @@ export function PublicReservationPage() {
                 weekStart={selectedWeekStart}
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
-                reservationSlotMinutes={settings.data.slotMinutes}
                 minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
+                isEmptySlotDisabled={(slot) => isPublicReservationCandidateInPast(slot.date, slot.startMinutes)}
+                emptySlotDisabledMessage={publicPastReservationMessage}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={hasRoomDescription(selectedRoom?.description) && selectedRoom
                   ? () => openRoomInfo(selectedRoom)
@@ -411,6 +411,7 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
+          slotMinutes={settings.data?.slotMinutes || 30}
           unavailableMessage={quickSelectionUnavailableMessage}
           onClose={() => {
             setQuickSelection(null);
