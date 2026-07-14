@@ -5,6 +5,7 @@ export const appReadinessPolicy = {
   maxWaitMs: 90_000,
   loadingDelayMs: 300,
   maxRetryDelayMs: 5_000,
+  recoveryIntervalMs: 15_000,
 } as const;
 
 export class ReadinessRequestError extends Error {
@@ -90,8 +91,37 @@ function isRetryableStatus(status: number) {
 }
 
 function isPublicSettingsShape(value: unknown): value is PublicSettings {
-  return typeof value === 'object'
-    && value !== null
-    && !Array.isArray(value)
-    && typeof (value as Record<string, unknown>).organizationName === 'string';
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const settings = value as Record<string, unknown>;
+  const stringFields = [
+    'organizationName',
+    'semesterStartDate',
+    'semesterEndDate',
+    'openTime',
+    'closeTime',
+  ];
+  const nullableStringFields = [
+    'publicNotice',
+    'reservationDisabledMessage',
+    'adminContactEmail',
+    'adminContactPhone',
+    'completionMessage',
+  ];
+  const numberFields = [
+    'slotMinutes',
+    'minReservationMinutes',
+    'maxReservationMinutes',
+  ];
+
+  return stringFields.every((field) => typeof settings[field] === 'string')
+    && nullableStringFields.every((field) => (
+      settings[field] === null || typeof settings[field] === 'string'
+    ))
+    && numberFields.every((field) => typeof settings[field] === 'number')
+    && typeof settings.reservationEnabled === 'boolean'
+    && Array.isArray(settings.availableDaysOfWeek)
+    && settings.availableDaysOfWeek.every((day) => typeof day === 'string');
 }

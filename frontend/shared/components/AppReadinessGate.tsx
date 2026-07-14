@@ -11,7 +11,7 @@ import { publicReservationKeys } from '../hooks/usePublicReservation';
 const loadingMessage = '데이터를 불러오는 중입니다. 잠시만 기다려주세요...';
 const failureMessage = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.';
 
-type ReadinessState = 'checking' | 'ready' | 'failed';
+type ReadinessState = 'checking' | 'recovering' | 'ready' | 'failed';
 
 export function AppReadinessGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -25,10 +25,41 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
       if (active) setShowLoading(true);
     }, appReadinessPolicy.loadingDelayMs);
 
-    const finish = (state: Exclude<ReadinessState, 'checking'>) => {
+    const transitionTo = (state: Exclude<ReadinessState, 'checking'>) => {
       if (!active) return;
       window.clearTimeout(loadingTimer);
+      setShowLoading(false);
       setReadinessState(state);
+    };
+
+    const finishReady = (settings: Awaited<ReturnType<typeof fetchReadinessSettings>>) => {
+      if (!active || lifecycleController.signal.aborted) return;
+      queryClient.setQueryData(publicReservationKeys.settings, settings);
+      transitionTo('ready');
+    };
+
+    const recoverReadiness = async () => {
+      transitionTo('recovering');
+
+      while (active && !lifecycleController.signal.aborted) {
+        await waitForRetry(
+          appReadinessPolicy.recoveryIntervalMs,
+          lifecycleController.signal,
+        );
+        if (!active || lifecycleController.signal.aborted) return;
+
+        try {
+          const settings = await fetchReadinessSettings(lifecycleController.signal);
+          finishReady(settings);
+          return;
+        } catch (error) {
+          if (!active || lifecycleController.signal.aborted) return;
+          if (!isRetryableReadinessError(error)) {
+            transitionTo('failed');
+            return;
+          }
+        }
+      }
     };
 
     const checkReadiness = async () => {
@@ -38,7 +69,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
       while (active && !lifecycleController.signal.aborted) {
         const remainingMs = deadline - Date.now();
         if (remainingMs <= 0) {
-          finish('failed');
+          await recoverReadiness();
           return;
         }
 
@@ -48,17 +79,12 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
             Math.min(appReadinessPolicy.requestTimeoutMs, remainingMs),
           );
           if (!active || lifecycleController.signal.aborted) return;
-          if (Date.now() > deadline) {
-            finish('failed');
-            return;
-          }
-          queryClient.setQueryData(publicReservationKeys.settings, settings);
-          finish('ready');
+          finishReady(settings);
           return;
         } catch (error) {
           if (!active || lifecycleController.signal.aborted) return;
           if (!isRetryableReadinessError(error)) {
-            finish('failed');
+            transitionTo('failed');
             return;
           }
         }
@@ -69,7 +95,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
           Math.max(deadline - Date.now(), 0),
         );
         if (waitMs <= 0) {
-          finish('failed');
+          await recoverReadiness();
           return;
         }
 
@@ -92,9 +118,13 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
     return children;
   }
 
-  if (readinessState === 'failed') {
+  if (readinessState === 'recovering' || readinessState === 'failed') {
     return (
-      <main className="app-readiness-page" role="alert">
+      <main
+        className="app-readiness-page"
+        role="alert"
+        aria-busy={readinessState === 'recovering'}
+      >
         <p>{failureMessage}</p>
       </main>
     );
