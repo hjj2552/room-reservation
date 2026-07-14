@@ -2,10 +2,9 @@ import type { PublicSettings } from './types';
 
 export const appReadinessPolicy = {
   requestTimeoutMs: 10_000,
-  maxWaitMs: 90_000,
+  maxWaitMs: 180_000,
   loadingDelayMs: 300,
   maxRetryDelayMs: 5_000,
-  recoveryIntervalMs: 15_000,
 } as const;
 
 export class ReadinessRequestError extends Error {

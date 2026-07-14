@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-const loadingMessage = '데이터를 불러오는 중입니다. 잠시만 기다려주세요...';
+const loadingMessage = '데이터를 불러오는 중입니다. 최대 3분 정도 걸릴 수 있습니다.';
 const failureMessage = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.';
 const publicSettings = {
   organizationName: 'Testing Organization',
@@ -30,18 +30,6 @@ async function advanceClock(page: Page, totalMs: number) {
   }
 }
 
-async function advanceUntilRecovering(page: Page) {
-  for (let elapsedMs = 0; elapsedMs <= 95_000; elapsedMs += 5_000) {
-    if (await page.getByRole('alert').count()) {
-      await expect(page.getByRole('alert')).toHaveText(failureMessage);
-      await expect(page.getByRole('alert')).toHaveAttribute('aria-busy', 'true');
-      return;
-    }
-    await advanceClock(page, 5_000);
-  }
-  throw new Error('Readiness gate did not enter recovering after the initial wait limit.');
-}
-
 test('immediate readiness success shows the entry choices and reuses the settings cache', async ({ page }) => {
   let settingsRequests = 0;
   await page.route('**/api/public/settings', async (route) => {
@@ -67,6 +55,39 @@ test('immediate readiness success shows the entry choices and reuses the setting
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('readiness shows the loading message only after 300ms', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-07-14T00:00:00Z'));
+  let releaseRequest: (() => Promise<void>) | undefined;
+  await page.route('**/api/public/settings', async (route) => {
+    await new Promise<void>((resolve) => {
+      releaseRequest = async () => {
+        try {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(publicSettings),
+          });
+        } finally {
+          resolve();
+        }
+      };
+    });
+  });
+
+  await page.goto('/');
+  await expect.poll(() => typeof releaseRequest).toBe('function');
+  await advanceClock(page, 299);
+  await expect(page.getByText(loadingMessage)).toHaveCount(0);
+
+  await advanceClock(page, 1);
+  await expect(page.getByRole('status')).toHaveText(loadingMessage);
+  await expect(page.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+
+  await releaseRequest?.();
+  await expect(page.getByTestId('entry-public-link')).toBeVisible();
 });
 
 test('readiness retries two 503 responses before showing the entry choices', async ({ page }) => {
@@ -150,7 +171,62 @@ test('direct admin login access waits for app readiness', async ({ page }) => {
   await expect.poll(() => settingsRequests).toBe(2);
 });
 
-test('retryable failures enter recovering after the initial wait limit', async ({ page }) => {
+test('valid settings just before the 180-second deadline enter without reloading', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
+  let settingsRequests = 0;
+  let holdNextRequest = false;
+  let heldRequest = false;
+  let releaseSuccess: (() => Promise<void>) | undefined;
+  let mainFrameNavigations = 0;
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) mainFrameNavigations += 1;
+  });
+  await page.route('**/api/public/settings', async (route) => {
+    settingsRequests += 1;
+    if (!holdNextRequest) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      return;
+    }
+
+    heldRequest = true;
+    await new Promise<void>((resolve) => {
+      releaseSuccess = async () => {
+        try {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(publicSettings),
+          });
+        } finally {
+          resolve();
+        }
+      };
+    });
+  });
+
+  await page.goto('/');
+  const startedAt = await page.evaluate(() => Date.now());
+  const navigationsAfterGoto = mainFrameNavigations;
+  await advanceClock(page, 170_000);
+
+  holdNextRequest = true;
+  for (let elapsedMs = 0; elapsedMs < 6_000 && !heldRequest; elapsedMs += 1_000) {
+    await advanceClock(page, 1_000);
+  }
+  await expect.poll(() => heldRequest).toBe(true);
+
+  const elapsedMs = await page.evaluate((start) => Date.now() - start, startedAt);
+  await advanceClock(page, Math.max(179_000 - elapsedMs, 0));
+  await releaseSuccess?.();
+
+  await expect(page.getByTestId('entry-public-link')).toBeVisible();
+  expect(mainFrameNavigations).toBe(navigationsAfterGoto);
+  const requestsAfterSuccess = settingsRequests;
+  await advanceClock(page, 10_000);
+  expect(settingsRequests).toBe(requestsAfterSuccess);
+});
+
+test('the 180-second deadline aborts checking and stops every later request', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
   let settingsRequests = 0;
   await page.route('**/api/public/settings', async (route) => {
@@ -159,131 +235,85 @@ test('retryable failures enter recovering after the initial wait limit', async (
   });
 
   await page.goto('/');
-  await advanceUntilRecovering(page);
+  await advanceClock(page, 178_000);
+  await expect(page.getByRole('status')).toHaveText(loadingMessage);
+  await expect(page.getByRole('alert')).toHaveCount(0);
 
-  expect(settingsRequests).toBeGreaterThan(1);
-  await expect(page.getByTestId('entry-public-link')).toHaveCount(0);
+  await advanceClock(page, 2_000);
+  await expect(page.getByRole('alert')).toHaveText(failureMessage);
+  await expect(page.getByRole('alert')).not.toHaveAttribute('aria-busy');
   await expect(page.getByRole('button')).toHaveCount(0);
-});
-
-test('recovering enters the app without reloading when settings become ready', async ({ page }) => {
-  await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
-  let settingsRequests = 0;
-  let serveSuccess = false;
-  let mainFrameNavigations = 0;
-  page.on('framenavigated', (frame) => {
-    if (frame === page.mainFrame()) mainFrameNavigations += 1;
-  });
-  await page.route('**/api/public/settings', async (route) => {
-    settingsRequests += 1;
-    await route.fulfill(serveSuccess
-      ? {
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(publicSettings),
-        }
-      : { status: 503, contentType: 'application/json', body: '{}' });
-  });
-
-  await page.goto('/');
-  const navigationsAfterGoto = mainFrameNavigations;
-  await advanceUntilRecovering(page);
-  const requestsBeforeRecovery = settingsRequests;
-
-  serveSuccess = true;
-  await advanceClock(page, 15_000);
-
-  await expect(page.getByTestId('entry-public-link')).toBeVisible();
-  expect(settingsRequests).toBe(requestsBeforeRecovery + 1);
-  expect(mainFrameNavigations).toBe(navigationsAfterGoto);
+  await expect(page.getByRole('link')).toHaveCount(0);
+  const requestsAtFailure = settingsRequests;
 
   await advanceClock(page, 60_000);
-  expect(settingsRequests).toBe(requestsBeforeRecovery + 1);
+  expect(settingsRequests).toBe(requestsAtFailure);
 });
 
-test('recovering waits after each completed request and never overlaps requests', async ({ page }) => {
+test('readiness requests never overlap', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
   let settingsRequests = 0;
-  let holdNextRequest = false;
   let inFlightRequests = 0;
   let maxInFlightRequests = 0;
-  let releaseRequest: (() => Promise<void>) | undefined;
+  let holdFirstRequest = true;
+  let releaseFirstRequest: (() => Promise<void>) | undefined;
 
   await page.route('**/api/public/settings', async (route: Route) => {
     settingsRequests += 1;
-    if (!holdNextRequest) {
-      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-      return;
-    }
-
     inFlightRequests += 1;
     maxInFlightRequests = Math.max(maxInFlightRequests, inFlightRequests);
-    await new Promise<void>((resolve) => {
-      releaseRequest = async () => {
-        holdNextRequest = false;
-        try {
-          await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-        } finally {
-          inFlightRequests -= 1;
-          resolve();
-        }
-      };
-    });
+    try {
+      if (holdFirstRequest) {
+        await new Promise<void>((resolve) => {
+          releaseFirstRequest = async () => {
+            holdFirstRequest = false;
+            try {
+              await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+            } finally {
+              resolve();
+            }
+          };
+        });
+        return;
+      }
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    } finally {
+      inFlightRequests -= 1;
+    }
   });
 
   await page.goto('/');
-  await advanceUntilRecovering(page);
-  const requestsBeforeHeldRequest = settingsRequests;
-
-  holdNextRequest = true;
-  for (let elapsedMs = 0; elapsedMs < 15_000 && inFlightRequests === 0; elapsedMs += 1_000) {
-    await advanceClock(page, 1_000);
-  }
   await expect.poll(() => inFlightRequests).toBe(1);
-  expect(settingsRequests).toBe(requestsBeforeHeldRequest + 1);
-
-  await advanceClock(page, 5_000);
-  expect(settingsRequests).toBe(requestsBeforeHeldRequest + 1);
+  await advanceClock(page, 9_000);
+  expect(settingsRequests).toBe(1);
   expect(maxInFlightRequests).toBe(1);
 
-  await releaseRequest?.();
+  await releaseFirstRequest?.();
   await expect.poll(() => inFlightRequests).toBe(0);
-  await page.evaluate(() => undefined);
-  const requestsAfterCompletion = settingsRequests;
-
-  await advanceClock(page, 14_000);
-  expect(settingsRequests).toBe(requestsAfterCompletion);
-  await advanceClock(page, 2_000);
-  await expect.poll(() => settingsRequests).toBe(requestsAfterCompletion + 1);
+  await advanceClock(page, 6_000);
+  expect(settingsRequests).toBeGreaterThan(1);
   expect(maxInFlightRequests).toBe(1);
 });
 
-test('a non-retryable response during recovering stops later requests', async ({ page }) => {
+test('a non-retryable response after a retry fails immediately', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
   let settingsRequests = 0;
-  let returnBadRequest = false;
   await page.route('**/api/public/settings', async (route) => {
     settingsRequests += 1;
     await route.fulfill({
-      status: returnBadRequest ? 400 : 503,
+      status: settingsRequests === 1 ? 503 : 400,
       contentType: 'application/json',
       body: '{}',
     });
   });
 
   await page.goto('/');
-  await advanceUntilRecovering(page);
-  const requestsBeforeBadRequest = settingsRequests;
-
-  returnBadRequest = true;
-  await advanceClock(page, 15_000);
+  await advanceClock(page, 5_000);
 
   await expect(page.getByRole('alert')).toHaveText(failureMessage);
-  await expect(page.getByRole('alert')).toHaveAttribute('aria-busy', 'false');
-  expect(settingsRequests).toBe(requestsBeforeBadRequest + 1);
-
-  await advanceClock(page, 45_000);
-  expect(settingsRequests).toBe(requestsBeforeBadRequest + 1);
+  expect(settingsRequests).toBe(2);
+  await advanceClock(page, 60_000);
+  expect(settingsRequests).toBe(2);
 });
 
 test('an initial non-retryable failure stops without actions or further requests', async ({ page }) => {
@@ -302,7 +332,7 @@ test('an initial non-retryable failure stops without actions or further requests
   expect(settingsRequests).toBe(1);
 });
 
-test('StrictMode starts one loop and successful cleanup leaves no timers or requests', async ({ page }) => {
+test('StrictMode unmount cleanup leaves one loop and no post-success timers or requests', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
   let settingsRequests = 0;
   await page.route('**/api/public/settings', async (route) => {
@@ -318,7 +348,7 @@ test('StrictMode starts one loop and successful cleanup leaves no timers or requ
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   expect(settingsRequests).toBe(1);
 
-  await advanceClock(page, 120_000);
+  await advanceClock(page, 240_000);
   expect(settingsRequests).toBe(1);
   await expect(page.getByRole('status')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);

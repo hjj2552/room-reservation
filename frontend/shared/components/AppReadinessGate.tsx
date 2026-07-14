@@ -8,10 +8,10 @@ import {
 } from '../api/readiness';
 import { publicReservationKeys } from '../hooks/usePublicReservation';
 
-const loadingMessage = '데이터를 불러오는 중입니다. 잠시만 기다려주세요...';
+const loadingMessage = '데이터를 불러오는 중입니다. 최대 3분 정도 걸릴 수 있습니다.';
 const failureMessage = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.';
 
-type ReadinessState = 'checking' | 'recovering' | 'ready' | 'failed';
+type ReadinessState = 'checking' | 'ready' | 'failed';
 
 export function AppReadinessGate({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -20,56 +20,42 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const lifecycleController = new AbortController();
+    const deadline = Date.now() + appReadinessPolicy.maxWaitMs;
     let active = true;
-    const loadingTimer = window.setTimeout(() => {
-      if (active) setShowLoading(true);
-    }, appReadinessPolicy.loadingDelayMs);
+    let loadingTimer: number | undefined;
+    let deadlineTimer: number | undefined;
 
-    const transitionTo = (state: Exclude<ReadinessState, 'checking'>) => {
-      if (!active) return;
-      window.clearTimeout(loadingTimer);
+    const clearTimers = () => {
+      if (loadingTimer !== undefined) window.clearTimeout(loadingTimer);
+      if (deadlineTimer !== undefined) window.clearTimeout(deadlineTimer);
+    };
+
+    const finish = (state: Exclude<ReadinessState, 'checking'>) => {
+      if (!active || lifecycleController.signal.aborted) return;
+      clearTimers();
+      lifecycleController.abort();
       setShowLoading(false);
       setReadinessState(state);
     };
 
+    loadingTimer = window.setTimeout(() => {
+      if (active) setShowLoading(true);
+    }, appReadinessPolicy.loadingDelayMs);
+    deadlineTimer = window.setTimeout(() => finish('failed'), appReadinessPolicy.maxWaitMs);
+
     const finishReady = (settings: Awaited<ReturnType<typeof fetchReadinessSettings>>) => {
       if (!active || lifecycleController.signal.aborted) return;
       queryClient.setQueryData(publicReservationKeys.settings, settings);
-      transitionTo('ready');
-    };
-
-    const recoverReadiness = async () => {
-      transitionTo('recovering');
-
-      while (active && !lifecycleController.signal.aborted) {
-        await waitForRetry(
-          appReadinessPolicy.recoveryIntervalMs,
-          lifecycleController.signal,
-        );
-        if (!active || lifecycleController.signal.aborted) return;
-
-        try {
-          const settings = await fetchReadinessSettings(lifecycleController.signal);
-          finishReady(settings);
-          return;
-        } catch (error) {
-          if (!active || lifecycleController.signal.aborted) return;
-          if (!isRetryableReadinessError(error)) {
-            transitionTo('failed');
-            return;
-          }
-        }
-      }
+      finish('ready');
     };
 
     const checkReadiness = async () => {
-      const deadline = Date.now() + appReadinessPolicy.maxWaitMs;
       let failedAttempts = 0;
 
       while (active && !lifecycleController.signal.aborted) {
         const remainingMs = deadline - Date.now();
         if (remainingMs <= 0) {
-          await recoverReadiness();
+          finish('failed');
           return;
         }
 
@@ -79,12 +65,16 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
             Math.min(appReadinessPolicy.requestTimeoutMs, remainingMs),
           );
           if (!active || lifecycleController.signal.aborted) return;
+          if (Date.now() >= deadline) {
+            finish('failed');
+            return;
+          }
           finishReady(settings);
           return;
         } catch (error) {
           if (!active || lifecycleController.signal.aborted) return;
           if (!isRetryableReadinessError(error)) {
-            transitionTo('failed');
+            finish('failed');
             return;
           }
         }
@@ -95,7 +85,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
           Math.max(deadline - Date.now(), 0),
         );
         if (waitMs <= 0) {
-          await recoverReadiness();
+          finish('failed');
           return;
         }
 
@@ -109,7 +99,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
-      window.clearTimeout(loadingTimer);
+      clearTimers();
       lifecycleController.abort();
     };
   }, [queryClient]);
@@ -118,13 +108,9 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
     return children;
   }
 
-  if (readinessState === 'recovering' || readinessState === 'failed') {
+  if (readinessState === 'failed') {
     return (
-      <main
-        className="app-readiness-page"
-        role="alert"
-        aria-busy={readinessState === 'recovering'}
-      >
+      <main className="app-readiness-page" role="alert">
         <p>{failureMessage}</p>
       </main>
     );
