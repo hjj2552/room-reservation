@@ -250,6 +250,113 @@ test('the 180-second deadline aborts checking and stops every later request', as
   expect(settingsRequests).toBe(requestsAtFailure);
 });
 
+test('readiness aborts hung requests at the per-request timeout and overall deadline', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-07-14T00:00:00Z'));
+  await page.addInitScript(() => {
+    const originalFetch = window.fetch.bind(window);
+    const probe = {
+      starts: [] as number[],
+      aborts: [] as Array<{ startedAt: number; abortedAt: number }>,
+      active: 0,
+    };
+    Object.defineProperty(window, '__readinessFetchProbe', {
+      configurable: true,
+      value: probe,
+    });
+
+    // Keep readiness retry jitter deterministic for the 180-second boundary schedule.
+    Math.random = () => 0.5;
+    window.fetch = (input, init) => {
+      const rawUrl = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      const url = new URL(rawUrl, window.location.href);
+      if (url.pathname !== '/api/public/settings') {
+        return originalFetch(input, init);
+      }
+
+      const signal = init?.signal;
+      const startedAt = Date.now();
+      probe.starts.push(startedAt);
+      probe.active += 1;
+
+      return new Promise<Response>((_resolve, reject) => {
+        const abortRequest = () => {
+          probe.aborts.push({ startedAt, abortedAt: Date.now() });
+          probe.active -= 1;
+          reject(signal?.reason || new DOMException('Aborted', 'AbortError'));
+        };
+        if (signal?.aborted) {
+          abortRequest();
+          return;
+        }
+        signal?.addEventListener('abort', abortRequest, { once: true });
+      });
+    };
+  });
+
+  const readProbe = () => page.evaluate(() => {
+    const probe = (window as typeof window & {
+      __readinessFetchProbe: {
+        starts: number[];
+        aborts: Array<{ startedAt: number; abortedAt: number }>;
+        active: number;
+      };
+    }).__readinessFetchProbe;
+    return {
+      starts: [...probe.starts],
+      aborts: probe.aborts.map((abort) => ({ ...abort })),
+      active: probe.active,
+    };
+  });
+
+  await page.goto('/');
+  await expect.poll(async () => (await readProbe()).starts.length).toBe(1);
+  const firstStart = (await readProbe()).starts[0];
+
+  await advanceClock(page, 9_999);
+  let probe = await readProbe();
+  expect(probe.starts).toHaveLength(1);
+  expect(probe.aborts).toHaveLength(0);
+  expect(probe.active).toBe(1);
+
+  await advanceClock(page, 1);
+  await expect.poll(async () => (await readProbe()).aborts.length).toBe(1);
+  probe = await readProbe();
+  expect(probe.aborts[0].abortedAt - probe.aborts[0].startedAt).toBe(10_000);
+  expect(probe.active).toBe(0);
+
+  await advanceClock(page, 1_000);
+  await expect.poll(async () => (await readProbe()).starts.length).toBe(2);
+  expect((await readProbe()).active).toBe(1);
+
+  const deadline = firstStart + 180_000;
+  const now = await page.evaluate(() => Date.now());
+  await advanceClock(page, deadline - now - 1);
+  probe = await readProbe();
+  expect(probe.starts.length).toBe(probe.aborts.length + 1);
+  expect(probe.active).toBe(1);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+
+  await advanceClock(page, 1);
+  await expect(page.getByRole('alert')).toHaveText(failureMessage);
+  await expect(page.getByRole('button')).toHaveCount(0);
+  await expect(page.getByRole('link')).toHaveCount(0);
+  await expect.poll(async () => (await readProbe()).active).toBe(0);
+  probe = await readProbe();
+  expect(probe.starts).toHaveLength(probe.aborts.length);
+  const startsAtDeadline = probe.starts.length;
+
+  await advanceClock(page, 60_000);
+  probe = await readProbe();
+  expect(probe.starts).toHaveLength(startsAtDeadline);
+  expect(probe.aborts).toHaveLength(startsAtDeadline);
+  expect(probe.active).toBe(0);
+});
+
 test('readiness requests never overlap', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-14T00:00:00Z') });
   let settingsRequests = 0;
