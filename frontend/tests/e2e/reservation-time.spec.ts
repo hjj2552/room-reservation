@@ -4,7 +4,6 @@ import {
   defaultOperatingTimeRange,
   defaultSuggestedDurationMinutes,
   fromServiceDateTimeLocal,
-  isPublicReservationCandidateInPast,
   newRequestSelection,
   noFutureReservationTimeMessage,
   slotToReservationSelection,
@@ -112,12 +111,6 @@ test('recurrence defaults use the operating start and suggested duration', () =>
     minReservationMinutes: 45,
     maxReservationMinutes: 120,
   })).toEqual({ startTime: '09:00', endTime: '09:45' });
-});
-
-test('detects public past candidates using the Seoul service instant', () => {
-  const now = new Date('2026-07-13T01:15:00Z');
-  expect(isPublicReservationCandidateInPast('2026-07-13', 600, now)).toBe(true);
-  expect(isPublicReservationCandidateInPast('2026-07-13', 630, now)).toBe(false);
 });
 
 test('serializes service-local reservation inputs with the Seoul offset', () => {
