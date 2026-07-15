@@ -11,9 +11,11 @@ import {
   useRecurrences,
 } from '../../shared/hooks/useRecurrences';
 import { useRooms } from '../../shared/hooks/useRooms';
+import { useSettings } from '../../shared/hooks/useSettings';
 import { useTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
+import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
 
 interface RecurrenceForm {
   roomId: string;
@@ -40,8 +42,8 @@ const initialForm: RecurrenceForm = {
   startDate: '',
   endDate: '',
   daysOfWeek: [],
-  startTime: '09:00',
-  endTime: '10:00',
+  startTime: '',
+  endTime: '',
   conflictPolicy: 'FAIL_ALL',
 };
 
@@ -58,7 +60,9 @@ export function RecurrencesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
+  const defaultTimesAppliedRef = useRef(false);
   const rooms = useRooms();
+  const settings = useSettings();
   const tags = useTags({ size: 1000 });
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
@@ -66,6 +70,17 @@ export function RecurrencesPage() {
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!settings.data || defaultTimesAppliedRef.current) return;
+    const suggested = defaultOperatingTimeRange(settings.data);
+    setForm((current) => ({
+      ...current,
+      startTime: suggested.startTime,
+      endTime: suggested.endTime,
+    }));
+    defaultTimesAppliedRef.current = true;
+  }, [settings.data]);
 
   const statusParam = searchParams.get('status');
   const status = statusParam === null || statusParam === 'ALL' ? '' : (statusParam as RecurrenceStatus);
@@ -245,6 +260,7 @@ export function RecurrencesPage() {
               data-testid="recurrence-start-time-input"
               name="startTime"
               type="time"
+              step={(settings.data?.slotMinutes || 30) * 60}
               value={form.startTime}
               onChange={(event) => setForm((prev) => ({ ...prev, startTime: event.target.value }))}
               required
@@ -256,6 +272,7 @@ export function RecurrencesPage() {
               data-testid="recurrence-end-time-input"
               name="endTime"
               type="time"
+              step={(settings.data?.slotMinutes || 30) * 60}
               value={form.endTime}
               onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
               required

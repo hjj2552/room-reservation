@@ -56,18 +56,37 @@ public class ReservationService {
             ReservationHistory.Action.CREATED,
             null,
             null,
-            passwordEncoder.encode(cancelPassword)
+            passwordEncoder.encode(cancelPassword),
+            ReservationValidationContext.PUBLIC
         );
     }
 
     @Transactional
     public Reservation createAdminReservation(@Valid CreateReservationCommand command, String adminId, String memo) {
-        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.CREATED_BY_ADMIN, memo, null, null);
+        return createReservation(
+            command,
+            Reservation.ActorType.ADMIN,
+            adminId,
+            ReservationHistory.Action.CREATED_BY_ADMIN,
+            memo,
+            null,
+            null,
+            ReservationValidationContext.ADMIN
+        );
     }
 
     @Transactional
     public Reservation createRecurringReservation(@Valid CreateReservationCommand command, String adminId, ReservationRecurrence recurrence) {
-        return createReservation(command, Reservation.ActorType.ADMIN, adminId, ReservationHistory.Action.RECURRENCE_GENERATED, null, recurrence, null);
+        return createReservation(
+            command,
+            Reservation.ActorType.ADMIN,
+            adminId,
+            ReservationHistory.Action.RECURRENCE_GENERATED,
+            null,
+            recurrence,
+            null,
+            ReservationValidationContext.ADMIN
+        );
     }
 
     private Reservation createReservation(
@@ -77,12 +96,13 @@ public class ReservationService {
         ReservationHistory.Action historyAction,
         String memo,
         ReservationRecurrence recurrence,
-        String cancelPasswordHash
+        String cancelPasswordHash,
+        ReservationValidationContext validationContext
     ) {
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
 
-        policyService.validate(room, command.startAt(), command.endAt(), command.applicantPhone());
+        validatePolicy(validationContext, room, command.startAt(), command.endAt(), command.applicantPhone());
         conflictService.validateNoConflict(command.roomId(), command.startAt(), command.endAt(), null);
 
         Reservation reservation = new Reservation(
@@ -132,7 +152,7 @@ public class ReservationService {
 
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
-        policyService.validate(room, command.startAt(), command.endAt(), command.applicantPhone());
+        policyService.validateAdminReservation(room, command.startAt(), command.endAt(), command.applicantPhone());
         conflictService.validateNoConflict(command.roomId(), command.startAt(), command.endAt(), reservationId);
 
         Reservation.ReservationStatus beforeStatus = reservation.getStatus();
@@ -253,7 +273,7 @@ public class ReservationService {
 
         Room room = roomRepository.findByIdAndDeletedAtIsNull(command.roomId())
             .orElseThrow(() -> new EntityNotFoundException("Room not found."));
-        policyService.validate(room, command.startAt(), command.endAt(), command.applicantPhone());
+        policyService.validatePublicReservation(room, command.startAt(), command.endAt(), command.applicantPhone());
         conflictService.validateNoConflict(command.roomId(), command.startAt(), command.endAt(), reservationId);
 
         Reservation.ReservationStatus beforeStatus = reservation.getStatus();
@@ -342,6 +362,25 @@ public class ReservationService {
         if (reservation.getStatus() == Reservation.ReservationStatus.CANCELLED) {
             throw new IllegalArgumentException("CANCELLED status reservations cannot be edited.");
         }
+    }
+
+    private void validatePolicy(
+        ReservationValidationContext context,
+        Room room,
+        OffsetDateTime startAt,
+        OffsetDateTime endAt,
+        String applicantPhone
+    ) {
+        if (context == ReservationValidationContext.PUBLIC) {
+            policyService.validatePublicReservation(room, startAt, endAt, applicantPhone);
+            return;
+        }
+        policyService.validateAdminReservation(room, startAt, endAt, applicantPhone);
+    }
+
+    private enum ReservationValidationContext {
+        PUBLIC,
+        ADMIN
     }
 
     @Transactional(readOnly = true)

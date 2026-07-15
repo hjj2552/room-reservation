@@ -226,6 +226,33 @@ class RecurrenceIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void recurrenceRejectsSecondsAndFractionalSeconds() throws Exception {
+        MockHttpSession session = loginAdminSession();
+        LocalDate date = nextWeekdayAt(9, 0).toLocalDate();
+
+        for (String startTime : new String[] { "09:00:01", "09:00:00.000000001" }) {
+            mockMvc.perform(post("/api/admin/recurrences/preview")
+                    .session(session)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "roomId": "%s",
+                          "startDate": "%s",
+                          "endDate": "%s",
+                          "daysOfWeek": ["%s"],
+                          "startTime": "%s",
+                          "endTime": "10:00:00",
+                          "applicantPhone": "010-5555-5555",
+                          "conflictPolicy": "FAIL_ALL"
+                        }
+                        """.formatted(testRoomId(), date, date, dayCode(date), startTime)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].available").value(false))
+                .andExpect(jsonPath("$.items[0].reason").value("INVALID_SLOT_UNIT"));
+        }
+    }
+
+    @Test
     void failAllRollsBackWhenAnyCandidateConflicts() throws Exception {
         MockHttpSession session = loginAdminSession();
         LocalDate firstDate = nextWeekdayAt(9, 0).toLocalDate();

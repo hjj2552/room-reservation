@@ -64,3 +64,11 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 6. Verify a state-changing request without a CSRF token returns `403` and a valid SPA request succeeds.
 7. Verify rate-limited responses return `429` and `Retry-After` through the deployment proxy.
 8. Store the final environment-variable list in the administrator handover notes, not in Git.
+
+## Reservation Time Migration Check
+
+- Immediately before deployment, read the deployed `operation_settings.slot_minutes` value without exposing database credentials or connection URLs.
+- Allowed values after the reservation-time migration are `5`, `10`, `15`, and `30`; `60` is intentionally rejected.
+- If the deployed value is `60`, do not auto-convert it. Choose the intended value manually with the operator before deployment.
+- The Flyway migration fails before changing constraints when it finds `slot_minutes=60`, so the migration transaction can roll back atomically.
+- Existing reservations and recurrences are not rewritten or retroactively aligned when the slot setting changes.
