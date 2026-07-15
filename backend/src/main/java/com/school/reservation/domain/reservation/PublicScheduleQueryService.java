@@ -55,7 +55,7 @@ public class PublicScheduleQueryService {
         try {
             Room room = roomRepository.findByIdAndEnabledTrueAndDeletedAtIsNull(roomId)
                 .orElseThrow(() -> new ReservationPolicyService.PolicyViolationException("ROOM_DISABLED", "This room is not available."));
-            policyService.validate(room, startAt, endAt, "availability-check");
+            policyService.validatePublicReservation(room, startAt, endAt, "availability-check");
             if (conflictService.existsConflict(roomId, startAt, endAt, null)) {
                 return ReservationAvailabilityResponse.unavailable("TIME_SLOT_CONFLICT", "The selected time slot is already reserved.");
             }

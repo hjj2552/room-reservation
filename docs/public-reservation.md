@@ -45,6 +45,15 @@ The public frontend maps `TIME_SLOT_CONFLICT` to:
 
 > 이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 강의실이나 시간을 선택해 주세요.
 
+## Time Policy
+
+- The timetable grid and empty-slot interaction candidates always use 30-minute intervals.
+- `slotMinutes` remains the manual time-input increment and accepts only `5`, `10`, `15`, or `30`.
+- Suggested reservations use `max(30, minReservationMinutes)` minutes and must fit completely inside operating hours.
+- Toolbar suggestions use the first strictly future 30-minute candidate in `Asia/Seoul`, considering the semester and operating weekdays.
+- Public creation, editing, availability checks, and past timetable candidates reject past start times with `과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
+- Existing reservations are not rewritten when `slotMinutes` changes. A later content/time edit is validated against the current setting.
+
 ## Request Protection
 
 - Public users do not need an administrator session, but state-changing requests are protected by CSRF validation.

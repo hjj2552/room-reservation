@@ -29,6 +29,7 @@ interface ReservationRequestPanelProps {
   variant: 'admin' | 'public';
   rooms: RequestRoom[];
   selection: TimetableSlotSelection;
+  slotMinutes: number;
   initialValues?: ReservationRequestValues;
   unavailableMessage?: string;
   submitError?: unknown;
@@ -135,6 +136,7 @@ export function ReservationRequestPanel({
   variant,
   rooms,
   selection,
+  slotMinutes,
   initialValues,
   unavailableMessage,
   submitError,
@@ -233,7 +235,9 @@ export function ReservationRequestPanel({
               : selection.date
                 ? `${selection.date} 새 신청`
                 : '예약 가능한 미래 시간 없음'}
-            {isAdmin ? ' · 관리자는 승인 상태로 저장할 수 있습니다.' : ' · 신청은 승인 대기 상태로 저장됩니다.'}
+            {isAdmin
+              ? ' · 관리자는 승인 상태로 저장할 수 있고, 과거의 시간도 예약할 수 있습니다.'
+              : ' · 신청은 승인 대기 상태로 저장됩니다.'}
           </p>
         </div>
         <button
@@ -307,12 +311,12 @@ export function ReservationRequestPanel({
             {fieldError('status')}
           </label>
         )}
-        {/* Keep datetime inputs free-form for keyboard entry; backend policy enforces slot alignment. */}
         <label>
           시작
           <input
             data-testid={ids.start}
             type="datetime-local"
+            step={slotMinutes * 60}
             value={values.startAt}
             onChange={(event) => updateField('startAt', event.target.value)}
             {...inputErrorProps('startAt')}
@@ -324,6 +328,7 @@ export function ReservationRequestPanel({
           <input
             data-testid={ids.end}
             type="datetime-local"
+            step={slotMinutes * 60}
             value={values.endAt}
             onChange={(event) => updateField('endAt', event.target.value)}
             {...inputErrorProps('endAt')}

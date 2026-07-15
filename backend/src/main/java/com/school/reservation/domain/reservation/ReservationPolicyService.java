@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 public class ReservationPolicyService {
 
     private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+    private static final String PUBLIC_PAST_RESERVATION_MESSAGE =
+        "과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.";
 
     private final OperationSettingsRepository operationSettingsRepository;
     private final Clock clock;
@@ -22,7 +24,21 @@ public class ReservationPolicyService {
         this.clock = clock;
     }
 
-    public void validate(Room room, OffsetDateTime startAt, OffsetDateTime endAt, String applicantPhone) {
+    public void validatePublicReservation(Room room, OffsetDateTime startAt, OffsetDateTime endAt, String applicantPhone) {
+        validate(room, startAt, endAt, applicantPhone, ValidationContext.PUBLIC);
+    }
+
+    public void validateAdminReservation(Room room, OffsetDateTime startAt, OffsetDateTime endAt, String applicantPhone) {
+        validate(room, startAt, endAt, applicantPhone, ValidationContext.ADMIN);
+    }
+
+    private void validate(
+        Room room,
+        OffsetDateTime startAt,
+        OffsetDateTime endAt,
+        String applicantPhone,
+        ValidationContext context
+    ) {
         if (room == null || !room.isUsable()) {
             throw new PolicyViolationException("ROOM_DISABLED", "This room is not available.");
         }
@@ -31,8 +47,8 @@ public class ReservationPolicyService {
             throw new PolicyViolationException("VALIDATION_ERROR", "Start time must be before end time.");
         }
 
-        if (startAt.toInstant().isBefore(clock.instant())) {
-            throw new PolicyViolationException("PAST_RESERVATION_TIME", "Reservation start time must not be in the past.");
+        if (context == ValidationContext.PUBLIC && startAt.toInstant().isBefore(clock.instant())) {
+            throw new PolicyViolationException("PAST_RESERVATION_TIME", PUBLIC_PAST_RESERVATION_MESSAGE);
         }
 
         OperationSettings settings = operationSettingsRepository.findById(OperationSettings.SINGLETON_ID)
@@ -45,6 +61,13 @@ public class ReservationPolicyService {
         var localStart = startAt.atZoneSameInstant(SERVICE_ZONE).toLocalDateTime();
         var localEnd = endAt.atZoneSameInstant(SERVICE_ZONE).toLocalDateTime();
         var date = localStart.toLocalDate();
+
+        if (!hasMinutePrecision(localStart) || !hasMinutePrecision(localEnd)) {
+            throw new PolicyViolationException(
+                "INVALID_SLOT_UNIT",
+                "Reservation start and end times must not include seconds or fractional seconds."
+            );
+        }
 
         if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
             throw new PolicyViolationException("OUTSIDE_OPERATING_HOURS", "Reservations must be within a single day.");
@@ -70,7 +93,8 @@ public class ReservationPolicyService {
         }
 
         if (!isAlignedToSlot(localStart.getMinute(), settings.getSlotMinutes())
-            || !isAlignedToSlot(localEnd.getMinute(), settings.getSlotMinutes())) {
+            || !isAlignedToSlot(localEnd.getMinute(), settings.getSlotMinutes())
+            || !isAlignedToSlot(minutes, settings.getSlotMinutes())) {
             throw new PolicyViolationException("INVALID_SLOT_UNIT", "The requested time must match the configured slot unit.");
         }
 
@@ -79,8 +103,17 @@ public class ReservationPolicyService {
         }
     }
 
-    private boolean isAlignedToSlot(int minute, int slotMinutes) {
-        return minute % slotMinutes == 0;
+    private boolean hasMinutePrecision(java.time.LocalDateTime value) {
+        return value.getSecond() == 0 && value.getNano() == 0;
+    }
+
+    private boolean isAlignedToSlot(long minutes, int slotMinutes) {
+        return minutes % slotMinutes == 0;
+    }
+
+    private enum ValidationContext {
+        PUBLIC,
+        ADMIN
     }
 
     public static class PolicyViolationException extends RuntimeException {

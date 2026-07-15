@@ -329,6 +329,14 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
     await page.getByTestId('public-edit-verify-button').click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
+    await expect(page.getByTestId('public-edit-start-input')).toHaveAttribute(
+      'step',
+      String(originalSettings.slotMinutes * 60),
+    );
+    await expect(page.getByTestId('public-edit-end-input')).toHaveAttribute(
+      'step',
+      String(originalSettings.slotMinutes * 60),
+    );
     await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
     await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
 

@@ -100,6 +100,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-edit-room');
   const reservation = await e2eData.createTestReservation(room.id, 'reservation-edit-seed');
+  const settings = await getSettingsByApi(request);
   const updatedPurpose = e2eData.name('reservation-edit-updated');
 
   try {
@@ -107,6 +108,8 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.getByTestId('reservation-edit-link').click();
 
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}/edit$`));
+    await expect(page.getByTestId('reservation-start-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
+    await expect(page.getByTestId('reservation-end-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
     await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);

@@ -2,6 +2,7 @@ package com.school.reservation.domain.reservation;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +29,7 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
 
     private static final Instant NOW = Instant.parse("2026-07-13T07:45:00Z");
     private static final OffsetDateTime PAST_START = OffsetDateTime.parse("2026-07-13T09:00:00+09:00");
+    private static final OffsetDateTime PAST_UPDATE_START = OffsetDateTime.parse("2026-07-13T10:00:00+09:00");
     private static final OffsetDateTime FUTURE_START = OffsetDateTime.parse("2026-07-13T17:00:00+09:00");
 
     @Autowired
@@ -56,7 +58,7 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
                 .content(publicRequest(PAST_START, "testing-reservation-public-past")))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"))
-            .andExpect(jsonPath("$.message").value("Reservation start time must not be in the past."));
+            .andExpect(jsonPath("$.message").value("과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
 
         String createdBody = mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -76,15 +78,15 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void adminCreationAndTimeChangingUpdateRejectPastStart() throws Exception {
+    void adminCreationAndTimeChangingUpdateAllowPastStart() throws Exception {
         MockHttpSession session = loginAdminSession();
 
         mockMvc.perform(post("/api/admin/reservations")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(adminRequest(PAST_START, "testing-reservation-admin-past")))
-            .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"));
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
         String createdBody = mockMvc.perform(post("/api/admin/reservations")
                 .session(session)
@@ -99,10 +101,49 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
 
         mockMvc.perform(put("/api/admin/reservations/{reservationId}", reservationId)
                 .session(session)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(adminRequest(PAST_UPDATE_START, "testing-reservation-admin-update-past")))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.startAt").value(PAST_UPDATE_START.toInstant().toString()));
+    }
+
+    @Test
+    void publicAvailabilityRejectsPastStart() throws Exception {
+        mockMvc.perform(get("/api/public/availability")
+                .param("roomId", testRoomId().toString())
+                .param("startAt", PAST_START.toString())
+                .param("endAt", PAST_START.plusMinutes(30).toString()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.available").value(false))
+            .andExpect(jsonPath("$.reason").value("PAST_RESERVATION_TIME"))
+            .andExpect(jsonPath("$.message").value("과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
+    }
+
+    @Test
+    void adminRecurrenceAllowsPastCandidates() throws Exception {
+        MockHttpSession session = loginAdminSession();
+
+        mockMvc.perform(post("/api/admin/recurrences")
+                .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(adminRequest(PAST_START, "testing-reservation-admin-update-past")))
-            .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"));
+                .content("""
+                    {
+                      "roomId": "%s",
+                      "applicantName": "testing-recurring-admin",
+                      "applicantEmail": "testing-recurring-admin@example.test",
+                      "applicantPhone": "010-3333-4444",
+                      "purpose": "testing-recurring-past",
+                      "tagId": null,
+                      "startDate": "2026-07-13",
+                      "endDate": "2026-07-13",
+                      "daysOfWeek": ["MON"],
+                      "startTime": "11:00:00",
+                      "endTime": "11:30:00",
+                      "conflictPolicy": "FAIL_ALL"
+                    }
+                    """.formatted(testRoomId())))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.createdCount").value(1));
     }
 
     private String publicRequest(OffsetDateTime startAt, String purpose) {

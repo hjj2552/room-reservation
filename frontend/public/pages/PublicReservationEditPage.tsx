@@ -9,13 +9,15 @@ import { ReservationPasswordDialog } from '../../shared/components/ReservationPa
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   usePublicReservationDetail,
+  usePublicSettings,
   usePublicRooms,
   useUpdatePublicReservation,
   useVerifyPublicReservationForEdit,
 } from '../../shared/hooks/usePublicReservation';
-import { formatDateTime, fromDateTimeLocal, toDateTimeLocal } from '../../shared/utils/date';
+import { formatDateTime } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMasking';
+import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 
 interface PublicReservationEditValues {
   roomId: string;
@@ -39,8 +41,8 @@ function valuesFromReservation(reservation: PublicReservationEditDetail): Public
     applicantEmail: reservation.applicantEmail,
     applicantPhone: reservation.applicantPhone || '',
     purpose: reservation.purpose,
-    startAt: toDateTimeLocal(reservation.startAt),
-    endAt: toDateTimeLocal(reservation.endAt),
+    startAt: toServiceDateTimeLocal(reservation.startAt),
+    endAt: toServiceDateTimeLocal(reservation.endAt),
   };
 }
 
@@ -50,6 +52,7 @@ export function PublicReservationEditPage() {
   const location = useLocation();
   const routeState = location.state as PublicReservationEditRouteState | null;
   const rooms = usePublicRooms();
+  const settings = usePublicSettings();
   const detail = usePublicReservationDetail(reservationId);
   const verify = useVerifyPublicReservationForEdit(reservationId);
   const update = useUpdatePublicReservation(reservationId);
@@ -113,8 +116,8 @@ export function PublicReservationEditPage() {
         applicantEmail: values.applicantEmail,
         applicantPhone: values.applicantPhone,
         purpose: values.purpose,
-        startAt: fromDateTimeLocal(values.startAt),
-        endAt: fromDateTimeLocal(values.endAt),
+        startAt: fromServiceDateTimeLocal(values.startAt),
+        endAt: fromServiceDateTimeLocal(values.endAt),
         cancelPassword: reservationPassword,
       },
       {
@@ -130,8 +133,9 @@ export function PublicReservationEditPage() {
     );
   }
 
-  if (detail.isLoading) return <LoadingState />;
+  if (detail.isLoading || settings.isLoading) return <LoadingState />;
   if (detail.isError) return <ErrorState error={detail.error} />;
+  if (settings.isError) return <ErrorState error={settings.error} />;
   if (!detail.data) return null;
 
   const reservation = detail.data;
@@ -224,6 +228,7 @@ export function PublicReservationEditPage() {
             <input
               data-testid="public-edit-start-input"
               type="datetime-local"
+              step={(settings.data?.slotMinutes || 30) * 60}
               {...register('startAt', { required: '시작 시간을 입력해 주세요.' })}
             />
             {errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
@@ -233,6 +238,7 @@ export function PublicReservationEditPage() {
             <input
               data-testid="public-edit-end-input"
               type="datetime-local"
+              step={(settings.data?.slotMinutes || 30) * 60}
               {...register('endAt', { required: '종료 시간을 입력해 주세요.' })}
             />
             {errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}

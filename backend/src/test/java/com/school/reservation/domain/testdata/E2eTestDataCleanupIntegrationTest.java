@@ -320,7 +320,7 @@ class E2eTestDataCleanupIntegrationTest {
                   source,
                   created_by_actor_type
                 )
-                values (?, ?, ?, ?, ?, '010-0000-0000', ?, current_timestamp + interval '21 days' + (? * interval '1 hour'), current_timestamp + interval '21 days' + ((? + 1) * interval '1 hour'), 'CONFIRMED'::reservation_status, 'ADMIN_MANUAL'::reservation_source, 'ADMIN'::actor_type)
+                values (?, ?, ?, ?, ?, '010-0000-0000', ?, date_trunc('hour', current_timestamp) + interval '21 days' + (? * interval '1 hour'), date_trunc('hour', current_timestamp) + interval '21 days' + ((? + 1) * interval '1 hour'), 'CONFIRMED'::reservation_status, 'ADMIN_MANUAL'::reservation_source, 'ADMIN'::actor_type)
                 """,
             reservationId,
             roomId,

@@ -1,13 +1,17 @@
-import { useMemo } from 'react';
+import { type CSSProperties, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReservationStatus } from '../api/types';
 import { hexToTint } from '../utils/color';
 import { statusLabels } from '../utils/labels';
+import {
+  INTERACTION_INTERVAL_MINUTES,
+  defaultSuggestedDurationMinutes,
+  type ReservationSlot,
+} from '../utils/reservationTime';
 import { StatusBadge } from './StatusBadge';
 
 export const TIMETABLE_MINUTE_HEIGHT = 1.6;
-// Reservation slotMinutes controls valid time alignment; timetable grids stay 30-minute for readability.
-export const TIMETABLE_GRID_MINUTES = 30;
+export const TIMETABLE_GRID_MINUTES = INTERACTION_INTERVAL_MINUTES;
 export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
 export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
 export const TIMETABLE_COMPACT_BLOCK_HEIGHT = 72;
@@ -41,10 +45,11 @@ interface ReservationDateTimetableProps {
   selectedDate: string;
   openTime?: string;
   closeTime?: string;
-  reservationSlotMinutes?: number;
   minReservationMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
+  isEmptySlotDisabled?: (slot: ReservationSlot) => boolean;
+  emptySlotDisabledMessage?: string;
   onReservationClick?: (reservation: TimetableReservation) => void;
   onRoomInfoClick?: (room: TimetableRoom) => void;
   statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
@@ -114,10 +119,11 @@ export function ReservationDateTimetable({
   selectedDate,
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
-  reservationSlotMinutes = TIMETABLE_GRID_MINUTES,
   minReservationMinutes = TIMETABLE_GRID_MINUTES,
   highlightedReservationId,
   onEmptySlotClick,
+  isEmptySlotDisabled,
+  emptySlotDisabledMessage,
   onReservationClick,
   onRoomInfoClick,
   statusLabelOverride,
@@ -129,12 +135,8 @@ export function ReservationDateTimetable({
     () => buildSlots(openMinutes, closeMinutes, TIMETABLE_GRID_MINUTES),
     [openMinutes, closeMinutes],
   );
-  // Empty-slot buttons may be coarser than the visual grid so shortcuts never create invalid reservations.
-  const emptySlotStepMinutes = Math.max(TIMETABLE_GRID_MINUTES, reservationSlotMinutes || TIMETABLE_GRID_MINUTES);
-  const emptySlots = useMemo(
-    () => buildSlots(openMinutes, closeMinutes, emptySlotStepMinutes),
-    [openMinutes, closeMinutes, emptySlotStepMinutes],
-  );
+  const emptySlots = slots;
+  const suggestedDurationMinutes = defaultSuggestedDurationMinutes(minReservationMinutes);
   const bodyHeight = (closeMinutes - openMinutes) * TIMETABLE_MINUTE_HEIGHT;
   const roomIds = useMemo(() => new Set(rooms.map((room) => room.id)), [rooms]);
   const reservationsByRoom = useMemo(() => {
@@ -204,9 +206,16 @@ export function ReservationDateTimetable({
           </div>
           {rooms.map((room) => (
             <div key={room.id} className="timetable-room-column" style={{ height: bodyHeight }}>
-              {emptySlots.slice(0, -1).map((slot, index) => {
-                if (slot + minReservationMinutes > closeMinutes) return null;
-                const nextSlot = emptySlots[index + 1];
+              {emptySlots.slice(0, -1).map((slot) => {
+                const endMinutes = slot + suggestedDurationMinutes;
+                if (endMinutes > closeMinutes) return null;
+                const selection = {
+                  date: selectedDate,
+                  startMinutes: slot,
+                  endMinutes,
+                  roomId: room.id,
+                };
+                const disabled = isEmptySlotDisabled?.(selection) || false;
                 return (
                   <button
                     key={`empty-${slot}`}
@@ -214,17 +223,15 @@ export function ReservationDateTimetable({
                     className="timetable-empty-slot"
                     style={{
                       top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
-                      height: (nextSlot - slot) * TIMETABLE_MINUTE_HEIGHT,
-                    }}
-                    onClick={() =>
-                      onEmptySlotClick?.({
-                        date: selectedDate,
-                        startMinutes: slot,
-                        endMinutes: nextSlot,
-                        roomId: room.id,
-                      })
-                    }
-                    aria-label={`${room.name} ${formatClock(slot)}-${formatClock(nextSlot)} 예약 신청`}
+                      height: TIMETABLE_GRID_MINUTES * TIMETABLE_MINUTE_HEIGHT,
+                      '--timetable-suggestion-height': `${suggestedDurationMinutes * TIMETABLE_MINUTE_HEIGHT}px`,
+                    } as CSSProperties}
+                    onClick={() => onEmptySlotClick?.(selection)}
+                    disabled={disabled}
+                    title={disabled ? emptySlotDisabledMessage : undefined}
+                    aria-label={`${room.name} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청${
+                      disabled && emptySlotDisabledMessage ? `: ${emptySlotDisabledMessage}` : ''
+                    }`}
                     data-testid="timetable-empty-slot"
                   />
                 );

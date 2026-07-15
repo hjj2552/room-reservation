@@ -126,6 +126,8 @@ export function SettingsPage() {
           운영 시작 시간
           <input
             type="time"
+            step={30 * 60}
+            data-testid="settings-open-time-input"
             value={form.openTime}
             onChange={(event) => updateField('openTime', event.target.value)}
             required
@@ -135,6 +137,8 @@ export function SettingsPage() {
           운영 종료 시간
           <input
             type="time"
+            step={30 * 60}
+            data-testid="settings-close-time-input"
             value={form.closeTime}
             onChange={(event) => updateField('closeTime', event.target.value)}
             required
@@ -148,7 +152,7 @@ export function SettingsPage() {
             onChange={(event) => updateField('slotMinutes', Number(event.target.value))}
             required
           >
-            {[5, 10, 15, 30, 60].map((minutes) => (
+            {[5, 10, 15, 30].map((minutes) => (
               <option key={minutes} value={minutes}>
                 {minutes}분
               </option>
@@ -159,7 +163,9 @@ export function SettingsPage() {
           최소 예약 시간(분)
           <input
             type="number"
-            min="1"
+            min={form.slotMinutes}
+            step={form.slotMinutes}
+            data-testid="settings-min-reservation-input"
             value={form.minReservationMinutes}
             onChange={(event) => updateField('minReservationMinutes', Number(event.target.value))}
             required
@@ -169,12 +175,17 @@ export function SettingsPage() {
           최대 예약 시간(분)
           <input
             type="number"
-            min="1"
+            min={form.minReservationMinutes}
+            step={form.slotMinutes}
+            data-testid="settings-max-reservation-input"
             value={form.maxReservationMinutes}
             onChange={(event) => updateField('maxReservationMinutes', Number(event.target.value))}
             required
           />
         </label>
+        <p className="compact-note muted full-span">
+          최소·최대 예약 시간을 현재 예약 단위의 배수로 입력해 주세요.
+        </p>
         <fieldset className="full-span checkbox-group">
           <legend>예약 가능 요일</legend>
           {days.map((day) => (

@@ -1,8 +1,14 @@
 import { expect, test } from '@playwright/test';
 import {
+  INTERACTION_INTERVAL_MINUTES,
+  defaultOperatingTimeRange,
+  defaultSuggestedDurationMinutes,
   fromServiceDateTimeLocal,
+  isPublicReservationCandidateInPast,
   newRequestSelection,
   noFutureReservationTimeMessage,
+  slotToReservationSelection,
+  toServiceDateTimeLocal,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
 
@@ -14,7 +20,16 @@ const settings: ReservationTimeSettings = {
   slotMinutes: 30,
   availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
   minReservationMinutes: 30,
+  maxReservationMinutes: 240,
 };
+
+test('uses a fixed 30-minute timetable interaction interval', () => {
+  expect(INTERACTION_INTERVAL_MINUTES).toBe(30);
+  expect(defaultSuggestedDurationMinutes(20)).toBe(30);
+  expect(defaultSuggestedDurationMinutes(45)).toBe(45);
+  expect(defaultSuggestedDurationMinutes(60)).toBe(60);
+  expect(defaultSuggestedDurationMinutes(120)).toBe(120);
+});
 
 test('uses the operating start before opening time', () => {
   expectSelection('2026-07-13T08:15:00+09:00', '2026-07-13T09:00', '2026-07-13T09:30');
@@ -69,17 +84,45 @@ test('returns no arbitrary date or time when no future semester slot exists', ()
   });
 });
 
-test('uses the shortest slot-aligned duration that satisfies a different minimum', () => {
+test('uses the configured minimum when it is longer than the 30-minute suggestion floor', () => {
   expectSelection(
     '2026-07-13T10:05:00+09:00',
     '2026-07-13T10:30',
-    '2026-07-13T11:30',
-    { minReservationMinutes: 45, slotMinutes: 30 },
+    '2026-07-13T11:15',
+    { minReservationMinutes: 45, maxReservationMinutes: 120, slotMinutes: 15 },
   );
+});
+
+test('slot selection preserves the full interval supplied by the timetable', () => {
+  expect(slotToReservationSelection({
+    date: '2026-07-13',
+    startMinutes: 600,
+    endMinutes: 645,
+    roomId: 'room-1',
+  })).toMatchObject({
+    startAt: '2026-07-13T10:00',
+    endAt: '2026-07-13T10:45',
+  });
+});
+
+test('recurrence defaults use the operating start and suggested duration', () => {
+  expect(defaultOperatingTimeRange({
+    ...settings,
+    slotMinutes: 15,
+    minReservationMinutes: 45,
+    maxReservationMinutes: 120,
+  })).toEqual({ startTime: '09:00', endTime: '09:45' });
+});
+
+test('detects public past candidates using the Seoul service instant', () => {
+  const now = new Date('2026-07-13T01:15:00Z');
+  expect(isPublicReservationCandidateInPast('2026-07-13', 600, now)).toBe(true);
+  expect(isPublicReservationCandidateInPast('2026-07-13', 630, now)).toBe(false);
 });
 
 test('serializes service-local reservation inputs with the Seoul offset', () => {
   expect(fromServiceDateTimeLocal('2026-07-14T09:00')).toBe('2026-07-14T09:00:00+09:00');
+  expect(toServiceDateTimeLocal('2026-07-14T00:00:00Z')).toBe('2026-07-14T09:00');
 });
 
 function expectSelection(

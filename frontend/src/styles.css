@@ -749,13 +749,28 @@ button:disabled {
   cursor: copy;
 }
 
-.timetable-empty-slot:hover,
-.timetable-empty-slot:focus-visible {
+.timetable-empty-slot::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--timetable-suggestion-height, 48px);
+  border-radius: 0;
+  pointer-events: none;
+  content: '';
+}
+
+.timetable-empty-slot:not(:disabled):hover::before,
+.timetable-empty-slot:not(:disabled):focus-visible::before {
   background: rgba(37, 99, 235, 0.08);
 }
 
-.timetable-empty-slot:focus-visible {
+.timetable-empty-slot:not(:disabled):focus-visible::before {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
+
+.timetable-empty-slot:disabled {
+  cursor: default;
 }
 
 .reservation-block {
