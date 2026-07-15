@@ -25,9 +25,7 @@ import { statusLabels } from '../../shared/utils/labels';
 import { maskName } from '../../shared/utils/privacyMasking';
 import {
   fromServiceDateTimeLocal,
-  isPublicReservationCandidateInPast,
   newRequestSelection,
-  publicPastReservationMessage,
   serviceDateInputValue,
   slotToReservationSelection,
 } from '../../shared/utils/reservationTime';
@@ -188,7 +186,7 @@ export function PublicReservationPage() {
   }
 
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
-    if (isUnavailable || isPublicReservationCandidateInPast(slot.date, slot.startMinutes)) return;
+    if (isUnavailable) return;
     setQuickSelectionUnavailableMessage(undefined);
     setQuickSelection(slotToReservationSelection(slot));
   }
@@ -328,8 +326,6 @@ export function PublicReservationPage() {
                 minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
-                isEmptySlotDisabled={(slot) => isPublicReservationCandidateInPast(slot.date, slot.startMinutes)}
-                emptySlotDisabledMessage={publicPastReservationMessage}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={(room) => openRoomInfo(room)}
                 statusLabelOverride={publicStatusLabels}
@@ -393,8 +389,6 @@ export function PublicReservationPage() {
                 minReservationMinutes={settings.data.minReservationMinutes}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
-                isEmptySlotDisabled={(slot) => isPublicReservationCandidateInPast(slot.date, slot.startMinutes)}
-                emptySlotDisabledMessage={publicPastReservationMessage}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={hasRoomDescription(selectedRoom?.description) && selectedRoom
                   ? () => openRoomInfo(selectedRoom)

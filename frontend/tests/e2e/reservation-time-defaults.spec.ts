@@ -4,7 +4,7 @@ import { expect, test } from './fixtures';
 const fixedInstant = new Date('2026-07-13T15:45:00Z'); // 2026-07-14 00:45 Asia/Seoul
 const expectedStart = '2026-07-14T09:00';
 const expectedEnd = '2026-07-14T09:30';
-const publicPastMessage = '과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.';
+const publicPastMessage = '이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.';
 const room = {
   id: '00000000-0000-0000-0000-000000000101',
   name: 'testing-room-time-default',
@@ -132,15 +132,37 @@ for (const policy of [
   });
 }
 
-test('public disables past candidates while admin can open the same past slot', async ({ page }) => {
+test('public and admin can open a past slot while public submission shows the policy error', async ({ page }) => {
   await mockReservationApis(page, '2026-07-31');
+  await page.route('**/api/public/reservations', (route) => route.fulfill({
+    status: 422,
+    json: {
+      code: 'PAST_RESERVATION_TIME',
+      message: publicPastMessage,
+      timestamp: '2026-07-13T01:15:00Z',
+      path: '/api/public/reservations',
+      fieldErrors: [],
+    },
+  }));
   await page.clock.setFixedTime(new Date('2026-07-13T01:15:00Z')); // 10:15 Asia/Seoul
 
   await page.goto('/timetable?view=date&date=2026-07-13');
   const publicPastSlot = page.getByRole('button', { name: new RegExp(`${room.name} 09:00-09:30`) });
-  await expect(publicPastSlot).toBeDisabled();
-  await expect(publicPastSlot).toHaveAttribute('title', publicPastMessage);
+  await expect(publicPastSlot).toBeEnabled();
+  await publicPastSlot.hover();
+  expect(await publicPastSlot.evaluate((element) => getComputedStyle(element, '::before').height)).toBe('48px');
+  await publicPastSlot.click();
+  await expect(page.getByTestId('public-request-start-input')).toHaveValue('2026-07-13T09:00');
+  await expect(page.getByTestId('public-request-end-input')).toHaveValue('2026-07-13T09:30');
   await expect(page.getByRole('button', { name: `${room.name} 10:30-11:00 예약 신청` })).toBeEnabled();
+
+  await page.getByTestId('public-request-purpose-input').fill('testing-reservation-public-past');
+  await page.getByTestId('public-request-applicant-name-input').fill('testing-user');
+  await page.getByTestId('public-request-email-input').fill('testing-user@example.test');
+  await page.getByTestId('public-request-phone-input').fill('010-1234-5678');
+  await page.getByTestId('public-request-cancel-password-input').fill('testing-password');
+  await page.getByTestId('public-request-submit-button').click();
+  await expect(page.getByTestId('public-quick-request-panel')).toContainText(publicPastMessage);
 
   await page.goto('/admin/timetable?view=date&date=2026-07-13');
   const adminPastSlot = page.getByRole('button', { name: `${room.name} 09:00-09:30 예약 신청` });

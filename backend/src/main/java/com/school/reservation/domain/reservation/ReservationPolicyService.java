@@ -14,7 +14,7 @@ public class ReservationPolicyService {
 
     private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
     private static final String PUBLIC_PAST_RESERVATION_MESSAGE =
-        "과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.";
+        "이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.";
 
     private final OperationSettingsRepository operationSettingsRepository;
     private final Clock clock;

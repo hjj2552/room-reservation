@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import type { ReservationStatus } from '../api/types';
 import { hexToTint } from '../utils/color';
 import { statusLabels } from '../utils/labels';
-import { defaultSuggestedDurationMinutes, type ReservationSlot } from '../utils/reservationTime';
+import { defaultSuggestedDurationMinutes } from '../utils/reservationTime';
 import {
   TIMETABLE_COMPACT_BLOCK_HEIGHT,
   TIMETABLE_GRID_MINUTES,
@@ -32,8 +32,6 @@ interface ReservationRoomTimetableProps {
   minReservationMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
-  isEmptySlotDisabled?: (slot: ReservationSlot) => boolean;
-  emptySlotDisabledMessage?: string;
   onReservationClick?: (reservation: TimetableReservation) => void;
   onRoomInfoClick?: () => void;
   statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
@@ -69,8 +67,6 @@ export function ReservationRoomTimetable({
   minReservationMinutes = TIMETABLE_GRID_MINUTES,
   highlightedReservationId,
   onEmptySlotClick,
-  isEmptySlotDisabled,
-  emptySlotDisabledMessage,
   onReservationClick,
   onRoomInfoClick,
   statusLabelOverride,
@@ -157,7 +153,6 @@ export function ReservationRoomTimetable({
                   endMinutes,
                   roomId: room.id,
                 };
-                const disabled = isEmptySlotDisabled?.(selection) || false;
                 return (
                   <button
                     key={`empty-${slot}`}
@@ -169,11 +164,7 @@ export function ReservationRoomTimetable({
                       '--timetable-suggestion-height': `${suggestedDurationMinutes * TIMETABLE_MINUTE_HEIGHT}px`,
                     } as CSSProperties}
                     onClick={() => onEmptySlotClick?.(selection)}
-                    disabled={disabled}
-                    title={disabled ? emptySlotDisabledMessage : undefined}
-                    aria-label={`${room.name} ${day.label} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청${
-                      disabled && emptySlotDisabledMessage ? `: ${emptySlotDisabledMessage}` : ''
-                    }`}
+                    aria-label={`${room.name} ${day.label} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청`}
                     data-testid="timetable-empty-slot"
                   />
                 );

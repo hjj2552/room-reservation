@@ -4,8 +4,6 @@ export const reservationServiceTimeZone = 'Asia/Seoul';
 export const INTERACTION_INTERVAL_MINUTES = 30;
 export const noFutureReservationTimeMessage =
   '학기 종료일까지 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.';
-export const publicPastReservationMessage =
-  '과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.';
 
 const serviceDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: reservationServiceTimeZone,
@@ -164,11 +162,6 @@ export function toServiceDateTimeLocal(value?: string | null) {
 
 export function serviceDateInputValue(now = new Date()) {
   return serviceDateTimeParts(now).date;
-}
-
-export function isPublicReservationCandidateInPast(date: string, startMinutes: number, now = new Date()) {
-  const candidate = new Date(`${date}T${minutesToTimeInput(startMinutes)}:00+09:00`);
-  return candidate.getTime() < now.getTime();
 }
 
 export function defaultOperatingTimeRange(settings: ReservationTimeSettings) {

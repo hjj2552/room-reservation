@@ -58,7 +58,7 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
                 .content(publicRequest(PAST_START, "testing-reservation-public-past")))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"))
-            .andExpect(jsonPath("$.message").value("과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
+            .andExpect(jsonPath("$.message").value("이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
 
         String createdBody = mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -74,7 +74,8 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(publicRequest(PAST_START, "testing-reservation-public-update-past")))
             .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"));
+            .andExpect(jsonPath("$.code").value("PAST_RESERVATION_TIME"))
+            .andExpect(jsonPath("$.message").value("이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
     }
 
     @Test
@@ -116,7 +117,7 @@ class ReservationPastTimeIntegrationTest extends IntegrationTestSupport {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.available").value(false))
             .andExpect(jsonPath("$.reason").value("PAST_RESERVATION_TIME"))
-            .andExpect(jsonPath("$.message").value("과거의 시간표는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
+            .andExpect(jsonPath("$.message").value("이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요."));
     }
 
     @Test
