@@ -760,17 +760,13 @@ button:disabled {
   content: '';
 }
 
-.timetable-empty-slot:not(:disabled):hover::before,
-.timetable-empty-slot:not(:disabled):focus-visible::before {
+.timetable-empty-slot:hover::before,
+.timetable-empty-slot:focus-visible::before {
   background: rgba(37, 99, 235, 0.08);
 }
 
-.timetable-empty-slot:not(:disabled):focus-visible::before {
+.timetable-empty-slot:focus-visible::before {
   box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.28);
-}
-
-.timetable-empty-slot:disabled {
-  cursor: default;
 }
 
 .reservation-block {

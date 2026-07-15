@@ -160,7 +160,7 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   OUTSIDE_OPERATING_DAYS: '예약 가능한 요일이 아닙니다. 운영 설정의 예약 가능 요일을 확인해 주세요.',
   OUTSIDE_OPERATING_HOURS: '운영 시간 안에서만 예약할 수 있습니다.',
   OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',
-  PAST_RESERVATION_TIME: '현재보다 이전 시간으로 예약할 수 없습니다. 미래 시간을 선택해 주세요.',
+  PAST_RESERVATION_TIME: '이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.',
   POLICY_NOT_CONFIGURED: '운영 설정이 아직 준비되지 않았습니다. 운영 설정을 확인해 주세요.',
   PUBLIC_CANCEL_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',
   PUBLIC_RESERVATION_PASSWORD_MISMATCH: '예약 비밀번호가 일치하지 않습니다.',

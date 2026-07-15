@@ -6,7 +6,6 @@ import { statusLabels } from '../utils/labels';
 import {
   INTERACTION_INTERVAL_MINUTES,
   defaultSuggestedDurationMinutes,
-  type ReservationSlot,
 } from '../utils/reservationTime';
 import { StatusBadge } from './StatusBadge';
 
@@ -48,8 +47,6 @@ interface ReservationDateTimetableProps {
   minReservationMinutes?: number;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
-  isEmptySlotDisabled?: (slot: ReservationSlot) => boolean;
-  emptySlotDisabledMessage?: string;
   onReservationClick?: (reservation: TimetableReservation) => void;
   onRoomInfoClick?: (room: TimetableRoom) => void;
   statusLabelOverride?: Partial<Record<ReservationStatus, string>>;
@@ -122,8 +119,6 @@ export function ReservationDateTimetable({
   minReservationMinutes = TIMETABLE_GRID_MINUTES,
   highlightedReservationId,
   onEmptySlotClick,
-  isEmptySlotDisabled,
-  emptySlotDisabledMessage,
   onReservationClick,
   onRoomInfoClick,
   statusLabelOverride,
@@ -215,7 +210,6 @@ export function ReservationDateTimetable({
                   endMinutes,
                   roomId: room.id,
                 };
-                const disabled = isEmptySlotDisabled?.(selection) || false;
                 return (
                   <button
                     key={`empty-${slot}`}
@@ -227,11 +221,7 @@ export function ReservationDateTimetable({
                       '--timetable-suggestion-height': `${suggestedDurationMinutes * TIMETABLE_MINUTE_HEIGHT}px`,
                     } as CSSProperties}
                     onClick={() => onEmptySlotClick?.(selection)}
-                    disabled={disabled}
-                    title={disabled ? emptySlotDisabledMessage : undefined}
-                    aria-label={`${room.name} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청${
-                      disabled && emptySlotDisabledMessage ? `: ${emptySlotDisabledMessage}` : ''
-                    }`}
+                    aria-label={`${room.name} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청`}
                     data-testid="timetable-empty-slot"
                   />
                 );
