@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { OperationSettings } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -66,9 +65,6 @@ export function SettingsPage() {
           <p className="eyebrow">관리자 메뉴</p>
           <h1 id="settings-title">운영 설정</h1>
           <p className="muted">예약 가능 기간, 시간, 안내 문구를 관리합니다.</p>
-        </div>
-        <div className="header-actions">
-          <Link className="secondary-button" to="/admin/settings/tags">태그 설정</Link>
         </div>
       </div>
 

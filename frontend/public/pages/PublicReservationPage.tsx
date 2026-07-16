@@ -295,7 +295,7 @@ export function PublicReservationPage() {
             data-testid="public-timetable-view-room"
           >
             <DoorOpen size={16} aria-hidden="true" />
-            강의실별
+            공간별
           </button>
         </div>
       ) : null}
@@ -348,7 +348,7 @@ export function PublicReservationPage() {
             <>
               <div className="room-week-controls">
                 <label className="compact-room-picker">
-                  강의실
+                  공간
                   <select
                     value={roomViewRoomId}
                     onChange={(event) => setRoomViewRoomId(event.target.value)}

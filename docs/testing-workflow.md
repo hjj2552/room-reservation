@@ -32,7 +32,7 @@ cd backend
 | 반복 예약 미리보기/등록/취소 | `.\gradlew.bat test --tests "*RecurrenceIntegrationTest"` |
 | 감사 이력 | `.\gradlew.bat test --tests "*ReservationHistoryIntegrationTest"` |
 | CSV 내보내기 | `.\gradlew.bat test --tests "*ReservationCsvExportIntegrationTest"` |
-| 강의실 운영 API | `.\gradlew.bat test --tests "*AdminRoomIntegrationTest" --tests "*PublicRoomQueryIntegrationTest"` |
+| 공간 운영 API | `.\gradlew.bat test --tests "*AdminRoomIntegrationTest" --tests "*PublicRoomQueryIntegrationTest"` |
 | 운영 설정 API | `.\gradlew.bat test --tests "*AdminSettingsIntegrationTest"` |
 | 태그 CRUD와 반복 예약 참조 | `.\gradlew.bat test --tests "*AdminTagIntegrationTest"` |
 | 인증/세션 | `.\gradlew.bat test --tests "*AdminAuthIntegrationTest"` |

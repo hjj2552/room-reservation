@@ -138,13 +138,13 @@ public class RoomService {
             DeletionCheckItem.impact(
                 "RESERVATION_REFERENCES_REASSIGNED",
                 "예약 기록 보존",
-                "기존 예약은 삭제하지 않고 삭제된 강의실 기록으로 연결됩니다.",
+                "기존 예약은 삭제하지 않고 삭제된 공간 기록으로 연결됩니다.",
                 reservationReferenceCount
             ),
             DeletionCheckItem.impact(
                 "RECURRENCE_REFERENCES_REASSIGNED",
                 "반복 예약 기록 보존",
-                "기존 반복 예약은 삭제하지 않고 삭제된 강의실 기록으로 연결됩니다.",
+                "기존 반복 예약은 삭제하지 않고 삭제된 공간 기록으로 연결됩니다.",
                 recurrenceReferenceCount
             )
         );

@@ -4,7 +4,7 @@ import { usePublicSettings } from '../../shared/hooks/usePublicReservation';
 
 export function EntryChoicePage() {
   const settings = usePublicSettings();
-  const organizationName = settings.data?.organizationName || '강의실 예약';
+  const organizationName = settings.data?.organizationName || '공간 예약';
 
   return (
     <main className="entry-page">
@@ -22,7 +22,7 @@ export function EntryChoicePage() {
             </span>
             <span>
               <strong>일반 사용자</strong>
-              <span>강의실 예약 신청 및 확인</span>
+              <span>공간 예약 신청 및 확인</span>
             </span>
           </Link>
 
@@ -32,7 +32,7 @@ export function EntryChoicePage() {
             </span>
             <span>
               <strong>관리자</strong>
-              <span>로그인 후 예약/강의실/운영 설정 관리</span>
+              <span>로그인 후 예약/공간/운영 설정 관리</span>
             </span>
           </Link>
         </div>

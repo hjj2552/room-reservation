@@ -12,7 +12,7 @@ import java.util.UUID;
 @Table(name = "rooms")
 public class Room {
 
-    public static final String DELETED_ROOM_DISPLAY_NAME = "삭제된 강의실";
+    public static final String DELETED_ROOM_DISPLAY_NAME = "삭제된 공간";
 
     @Id
     @GeneratedValue
