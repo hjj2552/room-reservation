@@ -1940,11 +1940,25 @@ button:disabled {
     font-size: 16px;
   }
 
-  /* iOS 26 WebKit adds author padding outside 100%-wide date controls. */
+  /* Keep iOS date controls contained without dropping their normal field padding. */
   input[type="date"] {
-    display: block;
-    inline-size: 100%;
-    padding-inline: 0;
+    width: -webkit-fill-available;
+    height: 40px;
+    min-height: 40px;
+    padding: 9px 10px;
+    line-height: 20px;
+    text-align: center;
+  }
+
+  input[type="date"]::-webkit-date-and-time-value {
+    height: 20px;
+    min-height: 20px;
+    line-height: 20px;
+    text-align: center;
+  }
+
+  .compact-request-form input[type="date"] {
+    padding: 8px 9px;
   }
 
   .content {
