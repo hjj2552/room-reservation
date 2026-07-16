@@ -167,12 +167,12 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   RATE_LIMIT_EXCEEDED: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
   RECURRENCE_CONFLICT: '반복 예약 후보 중 충돌이 있습니다. 미리보기 결과를 확인해 주세요.',
   RESERVATION_DISABLED: '현재 예약 접수가 중지되어 있습니다.',
-  ROOM_DELETE_BLOCKED: '강의실 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
-  ROOM_DISABLED: '선택한 강의실은 현재 예약할 수 없습니다.',
-  ROOM_NAME_DUPLICATED: '같은 이름의 강의실이 이미 있습니다.',
-  SYSTEM_ROOM_PROTECTED: '시스템 보존용 강의실은 수정하거나 삭제할 수 없습니다.',
+  ROOM_DELETE_BLOCKED: '공간 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
+  ROOM_DISABLED: '선택한 공간은 현재 예약할 수 없습니다.',
+  ROOM_NAME_DUPLICATED: '같은 이름의 공간이 이미 있습니다.',
+  SYSTEM_ROOM_PROTECTED: '시스템 보존용 공간은 수정하거나 삭제할 수 없습니다.',
   TAG_NAME_DUPLICATED: '같은 이름의 태그가 이미 있습니다.',
-  TIME_SLOT_CONFLICT: '같은 강의실의 같은 시간대에 이미 예약이 있습니다.',
+  TIME_SLOT_CONFLICT: '같은 공간의 동일 시간대에 이미 예약이 있습니다.',
   VERSION_CONFLICT: '다른 사용자가 먼저 수정했습니다. 화면을 새로고침한 뒤 다시 시도해 주세요.',
 };
 
@@ -224,7 +224,7 @@ function validationErrorMessage(message?: string) {
 
 function notFoundMessage(message?: string) {
   const normalized = (message || '').toLowerCase();
-  if (normalized.includes('room')) return '강의실을 찾을 수 없습니다. 목록을 새로고침해 주세요.';
+  if (normalized.includes('room')) return '공간을 찾을 수 없습니다. 목록을 새로고침해 주세요.';
   if (normalized.includes('reservation')) return '예약을 찾을 수 없습니다. 목록을 새로고침해 주세요.';
   if (normalized.includes('recurrence')) return '반복 예약을 찾을 수 없습니다. 목록을 새로고침해 주세요.';
   if (normalized.includes('settings')) return '운영 설정을 찾을 수 없습니다. 관리자에게 확인해 주세요.';
@@ -252,8 +252,8 @@ function fieldErrorMessage(field: string, message?: string) {
 }
 
 const fieldLabels: Record<string, string> = {
-  roomId: '강의실',
-  name: '강의실명',
+  roomId: '예약 공간',
+  name: '공간 이름',
   location: '위치',
   capacity: '정원',
   applicantName: '신청자 이름',

@@ -38,7 +38,7 @@ export function reservationCoreSections(detail: {
       title: '예약 정보',
       fields: [
         { label: '신청 목적', value: detail.purpose },
-        { label: '강의실', value: roomLabel },
+        { label: '공간', value: roomLabel },
         { label: '날짜/시간', value: `${formatDateTime(detail.startAt)} - ${formatDateTime(detail.endAt)}` },
         { label: '신청자 이름', value: detail.applicantName },
         { label: '이메일', value: detail.applicantEmail },

@@ -27,12 +27,12 @@ export function RoomInfoModal({
 
   return (
     <ModalDialog
-      title="강의실 안내"
+      title="공간 이용 안내"
       onClose={onClose}
       className="room-info-modal"
       ariaDescribedBy={descriptionId}
       showCloseButton
-      closeButtonLabel="강의실 안내 닫기"
+      closeButtonLabel="공간 이용 안내 닫기"
       closeOnBackdrop
       testId="room-info-modal"
       backdropTestId="room-info-backdrop"

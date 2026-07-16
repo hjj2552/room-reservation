@@ -280,7 +280,7 @@ export function TimetablePage() {
             data-testid={`timetable-view-${mode}`}
           >
             <ViewModeIcon mode={mode} />
-            {mode === 'date' ? '날짜별' : '강의실별'}
+            {mode === 'date' ? '날짜별' : '공간별'}
           </button>
         ))}
       </div>
@@ -294,7 +294,7 @@ export function TimetablePage() {
             </div>
             <div className="room-week-controls">
               <label className="compact-room-picker">
-                강의실
+                공간
                 <select
                   value={roomId}
                   onChange={(event) => setParam('roomId', event.target.value)}
@@ -338,7 +338,7 @@ export function TimetablePage() {
           ) : null}
           {dateTimetableReservations.data && dateTimetableReservations.data.totalPages > 1 ? (
             <p className="compact-note muted">
-              이 날짜의 예약이 많아 일부만 표시될 수 있습니다. 강의실을 선택해 범위를 좁혀 확인하세요.
+              이 날짜의 예약이 많아 일부만 표시될 수 있습니다. 공간을 선택해 범위를 좁혀 확인하세요.
             </p>
           ) : null}
         </section>
@@ -353,7 +353,7 @@ export function TimetablePage() {
             </div>
             <div className="room-week-controls">
               <label className="compact-room-picker">
-                강의실
+                공간
                 <select
                   value={selectedRoomViewRoomId}
                   onChange={(event) => setRoomViewRoomId(event.target.value)}
@@ -402,7 +402,7 @@ export function TimetablePage() {
           {rooms.isError ? <ErrorState error={rooms.error} /> : null}
           {settings.isError ? <ErrorState error={settings.error} /> : null}
           {roomTimetableReservations.isError ? <ErrorState error={roomTimetableReservations.error} /> : null}
-          {rooms.data && roomViewRooms.length === 0 ? <EmptyState message="표시할 활성 강의실이 없습니다." /> : null}
+          {rooms.data && roomViewRooms.length === 0 ? <EmptyState message="표시할 활성 공간이 없습니다." /> : null}
           {settings.data && selectedRoomViewRoom && roomTimetableReservations.data ? (
             <ReservationRoomTimetable
               room={selectedRoomViewRoom}
@@ -417,7 +417,7 @@ export function TimetablePage() {
           ) : null}
           {roomTimetableReservations.data && roomTimetableReservations.data.totalPages > 1 ? (
             <p className="compact-note muted">
-              이 주의 예약이 많아 일부만 표시될 수 있습니다. 강의실 또는 주를 조정해 확인하세요.
+              이 주의 예약이 많아 일부만 표시될 수 있습니다. 공간 또는 주를 조정해 확인하세요.
             </p>
           ) : null}
         </section>

@@ -3,7 +3,7 @@ package com.school.reservation.domain.room;
 public enum RoomDeletionBlockerCode {
     SENTINEL_ROOM_PROTECTED(
         "SENTINEL_ROOM_PROTECTED",
-        "삭제된 강의실 기록 보존용 시스템 강의실은 삭제할 수 없습니다."
+        "삭제된 공간 기록 보존용 시스템 공간은 삭제할 수 없습니다."
     );
 
     private final String code;

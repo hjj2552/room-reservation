@@ -178,7 +178,7 @@ export function RecurrencesPage() {
         <form className="panel form-grid" data-testid="recurrence-form" onSubmit={handlePreview}>
           <h2 className="full-span">반복 예약 입력</h2>
           <label>
-            강의실
+            예약 공간
             <select
               data-testid="recurrence-room-select"
               name="roomId"
@@ -397,7 +397,7 @@ export function RecurrencesPage() {
             </select>
           </label>
           <label>
-            강의실
+            공간
             <select
               data-testid="recurrence-list-room-filter"
               value={roomId}
@@ -455,7 +455,7 @@ export function RecurrencesPage() {
                 <thead>
                   <tr>
                     <th scope="col">상태</th>
-                    <th scope="col">강의실</th>
+                    <th scope="col">공간</th>
                     <th scope="col">기간</th>
                     <th scope="col">요일/시간</th>
                     <th scope="col">목적</th>

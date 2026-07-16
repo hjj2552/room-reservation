@@ -1,6 +1,6 @@
 # room-reservation
 
-강의실 예약 MVP입니다. 현재 저장소는 Spring Boot 백엔드와 React 기반 프런트엔드로 구성되어 있습니다.
+공간 예약 MVP입니다. 현재 저장소는 Spring Boot 백엔드와 React 기반 프런트엔드로 구성되어 있습니다.
 
 ## 문서
 
@@ -11,7 +11,7 @@
 - [관리자 E2E 문서](docs/admin-e2e.md)
 - [백엔드 테스트 워크플로](docs/testing-workflow.md)
 - [배포 체크리스트](docs/deployment-checklist.md)
-- [강의실 삭제 정책](docs/room-deletion-policy.md)
+- [공간 삭제 정책](docs/room-deletion-policy.md)
 
 ## 빠른 시작
 

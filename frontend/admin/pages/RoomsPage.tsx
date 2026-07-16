@@ -130,15 +130,15 @@ export function RoomsPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">관리자 메뉴</p>
-          <h1 id="rooms-title">강의실 관리</h1>
-          <p className="muted">예약에 사용할 강의실을 등록하고, 삭제된 강의실의 예약 기록은 보존합니다.</p>
+          <h1 id="rooms-title">공간 관리</h1>
+          <p className="muted">예약에 사용할 공간을 등록하고, 삭제된 공간의 예약 기록은 보존합니다.</p>
         </div>
       </div>
 
       <div className="detail-grid">
         <section className="panel" aria-labelledby="room-list-title">
           <div className="panel-header">
-            <h2 id="room-list-title">강의실 목록</h2>
+            <h2 id="room-list-title">공간 목록</h2>
           </div>
           <form
             className="inline-filter"
@@ -152,7 +152,7 @@ export function RoomsPage() {
               <input
                 type="search"
                 value={keyword}
-                placeholder="강의실명 또는 위치"
+                placeholder="공간명 또는 위치"
                 onChange={(event) => setKeyword(event.target.value)}
               />
             </label>
@@ -161,15 +161,15 @@ export function RoomsPage() {
 
           {rooms.isLoading ? <LoadingState /> : null}
           {rooms.isError ? <ErrorState error={rooms.error} /> : null}
-          {rooms.data?.items.length === 0 ? <EmptyState message="등록된 강의실이 없습니다." /> : null}
+          {rooms.data?.items.length === 0 ? <EmptyState message="등록된 공간이 없습니다." /> : null}
           {rooms.data?.items.length ? (
             <div className="table-wrap">
               <table className="data-table rooms-table" data-testid="rooms-table">
-                <caption className="sr-only">강의실 목록</caption>
+                <caption className="sr-only">공간 목록</caption>
                 <thead>
                   <tr>
                     <th scope="col" className="nowrap-cell">예약 대상</th>
-                    <th scope="col">강의실</th>
+                    <th scope="col">공간</th>
                     <th scope="col" className="nowrap-cell">정원</th>
                     <th scope="col" className="nowrap-cell">수정일</th>
                     <th scope="col" className="nowrap-cell">관리</th>
@@ -228,16 +228,16 @@ export function RoomsPage() {
 
         <section className="panel" aria-labelledby="room-form-title">
           <div className="panel-header">
-            <h2 id="room-form-title">{editingRoom ? '강의실 수정' : '강의실 등록'}</h2>
+            <h2 id="room-form-title">{editingRoom ? '공간 수정' : '공간 등록'}</h2>
             {editingRoom ? (
               <button type="button" className="ghost-button" onClick={() => setEditingRoom(null)}>
-                새 강의실 입력
+                새 공간 입력
               </button>
             ) : null}
           </div>
           <form className="form-stack" data-testid="room-form" onSubmit={handleSubmit}>
             <label>
-              강의실명
+              공간 이름
               <input
                 data-testid="room-name-input"
                 value={form.name}
@@ -273,7 +273,7 @@ export function RoomsPage() {
               예약 대상으로 사용
             </label>
             <label>
-              강의실 안내
+              공간 이용 안내
               <textarea
                 data-testid="room-description-input"
                 rows={4}
@@ -288,7 +288,7 @@ export function RoomsPage() {
               data-testid="room-save-button"
               disabled={createRoom.isPending || updateRoom.isPending}
             >
-              {editingRoom ? '수정 저장' : '강의실 등록'}
+              {editingRoom ? '수정 저장' : '공간 등록'}
             </button>
           </form>
         </section>
@@ -296,14 +296,14 @@ export function RoomsPage() {
 
       {deleteTarget ? (
         <ModalDialog
-          title="강의실 영구 삭제"
+          title="공간 영구 삭제"
           titleId="room-delete-title"
           onClose={closeDeleteModal}
           closeDisabled={deleteRoom.isPending}
           testId="room-delete-modal"
         >
           <p className="danger-copy">
-            삭제 후 복구할 수 없습니다. 강의실은 목록에서 제거되며 기존 예약 기록은 삭제된 강의실로 보존됩니다.
+            삭제 후 복구할 수 없습니다. 공간은 목록에서 제거되며 기존 예약 기록은 삭제된 공간으로 보존됩니다.
           </p>
 
           {deletionCheck.isLoading ? <LoadingState /> : null}
@@ -327,7 +327,7 @@ export function RoomsPage() {
           ) : null}
 
           <label>
-            삭제하려면 강의실명 <strong>{deleteTarget.name}</strong>을 다시 입력하세요.
+            삭제하려면 공간 이름 <strong>{deleteTarget.name}</strong>을 다시 입력하세요.
             <input
               data-testid="room-delete-confirm-input"
               value={deleteConfirmation}

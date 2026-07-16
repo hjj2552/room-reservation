@@ -65,7 +65,7 @@ export function RecurrenceDetailPage() {
           </div>
           <dl className="description-list">
             <div>
-              <dt>강의실</dt>
+              <dt>공간</dt>
               <dd data-testid="recurrence-detail-room">{detail.room.name} {detail.room.location ? `(${detail.room.location})` : ''}</dd>
             </div>
             <div>
@@ -142,7 +142,7 @@ export function RecurrenceDetailPage() {
             <thead>
               <tr>
                 <th scope="col">상태</th>
-                <th scope="col">강의실</th>
+                <th scope="col">공간</th>
                 <th scope="col">예약 시간</th>
                 <th scope="col">목적</th>
                 <th scope="col">시간표</th>

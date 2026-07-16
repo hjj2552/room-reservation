@@ -123,7 +123,7 @@ export function AuditPage() {
           />
         </label>
         <label>
-          강의실
+          공간
           <select
             data-testid="audit-room-select"
             value={roomId}

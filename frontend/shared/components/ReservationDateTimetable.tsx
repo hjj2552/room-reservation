@@ -146,7 +146,7 @@ export function ReservationDateTimetable({
   }, [reservations, roomIds]);
 
   if (rooms.length === 0) {
-    return <div className="state-box empty">표시할 활성 강의실이 없습니다.</div>;
+    return <div className="state-box empty">표시할 활성 공간이 없습니다.</div>;
   }
 
   return (
@@ -154,7 +154,7 @@ export function ReservationDateTimetable({
       <div className="timetable-summary" aria-live="polite">
         <strong>{selectedDate}</strong>
         <span>
-          {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 활성 강의실 {rooms.length}개 · 예약{' '}
+          {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 활성 공간 {rooms.length}개 · 예약{' '}
           {reservations.filter((reservation) => roomIds.has(reservation.roomId)).length}건
         </span>
       </div>
@@ -171,7 +171,7 @@ export function ReservationDateTimetable({
                     type="button"
                     className="timetable-room-info-trigger"
                     onClick={() => onRoomInfoClick?.(room)}
-                    aria-label={`${room.name} 강의실 안내 보기`}
+                    aria-label={`${room.name} 공간 이용 안내 보기`}
                     data-testid="timetable-room-info-trigger"
                   >
                     <strong>{room.name}</strong>

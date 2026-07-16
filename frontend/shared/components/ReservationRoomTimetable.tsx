@@ -96,7 +96,7 @@ export function ReservationRoomTimetable({
   }, [reservations]);
 
   if (!room) {
-    return <div className="state-box empty">표시할 활성 강의실이 없습니다.</div>;
+    return <div className="state-box empty">표시할 활성 공간이 없습니다.</div>;
   }
 
   return (

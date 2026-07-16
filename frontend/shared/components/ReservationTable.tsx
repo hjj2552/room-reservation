@@ -19,7 +19,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
         <thead>
           <tr>
             <th scope="col">상태</th>
-            <th scope="col">강의실</th>
+            <th scope="col">공간</th>
             <th scope="col">예약 시간</th>
             <th scope="col">신청자</th>
             <th scope="col">목적</th>

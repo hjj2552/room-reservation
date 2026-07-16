@@ -21,7 +21,7 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
 
     const updatedLocation = e2eData.name('updated-location');
     await expect(page.getByTestId('room-name-input')).toHaveValue(room.name);
-    await expect(page.getByLabel('강의실 안내')).toBeVisible();
+    await expect(page.getByLabel('공간 이용 안내')).toBeVisible();
     await page.getByTestId('room-location-input').fill(updatedLocation);
     await page.getByTestId('room-save-button').click();
 
@@ -42,7 +42,7 @@ test('rooms smoke: deletion requires matching room name and server checks', asyn
   await row.getByTestId('room-delete-button').click();
   const deleteModal = page.getByTestId('room-delete-modal');
   await expect(deleteModal).toBeVisible();
-  await expect(page.getByRole('heading', { name: '강의실 영구 삭제' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '공간 영구 삭제' })).toBeVisible();
   await expect(deleteModal.locator('.modal-close-button')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(deleteModal).toBeHidden();
@@ -77,7 +77,7 @@ test('rooms smoke: deletion explains preserved reservation records', async ({ pa
 
     await row.getByTestId('room-delete-button').click();
     await expect(page.getByTestId('room-delete-modal')).toBeVisible();
-    await expect(page.getByText('기존 예약 기록은 삭제된 강의실로 보존됩니다')).toBeVisible();
+    await expect(page.getByText('기존 예약 기록은 삭제된 공간으로 보존됩니다')).toBeVisible();
     await expect(page.getByTestId('room-delete-checks')).toContainText('연결된 예약 기록 1건');
 
     await page.getByTestId('room-delete-confirm-input').fill(room.name);
@@ -97,6 +97,7 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
   try {
     await page.goto('/admin/settings');
     await expect(page.getByTestId('settings-form')).toBeVisible();
+    await expect(page.locator('.page-header').getByRole('link', { name: '태그 설정' })).toHaveCount(0);
     await expect(page.getByLabel('관리자 이름')).toHaveCount(0);
     await expect(page.getByLabel('문의 이메일')).toBeVisible();
     await expect(page.getByLabel('문의 전화번호')).toBeVisible();
