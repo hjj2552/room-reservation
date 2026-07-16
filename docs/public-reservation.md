@@ -48,11 +48,14 @@ The public frontend maps `TIME_SLOT_CONFLICT` to:
 ## Time Policy
 
 - The timetable grid and empty-slot interaction candidates always use 30-minute intervals.
-- `slotMinutes` remains the manual time-input increment and accepts only `5`, `10`, `15`, or `30`.
-- Suggested reservations use `max(30, minReservationMinutes)` minutes and must fit completely inside operating hours.
+- Reservation start and end inputs always use 5-minute increments.
+- The administrator-configured minimum duration is at least 30 minutes; minimum and maximum durations are multiples of 5.
+- Suggested reservations and empty-slot hover ranges use exactly `minReservationMinutes` and must fit completely inside operating hours.
 - Toolbar suggestions use the first strictly future 30-minute candidate in `Asia/Seoul`, considering the semester and operating weekdays.
 - Past timetable candidates remain clickable so users can inspect the exact interval. Public creation, editing, and availability checks reject past start times with `이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
-- Existing reservations are not rewritten when `slotMinutes` changes. A later content/time edit is validated against the current setting.
+- Administrators can create and edit past reservations; public users cannot save them.
+- Existing reservations are not rewritten. A later time/content edit is validated against the fixed 5-minute increment and current duration/operating policy.
+- The `slotMinutes` API/DB field is temporarily retained only for rolling-deployment compatibility, always returns `5`, and is not a product setting. Remove it in a later contract-cleanup migration.
 
 ## Request Protection
 

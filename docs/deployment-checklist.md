@@ -67,8 +67,10 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 
 ## Reservation Time Migration Check
 
-- Immediately before deployment, read the deployed `operation_settings.slot_minutes` value without exposing database credentials or connection URLs.
-- Allowed values after the reservation-time migration are `5`, `10`, `15`, and `30`; `60` is intentionally rejected.
-- If the deployed value is `60`, do not auto-convert it. Choose the intended value manually with the operator before deployment.
-- The Flyway migration fails before changing constraints when it finds `slot_minutes=60`, so the migration transaction can roll back atomically.
-- Existing reservations and recurrences are not rewritten or retroactively aligned when the slot setting changes.
+- Immediately before deployment, read `operation_settings.min_reservation_minutes` and `max_reservation_minutes` without exposing database credentials or connection URLs.
+- Confirm minimum is at least `30`, both values are divisible by `5`, maximum is at least minimum, and minimum fits within operating hours.
+- If a value is incompatible, do not auto-convert production data. Agree on the intended values with the operator before deployment.
+- V3 fails before changing constraints or trigger functions when existing settings are incompatible, so the migration rolls back atomically.
+- Reservation inputs use a fixed 5-minute increment; timetable candidates and operating start/end use 30-minute intervals.
+- Existing reservations and recurrences are not rewritten or retroactively validated.
+- `slot_minutes` remains temporarily as a deprecated rolling-deployment compatibility column. The API returns `5`; business logic and V3 triggers do not read it. Remove the field and column in a later coordinated contract-cleanup migration.

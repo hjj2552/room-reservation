@@ -1,22 +1,29 @@
 import { expect, test } from '@playwright/test';
 import {
   INTERACTION_INTERVAL_MINUTES,
+  RESERVATION_INCREMENT_MINUTES,
   defaultOperatingTimeRange,
   defaultSuggestedDurationMinutes,
   fromServiceDateTimeLocal,
+  isPastServiceReservationTime,
   newRequestSelection,
   noFutureReservationTimeMessage,
   slotToReservationSelection,
   toServiceDateTimeLocal,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
+import {
+  includeExistingTime,
+  operatingTimeOptions,
+  reservationEndTimeOptions,
+  reservationStartTimeOptions,
+} from '../../shared/utils/timeOptions';
 
 const settings: ReservationTimeSettings = {
   semesterStartDate: '2026-07-01',
   semesterEndDate: '2026-07-31',
   openTime: '09:00',
   closeTime: '18:00',
-  slotMinutes: 30,
   availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
   minReservationMinutes: 30,
   maxReservationMinutes: 240,
@@ -24,7 +31,9 @@ const settings: ReservationTimeSettings = {
 
 test('uses a fixed 30-minute timetable interaction interval', () => {
   expect(INTERACTION_INTERVAL_MINUTES).toBe(30);
-  expect(defaultSuggestedDurationMinutes(20)).toBe(30);
+  expect(RESERVATION_INCREMENT_MINUTES).toBe(5);
+  expect(defaultSuggestedDurationMinutes(30)).toBe(30);
+  expect(defaultSuggestedDurationMinutes(35)).toBe(35);
   expect(defaultSuggestedDurationMinutes(45)).toBe(45);
   expect(defaultSuggestedDurationMinutes(60)).toBe(60);
   expect(defaultSuggestedDurationMinutes(120)).toBe(120);
@@ -88,7 +97,7 @@ test('uses the configured minimum when it is longer than the 30-minute suggestio
     '2026-07-13T10:05:00+09:00',
     '2026-07-13T10:30',
     '2026-07-13T11:15',
-    { minReservationMinutes: 45, maxReservationMinutes: 120, slotMinutes: 15 },
+    { minReservationMinutes: 45, maxReservationMinutes: 120 },
   );
 });
 
@@ -107,15 +116,45 @@ test('slot selection preserves the full interval supplied by the timetable', () 
 test('recurrence defaults use the operating start and suggested duration', () => {
   expect(defaultOperatingTimeRange({
     ...settings,
-    slotMinutes: 15,
     minReservationMinutes: 45,
     maxReservationMinutes: 120,
   })).toEqual({ startTime: '09:00', endTime: '09:45' });
 });
 
+test('builds reservation choices at exactly five-minute increments within min and max limits', () => {
+  const starts = reservationStartTimeOptions('09:00', '10:00', 30);
+  expect(starts.map((option) => option.value)).toEqual([
+    '09:00', '09:05', '09:10', '09:15', '09:20', '09:25', '09:30',
+  ]);
+  expect(starts).not.toContainEqual(expect.objectContaining({ value: '09:01' }));
+
+  const ends = reservationEndTimeOptions('09:10', '10:00', 35, 45);
+  expect(ends.map((option) => option.value)).toEqual(['09:45', '09:50', '09:55']);
+});
+
+test('builds operating choices at exactly thirty-minute increments', () => {
+  const options = operatingTimeOptions();
+  expect(options[0].value).toBe('00:00');
+  expect(options[1].value).toBe('00:30');
+  expect(options.at(-1)?.value).toBe('23:30');
+  expect(options).not.toContainEqual(expect.objectContaining({ value: '00:05' }));
+});
+
+test('keeps an existing reservation time visible when it is outside current choices', () => {
+  expect(includeExistingTime([], '08:55')).toEqual([
+    { value: '08:55', label: '08:55 (기존 시간)', existing: true },
+  ]);
+});
+
 test('serializes service-local reservation inputs with the Seoul offset', () => {
   expect(fromServiceDateTimeLocal('2026-07-14T09:00')).toBe('2026-07-14T09:00:00+09:00');
   expect(toServiceDateTimeLocal('2026-07-14T00:00:00Z')).toBe('2026-07-14T09:00');
+});
+
+test('checks public past input against the Seoul service-local instant', () => {
+  const now = new Date('2026-07-14T00:00:00Z');
+  expect(isPastServiceReservationTime('2026-07-14T08:55', now)).toBe(true);
+  expect(isPastServiceReservationTime('2026-07-14T09:00', now)).toBe(false);
 });
 
 function expectSelection(

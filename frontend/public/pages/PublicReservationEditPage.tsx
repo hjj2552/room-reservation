@@ -1,4 +1,3 @@
-import { Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -6,6 +5,7 @@ import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail } from '../../shared/api/types';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
+import { ReservationTimeRangeInput } from '../../shared/components/ReservationTimeRangeInput';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   usePublicReservationDetail,
@@ -17,7 +17,12 @@ import {
 import { formatDateTime } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMasking';
-import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
+import {
+  fromServiceDateTimeLocal,
+  isPastServiceReservationTime,
+  publicPastReservationMessage,
+  toServiceDateTimeLocal,
+} from '../../shared/utils/reservationTime';
 
 interface PublicReservationEditValues {
   roomId: string;
@@ -62,11 +67,13 @@ export function PublicReservationEditPage() {
   );
   const [showPasswordDialog, setShowPasswordDialog] = useState(!routeState?.verifiedReservation);
   const [successMessage, setSuccessMessage] = useState('');
+  const [submissionPolicyError, setSubmissionPolicyError] = useState('');
   const {
     register,
     handleSubmit,
     reset,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<PublicReservationEditValues>({
     defaultValues: {
@@ -79,6 +86,8 @@ export function PublicReservationEditPage() {
       endAt: '',
     },
   });
+  const startAt = watch('startAt');
+  const endAt = watch('endAt');
 
   useEffect(() => {
     if (!verifiedReservation) return;
@@ -108,6 +117,11 @@ export function PublicReservationEditPage() {
 
   function onSubmit(values: PublicReservationEditValues) {
     if (!verifiedReservation) return;
+    if (isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(publicPastReservationMessage);
+      return;
+    }
+    setSubmissionPolicyError('');
     const previousStatus = verifiedReservation.status;
     update.mutate(
       {
@@ -203,13 +217,13 @@ export function PublicReservationEditPage() {
             신청 목적
             <input
               data-testid="public-edit-purpose-input"
-              {...register('purpose', { required: '예약 목적을 입력해 주세요.' })}
+              {...register('purpose', { required: '신청 목적을 입력해 주세요.' })}
             />
             {errors.purpose ? <span className="field-error">{errors.purpose.message}</span> : null}
           </label>
           <label>
-            강의실
-            <select data-testid="public-edit-room-select" {...register('roomId', { required: '강의실을 선택해 주세요.' })}>
+            예약 공간
+            <select data-testid="public-edit-room-select" {...register('roomId', { required: '예약 공간을 선택해 주세요.' })}>
               <option value="">선택</option>
               {rooms.data?.map((room) => (
                 <option key={room.id} value={room.id}>
@@ -219,32 +233,25 @@ export function PublicReservationEditPage() {
             </select>
             {errors.roomId ? <span className="field-error">{errors.roomId.message}</span> : null}
           </label>
+          <ReservationTimeRangeInput
+            startAt={startAt}
+            endAt={endAt}
+            openTime={settings.data?.openTime || '09:00'}
+            closeTime={settings.data?.closeTime || '18:00'}
+            minReservationMinutes={settings.data?.minReservationMinutes || 30}
+            maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
+            onStartAtChange={(value) => setValue('startAt', value, { shouldDirty: true, shouldValidate: true })}
+            onEndAtChange={(value) => setValue('endAt', value, { shouldDirty: true, shouldValidate: true })}
+            dateTestId="public-edit-date-input"
+            startTestId="public-edit-start-input"
+            endTestId="public-edit-end-input"
+            startInvalid={Boolean(errors.startAt)}
+            endInvalid={Boolean(errors.endAt)}
+            startError={errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
+            endError={errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}
+          />
           <label>
-            현재 상태
-            <input value={statusLabels[verifiedReservation.status]} readOnly data-testid="public-edit-status-input" />
-          </label>
-          <label>
-            시작 시간
-            <input
-              data-testid="public-edit-start-input"
-              type="datetime-local"
-              step={(settings.data?.slotMinutes || 30) * 60}
-              {...register('startAt', { required: '시작 시간을 입력해 주세요.' })}
-            />
-            {errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
-          </label>
-          <label>
-            종료 시간
-            <input
-              data-testid="public-edit-end-input"
-              type="datetime-local"
-              step={(settings.data?.slotMinutes || 30) * 60}
-              {...register('endAt', { required: '종료 시간을 입력해 주세요.' })}
-            />
-            {errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}
-          </label>
-          <label>
-            신청자 이름
+            신청자
             <input
               data-testid="public-edit-applicant-name-input"
               {...register('applicantName', { required: '신청자 이름을 입력해 주세요.' })}
@@ -269,14 +276,21 @@ export function PublicReservationEditPage() {
             />
             {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
           </label>
-          {update.isError ? <div className="inline-error full-span" role="alert">{errorMessage(update.error)}</div> : null}
+          <label>
+            예약 상태
+            <input value={statusLabels[verifiedReservation.status]} readOnly data-testid="public-edit-status-input" />
+          </label>
+          {submissionPolicyError ? (
+            <div className="inline-error full-span" role="alert">{submissionPolicyError}</div>
+          ) : update.isError ? (
+            <div className="inline-error full-span" role="alert">{errorMessage(update.error)}</div>
+          ) : null}
           {successMessage ? <div className="success-box full-span" role="status">{successMessage}</div> : null}
           <div className="button-row full-span">
             <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
               취소
             </button>
             <button type="submit" className="primary-button" disabled={update.isPending} data-testid="public-edit-save-button">
-              <Save size={16} aria-hidden="true" />
               {update.isPending ? '저장 중...' : '수정 저장'}
             </button>
           </div>

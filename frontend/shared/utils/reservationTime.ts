@@ -1,9 +1,13 @@
 const fallbackReservationDurationMinutes = 30;
 
 export const reservationServiceTimeZone = 'Asia/Seoul';
-export const INTERACTION_INTERVAL_MINUTES = 30;
+export const TIMETABLE_GRID_MINUTES = 30;
+export const INTERACTION_INTERVAL_MINUTES = TIMETABLE_GRID_MINUTES;
+export const RESERVATION_INCREMENT_MINUTES = 5;
 export const noFutureReservationTimeMessage =
   '학기 종료일까지 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.';
+export const publicPastReservationMessage =
+  '이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.';
 
 const serviceDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   timeZone: reservationServiceTimeZone,
@@ -23,7 +27,6 @@ export interface ReservationTimeSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
-  slotMinutes: number;
   availableDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
@@ -49,11 +52,10 @@ export interface NewReservationSelectionResult {
   unavailableMessage?: string;
 }
 
-// Quick-create defaults should be valid starting points, while manual time input stays flexible.
 export function defaultSuggestedDurationMinutes(
   minReservationMinutes = fallbackReservationDurationMinutes,
 ) {
-  return Math.max(INTERACTION_INTERVAL_MINUTES, minReservationMinutes || fallbackReservationDurationMinutes);
+  return minReservationMinutes || fallbackReservationDurationMinutes;
 }
 
 export function slotToReservationSelection(
@@ -139,11 +141,16 @@ export function newRequestSelection(
   return { selection: emptySelection, unavailableMessage: noFutureReservationTimeMessage };
 }
 
-// datetime-local values in reservation panels represent service-local wall time, not browser-local time.
+// Reservation form values represent service-local wall time, not browser-local time.
 export function fromServiceDateTimeLocal(value: string) {
   if (!value) return value;
   const withSeconds = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? `${value}:00` : value;
   return `${withSeconds}+09:00`;
+}
+
+export function isPastServiceReservationTime(value: string, now = new Date()) {
+  const timestamp = Date.parse(fromServiceDateTimeLocal(value));
+  return Number.isFinite(timestamp) && timestamp < now.getTime();
 }
 
 export function toServiceStartOfDayOffset(date: string) {
@@ -221,7 +228,7 @@ export function minutesToTimeInput(minutes: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-function timeValueToMinutes(value?: string) {
+export function timeValueToMinutes(value?: string) {
   const match = value?.match(/^(\d{2}):(\d{2})/);
   if (!match) return undefined;
   return Number(match[1]) * 60 + Number(match[2]);

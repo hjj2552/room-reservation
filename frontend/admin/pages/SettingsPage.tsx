@@ -5,6 +5,7 @@ import type { OperationSettings } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useSettings, useUpdateSettings } from '../../shared/hooks/useSettings';
 import { dayLabels } from '../../shared/utils/labels';
+import { operatingTimeOptions } from '../../shared/utils/timeOptions';
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -17,6 +18,7 @@ export function SettingsPage() {
     if (settings.data) {
       setForm({
         ...settings.data,
+        slotMinutes: 5,
         openTime: settings.data.openTime.slice(0, 5),
         closeTime: settings.data.closeTime.slice(0, 5),
       });
@@ -44,6 +46,7 @@ export function SettingsPage() {
     if (!form) return;
     updateSettings.mutate({
       ...form,
+      slotMinutes: 5,
       publicNotice: form.publicNotice || null,
       reservationDisabledMessage: form.reservationDisabledMessage || null,
       adminContactEmail: form.adminContactEmail || null,
@@ -124,38 +127,27 @@ export function SettingsPage() {
         </label>
         <label>
           운영 시작 시간
-          <input
-            type="time"
-            step={30 * 60}
+          <select
             data-testid="settings-open-time-input"
             value={form.openTime}
             onChange={(event) => updateField('openTime', event.target.value)}
             required
-          />
+          >
+            {operatingTimeOptions().map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
         </label>
         <label>
           운영 종료 시간
-          <input
-            type="time"
-            step={30 * 60}
+          <select
             data-testid="settings-close-time-input"
             value={form.closeTime}
             onChange={(event) => updateField('closeTime', event.target.value)}
             required
-          />
-        </label>
-        <label>
-          예약 단위(분)
-          <select
-            data-testid="settings-slot-minutes-select"
-            value={form.slotMinutes}
-            onChange={(event) => updateField('slotMinutes', Number(event.target.value))}
-            required
           >
-            {[5, 10, 15, 30].map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {minutes}분
-              </option>
+            {operatingTimeOptions().map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
         </label>
@@ -163,8 +155,8 @@ export function SettingsPage() {
           최소 예약 시간(분)
           <input
             type="number"
-            min={form.slotMinutes}
-            step={form.slotMinutes}
+            min={30}
+            step={5}
             data-testid="settings-min-reservation-input"
             value={form.minReservationMinutes}
             onChange={(event) => updateField('minReservationMinutes', Number(event.target.value))}
@@ -176,7 +168,7 @@ export function SettingsPage() {
           <input
             type="number"
             min={form.minReservationMinutes}
-            step={form.slotMinutes}
+            step={5}
             data-testid="settings-max-reservation-input"
             value={form.maxReservationMinutes}
             onChange={(event) => updateField('maxReservationMinutes', Number(event.target.value))}
@@ -184,7 +176,7 @@ export function SettingsPage() {
           />
         </label>
         <p className="compact-note muted full-span">
-          최소·최대 예약 시간을 현재 예약 단위의 배수로 입력해 주세요.
+          최소·최대 예약 시간을 5(분)의 배수로 입력해 주세요. 최소 예약 시간은 30분 이상이어야 합니다.
         </p>
         <fieldset className="full-span checkbox-group">
           <legend>예약 가능 요일</legend>

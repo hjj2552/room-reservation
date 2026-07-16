@@ -88,72 +88,65 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void adminCanSetFiveMinuteReservationSlots() throws Exception {
+    void settingsAlwaysExposeFixedFiveMinuteCompatibilityValue() throws Exception {
         MockHttpSession session = loginAsAdmin();
         long version = currentSettingsVersion(session);
 
         mockMvc.perform(put("/api/admin/settings")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Five minute slots", 5)))
+                .content(updateBody(version, "Legacy client value is ignored", 30)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.slotMinutes").value(5));
     }
 
     @Test
-    void settingsAllowOnlyFiveTenFifteenAndThirtyMinuteSlots() throws Exception {
-        MockHttpSession session = loginAsAdmin();
+    void databaseStillRejectsUnsupportedCompatibilityValue() {
+        assertThatThrownBy(() -> jdbcTemplate.update("update operation_settings set slot_minutes = 60 where id = 1"))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update("update operation_settings set min_reservation_minutes = 25 where id = 1"))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update("update operation_settings set max_reservation_minutes = 241 where id = 1"))
+            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
 
-        for (int slotMinutes : new int[] { 5, 10, 15, 30 }) {
+    @Test
+    void reservationDurationSettingsUseFixedFiveMinuteIncrementsAndThirtyMinuteMinimum() throws Exception {
+        MockHttpSession session = loginAsAdmin();
+        for (int invalidMin : new int[] { 25, 31 }) {
             long version = currentSettingsVersion(session);
             mockMvc.perform(put("/api/admin/settings")
                     .session(session)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(updateBody(version, "Allowed slot " + slotMinutes, slotMinutes)))
+                    .content(updateBody(version, "Invalid min duration", 5, invalidMin, 240)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+
+        for (int validMin : new int[] { 30, 35, 45, 60 }) {
+            long version = currentSettingsVersion(session);
+            mockMvc.perform(put("/api/admin/settings")
+                    .session(session)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(updateBody(version, "Valid fixed increment", 30, validMin, 240)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.slotMinutes").value(slotMinutes));
+                .andExpect(jsonPath("$.slotMinutes").value(5))
+                .andExpect(jsonPath("$.minReservationMinutes").value(validMin));
         }
 
         long version = currentSettingsVersion(session);
         mockMvc.perform(put("/api/admin/settings")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Removed sixty minute slot", 60)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-        assertThatThrownBy(() -> jdbcTemplate.update("update operation_settings set slot_minutes = 60 where id = 1"))
-            .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-    }
-
-    @Test
-    void reservationDurationSettingsMustMatchUpdatedSlotMinutes() throws Exception {
-        MockHttpSession session = loginAsAdmin();
-        long version = currentSettingsVersion(session);
-
-        mockMvc.perform(put("/api/admin/settings")
-                .session(session)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Invalid min duration", 5, 31, 240)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .content(updateBody(version, "Invalid max increment", 5, 30, 241)))
+            .andExpect(status().isBadRequest());
 
         version = currentSettingsVersion(session);
         mockMvc.perform(put("/api/admin/settings")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Invalid min duration", 10, 35, 240)))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-
-        version = currentSettingsVersion(session);
-        mockMvc.perform(put("/api/admin/settings")
-                .session(session)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Valid updated slot", 5, 35, 240)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.slotMinutes").value(5))
-            .andExpect(jsonPath("$.minReservationMinutes").value(35));
+                .content(updateBody(version, "Max below min", 5, 60, 55)))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -200,25 +193,22 @@ class AdminSettingsIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void maxReservationDurationMustAllowDefaultSuggestion() throws Exception {
+    void invalidDurationUpdateLeavesPreviousSettingsUnchanged() throws Exception {
         MockHttpSession session = loginAsAdmin();
         long version = currentSettingsVersion(session);
 
         mockMvc.perform(put("/api/admin/settings")
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Too short for default suggestion", 5, 20, 20)))
+                .content(updateBody(version, "Invalid duration", 5, 25, 240)))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
-        version = currentSettingsVersion(session);
-        mockMvc.perform(put("/api/admin/settings")
-                .session(session)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(updateBody(version, "Allows default suggestion", 5, 20, 30)))
+        mockMvc.perform(get("/api/admin/settings").session(session))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.minReservationMinutes").value(20))
-            .andExpect(jsonPath("$.maxReservationMinutes").value(30));
+            .andExpect(jsonPath("$.minReservationMinutes").value(30))
+            .andExpect(jsonPath("$.maxReservationMinutes").value(240))
+            .andExpect(jsonPath("$.version").value((int) version));
     }
 
     @Test

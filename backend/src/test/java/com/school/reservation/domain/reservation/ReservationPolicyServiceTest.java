@@ -46,7 +46,7 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
     }
 
     @Test
-    void reservationTimesRequireCurrentSlotDurationAndMinutePrecision() throws Exception {
+    void reservationTimesRequireFixedFiveMinuteIncrementAndMinutePrecision() throws Exception {
         jdbcTemplate.update("""
             update operation_settings
             set slot_minutes = 15,
@@ -59,6 +59,12 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
         mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(publicRequest(validStart, validStart.plusMinutes(45), "testing-valid-fifteen-minute-slot")))
+            .andExpect(status().isCreated());
+
+        OffsetDateTime fixedFiveStart = nextWeekdayAt(14, 10);
+        mockMvc.perform(post("/api/public/reservations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(publicRequest(fixedFiveStart, fixedFiveStart.plusMinutes(45), "testing-fixed-five-ignores-slot")))
             .andExpect(status().isCreated());
 
         OffsetDateTime secondsStart = nextWeekdayAt(10, 15).plusSeconds(1);
@@ -75,12 +81,12 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("INVALID_SLOT_UNIT"));
 
-        OffsetDateTime invalidDurationStart = nextWeekdayAt(13, 15);
+        OffsetDateTime invalidDurationStart = nextWeekdayAt(13, 3);
         mockMvc.perform(post("/api/public/reservations")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(publicRequest(
                     invalidDurationStart,
-                    invalidDurationStart.plusMinutes(50),
+                    invalidDurationStart.plusMinutes(45),
                     "testing-duration-unit-rejected"
                 )))
             .andExpect(status().isUnprocessableEntity())
@@ -88,7 +94,7 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
     }
 
     @Test
-    void slotChangePreservesExistingReservationAndStatusTransitionsButRevalidatesContentUpdates() throws Exception {
+    void policyChangePreservesExistingReservationStatusTransitionsButRevalidatesTimeEdits() throws Exception {
         jdbcTemplate.update("""
             update operation_settings
             set slot_minutes = 5,
@@ -108,14 +114,19 @@ class ReservationPolicyServiceTest extends IntegrationTestSupport {
             .getContentAsString();
         UUID reservationId = UUID.fromString(objectMapper.readTree(createdBody).get("id").asText());
 
-        jdbcTemplate.update("update operation_settings set slot_minutes = 30 where id = 1");
+        jdbcTemplate.update("""
+            update operation_settings
+            set slot_minutes = 30,
+                min_reservation_minutes = 60
+            where id = 1
+            """);
 
         mockMvc.perform(put("/api/admin/reservations/{reservationId}", reservationId)
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(adminRequest(legacyStart, legacyStart.plusMinutes(30), "testing-content-update", "REQUESTED")))
             .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("INVALID_SLOT_UNIT"));
+            .andExpect(jsonPath("$.code").value("INVALID_DURATION"));
 
         mockMvc.perform(post("/api/admin/reservations/{reservationId}/approve", reservationId)
                 .session(session)

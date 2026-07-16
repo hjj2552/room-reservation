@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { ReservationPayload, ReservationStatus } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
+import { ReservationTimeRangeInput } from '../../shared/components/ReservationTimeRangeInput';
 import {
   useReservation,
   useUpdateReservation,
@@ -48,10 +49,14 @@ export function ReservationFormPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ReservationFormValues>({
     defaultValues: defaultReservationFormValues,
   });
+  const startAt = watch('startAt');
+  const endAt = watch('endAt');
 
   useEffect(() => {
     if (reservation.data) {
@@ -110,9 +115,17 @@ export function ReservationFormPage() {
       </div>
 
       <form className="panel form-grid" onSubmit={handleSubmit(onSubmit)}>
+        <label className="full-span">
+          신청 목적
+          <input
+            data-testid="reservation-purpose-input"
+            {...register('purpose', { required: '신청 목적을 입력해 주세요.' })}
+          />
+          {errors.purpose ? <span className="field-error">{errors.purpose.message}</span> : null}
+        </label>
         <label>
-          강의실
-          <select data-testid="reservation-room-select" {...register('roomId', { required: '강의실을 선택하세요.' })}>
+          예약 공간
+          <select data-testid="reservation-room-select" {...register('roomId', { required: '예약 공간을 선택해 주세요.' })}>
             <option value="">선택</option>
             {rooms.data?.items.map((room) => (
               <option key={room.id} value={room.id}>
@@ -122,21 +135,28 @@ export function ReservationFormPage() {
           </select>
           {errors.roomId ? <span className="field-error">{errors.roomId.message}</span> : null}
         </label>
+        <ReservationTimeRangeInput
+          startAt={startAt}
+          endAt={endAt}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
+          minReservationMinutes={settings.data?.minReservationMinutes || 30}
+          maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
+          onStartAtChange={(value) => setValue('startAt', value, { shouldDirty: true, shouldValidate: true })}
+          onEndAtChange={(value) => setValue('endAt', value, { shouldDirty: true, shouldValidate: true })}
+          dateTestId="reservation-date-input"
+          startTestId="reservation-start-input"
+          endTestId="reservation-end-input"
+          startInvalid={Boolean(errors.startAt)}
+          endInvalid={Boolean(errors.endAt)}
+          startError={errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
+          endError={errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}
+        />
         <label>
-          상태
-          <select data-testid="reservation-status-select" {...register('status', { required: true })}>
-            {Object.entries(statusLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          신청자 이름
+          신청자
           <input
             data-testid="reservation-applicant-name-input"
-            {...register('applicantName', { required: '신청자 이름을 입력하세요.' })}
+            {...register('applicantName', { required: '신청자 이름을 입력해 주세요.' })}
           />
           {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
         </label>
@@ -145,7 +165,7 @@ export function ReservationFormPage() {
           <input
             data-testid="reservation-email-input"
             type="email"
-            {...register('applicantEmail', { required: '이메일을 입력하세요.' })}
+            {...register('applicantEmail', { required: '이메일을 입력해 주세요.' })}
           />
           {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
         </label>
@@ -154,37 +174,19 @@ export function ReservationFormPage() {
           <input
             data-testid="reservation-phone-input"
             placeholder="- 제외하고 입력"
-            {...register('applicantPhone', { required: '전화번호를 입력하세요.' })}
+            {...register('applicantPhone', { required: '전화번호를 입력해 주세요.' })}
           />
           {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
         </label>
         <label>
-          예약 목적
-          <input
-            data-testid="reservation-purpose-input"
-            {...register('purpose', { required: '예약 목적을 입력하세요.' })}
-          />
-          {errors.purpose ? <span className="field-error">{errors.purpose.message}</span> : null}
-        </label>
-        <label>
-          시작 시간
-          <input
-            data-testid="reservation-start-input"
-            type="datetime-local"
-            step={(settings.data?.slotMinutes || 30) * 60}
-            {...register('startAt', { required: '시작 시간을 입력하세요.' })}
-          />
-          {errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
-        </label>
-        <label>
-          종료 시간
-          <input
-            data-testid="reservation-end-input"
-            type="datetime-local"
-            step={(settings.data?.slotMinutes || 30) * 60}
-            {...register('endAt', { required: '종료 시간을 입력하세요.' })}
-          />
-          {errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}
+          예약 상태
+          <select data-testid="reservation-status-select" {...register('status', { required: true })}>
+            {Object.entries(statusLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="full-span">
           처리 메모

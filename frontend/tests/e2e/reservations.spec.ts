@@ -2,6 +2,8 @@ import { expect, test } from './fixtures';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTestIdPairsOnSameRow,
+  expectTestIdsInDomOrder,
   getSettingsByApi,
   loginByApi,
   nextWeekdayReservationLocalInputs,
@@ -100,7 +102,6 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-edit-room');
   const reservation = await e2eData.createTestReservation(room.id, 'reservation-edit-seed');
-  const settings = await getSettingsByApi(request);
   const updatedPurpose = e2eData.name('reservation-edit-updated');
 
   try {
@@ -108,8 +109,30 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.getByTestId('reservation-edit-link').click();
 
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}/edit$`));
-    await expect(page.getByTestId('reservation-start-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
-    await expect(page.getByTestId('reservation-end-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
+    await expectTestIdsInDomOrder(page, [
+      'reservation-purpose-input',
+      'reservation-room-select',
+      'reservation-date-input',
+      'reservation-start-input',
+      'reservation-end-input',
+      'reservation-applicant-name-input',
+      'reservation-email-input',
+      'reservation-phone-input',
+      'reservation-status-select',
+      'reservation-memo-input',
+    ]);
+    await expectTestIdPairsOnSameRow(page, [
+      ['reservation-room-select', 'reservation-date-input'],
+      ['reservation-start-input', 'reservation-end-input'],
+      ['reservation-applicant-name-input', 'reservation-email-input'],
+      ['reservation-phone-input', 'reservation-status-select'],
+    ]);
+    await expect(page.getByTestId('reservation-purpose-input').locator('..')).toHaveClass(/full-span/);
+    await expect(page.getByTestId('reservation-status-select')).toBeEditable();
+    await expect(page.getByTestId('reservation-memo-input').locator('..')).toHaveClass(/full-span/);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(page.getByTestId('reservation-start-input').locator('option[value="09:05"]')).toHaveCount(1);
     await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
@@ -165,10 +188,11 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
     await expect(page.getByTestId('quick-add-phone-input')).toHaveValue(source.applicantPhone);
     await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(source.purpose);
     await expect(page.getByTestId('quick-add-status-select')).toHaveValue(source.status);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(toolbarDefault.selection.startAt);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(toolbarDefault.selection.endAt);
-    await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue(source.startAt.slice(0, 16));
-    await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue(source.endAt.slice(0, 16));
+    await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(toolbarDefault.selection.date);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(toolbarDefault.selection.startAt.slice(11, 16));
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(toolbarDefault.selection.endAt.slice(11, 16));
+    await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue(source.startAt.slice(11, 16));
+    await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue(source.endAt.slice(11, 16));
   }
 
   await page.goto(`/admin/reservations/${sourceReservationId}`);
@@ -261,19 +285,39 @@ test('admin can request a reservation from the timetable and see it on detail an
     await page.goto(`/admin/timetable?view=date&date=${reservationTime.date}&roomId=${room.id}`);
     await page.getByTestId('timetable-empty-slot').first().click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expectTestIdsInDomOrder(page, [
+      'quick-add-purpose-input',
+      'quick-add-room-select',
+      'quick-add-start-input-date',
+      'quick-add-start-input',
+      'quick-add-end-input',
+      'quick-add-applicant-name-input',
+      'quick-add-email-input',
+      'quick-add-phone-input',
+      'quick-add-status-select',
+      'quick-add-memo-input',
+    ]);
+    await expectTestIdPairsOnSameRow(page, [
+      ['quick-add-room-select', 'quick-add-start-input-date'],
+      ['quick-add-start-input', 'quick-add-end-input'],
+      ['quick-add-applicant-name-input', 'quick-add-email-input'],
+      ['quick-add-phone-input', 'quick-add-status-select'],
+    ]);
+    await expect(page.getByTestId('quick-add-status-select')).toBeEditable();
     await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
     await page.getByTestId('quick-add-email-input').fill(`testing-reservation-${Date.now()}@example.test`);
     await page.getByTestId('quick-add-phone-input').fill('010-1111-2222');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
-    await page.getByTestId('quick-add-start-input').fill(reservationTime.startAt);
-    await page.getByTestId('quick-add-end-input').fill(reservationTime.endAt);
+    await page.getByTestId('quick-add-start-input-date').fill(reservationTime.date);
+    await page.getByTestId('quick-add-start-input').selectOption(reservationTime.startAt.slice(11, 16));
+    await page.getByTestId('quick-add-end-input').selectOption(reservationTime.endAt.slice(11, 16));
     await page.getByTestId('quick-add-memo-input').fill('testing-create-verification');
 
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(purpose);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(reservationTime.startAt);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(reservationTime.endAt);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(reservationTime.startAt.slice(11, 16));
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(reservationTime.endAt.slice(11, 16));
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/reservations') &&

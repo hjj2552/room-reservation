@@ -1,5 +1,12 @@
 import { expect, test } from './fixtures';
-import { approveReservationByApi, getSettingsByApi, nextWeekdayReservationLocalInputs, updateSettingsByApi } from './helpers';
+import {
+  approveReservationByApi,
+  expectTestIdPairsOnSameRow,
+  expectTestIdsInDomOrder,
+  getSettingsByApi,
+  nextWeekdayReservationLocalInputs,
+  updateSettingsByApi,
+} from './helpers';
 
 function maskName(value: string) {
   const chars = Array.from(value);
@@ -135,6 +142,30 @@ test('public toolbar request opens the shared panel without slot room context', 
     await page.getByTestId('public-new-request-button').click();
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
+    await expectTestIdsInDomOrder(page, [
+      'public-request-purpose-input',
+      'public-request-room-select',
+      'public-request-start-input-date',
+      'public-request-start-input',
+      'public-request-end-input',
+      'public-request-applicant-name-input',
+      'public-request-email-input',
+      'public-request-phone-input',
+      'public-request-status-select',
+      'public-request-cancel-password-input',
+    ]);
+    await expectTestIdPairsOnSameRow(page, [
+      ['public-request-room-select', 'public-request-start-input-date'],
+      ['public-request-start-input', 'public-request-end-input'],
+      ['public-request-applicant-name-input', 'public-request-email-input'],
+      ['public-request-phone-input', 'public-request-status-select'],
+    ]);
+    await expect(page.getByTestId('public-request-purpose-input').locator('..')).toContainText('신청 목적');
+    await expect(page.getByTestId('public-request-room-select').locator('..')).toContainText('예약 공간');
+    await expect(page.getByTestId('public-request-applicant-name-input').locator('..')).toContainText('신청자');
+    await expect(page.getByTestId('public-request-status-select')).not.toBeEditable();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByTestId('public-request-room-select')).toHaveValue('');
     await expect(page.getByTestId('public-request-start-input')).not.toHaveValue('');
     await expect(page.getByTestId('public-request-end-input')).not.toHaveValue('');
@@ -199,8 +230,9 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await page.getByTestId('timetable-empty-slot').first().click();
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expect(page.getByTestId('public-request-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('public-request-start-input')).toHaveValue(`${selectedWeekStart}T09:00`);
-    await expect(page.getByTestId('public-request-end-input')).toHaveValue(`${selectedWeekStart}T09:30`);
+    await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(selectedWeekStart);
+    await expect(page.getByTestId('public-request-start-input')).toHaveValue('09:00');
+    await expect(page.getByTestId('public-request-end-input')).toHaveValue('09:30');
 
     await page.getByTestId('public-request-applicant-name-input').fill(applicantName);
     await page.getByTestId('public-request-email-input').fill(email);
@@ -329,14 +361,27 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
     await page.getByTestId('public-edit-verify-button').click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
-    await expect(page.getByTestId('public-edit-start-input')).toHaveAttribute(
-      'step',
-      String(originalSettings.slotMinutes * 60),
-    );
-    await expect(page.getByTestId('public-edit-end-input')).toHaveAttribute(
-      'step',
-      String(originalSettings.slotMinutes * 60),
-    );
+    await expectTestIdsInDomOrder(page, [
+      'public-edit-purpose-input',
+      'public-edit-room-select',
+      'public-edit-date-input',
+      'public-edit-start-input',
+      'public-edit-end-input',
+      'public-edit-applicant-name-input',
+      'public-edit-email-input',
+      'public-edit-phone-input',
+      'public-edit-status-input',
+    ]);
+    await expectTestIdPairsOnSameRow(page, [
+      ['public-edit-room-select', 'public-edit-date-input'],
+      ['public-edit-start-input', 'public-edit-end-input'],
+      ['public-edit-applicant-name-input', 'public-edit-email-input'],
+      ['public-edit-phone-input', 'public-edit-status-input'],
+    ]);
+    await expect(page.getByTestId('public-edit-status-input')).not.toBeEditable();
+    await expect(page.getByTestId('public-edit-save-button').locator('svg')).toHaveCount(0);
+    await expect(page.getByTestId('public-edit-save-button')).toHaveText('수정 저장');
+    await expect(page.getByTestId('public-edit-start-input').locator('option[value="09:05"]')).toHaveCount(1);
     await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
     await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
 
@@ -344,8 +389,9 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-applicant-name-input').fill(editedName);
     await page.getByTestId('public-edit-email-input').fill(editedEmail);
     await page.getByTestId('public-edit-phone-input').fill(editedPhone);
-    await page.getByTestId('public-edit-start-input').fill(editTime.startAt);
-    await page.getByTestId('public-edit-end-input').fill(editTime.endAt);
+    await page.getByTestId('public-edit-date-input').fill(editTime.date);
+    await page.getByTestId('public-edit-start-input').selectOption(editTime.startAt.slice(11, 16));
+    await page.getByTestId('public-edit-end-input').selectOption(editTime.endAt.slice(11, 16));
     await page.getByTestId('public-edit-save-button').click();
 
     await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');

@@ -25,7 +25,9 @@ import { statusLabels } from '../../shared/utils/labels';
 import { maskName } from '../../shared/utils/privacyMasking';
 import {
   fromServiceDateTimeLocal,
+  isPastServiceReservationTime,
   newRequestSelection,
+  publicPastReservationMessage,
   serviceDateInputValue,
   slotToReservationSelection,
 } from '../../shared/utils/reservationTime';
@@ -98,6 +100,7 @@ export function PublicReservationPage() {
   const create = useCreatePublicReservation();
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [quickSelectionUnavailableMessage, setQuickSelectionUnavailableMessage] = useState<string>();
+  const [submissionPolicyError, setSubmissionPolicyError] = useState<Error | null>(null);
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
@@ -188,12 +191,14 @@ export function PublicReservationPage() {
   function handleSlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
     if (isUnavailable) return;
     setQuickSelectionUnavailableMessage(undefined);
+    setSubmissionPolicyError(null);
     setQuickSelection(slotToReservationSelection(slot));
   }
 
   function handleNewRequestClick() {
     if (isUnavailable || !settings.data) return;
     const nextSelection = newRequestSelection(settings.data);
+    setSubmissionPolicyError(null);
     setQuickSelection(nextSelection.selection);
     setQuickSelectionUnavailableMessage(nextSelection.unavailableMessage);
   }
@@ -207,6 +212,11 @@ export function PublicReservationPage() {
   }
 
   function handlePublicRequest(values: ReservationRequestValues) {
+    if (isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(new Error(publicPastReservationMessage));
+      return;
+    }
+    setSubmissionPolicyError(null);
     create.mutate(
       {
         roomId: values.roomId,
@@ -223,6 +233,7 @@ export function PublicReservationPage() {
           setHighlightedReservationId(created.id);
           setQuickSelection(null);
           setQuickSelectionUnavailableMessage(undefined);
+          setSubmissionPolicyError(null);
         },
       },
     );
@@ -405,14 +416,18 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          slotMinutes={settings.data?.slotMinutes || 30}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
+          minReservationMinutes={settings.data?.minReservationMinutes || 30}
+          maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
           unavailableMessage={quickSelectionUnavailableMessage}
           onClose={() => {
             setQuickSelection(null);
             setQuickSelectionUnavailableMessage(undefined);
+            setSubmissionPolicyError(null);
           }}
           onSubmit={handlePublicRequest}
-          submitError={create.error}
+          submitError={submissionPolicyError || create.error}
           isPending={create.isPending}
         />
       ) : null}

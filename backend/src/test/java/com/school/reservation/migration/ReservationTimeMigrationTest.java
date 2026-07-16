@@ -30,6 +30,7 @@ class ReservationTimeMigrationTest {
     @AfterEach
     void dropMigrationSchemas() {
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.execute("set search_path to public");
         for (String schema : schemas) {
             jdbc.execute("drop schema if exists " + schema + " cascade");
         }
@@ -42,22 +43,25 @@ class ReservationTimeMigrationTest {
 
         int migrations = flyway(schema, null).migrate().migrationsExecuted;
 
-        assertThat(migrations).isEqualTo(2);
+        assertThat(migrations).isEqualTo(3);
         assertThat(slotMinutes(schema)).isEqualTo(30);
         assertThat(constraintExists(schema, "chk_operation_settings_time_grid_alignment")).isTrue();
     }
 
     @Test
-    void versionOneDatabaseWithThirtyMinuteSettingUpgradesAndRejectsSixty() {
+    void versionOneDatabaseUpgradesThroughFixedFiveMinutePolicy() {
         String schema = newSchema();
         flyway(schema, MigrationVersion.fromVersion("1")).migrate();
 
-        assertThat(flyway(schema, null).migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(flyway(schema, null).migrate().migrationsExecuted).isEqualTo(2);
         assertThat(slotMinutes(schema)).isEqualTo(30);
         assertThat(constraintExists(schema, "chk_operation_settings_time_slot_alignment")).isFalse();
         assertThat(constraintExists(schema, "chk_operation_settings_time_grid_alignment")).isTrue();
+        assertThat(functionDefinition(schema, "enforce_reservation_time_policy")).doesNotContain("slot_minutes");
+        assertThat(functionDefinition(schema, "enforce_recurrence_time_policy")).doesNotContain("slot_minutes");
 
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.execute("set search_path to " + schema + ", public");
         jdbc.update(
             "update " + schema + ".operation_settings set slot_minutes = 15, min_reservation_minutes = 45, max_reservation_minutes = 120 where id = 1"
         );
@@ -73,12 +77,42 @@ class ReservationTimeMigrationTest {
               '2026-07-13 09:15:01+09', '2026-07-13 10:00:01+09', 'CONFIRMED', 'ADMIN_MANUAL', 'ADMIN')
             """.formatted(schema), roomId))
             .isInstanceOf(DataIntegrityViolationException.class);
+
+        assertThatThrownBy(() -> jdbc.update("""
+            insert into %s.reservations (
+              room_id, applicant_name, applicant_email, applicant_phone, purpose,
+              start_at, end_at, status, source, created_by_actor_type
+            ) values (?, 'testing-user', 'testing@example.test', '010-0000-0000', 'testing-fixed-five',
+              '2026-07-13 09:03:00+09', '2026-07-13 10:03:00+09', 'CONFIRMED', 'ADMIN_MANUAL', 'ADMIN')
+            """.formatted(schema), roomId))
+            .isInstanceOf(DataIntegrityViolationException.class);
+
+        UUID existingReservationId = jdbc.queryForObject("""
+            insert into %s.reservations (
+              room_id, applicant_name, applicant_email, applicant_phone, purpose,
+              start_at, end_at, status, source, created_by_actor_type
+            ) values (?, 'testing-user', 'testing@example.test', '010-0000-0000', 'testing-fixed-five-valid',
+              '2026-07-13 11:10:00+09', '2026-07-13 11:55:00+09', 'REQUESTED', 'ADMIN_MANUAL', 'ADMIN')
+            returning id
+            """.formatted(schema), UUID.class, roomId);
+        jdbc.update(
+            "update " + schema + ".operation_settings set min_reservation_minutes = 60 where id = 1"
+        );
+        assertThat(jdbc.update(
+            "update " + schema + ".reservations set status = 'CONFIRMED' where id = ?",
+            existingReservationId
+        )).isEqualTo(1);
+        assertThatThrownBy(() -> jdbc.update(
+            "update " + schema + ".reservations set end_at = '2026-07-13 12:00:00+09' where id = ?",
+            existingReservationId
+        )).isInstanceOf(DataIntegrityViolationException.class);
+
         assertThatThrownBy(() -> jdbc.update("""
             insert into %s.reservation_recurrences (
               room_id, applicant_name, applicant_email, applicant_phone, purpose,
               start_date, end_date, days_of_week, start_time, end_time, conflict_policy
             ) values (?, 'testing-user', 'testing@example.test', '010-0000-0000', 'testing-nanos',
-              '2026-07-13', '2026-07-13', 'MON', '09:15:00.000000001', '10:00:00', 'FAIL_ALL')
+              '2026-07-13', '2026-07-13', 'MON', '09:15:00.000001', '10:00:00', 'FAIL_ALL')
             """.formatted(schema), roomId))
             .isInstanceOf(DataIntegrityViolationException.class);
 
@@ -86,6 +120,31 @@ class ReservationTimeMigrationTest {
             "update " + schema + ".operation_settings set slot_minutes = 60 where id = 1"
         )).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(slotMinutes(schema)).isEqualTo(15);
+    }
+
+    @Test
+    void incompatibleVersionTwoSettingsFailV3WithoutPartialChanges() {
+        String schema = newSchema();
+        flyway(schema, MigrationVersion.fromVersion("2")).migrate();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        jdbc.execute("set search_path to " + schema + ", public");
+        jdbc.update(
+            "update " + schema + ".operation_settings set slot_minutes = 5, min_reservation_minutes = 25, max_reservation_minutes = 240 where id = 1"
+        );
+
+        assertThatThrownBy(() -> flyway(schema, null).migrate())
+            .isInstanceOf(FlywayException.class)
+            .hasStackTraceContaining("Cannot apply fixed 5-minute reservation policy");
+
+        assertThat(jdbc.queryForObject(
+            "select min_reservation_minutes from " + schema + ".operation_settings where id = 1",
+            Integer.class
+        )).isEqualTo(25);
+        assertThat(jdbc.queryForObject(
+            "select count(*) from " + schema + ".flyway_schema_history where version = '3' and success",
+            Integer.class
+        )).isZero();
+        assertThat(functionDefinition(schema, "enforce_reservation_time_policy")).contains("slot_minutes");
     }
 
     @Test
@@ -147,5 +206,19 @@ class ReservationTimeMigrationTest {
             constraintName
         );
         return Boolean.TRUE.equals(exists);
+    }
+
+    private String functionDefinition(String schema, String functionName) {
+        return new JdbcTemplate(dataSource).queryForObject(
+            """
+                select pg_get_functiondef(procedure_definition.oid)
+                from pg_proc procedure_definition
+                join pg_namespace namespace on namespace.oid = procedure_definition.pronamespace
+                where namespace.nspname = ? and procedure_definition.proname = ?
+                """,
+            String.class,
+            schema,
+            functionName
+        );
     }
 }

@@ -427,7 +427,10 @@ export function TimetablePage() {
           variant="admin"
           rooms={roomViewRooms}
           selection={quickAddSelection}
-          slotMinutes={settings.data?.slotMinutes || 30}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
+          minReservationMinutes={settings.data?.minReservationMinutes || 30}
+          maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
           unavailableMessage={quickAddUnavailableMessage}
           initialValues={duplicateQuickAddInitialValues}
           onClose={handleQuickAddClose}

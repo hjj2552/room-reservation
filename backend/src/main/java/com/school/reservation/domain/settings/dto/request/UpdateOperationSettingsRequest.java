@@ -19,9 +19,10 @@ public record UpdateOperationSettingsRequest(
     @NotNull LocalDate semesterEndDate,
     @NotNull LocalTime openTime,
     @NotNull LocalTime closeTime,
+    // Deprecated compatibility field; SettingsService intentionally ignores the supplied value.
     @NotNull Integer slotMinutes,
     @NotEmpty List<String> availableDaysOfWeek,
-    @NotNull @Min(1) Integer minReservationMinutes,
+    @NotNull @Min(30) Integer minReservationMinutes,
     @NotNull @Min(1) Integer maxReservationMinutes,
     @Email @Size(max = 255) String adminContactEmail,
     @Size(max = 50) String adminContactPhone,

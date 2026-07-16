@@ -47,6 +47,7 @@ public class OperationSettings {
     private LocalTime closeTime;
 
     @Column(name = "slot_minutes", nullable = false)
+    // Deprecated compatibility storage. Reservation policy uses the fixed 5-minute increment.
     private Integer slotMinutes;
 
     @Column(name = "available_days_of_week", nullable = false, length = 50)

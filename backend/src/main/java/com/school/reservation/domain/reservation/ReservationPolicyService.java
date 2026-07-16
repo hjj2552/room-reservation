@@ -3,6 +3,7 @@ package com.school.reservation.domain.reservation;
 import com.school.reservation.domain.room.Room;
 import com.school.reservation.domain.settings.OperationSettings;
 import com.school.reservation.domain.settings.OperationSettingsRepository;
+import com.school.reservation.global.time.ReservationTimePolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -92,10 +93,10 @@ public class ReservationPolicyService {
             throw new PolicyViolationException("INVALID_DURATION", "The requested duration is not allowed.");
         }
 
-        if (!isAlignedToSlot(localStart.getMinute(), settings.getSlotMinutes())
-            || !isAlignedToSlot(localEnd.getMinute(), settings.getSlotMinutes())
-            || !isAlignedToSlot(minutes, settings.getSlotMinutes())) {
-            throw new PolicyViolationException("INVALID_SLOT_UNIT", "The requested time must match the configured slot unit.");
+        if (!isAlignedToIncrement(localStart.getMinute())
+            || !isAlignedToIncrement(localEnd.getMinute())
+            || !isAlignedToIncrement(minutes)) {
+            throw new PolicyViolationException("INVALID_SLOT_UNIT", "The requested time must use 5-minute increments.");
         }
 
         if (applicantPhone == null || applicantPhone.isBlank()) {
@@ -107,8 +108,8 @@ public class ReservationPolicyService {
         return value.getSecond() == 0 && value.getNano() == 0;
     }
 
-    private boolean isAlignedToSlot(long minutes, int slotMinutes) {
-        return minutes % slotMinutes == 0;
+    private boolean isAlignedToIncrement(long minutes) {
+        return minutes % ReservationTimePolicy.RESERVATION_INCREMENT_MINUTES == 0;
     }
 
     private enum ValidationContext {
