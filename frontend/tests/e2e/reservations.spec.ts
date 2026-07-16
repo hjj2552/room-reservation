@@ -26,8 +26,13 @@ async function expectFormControlsContained(container: Locator) {
         containerLeft: containerRect.left,
         containerRight: containerRect.right,
         controlHeight: controlRect.height,
+        appearance: style.appearance,
+        lineHeight: style.lineHeight,
+        maxHeight: style.maxHeight,
         minInlineSize: style.minInlineSize,
         maxInlineSize: style.maxInlineSize,
+        paddingBlockStart: style.paddingBlockStart,
+        paddingBlockEnd: style.paddingBlockEnd,
         paddingInlineStart: style.paddingInlineStart,
         paddingInlineEnd: style.paddingInlineEnd,
         textAlign: style.textAlign,
@@ -43,6 +48,11 @@ async function expectFormControlsContained(container: Locator) {
     expect(metric.maxInlineSize).toBe('100%');
     if (metric.type === 'date') {
       expect(metric.controlHeight).toBe(40);
+      expect(metric.appearance).toBe('none');
+      expect(metric.lineHeight).toBe('38px');
+      expect(metric.maxHeight).toBe('40px');
+      expect(metric.paddingBlockStart).toBe('0px');
+      expect(metric.paddingBlockEnd).toBe('0px');
       expect(Number.parseFloat(metric.paddingInlineStart)).toBeGreaterThan(0);
       expect(Number.parseFloat(metric.paddingInlineEnd)).toBeGreaterThan(0);
       expect(metric.textAlign).toBe('center');
