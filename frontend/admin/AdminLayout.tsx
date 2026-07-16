@@ -21,7 +21,7 @@ export function AdminLayout() {
     <div className="app-shell">
       <aside className="sidebar" aria-label="관리자 메뉴">
         <div className="brand">
-          <strong>강의실 예약</strong>
+          <strong>공간 예약</strong>
           <span>관리자</span>
         </div>
         <nav className="nav-list">
@@ -39,7 +39,7 @@ export function AdminLayout() {
           </NavLink>
           <NavLink to="/admin/rooms">
             <Building2 size={18} aria-hidden="true" />
-            강의실 관리
+            공간 관리
           </NavLink>
           <NavLink to="/admin/settings" end>
             <SlidersHorizontal size={18} aria-hidden="true" />

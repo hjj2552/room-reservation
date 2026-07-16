@@ -43,7 +43,7 @@ The backend is the final authority for overlap checks.
 
 The public frontend maps `TIME_SLOT_CONFLICT` to:
 
-> 이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 강의실이나 시간을 선택해 주세요.
+> 이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 공간이나 시간을 선택해 주세요.
 
 ## Time Policy
 

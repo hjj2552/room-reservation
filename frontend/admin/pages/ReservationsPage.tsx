@@ -112,7 +112,7 @@ export function ReservationsPage() {
           </select>
         </label>
         <label>
-          강의실
+          공간
           <select value={roomId} onChange={(event) => setParam('roomId', event.target.value)}>
             <option value="">전체</option>
             {rooms.data?.items.map((room) => (

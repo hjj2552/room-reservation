@@ -211,7 +211,7 @@ npm run e2e:ci
 ```
 
 E2E runner는 기본적으로 백엔드 readiness URL이 열려 있지 않으면 `e2e` profile로 백엔드 jar를 실행하고, 프런트엔드 URL이 열려 있지 않으면 Vite 개발 서버를 실행합니다.
-E2E가 만든 강의실, 태그, 예약, 반복 예약은 `testing-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
+E2E가 만든 공간, 태그, 예약, 반복 예약은 `testing-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
 
 ```powershell
 npm run e2e:cleanup:preview

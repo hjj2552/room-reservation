@@ -62,7 +62,7 @@ test('public timetable exposes room descriptions without changing timetable cont
   await page.goto('/timetable?view=date&date=2026-09-10');
   const timetableScroll = page.getByRole('region', { name: '2026-09-10 날짜별 예약 시간표' });
   const informedHeader = page.locator('.timetable-room-header').filter({ hasText: informedRoom.name });
-  const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 강의실 안내 보기` });
+  const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 공간 이용 안내 보기` });
   const blankHeader = page.locator('.timetable-room-header').filter({ hasText: blankRoom.name });
 
   await expect(infoTrigger).toBeVisible();
@@ -78,15 +78,15 @@ test('public timetable exposes room descriptions without changing timetable cont
   }));
 
   await infoTrigger.click();
-  const dialog = page.getByRole('dialog', { name: '강의실 안내' });
+  const dialog = page.getByRole('dialog', { name: '공간 이용 안내' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(informedRoom.name);
   await expect(dialog).toContainText('본관 2층');
   await expect(dialog.locator('.room-info-description')).toHaveCSS('white-space', 'pre-wrap');
   await expect(dialog.locator('.room-info-description')).toContainText('음식물 반입은 허용되지 않습니다.');
   await expect(dialog.getByRole('button', { name: '접기' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '강의실 안내 닫기' })).toBeFocused();
-  await page.getByRole('button', { name: '강의실 안내 닫기' }).click();
+  await expect(page.getByRole('button', { name: '공간 이용 안내 닫기' })).toBeFocused();
+  await page.getByRole('button', { name: '공간 이용 안내 닫기' }).click();
   await expect(dialog).toBeHidden();
   await expect(infoTrigger).toBeFocused();
   expect(page.url()).toBe(urlBeforeModal);
@@ -111,7 +111,7 @@ test('public timetable exposes room descriptions without changing timetable cont
   await moreButton.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('본관 2층');
-  await page.getByRole('button', { name: '강의실 안내 닫기' }).click();
+  await page.getByRole('button', { name: '공간 이용 안내 닫기' }).click();
   await expect(dialog).toBeHidden();
   await expect(moreButton).toBeFocused();
 
@@ -268,7 +268,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(detailPanel.locator('.status-badge')).toContainText('승인 대기');
     await expect(detailPanel).toContainText('예약 정보');
     await expect(detailPanel).toContainText('신청 목적');
-    await expect(detailPanel).toContainText('강의실');
+    await expect(detailPanel).toContainText('공간');
     await expect(detailPanel).toContainText('날짜/시간');
     await expect(detailPanel).toContainText('신청자 이름');
     await expect(detailPanel).toContainText('이메일');
