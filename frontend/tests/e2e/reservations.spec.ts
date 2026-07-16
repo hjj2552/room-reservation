@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import type { Locator } from '@playwright/test';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
@@ -9,6 +10,60 @@ import {
   nextWeekdayReservationLocalInputs,
 } from './helpers';
 import { newRequestSelection } from '../../shared/utils/reservationTime';
+
+async function expectFormControlsContained(container: Locator) {
+  const metrics = await container.evaluate((element) => {
+    const containerRect = element.getBoundingClientRect();
+
+    return Array.from(element.querySelectorAll<HTMLElement>('input:not([type="checkbox"]), select, textarea')).map((control) => {
+      const controlRect = control.getBoundingClientRect();
+      const style = getComputedStyle(control);
+
+      return {
+        controlLeft: controlRect.left,
+        controlRight: controlRect.right,
+        containerLeft: containerRect.left,
+        containerRight: containerRect.right,
+        minInlineSize: style.minInlineSize,
+        maxInlineSize: style.maxInlineSize,
+      };
+    });
+  });
+
+  expect(metrics.length).toBeGreaterThan(0);
+  for (const metric of metrics) {
+    expect(metric.controlLeft).toBeGreaterThanOrEqual(metric.containerLeft - 1);
+    expect(metric.controlRight).toBeLessThanOrEqual(metric.containerRight + 1);
+    expect(metric.minInlineSize).toBe('0px');
+    expect(metric.maxInlineSize).toBe('100%');
+  }
+}
+
+test('form controls stay within admin panels on narrow screens', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/admin/reservations');
+  await expectFormControlsContained(page.locator('.filter-bar'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/settings');
+  await expectFormControlsContained(page.getByTestId('settings-form'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/recurrences');
+  await expectFormControlsContained(page.getByTestId('recurrence-form'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/rooms');
+  await expectFormControlsContained(page.getByTestId('room-form'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/settings/tags');
+  await page.locator('.page-header .primary-button').click();
+  await expectFormControlsContained(page.locator('.quick-add-form'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
 
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
   await loginByApi(request);

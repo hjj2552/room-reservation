@@ -207,6 +207,22 @@ test('public and admin can open a past slot while public submission shows the po
   expect(adminCreateRequests).toBe(1);
 });
 
+test('empty slot hover fills the 30-minute grid cell when minimum duration is shorter', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31', { minReservationMinutes: 10 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/timetable?view=date&date=2026-07-13');
+
+  const slot = page.getByRole('button', { name: new RegExp(`${room.name} 09:00-09:10`) });
+  await slot.hover();
+
+  const sizes = await slot.evaluate((element) => ({
+    slotHeight: element.getBoundingClientRect().height,
+    hoverHeight: Number.parseFloat(getComputedStyle(element, '::before').height),
+  }));
+  expect(sizes.hoverHeight).toBe(sizes.slotHeight);
+  expect(sizes.slotHeight).toBe(48);
+});
+
 async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
