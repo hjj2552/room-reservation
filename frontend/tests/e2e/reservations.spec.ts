@@ -20,12 +20,15 @@ async function expectFormControlsContained(container: Locator) {
       const style = getComputedStyle(control);
 
       return {
+        type: control instanceof HTMLInputElement ? control.type : control.tagName.toLowerCase(),
         controlLeft: controlRect.left,
         controlRight: controlRect.right,
         containerLeft: containerRect.left,
         containerRight: containerRect.right,
         minInlineSize: style.minInlineSize,
         maxInlineSize: style.maxInlineSize,
+        paddingInlineStart: style.paddingInlineStart,
+        paddingInlineEnd: style.paddingInlineEnd,
       };
     });
   });
@@ -36,6 +39,10 @@ async function expectFormControlsContained(container: Locator) {
     expect(metric.controlRight).toBeLessThanOrEqual(metric.containerRight + 1);
     expect(metric.minInlineSize).toBe('0px');
     expect(metric.maxInlineSize).toBe('100%');
+    if (metric.type === 'date') {
+      expect(metric.paddingInlineStart).toBe('0px');
+      expect(metric.paddingInlineEnd).toBe('0px');
+    }
   }
 }
 
@@ -49,6 +56,14 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
 
   await page.goto('/admin/settings');
   await expectFormControlsContained(page.getByTestId('settings-form'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/timetable');
+  await expectFormControlsContained(page.locator('.timetable-panel'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.goto('/admin/audit');
+  await expectFormControlsContained(page.locator('.audit-filter'));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto('/admin/recurrences');
