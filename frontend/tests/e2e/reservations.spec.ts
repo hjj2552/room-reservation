@@ -25,10 +25,12 @@ async function expectFormControlsContained(container: Locator) {
         controlRight: controlRect.right,
         containerLeft: containerRect.left,
         containerRight: containerRect.right,
+        controlHeight: controlRect.height,
         minInlineSize: style.minInlineSize,
         maxInlineSize: style.maxInlineSize,
         paddingInlineStart: style.paddingInlineStart,
         paddingInlineEnd: style.paddingInlineEnd,
+        textAlign: style.textAlign,
       };
     });
   });
@@ -40,8 +42,10 @@ async function expectFormControlsContained(container: Locator) {
     expect(metric.minInlineSize).toBe('0px');
     expect(metric.maxInlineSize).toBe('100%');
     if (metric.type === 'date') {
-      expect(metric.paddingInlineStart).toBe('0px');
-      expect(metric.paddingInlineEnd).toBe('0px');
+      expect(metric.controlHeight).toBe(40);
+      expect(Number.parseFloat(metric.paddingInlineStart)).toBeGreaterThan(0);
+      expect(Number.parseFloat(metric.paddingInlineEnd)).toBeGreaterThan(0);
+      expect(metric.textAlign).toBe('center');
     }
   }
 }
@@ -60,6 +64,16 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
 
   await page.goto('/admin/timetable');
   await expectFormControlsContained(page.locator('.timetable-panel'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByTestId('timetable-new-request-button').click();
+  const requestPanel = page.getByTestId('timetable-quick-add-panel');
+  await expectFormControlsContained(requestPanel);
+  const requestControlHeights = await Promise.all([
+    page.getByTestId('quick-add-start-input-date').evaluate((element) => element.getBoundingClientRect().height),
+    page.getByTestId('quick-add-start-input').evaluate((element) => element.getBoundingClientRect().height),
+  ]);
+  expect(requestControlHeights).toEqual([40, 40]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto('/admin/audit');

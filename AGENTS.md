@@ -8,6 +8,14 @@ These rules apply to every Codex/agent task in this repository.
 - Keep maintenance changes tightly scoped. Avoid schema rewrites, UI redesign, broad reset commands, or API contract changes for hygiene-only tasks.
 - Prefer existing patterns, helpers, fixtures, scripts, and controllers over ad-hoc one-off code.
 
+## Git Workflow
+
+- Do not merge `origin/main` into a task branch solely because Git reports that the branch is behind or has diverged. A previous squash merge may have produced different commit hashes for an equivalent tree.
+- Task branches such as `codex/uiux-polish` may be intentionally reused after a squash merge. Do not delete, recreate, reset, or rebase a reused branch solely to make its history match `main`; identify unmerged work from the actual file diff between the branch tips.
+- Before synchronizing a task branch with `main`, fetch the latest refs and compare the merge base, actual diff, and relevant file changes. Merge `main` only when it contains independent changes required by the current task.
+- Merge or push changes to `main` only when the user explicitly requests it. Do not force-push, rebase a shared branch, or rewrite published history unless the user explicitly authorizes that operation.
+- When the user requests a squash merge, create or use the task branch PR and squash-merge it without first adding an unnecessary `merge origin/main` commit.
+
 ## E2E Test Data Hygiene
 
 - Any data created by Playwright E2E must be identifiable as test data.
