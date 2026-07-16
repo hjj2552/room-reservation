@@ -11,7 +11,8 @@ These rules apply to every Codex/agent task in this repository.
 ## Git Workflow
 
 - Do not merge `origin/main` into a task branch solely because Git reports that the branch is behind or has diverged. A previous squash merge may have produced different commit hashes for an equivalent tree.
-- Task branches such as `codex/uiux-polish` may be intentionally reused after a squash merge. Do not delete, recreate, reset, or rebase a reused branch solely to make its history match `main`; identify unmerged work from the actual file diff between the branch tips.
+- After confirming that a task branch was squash-merged and has no remaining unmerged work, delete its local and remote refs. For follow-up work, recreate the same branch name from the latest `origin/main` instead of continuing from the pre-squash history.
+- Do not push a newly recreated branch until it contains an actual task commit. Creating or synchronizing an empty branch must not trigger an extra CI run.
 - Before synchronizing a task branch with `main`, fetch the latest refs and compare the merge base, actual diff, and relevant file changes. Merge `main` only when it contains independent changes required by the current task.
 - Merge or push changes to `main` only when the user explicitly requests it. Do not force-push, rebase a shared branch, or rewrite published history unless the user explicitly authorizes that operation.
 - When the user requests a squash merge, create or use the task branch PR and squash-merge it without first adding an unnecessary `merge origin/main` commit.
