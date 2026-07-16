@@ -100,27 +100,27 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
     await expect(page.getByLabel('관리자 이름')).toHaveCount(0);
     await expect(page.getByLabel('문의 이메일')).toBeVisible();
     await expect(page.getByLabel('문의 전화번호')).toBeVisible();
-    await expect(page.getByTestId('settings-slot-minutes-select').locator('option[value="60"]')).toHaveCount(0);
-    await expect(page.getByTestId('settings-open-time-input')).toHaveAttribute('step', '1800');
-    await expect(page.getByTestId('settings-close-time-input')).toHaveAttribute('step', '1800');
+    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveCount(0);
+    await expect(page.getByTestId('settings-open-time-input').locator('option[value="00:30"]')).toHaveCount(1);
+    await expect(page.getByTestId('settings-open-time-input').locator('option[value="00:05"]')).toHaveCount(0);
 
     await page.getByTestId('settings-organization-input').fill(updatedOrganizationName);
     await page.getByTestId('settings-public-notice-input').fill('testing-settings-smoke-notice');
     await page.getByLabel('문의 이메일').fill(contactEmail);
     await page.getByLabel('문의 전화번호').fill(contactPhone);
-    await page.getByTestId('settings-slot-minutes-select').selectOption('5');
+    await expect(page.getByTestId('settings-min-reservation-input')).toHaveAttribute('min', '30');
     await expect(page.getByTestId('settings-min-reservation-input')).toHaveAttribute('step', '5');
     await expect(page.getByTestId('settings-max-reservation-input')).toHaveAttribute('step', '5');
     await expect(page.getByTestId('settings-form')).toContainText(
-      '최소·최대 예약 시간을 현재 예약 단위의 배수로 입력해 주세요.',
+      '최소·최대 예약 시간을 5(분)의 배수로 입력해 주세요. 최소 예약 시간은 30분 이상이어야 합니다.',
     );
     await page.getByTestId('settings-save-button').click();
 
     await expect(page.getByRole('status')).toBeVisible();
     await expect(page.getByTestId('settings-organization-input')).toHaveValue(updatedOrganizationName);
-    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
+    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveValue('5');
+    await expect(page.getByTestId('settings-slot-minutes-select')).toHaveCount(0);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');

@@ -20,11 +20,10 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
   try {
     await page.goto('/admin/recurrences');
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
-    await expect(page.getByTestId('recurrence-start-time-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
-    await expect(page.getByTestId('recurrence-end-time-input')).toHaveAttribute('step', String(settings.slotMinutes * 60));
+    await expect(page.getByTestId('recurrence-start-time-input').locator('option[value="09:05"]')).toHaveCount(1);
     await expect(page.getByTestId('recurrence-start-time-input')).toHaveValue(settings.openTime.slice(0, 5));
     await expect(page.getByTestId('recurrence-end-time-input')).toHaveValue(
-      addMinutesToTime(settings.openTime, Math.max(30, settings.minReservationMinutes)),
+      addMinutesToTime(settings.openTime, settings.minReservationMinutes),
     );
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
 
@@ -35,8 +34,8 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
     await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
-    await page.getByTestId('recurrence-start-time-input').fill(recurrenceTime.startTime);
-    await page.getByTestId('recurrence-end-time-input').fill(recurrenceTime.endTime);
+    await page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime);
+    await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
 
@@ -120,8 +119,8 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
     await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
-    await page.getByTestId('recurrence-start-time-input').fill(recurrenceTime.startTime);
-    await page.getByTestId('recurrence-end-time-input').fill(recurrenceTime.endTime);
+    await page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime);
+    await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('SKIP_CONFLICTS');
 
@@ -193,8 +192,8 @@ test('recurrence create can select a configured tag', async ({ page, request, e2
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
     await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
-    await page.getByTestId('recurrence-start-time-input').fill(recurrenceTime.startTime);
-    await page.getByTestId('recurrence-end-time-input').fill(recurrenceTime.endTime);
+    await page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime);
+    await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await expect(page.getByTestId('recurrence-tag-select')).toContainText(tag.name);
     await page.getByTestId('recurrence-tag-select').selectOption(tag.id);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();

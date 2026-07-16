@@ -33,6 +33,37 @@ export interface E2eTag {
   color: string;
 }
 
+export async function expectTestIdsInDomOrder(page: Page, testIds: string[]) {
+  await expect(page.getByTestId(testIds[0])).toBeVisible();
+  await expect(page.getByTestId(testIds[testIds.length - 1])).toBeVisible();
+  const selector = testIds.map((testId) => `[data-testid="${testId}"]`).join(', ');
+  const actualOrder = await page.locator(selector).evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute('data-testid')),
+  );
+  expect(actualOrder).toEqual(testIds);
+}
+
+export async function expectTestIdPairsOnSameRow(page: Page, testIdPairs: Array<[string, string]>) {
+  const nativeControlPixelTolerance = 1;
+  for (const [firstTestId, secondTestId] of testIdPairs) {
+    const [firstBox, secondBox] = await Promise.all([
+      page.getByTestId(firstTestId).boundingBox(),
+      page.getByTestId(secondTestId).boundingBox(),
+    ]);
+    if (!firstBox || !secondBox) {
+      throw new Error(`Could not measure ${firstTestId} and ${secondTestId}`);
+    }
+    expect(
+      Math.abs(firstBox.y - secondBox.y),
+      `${firstTestId} and ${secondTestId} should start on the same row`,
+    ).toBeLessThanOrEqual(nativeControlPixelTolerance);
+    expect(
+      Math.abs(firstBox.height - secondBox.height),
+      `${firstTestId} and ${secondTestId} should have the same height`,
+    ).toBeLessThanOrEqual(nativeControlPixelTolerance);
+  }
+}
+
 export interface E2eSettings {
   organizationName: string;
   publicNotice: string | null;

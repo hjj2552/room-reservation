@@ -11,7 +11,7 @@ const publicSettings = {
   semesterEndDate: '2026-12-31',
   openTime: '09:00',
   closeTime: '18:00',
-  slotMinutes: 30,
+  slotMinutes: 5,
   availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
   minReservationMinutes: 30,
   maxReservationMinutes: 240,

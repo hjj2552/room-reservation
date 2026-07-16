@@ -31,28 +31,38 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await page.getByTestId('timetable-new-request-button').click();
       const adminStart = page.getByTestId('quick-add-start-input');
       const adminEnd = page.getByTestId('quick-add-end-input');
-      await expect(adminStart).toHaveValue(expectedStart);
-      await expect(adminEnd).toHaveValue(expectedEnd);
+      await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
+      await expect(adminStart).toHaveValue('09:00');
+      await expect(adminEnd).toHaveValue('09:30');
+      await expect(adminStart.locator('option[value="09:05"]')).toHaveCount(1);
+      await expect(adminStart.locator('option[value="09:01"]')).toHaveCount(0);
 
-      await adminStart.fill('2026-07-15T10:00');
-      await adminEnd.fill('2026-07-15T10:30');
+      await page.getByTestId('quick-add-start-input-date').fill('2026-07-15');
+      await adminStart.selectOption('10:00');
+      await adminEnd.selectOption('10:30');
       await page.getByTestId('quick-add-room-select').selectOption(room.id);
-      await expect(adminStart).toHaveValue('2026-07-15T10:00');
-      await expect(adminEnd).toHaveValue('2026-07-15T10:30');
+      await expect(adminStart).toHaveValue('10:00');
+      await expect(adminEnd).toHaveValue('10:30');
       await page.getByTestId('timetable-quick-add-close').click();
 
       await page.goto('/timetable');
       await page.getByTestId('public-new-request-button').click();
       const publicStart = page.getByTestId('public-request-start-input');
       const publicEnd = page.getByTestId('public-request-end-input');
-      await expect(publicStart).toHaveValue(expectedStart);
-      await expect(publicEnd).toHaveValue(expectedEnd);
+      await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
+      await expect(publicStart).toHaveValue('09:00');
+      await expect(publicEnd).toHaveValue('09:30');
 
-      await publicStart.fill('2026-07-15T10:00');
-      await publicEnd.fill('2026-07-15T10:30');
+      await page.getByTestId('public-request-start-input-date').fill('2026-07-15');
+      await publicStart.selectOption('10:00');
+      await publicEnd.selectOption('10:30');
       await page.getByTestId('public-request-room-select').selectOption(room.id);
-      await expect(publicStart).toHaveValue('2026-07-15T10:00');
-      await expect(publicEnd).toHaveValue('2026-07-15T10:30');
+      await expect(publicStart).toHaveValue('10:00');
+      await expect(publicEnd).toHaveValue('10:30');
+      await publicStart.selectOption('17:30');
+      await expect(publicEnd).toHaveValue('');
+      await publicStart.selectOption('10:00');
+      await publicEnd.selectOption('10:30');
 
       await page.getByTestId('public-request-purpose-input').fill('testing-reservation-time-default');
       await page.getByTestId('public-request-applicant-name-input').fill('testing-user');
@@ -81,7 +91,7 @@ test('public blocks unavailable future suggestions while admin allows manual pas
   await page.getByTestId('timetable-new-request-button').click();
   await expect(page.getByTestId('reservation-time-unavailable')).toHaveCount(0);
   await expect(page.getByTestId('timetable-quick-add-panel')).toContainText(
-    '관리자는 승인 상태로 저장할 수 있고, 과거의 시간도 예약할 수 있습니다.',
+    '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.',
   );
   await expect(page.getByTestId('quick-add-start-input')).toHaveValue('');
   await expect(page.getByTestId('quick-add-end-input')).toHaveValue('');
@@ -97,12 +107,12 @@ test('public blocks unavailable future suggestions while admin allows manual pas
 });
 
 for (const policy of [
-  { slotMinutes: 5, minReservationMinutes: 20, expectedEnd: '09:30', expectedHeight: '48px' },
-  { slotMinutes: 10, minReservationMinutes: 60, expectedEnd: '10:00', expectedHeight: '96px' },
-  { slotMinutes: 15, minReservationMinutes: 45, expectedEnd: '09:45', expectedHeight: '72px' },
-  { slotMinutes: 30, minReservationMinutes: 120, expectedEnd: '11:00', expectedHeight: '192px' },
+  { minReservationMinutes: 30, expectedEnd: '09:30', expectedHeight: '48px' },
+  { minReservationMinutes: 45, expectedEnd: '09:45', expectedHeight: '72px' },
+  { minReservationMinutes: 60, expectedEnd: '10:00', expectedHeight: '96px' },
+  { minReservationMinutes: 120, expectedEnd: '11:00', expectedHeight: '192px' },
 ]) {
-  test(`slot ${policy.slotMinutes} and min ${policy.minReservationMinutes} use the full suggestion in both timetable views`, async ({ page }) => {
+  test(`minimum ${policy.minReservationMinutes} uses the full suggestion in both timetable views`, async ({ page }) => {
     await mockReservationApis(page, '2026-07-31', policy);
     const date = '2026-07-13';
 
@@ -114,9 +124,9 @@ for (const policy of [
     expect(await dateCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
       .toBe(policy.expectedHeight);
     await dateCandidate.click();
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${date}T09:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${date}T${policy.expectedEnd}`);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveAttribute('step', String(policy.slotMinutes * 60));
+    await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(date);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(policy.expectedEnd);
     await page.getByTestId('timetable-quick-add-close').click();
 
     await page.getByTestId('timetable-view-room').click();
@@ -127,14 +137,17 @@ for (const policy of [
     expect(await roomCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
       .toBe(policy.expectedHeight);
     await roomCandidate.click();
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${date}T09:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${date}T${policy.expectedEnd}`);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(policy.expectedEnd);
   });
 }
 
 test('public and admin can open a past slot while public submission shows the policy error', async ({ page }) => {
   await mockReservationApis(page, '2026-07-31');
-  await page.route('**/api/public/reservations', (route) => route.fulfill({
+  let publicCreateRequests = 0;
+  await page.route('**/api/public/reservations', (route) => {
+    publicCreateRequests += 1;
+    return route.fulfill({
     status: 422,
     json: {
       code: 'PAST_RESERVATION_TIME',
@@ -143,7 +156,8 @@ test('public and admin can open a past slot while public submission shows the po
       path: '/api/public/reservations',
       fieldErrors: [],
     },
-  }));
+    });
+  });
   await page.clock.setFixedTime(new Date('2026-07-13T01:15:00Z')); // 10:15 Asia/Seoul
 
   await page.goto('/timetable?view=date&date=2026-07-13');
@@ -152,8 +166,9 @@ test('public and admin can open a past slot while public submission shows the po
   await publicPastSlot.hover();
   expect(await publicPastSlot.evaluate((element) => getComputedStyle(element, '::before').height)).toBe('48px');
   await publicPastSlot.click();
-  await expect(page.getByTestId('public-request-start-input')).toHaveValue('2026-07-13T09:00');
-  await expect(page.getByTestId('public-request-end-input')).toHaveValue('2026-07-13T09:30');
+  await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-13');
+  await expect(page.getByTestId('public-request-start-input')).toHaveValue('09:00');
+  await expect(page.getByTestId('public-request-end-input')).toHaveValue('09:30');
   await expect(page.getByRole('button', { name: `${room.name} 10:30-11:00 예약 신청` })).toBeEnabled();
 
   await page.getByTestId('public-request-purpose-input').fill('testing-reservation-public-past');
@@ -163,21 +178,39 @@ test('public and admin can open a past slot while public submission shows the po
   await page.getByTestId('public-request-cancel-password-input').fill('testing-password');
   await page.getByTestId('public-request-submit-button').click();
   await expect(page.getByTestId('public-quick-request-panel')).toContainText(publicPastMessage);
+  expect(publicCreateRequests).toBe(0);
 
   await page.goto('/admin/timetable?view=date&date=2026-07-13');
+  let adminCreateRequests = 0;
+  await page.route('**/api/admin/reservations', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    adminCreateRequests += 1;
+    return route.fulfill({
+      status: 201,
+      json: { id: '00000000-0000-0000-0000-000000000301' },
+    });
+  });
   const adminPastSlot = page.getByRole('button', { name: `${room.name} 09:00-09:30 예약 신청` });
   await expect(adminPastSlot).toBeEnabled();
   await adminPastSlot.click();
-  await expect(page.getByTestId('quick-add-start-input')).toHaveValue('2026-07-13T09:00');
+  await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue('2026-07-13');
+  await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
   await expect(page.getByTestId('timetable-quick-add-panel')).toContainText(
-    '관리자는 승인 상태로 저장할 수 있고, 과거의 시간도 예약할 수 있습니다.',
+    '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.',
   );
+  await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
+  await page.getByTestId('quick-add-email-input').fill('testing-admin@example.test');
+  await page.getByTestId('quick-add-phone-input').fill('010-5555-5555');
+  await page.getByTestId('quick-add-purpose-input').fill('testing-reservation-admin-past');
+  await page.getByTestId('quick-add-save-button').click();
+  await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+  expect(adminCreateRequests).toBe(1);
 });
 
 async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
-  overrides: Partial<{ slotMinutes: number; minReservationMinutes: number; maxReservationMinutes: number }> = {},
+  overrides: Partial<{ minReservationMinutes: number; maxReservationMinutes: number }> = {},
 ) {
   const settings = {
     organizationName: 'testing-organization',
@@ -188,7 +221,7 @@ async function mockReservationApis(
     semesterEndDate,
     openTime: '09:00',
     closeTime: '18:00',
-    slotMinutes: 30,
+    slotMinutes: 5,
     availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
     minReservationMinutes: 30,
     maxReservationMinutes: 240,

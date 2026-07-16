@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { ConflictPolicy, RecurrenceFilters, RecurrenceStatus } from '../../shared/api/types';
 import { Pagination } from '../../shared/components/Pagination';
+import { TimeRangeSelect } from '../../shared/components/ReservationTimeRangeInput';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCreateRecurrence,
@@ -254,30 +255,18 @@ export function RecurrencesPage() {
               required
             />
           </label>
-          <label>
-            시작 시간
-            <input
-              data-testid="recurrence-start-time-input"
-              name="startTime"
-              type="time"
-              step={(settings.data?.slotMinutes || 30) * 60}
-              value={form.startTime}
-              onChange={(event) => setForm((prev) => ({ ...prev, startTime: event.target.value }))}
-              required
-            />
-          </label>
-          <label>
-            종료 시간
-            <input
-              data-testid="recurrence-end-time-input"
-              name="endTime"
-              type="time"
-              step={(settings.data?.slotMinutes || 30) * 60}
-              value={form.endTime}
-              onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
-              required
-            />
-          </label>
+          <TimeRangeSelect
+            startTime={form.startTime}
+            endTime={form.endTime}
+            openTime={settings.data?.openTime || '09:00'}
+            closeTime={settings.data?.closeTime || '18:00'}
+            minReservationMinutes={settings.data?.minReservationMinutes || 30}
+            maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
+            onStartTimeChange={(value) => setForm((prev) => ({ ...prev, startTime: value }))}
+            onEndTimeChange={(value) => setForm((prev) => ({ ...prev, endTime: value }))}
+            startTestId="recurrence-start-time-input"
+            endTestId="recurrence-end-time-input"
+          />
           <label>
             태그
             <select

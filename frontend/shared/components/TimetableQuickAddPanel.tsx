@@ -4,6 +4,7 @@ import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { statusLabels } from '../utils/labels';
 import type { ReservationTimeSelection } from '../utils/reservationTime';
+import { ReservationTimeRangeInput } from './ReservationTimeRangeInput';
 
 export type TimetableSlotSelection = ReservationTimeSelection;
 
@@ -29,7 +30,10 @@ interface ReservationRequestPanelProps {
   variant: 'admin' | 'public';
   rooms: RequestRoom[];
   selection: TimetableSlotSelection;
-  slotMinutes: number;
+  openTime: string;
+  closeTime: string;
+  minReservationMinutes: number;
+  maxReservationMinutes: number;
   initialValues?: ReservationRequestValues;
   unavailableMessage?: string;
   submitError?: unknown;
@@ -136,7 +140,10 @@ export function ReservationRequestPanel({
   variant,
   rooms,
   selection,
-  slotMinutes,
+  openTime,
+  closeTime,
+  minReservationMinutes,
+  maxReservationMinutes,
   initialValues,
   unavailableMessage,
   submitError,
@@ -178,11 +185,11 @@ export function ReservationRequestPanel({
 
   function validate() {
     const nextErrors: Partial<Record<keyof ReservationRequestValues, string>> = {};
-    if (!values.roomId) nextErrors.roomId = '강의실을 선택해 주세요.';
+    if (!values.roomId) nextErrors.roomId = '예약 공간을 선택해 주세요.';
     if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
     if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
     if (!values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
-    if (!values.purpose) nextErrors.purpose = '예약 목적을 입력해 주세요.';
+    if (!values.purpose) nextErrors.purpose = '신청 목적을 입력해 주세요.';
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
     if (!isAdmin && (!values.cancelPassword || values.cancelPassword.length < 4)) {
@@ -236,7 +243,7 @@ export function ReservationRequestPanel({
                 ? `${selection.date} 새 신청`
                 : '예약 가능한 미래 시간 없음'}
             {isAdmin
-              ? ' · 관리자는 승인 상태로 저장할 수 있고, 과거의 시간도 예약할 수 있습니다.'
+              ? ' · 관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.'
               : ' · 신청은 승인 대기 상태로 저장됩니다.'}
           </p>
         </div>
@@ -271,7 +278,7 @@ export function ReservationRequestPanel({
           {fieldError('purpose')}
         </label>
         <label>
-          강의실
+          예약 공간
           <select
             data-testid={ids.room}
             value={values.roomId}
@@ -287,54 +294,26 @@ export function ReservationRequestPanel({
           </select>
           {fieldError('roomId')}
         </label>
-        {isAdmin ? (
-          <label>
-            저장 상태
-            <select
-              data-testid={ids.status}
-              value={values.status}
-              onChange={(event) => updateField('status', event.target.value as ReservationStatus)}
-              {...inputErrorProps('status')}
-            >
-              {(['CONFIRMED', 'REQUESTED'] as ReservationStatus[]).map((value) => (
-                <option key={value} value={value}>
-                  {value === 'CONFIRMED' ? '승인으로 저장' : statusLabels[value]}
-                </option>
-              ))}
-            </select>
-            {fieldError('status')}
-          </label>
-        ) : (
-          <label>
-            예약 상태
-            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} {...inputErrorProps('status')} />
-            {fieldError('status')}
-          </label>
-        )}
-        <label>
-          시작
-          <input
-            data-testid={ids.start}
-            type="datetime-local"
-            step={slotMinutes * 60}
-            value={values.startAt}
-            onChange={(event) => updateField('startAt', event.target.value)}
-            {...inputErrorProps('startAt')}
-          />
-          {fieldError('startAt')}
-        </label>
-        <label>
-          종료
-          <input
-            data-testid={ids.end}
-            type="datetime-local"
-            step={slotMinutes * 60}
-            value={values.endAt}
-            onChange={(event) => updateField('endAt', event.target.value)}
-            {...inputErrorProps('endAt')}
-          />
-          {fieldError('endAt')}
-        </label>
+        <ReservationTimeRangeInput
+          key={`${selection.source}-${selection.date}-${selection.startAt}-${selection.endAt}`}
+          startAt={values.startAt}
+          endAt={values.endAt}
+          openTime={openTime}
+          closeTime={closeTime}
+          minReservationMinutes={minReservationMinutes}
+          maxReservationMinutes={maxReservationMinutes}
+          onStartAtChange={(value) => updateField('startAt', value)}
+          onEndAtChange={(value) => updateField('endAt', value)}
+          dateTestId={`${ids.start}-date`}
+          startTestId={ids.start}
+          endTestId={ids.end}
+          startInvalid={Boolean(errors.startAt)}
+          endInvalid={Boolean(errors.endAt)}
+          startDescribedBy={errorId('startAt')}
+          endDescribedBy={errorId('endAt')}
+          startError={fieldError('startAt')}
+          endError={fieldError('endAt')}
+        />
         <label>
           신청자
           <input
@@ -367,6 +346,30 @@ export function ReservationRequestPanel({
           />
           {fieldError('applicantPhone')}
         </label>
+        {isAdmin ? (
+          <label>
+            예약 상태
+            <select
+              data-testid={ids.status}
+              value={values.status}
+              onChange={(event) => updateField('status', event.target.value as ReservationStatus)}
+              {...inputErrorProps('status')}
+            >
+              {(['CONFIRMED', 'REQUESTED'] as ReservationStatus[]).map((value) => (
+                <option key={value} value={value}>
+                  {value === 'CONFIRMED' ? '승인으로 저장' : statusLabels[value]}
+                </option>
+              ))}
+            </select>
+            {fieldError('status')}
+          </label>
+        ) : (
+          <label>
+            예약 상태
+            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} {...inputErrorProps('status')} />
+            {fieldError('status')}
+          </label>
+        )}
         {isAdmin ? (
           <label>
             처리 메모

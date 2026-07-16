@@ -94,8 +94,9 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await page.getByLabel(`${room.name} 12:00-12:30 예약 신청`).click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
+    await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(reservationDay);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue('12:00');
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue('12:30');
 
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
     await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-${Date.now()}@example.test`);
@@ -160,8 +161,9 @@ test('date view quick add defaults to the clicked room column', async ({ page, r
     await page.getByRole('button', { name: new RegExp(`^${escapeRegExp(room.name)} 12:00-12:30`) }).click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${reservationDay}T12:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${reservationDay}T12:30`);
+    await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(reservationDay);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue('12:00');
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue('12:30');
 
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
     await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-select-room-${Date.now()}@example.test`);
@@ -208,8 +210,9 @@ test('room view can create a reservation from an empty weekly slot', async ({ pa
     await page.getByTestId('timetable-empty-slot').nth(0).click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue(room.id);
-    await expect(page.getByTestId('quick-add-start-input')).toHaveValue(`${weekStart}T09:00`);
-    await expect(page.getByTestId('quick-add-end-input')).toHaveValue(`${weekStart}T09:30`);
+    await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(weekStart);
+    await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
+    await expect(page.getByTestId('quick-add-end-input')).toHaveValue('09:30');
 
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
     await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-room-${Date.now()}@example.test`);

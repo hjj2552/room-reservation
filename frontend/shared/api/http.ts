@@ -156,7 +156,7 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
   DATA_INTEGRITY_VIOLATION: '입력한 내용이 시스템 제약 조건과 맞지 않습니다. 값을 다시 확인해 주세요.',
   INVALID_DURATION: '예약 시간이 허용된 최소/최대 예약 시간을 벗어났습니다.',
-  INVALID_SLOT_UNIT: '예약 시간이 설정된 예약 단위와 맞지 않습니다.',
+  INVALID_SLOT_UNIT: '예약 시간을 5분 단위로 입력하고 초 단위 값이 없는지 확인해 주세요.',
   OUTSIDE_OPERATING_DAYS: '예약 가능한 요일이 아닙니다. 운영 설정의 예약 가능 요일을 확인해 주세요.',
   OUTSIDE_OPERATING_HOURS: '운영 시간 안에서만 예약할 수 있습니다.',
   OUTSIDE_SEMESTER_PERIOD: '운영 설정의 예약 가능 기간 밖입니다.',

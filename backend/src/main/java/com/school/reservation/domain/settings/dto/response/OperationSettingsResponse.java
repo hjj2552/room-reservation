@@ -1,6 +1,7 @@
 package com.school.reservation.domain.settings.dto.response;
 
 import com.school.reservation.domain.settings.OperationSettings;
+import com.school.reservation.global.time.ReservationTimePolicy;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -14,6 +15,7 @@ public record OperationSettingsResponse(
     LocalDate semesterEndDate,
     LocalTime openTime,
     LocalTime closeTime,
+    // Deprecated compatibility field; always 5.
     Integer slotMinutes,
     List<String> availableDaysOfWeek,
     Integer minReservationMinutes,
@@ -33,7 +35,7 @@ public record OperationSettingsResponse(
             settings.getSemesterEndDate(),
             settings.getOpenTime(),
             settings.getCloseTime(),
-            settings.getSlotMinutes(),
+            ReservationTimePolicy.RESERVATION_INCREMENT_MINUTES,
             settings.availableDaySet().stream().sorted().toList(),
             settings.getMinReservationMinutes(),
             settings.getMaxReservationMinutes(),

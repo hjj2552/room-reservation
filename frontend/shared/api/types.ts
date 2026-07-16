@@ -96,6 +96,7 @@ export interface OperationSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
+  /** @deprecated Compatibility field. Reservation inputs always use 5-minute increments. */
   slotMinutes: number;
   availableDaysOfWeek: string[];
   minReservationMinutes: number;

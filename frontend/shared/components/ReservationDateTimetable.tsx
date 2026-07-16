@@ -4,13 +4,13 @@ import type { ReservationStatus } from '../api/types';
 import { hexToTint } from '../utils/color';
 import { statusLabels } from '../utils/labels';
 import {
-  INTERACTION_INTERVAL_MINUTES,
+  TIMETABLE_GRID_MINUTES,
   defaultSuggestedDurationMinutes,
 } from '../utils/reservationTime';
 import { StatusBadge } from './StatusBadge';
 
 export const TIMETABLE_MINUTE_HEIGHT = 1.6;
-export const TIMETABLE_GRID_MINUTES = INTERACTION_INTERVAL_MINUTES;
+export { TIMETABLE_GRID_MINUTES } from '../utils/reservationTime';
 export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
 export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
 export const TIMETABLE_COMPACT_BLOCK_HEIGHT = 72;
@@ -75,9 +75,9 @@ export function formatClock(totalMinutes: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-export function buildSlots(openMinutes: number, closeMinutes: number, slotMinutes: number) {
+export function buildSlots(openMinutes: number, closeMinutes: number, incrementMinutes: number) {
   const slots: number[] = [];
-  for (let minutes = openMinutes; minutes <= closeMinutes; minutes += slotMinutes) {
+  for (let minutes = openMinutes; minutes <= closeMinutes; minutes += incrementMinutes) {
     slots.push(minutes);
   }
   if (slots[slots.length - 1] !== closeMinutes) {
