@@ -1,4 +1,4 @@
-import { type CSSProperties, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ReservationStatus } from '../api/types';
 import { hexToTint } from '../utils/color';
@@ -218,8 +218,7 @@ export function ReservationDateTimetable({
                     style={{
                       top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
                       height: TIMETABLE_GRID_MINUTES * TIMETABLE_MINUTE_HEIGHT,
-                      '--timetable-suggestion-height': `${suggestedDurationMinutes * TIMETABLE_MINUTE_HEIGHT}px`,
-                    } as CSSProperties}
+                    }}
                     onClick={() => onEmptySlotClick?.(selection)}
                     aria-label={`${room.name} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청`}
                     data-testid="timetable-empty-slot"

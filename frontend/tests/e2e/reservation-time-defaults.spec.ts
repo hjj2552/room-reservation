@@ -107,12 +107,12 @@ test('public blocks unavailable future suggestions while admin allows manual pas
 });
 
 for (const policy of [
-  { minReservationMinutes: 30, expectedEnd: '09:30', expectedHeight: '48px' },
-  { minReservationMinutes: 45, expectedEnd: '09:45', expectedHeight: '72px' },
-  { minReservationMinutes: 60, expectedEnd: '10:00', expectedHeight: '96px' },
-  { minReservationMinutes: 120, expectedEnd: '11:00', expectedHeight: '192px' },
+  { minReservationMinutes: 30, expectedEnd: '09:30' },
+  { minReservationMinutes: 45, expectedEnd: '09:45' },
+  { minReservationMinutes: 60, expectedEnd: '10:00' },
+  { minReservationMinutes: 120, expectedEnd: '11:00' },
 ]) {
-  test(`minimum ${policy.minReservationMinutes} uses the full suggestion in both timetable views`, async ({ page }) => {
+  test(`minimum ${policy.minReservationMinutes} uses its duration with a one-cell hover in both timetable views`, async ({ page }) => {
     await mockReservationApis(page, '2026-07-31', policy);
     const date = '2026-07-13';
 
@@ -122,7 +122,7 @@ for (const policy of [
     });
     await dateCandidate.hover();
     expect(await dateCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
-      .toBe(policy.expectedHeight);
+      .toBe('48px');
     await dateCandidate.click();
     await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(date);
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
@@ -135,7 +135,7 @@ for (const policy of [
     });
     await roomCandidate.hover();
     expect(await roomCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
-      .toBe(policy.expectedHeight);
+      .toBe('48px');
     await roomCandidate.click();
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue(policy.expectedEnd);
@@ -205,6 +205,22 @@ test('public and admin can open a past slot while public submission shows the po
   await page.getByTestId('quick-add-save-button').click();
   await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
   expect(adminCreateRequests).toBe(1);
+});
+
+test('empty slot hover fills the 30-minute grid cell when minimum duration is shorter', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31', { minReservationMinutes: 10 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/timetable?view=date&date=2026-07-13');
+
+  const slot = page.getByRole('button', { name: new RegExp(`${room.name} 09:00-09:10`) });
+  await slot.hover();
+
+  const sizes = await slot.evaluate((element) => ({
+    slotHeight: element.getBoundingClientRect().height,
+    hoverHeight: Number.parseFloat(getComputedStyle(element, '::before').height),
+  }));
+  expect(sizes.hoverHeight).toBe(sizes.slotHeight);
+  expect(sizes.slotHeight).toBe(48);
 });
 
 async function mockReservationApis(

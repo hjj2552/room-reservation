@@ -131,11 +131,17 @@ test('toolbar request opens the shared panel without slot room context', async (
   const room = await e2eData.createTestRoom('toolbar-request-room');
 
   try {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/admin/timetable');
     await page.getByTestId('timetable-date-room-select').selectOption(room.id);
     await page.getByTestId('timetable-new-request-button').click();
 
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    const closeButton = page.getByTestId('timetable-quick-add-close');
+    const closeButtonBox = await closeButton.boundingBox();
+    expect(closeButtonBox?.width).toBe(42);
+    await expect(page.locator('.reservation-request-panel .quick-add-form')).toHaveCSS('overscroll-behavior-x', 'none');
+    await expect(page.locator('.reservation-request-panel .quick-add-form')).toHaveCSS('overscroll-behavior-y', 'auto');
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue('');
     await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue('');
     await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue('');
