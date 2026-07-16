@@ -1,10 +1,10 @@
 import { FormEvent, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
-import { useAdminSession, useLogin } from '../../shared/hooks/useAuth';
+import { isUnauthorized, useAdminSession, useLogin } from '../../shared/hooks/useAuth';
 
 export function LoginPage() {
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const login = useLogin();
   const session = useAdminSession();
@@ -54,7 +54,11 @@ export function LoginPage() {
               required
             />
           </label>
-          {login.isError ? <div className="inline-error" role="alert">{errorMessage(login.error)}</div> : null}
+          {login.isError ? (
+            <div className="inline-error" role="alert">
+              {isUnauthorized(login.error) ? '아이디 또는 비밀번호가 잘못되었습니다.' : errorMessage(login.error)}
+            </div>
+          ) : null}
           <button type="submit" className="primary-button" disabled={login.isPending}>
             {login.isPending ? '로그인 중...' : '로그인'}
           </button>

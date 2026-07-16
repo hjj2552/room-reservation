@@ -166,9 +166,6 @@ export function PublicReservationEditPage() {
           </p>
         </div>
         <div className="header-actions">
-          <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
-            이전으로
-          </button>
           <Link className="secondary-button" to={`/reservations/${reservation.id}`}>
             상세로
           </Link>
