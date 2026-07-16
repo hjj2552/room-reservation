@@ -107,12 +107,12 @@ test('public blocks unavailable future suggestions while admin allows manual pas
 });
 
 for (const policy of [
-  { minReservationMinutes: 30, expectedEnd: '09:30', expectedHeight: '48px' },
-  { minReservationMinutes: 45, expectedEnd: '09:45', expectedHeight: '72px' },
-  { minReservationMinutes: 60, expectedEnd: '10:00', expectedHeight: '96px' },
-  { minReservationMinutes: 120, expectedEnd: '11:00', expectedHeight: '192px' },
+  { minReservationMinutes: 30, expectedEnd: '09:30' },
+  { minReservationMinutes: 45, expectedEnd: '09:45' },
+  { minReservationMinutes: 60, expectedEnd: '10:00' },
+  { minReservationMinutes: 120, expectedEnd: '11:00' },
 ]) {
-  test(`minimum ${policy.minReservationMinutes} uses the full suggestion in both timetable views`, async ({ page }) => {
+  test(`minimum ${policy.minReservationMinutes} uses its duration with a one-cell hover in both timetable views`, async ({ page }) => {
     await mockReservationApis(page, '2026-07-31', policy);
     const date = '2026-07-13';
 
@@ -122,7 +122,7 @@ for (const policy of [
     });
     await dateCandidate.hover();
     expect(await dateCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
-      .toBe(policy.expectedHeight);
+      .toBe('48px');
     await dateCandidate.click();
     await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(date);
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
@@ -135,7 +135,7 @@ for (const policy of [
     });
     await roomCandidate.hover();
     expect(await roomCandidate.evaluate((element) => getComputedStyle(element, '::before').height))
-      .toBe(policy.expectedHeight);
+      .toBe('48px');
     await roomCandidate.click();
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue(policy.expectedEnd);
