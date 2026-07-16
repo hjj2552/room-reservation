@@ -362,10 +362,7 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-verify-button').click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
     await expect(page.getByRole('button', { name: '이전으로', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: '상세로', exact: true })).toHaveAttribute(
-      'href',
-      `/reservations/${reservation.id}`,
-    );
+    await expect(page.getByRole('link', { name: '상세로', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '취소', exact: true })).toBeVisible();
     await expectTestIdsInDomOrder(page, [
       'public-edit-purpose-input',
@@ -403,7 +400,8 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-save-button').click();
 
     await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');
-    await page.goto(`/reservations/${reservation.id}`);
+    await page.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
     await expect(page.locator('.status-badge')).toContainText('승인 대기');
     await expect(page.locator('.reservation-detail-main')).toContainText(editedPurpose);
   } finally {

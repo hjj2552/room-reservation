@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail } from '../../shared/api/types';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
@@ -154,6 +154,7 @@ export function PublicReservationEditPage() {
 
   const reservation = detail.data;
   const isEditable = reservation.editable;
+  const reservationDetailPath = `/reservations/${reservation.id}`;
 
   return (
     <main className="public-shell" aria-labelledby="public-reservation-edit-title">
@@ -164,11 +165,6 @@ export function PublicReservationEditPage() {
           <p className="muted">
             {reservation.room.name} · {formatDateTime(reservation.startAt)} · {statusLabels[reservation.status]}
           </p>
-        </div>
-        <div className="header-actions">
-          <Link className="secondary-button" to={`/reservations/${reservation.id}`}>
-            상세로
-          </Link>
         </div>
       </div>
 
@@ -204,7 +200,7 @@ export function PublicReservationEditPage() {
         inputTestId="public-edit-password-input"
         submitTestId="public-edit-verify-button"
         onPasswordChange={setReservationPassword}
-        onClose={() => navigate(`/reservations/${reservation.id}`)}
+        onClose={() => navigate(reservationDetailPath)}
         onSubmit={verifyReservationPassword}
       />
 
@@ -284,7 +280,7 @@ export function PublicReservationEditPage() {
           ) : null}
           {successMessage ? <div className="success-box full-span" role="status">{successMessage}</div> : null}
           <div className="button-row full-span">
-            <button type="button" className="ghost-button" onClick={() => navigate(-1)}>
+            <button type="button" className="ghost-button" onClick={() => navigate(reservationDetailPath)}>
               취소
             </button>
             <button type="submit" className="primary-button" disabled={update.isPending} data-testid="public-edit-save-button">
