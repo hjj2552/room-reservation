@@ -1940,6 +1940,13 @@ button:disabled {
     font-size: 16px;
   }
 
+  /* iOS 26 WebKit adds author padding outside 100%-wide date controls. */
+  input[type="date"] {
+    display: block;
+    inline-size: 100%;
+    padding-inline: 0;
+  }
+
   .content {
     padding: 18px;
   }
