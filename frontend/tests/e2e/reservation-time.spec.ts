@@ -159,7 +159,9 @@ test('formats instants and admin date boundaries in Seoul', () => {
   expect(formatted).toContain('2026. 7. 14.');
   expect(formatted).toContain('12:30');
   expect(toServiceStartOfDayOffset('2026-07-14')).toBe('2026-07-14T00:00:00+09:00');
-  expect(toServiceEndOfDayOffset('2026-07-14')).toBe('2026-07-14T23:59:59+09:00');
+  const inclusiveEnd = toServiceEndOfDayOffset('2026-07-14');
+  expect(inclusiveEnd).toBe('2026-07-14T23:59:59.999999+09:00');
+  expect('2026-07-14T23:59:59.999998+09:00' <= (inclusiveEnd ?? '')).toBe(true);
 });
 
 test('checks public past input against the Seoul service-local instant', () => {

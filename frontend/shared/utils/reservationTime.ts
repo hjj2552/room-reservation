@@ -158,7 +158,7 @@ export function toServiceStartOfDayOffset(date: string) {
 }
 
 export function toServiceEndOfDayOffset(date: string) {
-  return date ? `${date}T23:59:59+09:00` : undefined;
+  return date ? `${date}T23:59:59.999999+09:00` : undefined;
 }
 
 export function toServiceDateTimeLocal(value?: string | null) {

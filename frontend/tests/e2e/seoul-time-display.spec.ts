@@ -60,7 +60,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await page.goto('/admin/audit?action=DELETED&fromDate=2026-07-14&toDate=2026-07-14');
       await expect.poll(() => auditFilters).toEqual({
         from: '2026-07-14T00:00:00+09:00',
-        to: '2026-07-14T23:59:59+09:00',
+        to: '2026-07-14T23:59:59.999999+09:00',
       });
 
       const auditRow = page.getByTestId('audit-table').locator('tbody tr').first();
@@ -75,7 +75,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await page.goto('/admin/reservations?fromDate=2026-07-14&toDate=2026-07-14');
       await expect.poll(() => reservationFilters).toEqual({
         from: '2026-07-14T00:00:00+09:00',
-        to: '2026-07-14T23:59:59+09:00',
+        to: '2026-07-14T23:59:59.999999+09:00',
       });
     });
   });
