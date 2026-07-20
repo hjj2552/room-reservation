@@ -1,8 +1,11 @@
+import { reservationServiceTimeZone } from './reservationTime';
+
 export function formatDateTime(value?: string | null) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: reservationServiceTimeZone,
   }).format(new Date(value));
 }
 

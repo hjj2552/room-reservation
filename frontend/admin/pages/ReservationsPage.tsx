@@ -9,8 +9,11 @@ import { ReservationTable } from '../../shared/components/ReservationTable';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useReservations } from '../../shared/hooks/useReservations';
 import { useRooms } from '../../shared/hooks/useRooms';
-import { toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
+import {
+  toServiceEndOfDayOffset,
+  toServiceStartOfDayOffset,
+} from '../../shared/utils/reservationTime';
 
 const pageSize = 20;
 
@@ -41,8 +44,8 @@ export function ReservationsPage() {
       status,
       roomId,
       keyword,
-      from: toStartOfDayOffset(fromDate),
-      to: toEndOfDayOffset(toDate),
+      from: toServiceStartOfDayOffset(fromDate),
+      to: toServiceEndOfDayOffset(toDate),
       page,
       size: pageSize,
     }),

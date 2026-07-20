@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { formatDateTime } from '../../shared/utils/date';
 import {
   INTERACTION_INTERVAL_MINUTES,
   RESERVATION_INCREMENT_MINUTES,
@@ -9,7 +10,9 @@ import {
   newRequestSelection,
   noFutureReservationTimeMessage,
   slotToReservationSelection,
+  toServiceEndOfDayOffset,
   toServiceDateTimeLocal,
+  toServiceStartOfDayOffset,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
 import {
@@ -149,6 +152,16 @@ test('keeps an existing reservation time visible when it is outside current choi
 test('serializes service-local reservation inputs with the Seoul offset', () => {
   expect(fromServiceDateTimeLocal('2026-07-14T09:00')).toBe('2026-07-14T09:00:00+09:00');
   expect(toServiceDateTimeLocal('2026-07-14T00:00:00Z')).toBe('2026-07-14T09:00');
+});
+
+test('formats instants and admin date boundaries in Seoul', () => {
+  const formatted = formatDateTime('2026-07-13T15:30:00Z');
+  expect(formatted).toContain('2026. 7. 14.');
+  expect(formatted).toContain('12:30');
+  expect(toServiceStartOfDayOffset('2026-07-14')).toBe('2026-07-14T00:00:00+09:00');
+  const inclusiveEnd = toServiceEndOfDayOffset('2026-07-14');
+  expect(inclusiveEnd).toBe('2026-07-14T23:59:59.999999+09:00');
+  expect('2026-07-14T23:59:59.999998+09:00' <= (inclusiveEnd ?? '')).toBe(true);
 });
 
 test('checks public past input against the Seoul service-local instant', () => {

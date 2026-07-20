@@ -5,10 +5,25 @@ import { EmptyState, ErrorState, LoadingState } from '../../shared/components/St
 import { useReservationHistoryAudit } from '../../shared/hooks/useAudit';
 import { useRooms } from '../../shared/hooks/useRooms';
 import type { ReservationHistory } from '../../shared/api/types';
-import { formatDateTime, toEndOfDayOffset, toStartOfDayOffset } from '../../shared/utils/date';
+import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
+import {
+  reservationServiceTimeZone,
+  toServiceEndOfDayOffset,
+  toServiceStartOfDayOffset,
+} from '../../shared/utils/reservationTime';
 
 const pageSize = 20;
+const snapshotDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: reservationServiceTimeZone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+const snapshotTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
+  timeZone: reservationServiceTimeZone,
+  timeStyle: 'short',
+});
 
 const actions = [
   'CREATED_BY_ADMIN',
@@ -50,12 +65,10 @@ function reservationTimeRange(history: ReservationHistory) {
 function formatSnapshotEndTime(startAt: string, endAt: string) {
   const start = new Date(startAt);
   const end = new Date(endAt);
-  if (start.toDateString() !== end.toDateString()) {
+  if (snapshotDateFormatter.format(start) !== snapshotDateFormatter.format(end)) {
     return formatDateTime(endAt);
   }
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeStyle: 'short',
-  }).format(end);
+  return snapshotTimeFormatter.format(end);
 }
 
 export function AuditPage() {
@@ -79,8 +92,8 @@ export function AuditPage() {
       reservationId,
       roomId,
       action,
-      from: toStartOfDayOffset(fromDate),
-      to: toEndOfDayOffset(toDate),
+      from: toServiceStartOfDayOffset(fromDate),
+      to: toServiceEndOfDayOffset(toDate),
       page,
       size: pageSize,
     }),
