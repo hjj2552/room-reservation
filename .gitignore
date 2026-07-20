@@ -11,6 +11,8 @@ backend/build/
 .env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
 
 backend/src/main/resources/application-local.yml
 backend/src/main/resources/application-local.yaml
@@ -22,6 +24,7 @@ backend/uploads/
 
 node_modules/
 dist/
+.wrangler/
 playwright-report/
 test-results/
 tests/e2e/.auth/
