@@ -8,6 +8,8 @@ export interface SessionRecord {
   expiresAt: Date;
 }
 
+const EXPIRED_SESSION_DELETE_LIMIT = 100;
+
 export class SessionService {
   constructor(
     private readonly database: Database,
@@ -38,6 +40,18 @@ export class SessionService {
   }
 
   async issue(): Promise<{ sessionId: string; csrfToken: string; record: SessionRecord }> {
+    await this.database.query(
+      `WITH expired AS (
+         SELECT session_id_hash FROM admin_sessions
+         WHERE expires_at <= $1
+         ORDER BY expires_at ASC, session_id_hash ASC
+         LIMIT $2
+       )
+       DELETE FROM admin_sessions session
+       USING expired
+       WHERE session.session_id_hash=expired.session_id_hash`,
+      [this.now(), EXPIRED_SESSION_DELETE_LIMIT],
+    );
     const sessionId = createOpaqueToken();
     const csrfToken = createOpaqueToken();
     const expiresAt = new Date(this.now().getTime() + 8 * 60 * 60 * 1000);

@@ -2,9 +2,14 @@ import {
   datesInRange,
   normalizeDays,
   paged,
+  parseBooleanParameter,
+  parseDate,
+  parseEnumParameter,
   parseInstant,
   parsePage,
   parseReservationInput,
+  parseTime,
+  parseUuid,
   requireBoolean,
   requireEmail,
   requireInteger,
@@ -49,6 +54,8 @@ const activeStatuses = new Set<ReservationStatus>(["REQUESTED", "CONFIRMED"]);
 const allStatuses = new Set<ReservationStatus>(["REQUESTED", "CONFIRMED", "CANCELLED"]);
 const allSources = new Set<ReservationSource>(["PUBLIC_FORM", "ADMIN_GRID", "ADMIN_MANUAL", "RECURRING_GENERATED"]);
 const conflictPolicies = new Set<ConflictPolicy>(["FAIL_ALL", "SKIP_CONFLICTS"]);
+const recurrenceStatuses = ["ACTIVE", "CANCELLED"] as const;
+const historyActions = ["CREATED", "CREATED_BY_ADMIN", "UPDATED", "APPROVED", "CANCELLED", "DELETED", "RECURRENCE_GENERATED", "RECURRENCE_CANCELLED"] as const;
 
 function value(row: Row, key: string): unknown {
   return row[key];
@@ -182,10 +189,10 @@ export class ProductService {
     const reservationDisabledMessage = input.reservationDisabledMessage === null || input.reservationDisabledMessage === undefined
       ? null
       : requireString(input, "reservationDisabledMessage", { allowBlank: true });
-    const semesterStartDate = requireString(input, "semesterStartDate");
-    const semesterEndDate = requireString(input, "semesterEndDate");
-    const openTime = requireString(input, "openTime");
-    const closeTime = requireString(input, "closeTime");
+    const semesterStartDate = parseDate(requireString(input, "semesterStartDate"), "semesterStartDate");
+    const semesterEndDate = parseDate(requireString(input, "semesterEndDate"), "semesterEndDate");
+    const openTime = parseTime(requireString(input, "openTime"), "openTime");
+    const closeTime = parseTime(requireString(input, "closeTime"), "closeTime");
     requireInteger(input, "slotMinutes");
     const availableDaysOfWeek = normalizeDays(input.availableDaysOfWeek);
     const minReservationMinutes = requireInteger(input, "minReservationMinutes", 30);
@@ -201,11 +208,7 @@ export class ProductService {
       : requireString(input, "completionMessage", { allowBlank: true });
     const version = requireInteger(input, "version", 0);
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(semesterStartDate) || !/^\d{4}-\d{2}-\d{2}$/.test(semesterEndDate)) {
-      validation("Invalid date format.");
-    }
     if (semesterStartDate > semesterEndDate) validation("Semester start date must be before or equal to end date.");
-    if (!/^\d{2}:\d{2}(:00)?$/.test(openTime) || !/^\d{2}:\d{2}(:00)?$/.test(closeTime)) validation("Invalid time format.");
     if (openTime >= closeTime) validation("Open time must be before close time.");
     const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
     if (minutes(openTime) % 30 !== 0 || minutes(closeTime) % 30 !== 0) {
@@ -249,6 +252,7 @@ export class ProductService {
   }
 
   async getPublicRoom(roomId: string) {
+    parseUuid(roomId, "roomId");
     const result = await this.database.query(
       `SELECT * FROM rooms WHERE id = $1 AND enabled = true AND deleted_at IS NULL AND system_reserved = false`,
       [roomId],
@@ -264,8 +268,8 @@ export class ProductService {
     const conditions = ["system_reserved = false"];
     const values: unknown[] = [];
     const add = (condition: string, input: unknown) => { values.push(input); conditions.push(condition.replace("?", `$${values.length}`)); };
-    if (url.searchParams.get("includeDeleted") !== "true") conditions.push("deleted_at IS NULL");
-    if (url.searchParams.has("enabled")) add("enabled = ?", url.searchParams.get("enabled") === "true");
+    if (!parseBooleanParameter(url.searchParams.get("includeDeleted"), "includeDeleted", false)) conditions.push("deleted_at IS NULL");
+    if (url.searchParams.has("enabled")) add("enabled = ?", parseBooleanParameter(url.searchParams.get("enabled"), "enabled", false));
     const keyword = url.searchParams.get("keyword")?.trim();
     if (keyword) {
       const pattern = `%${keyword.toLowerCase()}%`;
@@ -283,6 +287,7 @@ export class ProductService {
   }
 
   async getAdminRoom(roomId: string, queryable: Queryable = this.database): Promise<Row> {
+    parseUuid(roomId, "roomId");
     const result = await queryable.query("SELECT * FROM rooms WHERE id = $1 AND system_reserved = false", [roomId]);
     const row = result.rows[0];
     if (!row) notFound("Room");
@@ -577,6 +582,7 @@ export class ProductService {
   }
 
   async getReservationRow(reservationId: string, client: Queryable = this.database): Promise<Row> {
+    parseUuid(reservationId, "reservationId");
     const result = await client.query(`${this.reservationSelect} WHERE r.id=$1`, [reservationId]);
     const row = result.rows[0];
     if (!row) notFound("Reservation");
@@ -802,11 +808,11 @@ export class ProductService {
     const keyword = url.searchParams.get("keyword")?.trim().toLowerCase();
     if (from) { parseInstant(from, "from"); add("r.end_at > ?::timestamptz", from); }
     if (to) { parseInstant(to, "to"); add("r.start_at < ?::timestamptz", to); }
-    if (roomId) add("r.room_id = ?::uuid", roomId);
+    if (roomId) add("r.room_id = ?::uuid", parseUuid(roomId, "roomId"));
     if (status) {
       if (!allStatuses.has(status as ReservationStatus)) validation("Invalid reservation status.");
       add("r.status = ?::reservation_status", status);
-    } else if (url.searchParams.get("excludeCancelled") === "true") {
+    } else if (parseBooleanParameter(url.searchParams.get("excludeCancelled"), "excludeCancelled", false)) {
       conditions.push("r.status <> 'CANCELLED'");
     }
     if (source) {
@@ -834,7 +840,8 @@ export class ProductService {
   }
 
   async getWeeklyReservations(roomId: string, weekStart: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) validation("Invalid date format.", "weekStart");
+    parseUuid(roomId, "roomId");
+    parseDate(weekStart, "weekStart");
     const room = await this.getPublicRoom(roomId);
     const start = serviceOffsetDateTime(weekStart, "00:00");
     const endDate = new Date(`${weekStart}T00:00:00Z`);
@@ -869,6 +876,9 @@ export class ProductService {
     const startAt = url.searchParams.get("startAt");
     const endAt = url.searchParams.get("endAt");
     if (!roomId || !startAt || !endAt) validation("roomId, startAt and endAt are required.");
+    parseUuid(roomId, "roomId");
+    parseInstant(startAt, "startAt");
+    parseInstant(endAt, "endAt");
     const input: ReservationInput = {
       roomId,
       applicantName: "availability-check",
@@ -969,6 +979,7 @@ export class ProductService {
   }
 
   async getReservationHistories(reservationId: string) {
+    parseUuid(reservationId, "reservationId");
     await this.getReservationRow(reservationId);
     const result = await this.database.query(
       "SELECT * FROM reservation_histories WHERE reservation_id=$1 OR reservation_deleted_id=$1 ORDER BY created_at DESC",
@@ -987,15 +998,15 @@ export class ProductService {
     const action = url.searchParams.get("action");
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
-    if (reservationId) add("coalesce(reservation_id,reservation_deleted_id)=?::uuid", reservationId);
-    if (roomId) add("(reservation_room_id=?::uuid OR before_reservation_room_id=?::uuid)", roomId);
+    if (reservationId) add("coalesce(reservation_id,reservation_deleted_id)=?::uuid", parseUuid(reservationId, "reservationId"));
+    if (roomId) add("(reservation_room_id=?::uuid OR before_reservation_room_id=?::uuid)", parseUuid(roomId, "roomId"));
     if (roomId) {
       const last = values.length;
       conditions[conditions.length - 1] = `(reservation_room_id=$${last}::uuid OR before_reservation_room_id=$${last}::uuid)`;
     }
-    if (action) add("action=?", action);
-    if (from) add("created_at>=?::timestamptz", from);
-    if (to) add("created_at<=?::timestamptz", to);
+    if (action) add("action=?", parseEnumParameter(action, "action", historyActions));
+    if (from) { parseInstant(from, "from"); add("created_at>=?::timestamptz", from); }
+    if (to) { parseInstant(to, "to"); add("created_at<=?::timestamptz", to); }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const count = await this.database.query(`SELECT count(*) AS total FROM reservation_histories ${where}`, values);
     const result = await this.database.query(
@@ -1010,18 +1021,18 @@ export class ProductService {
   private parseRecurrence(body: unknown, requireApplicant: boolean): RecurrencePreviewInput | RecurrenceCreateInput {
     const object = requireObject(body);
     const roomId = requireUuid(object, "roomId");
-    const startDate = requireString(object, "startDate");
-    const endDate = requireString(object, "endDate");
+    const startDate = parseDate(requireString(object, "startDate"), "startDate");
+    const endDate = parseDate(requireString(object, "endDate"), "endDate");
     const daysOfWeek = normalizeDays(object.daysOfWeek);
-    const startTime = requireString(object, "startTime");
-    const endTime = requireString(object, "endTime");
+    const startTime = parseTime(requireString(object, "startTime"), "startTime");
+    const endTime = parseTime(requireString(object, "endTime"), "endTime");
     const applicantPhone = requireString(object, "applicantPhone", { max: 50 });
     const conflictPolicy = requireString(object, "conflictPolicy") as ConflictPolicy;
     if (!conflictPolicies.has(conflictPolicy)) validation("Invalid conflict policy.", "conflictPolicy");
-    if (!/^\d{2}:\d{2}(:00)?$/.test(startTime) || !/^\d{2}:\d{2}(:00)?$/.test(endTime) || startTime >= endTime) {
+    if (startTime >= endTime) {
       validation("Start time must be before end time.");
     }
-    const common = { object, roomId, startDate, endDate, daysOfWeek, startTime: startTime.slice(0, 5), endTime: endTime.slice(0, 5), applicantPhone, conflictPolicy };
+    const common = { object, roomId, startDate, endDate, daysOfWeek, startTime, endTime, applicantPhone, conflictPolicy };
     if (!requireApplicant) return common;
     return {
       ...common,
@@ -1180,8 +1191,9 @@ export class ProductService {
     const conditions: string[] = [];
     const values: unknown[] = [];
     const add = (condition: string, input: unknown) => { values.push(input); conditions.push(condition.replace("?", `$${values.length}`)); };
-    const status = url.searchParams.get("status")?.toUpperCase();
-    const includeDeleted = url.searchParams.get("includeDeleted") === "true" || status === "CANCELLED";
+    const rawStatus = url.searchParams.get("status");
+    const status = parseEnumParameter(rawStatus?.toUpperCase(), "status", recurrenceStatuses);
+    const includeDeleted = parseBooleanParameter(url.searchParams.get("includeDeleted"), "includeDeleted", false) || status === "CANCELLED";
     if (!includeDeleted) conditions.push("rr.deleted_at IS NULL");
     if (status === "ACTIVE") conditions.push("rr.deleted_at IS NULL");
     if (status === "CANCELLED") conditions.push("rr.deleted_at IS NOT NULL");
@@ -1189,16 +1201,17 @@ export class ProductService {
     const fromDate = url.searchParams.get("fromDate");
     const toDate = url.searchParams.get("toDate");
     const keyword = url.searchParams.get("keyword")?.trim().toLowerCase();
-    if (roomId) add("rr.room_id=?::uuid", roomId);
-    if (fromDate) add("rr.end_date>=?::date", fromDate);
-    if (toDate) add("rr.start_date<=?::date", toDate);
+    if (roomId) add("rr.room_id=?::uuid", parseUuid(roomId, "roomId"));
+    if (fromDate) add("rr.end_date>=?::date", parseDate(fromDate, "fromDate"));
+    if (toDate) add("rr.start_date<=?::date", parseDate(toDate, "toDate"));
     if (keyword) {
-      values.push(`%${keyword}%`, `%${keyword}%`, `%${keyword}%`);
-      const base = values.length - 2;
-      conditions.push(`(lower(rr.purpose) LIKE $${base} OR lower(rr.applicant_name) LIKE $${base + 1} OR lower(rr.applicant_email) LIKE $${base + 2})`);
+      values.push(`%${keyword}%`);
+      const parameter = values.length;
+      conditions.push(`(lower(rr.purpose) LIKE $${parameter} OR lower(rr.applicant_name) LIKE $${parameter} OR lower(rm.name) LIKE $${parameter} OR lower(coalesce(t.name,'')) LIKE $${parameter})`);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const count = await this.database.query(`SELECT count(*) AS total FROM reservation_recurrences rr ${where}`, values);
+    const recurrenceFrom = "FROM reservation_recurrences rr JOIN rooms rm ON rm.id=rr.room_id LEFT JOIN tags t ON t.id=rr.tag_id";
+    const count = await this.database.query(`SELECT count(*) AS total ${recurrenceFrom} ${where}`, values);
     const result = await this.database.query(
       `${this.recurrenceSelect} ${where} ORDER BY rr.created_at DESC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       [...values, size, offset],
@@ -1207,6 +1220,7 @@ export class ProductService {
   }
 
   async getRecurrence(recurrenceId: string) {
+    parseUuid(recurrenceId, "recurrenceId");
     const result = await this.database.query(`${this.recurrenceSelect} WHERE rr.id=$1`, [recurrenceId]);
     const row = result.rows[0];
     if (!row) notFound("Recurrence");
@@ -1244,6 +1258,7 @@ export class ProductService {
   }
 
   async cancelRecurrence(recurrenceId: string, body: unknown, adminUsername: string): Promise<void> {
+    parseUuid(recurrenceId, "recurrenceId");
     const object = body === undefined || body === null ? {} : requireObject(body);
     const memo = object.memo === undefined || object.memo === null ? null : requireString(object, "memo", { max: 1000, allowBlank: true });
     await this.database.transaction(async (client) => {
@@ -1266,7 +1281,7 @@ export class ProductService {
   async exportReservationsCsv(url: URL): Promise<string> {
     const filter = this.reservationFilter(url);
     const result = await this.database.query(
-      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC`,
+      `${this.reservationSelect} ${filter.where} ORDER BY r.start_at ASC`,
       filter.values,
     );
     const header = ["reservationId", "roomName", "applicantName", "applicantEmail", "applicantPhone", "purpose", "startAt", "endAt", "status", "source", "recurrenceId", "createdAt"];
@@ -1289,54 +1304,96 @@ export class ProductService {
   }
 
   async cleanupE2e(prefix: string, dryRun: boolean) {
-    if (prefix !== "testing-") validation("E2E cleanup prefix must be exactly testing-.");
+    const normalizedPrefix = prefix.trim().toLowerCase() || "testing-";
+    if (!normalizedPrefix.startsWith("testing-") || normalizedPrefix.includes("%") || normalizedPrefix.includes("_")) {
+      validation("E2E cleanup prefix must start with testing- and cannot contain SQL wildcards.");
+    }
     return this.database.transaction(async (client) => {
-      const pattern = `${prefix}%`;
-      const counts = await client.query(
-        `SELECT
-          (SELECT count(*) FROM reservation_histories h WHERE
-            coalesce(h.reservation_purpose,'') LIKE $1 OR coalesce(h.reservation_applicant_name,'') LIKE $1 OR coalesce(h.reservation_applicant_email,'') LIKE $1) AS histories,
-          (SELECT count(*) FROM reservations r WHERE r.purpose LIKE $1 OR r.applicant_name LIKE $1 OR r.applicant_email LIKE $1) AS reservations,
-          (SELECT count(*) FROM reservation_recurrences rr WHERE rr.purpose LIKE $1 OR rr.applicant_name LIKE $1 OR rr.applicant_email LIKE $1) AS recurrences,
-          (SELECT count(*) FROM tags t WHERE t.name LIKE $1 AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.tag_id=t.id AND NOT (rr.purpose LIKE $1 OR rr.applicant_name LIKE $1 OR rr.applicant_email LIKE $1))) AS tags,
-          (SELECT count(*) FROM tags t WHERE t.name LIKE $1 AND EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.tag_id=t.id AND NOT (rr.purpose LIKE $1 OR rr.applicant_name LIKE $1 OR rr.applicant_email LIKE $1))) AS tags_skipped,
-          (SELECT count(*) FROM rooms rm WHERE rm.system_reserved=false AND (rm.name LIKE $1 OR rm.location LIKE $1 OR rm.description LIKE $1)
-            AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.room_id=rm.id AND NOT (r.purpose LIKE $1 OR r.applicant_name LIKE $1 OR r.applicant_email LIKE $1))
-            AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.room_id=rm.id AND NOT (rr.purpose LIKE $1 OR rr.applicant_name LIKE $1 OR rr.applicant_email LIKE $1))) AS rooms`,
+      const pattern = `${normalizedPrefix}%`;
+      const ids = async (sql: string, values: unknown[]): Promise<string[]> => {
+        const result = await client.query(sql, values);
+        return result.rows.map((row) => text(row, "id"));
+      };
+      const roomIds = await ids(
+        "SELECT id FROM rooms WHERE system_reserved=false AND lower(name) LIKE $1",
         [pattern],
       );
-      const row = counts.rows[0]!;
+      const tagIds = await ids("SELECT id FROM tags WHERE lower(name) LIKE $1", [pattern]);
+      const recurrenceIds = await ids(
+        `SELECT id FROM reservation_recurrences
+         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(applicant_email) LIKE $1
+           OR room_id=ANY($2::uuid[])`,
+        [pattern, roomIds],
+      );
+      const reservationIds = await ids(
+        `SELECT id FROM reservations
+         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(applicant_email) LIKE $1
+           OR room_id=ANY($2::uuid[]) OR recurrence_id=ANY($3::uuid[])`,
+        [pattern, roomIds, recurrenceIds],
+      );
+      const historyIds = await ids(
+        `SELECT id FROM reservation_histories
+         WHERE reservation_id=ANY($2::uuid[]) OR reservation_deleted_id=ANY($2::uuid[])
+           OR lower(coalesce(reservation_purpose,'')) LIKE $1
+           OR lower(coalesce(reservation_room_name,'')) LIKE $1`,
+        [pattern, reservationIds],
+      );
+      const deletableTagIds = await ids(
+        `SELECT t.id FROM tags t WHERE t.id=ANY($1::uuid[])
+           AND NOT EXISTS (
+             SELECT 1 FROM reservation_recurrences rr
+             WHERE rr.tag_id=t.id AND NOT (rr.id=ANY($2::uuid[]))
+           )`,
+        [tagIds, recurrenceIds],
+      );
+      const deletableRoomIds = await ids(
+        `SELECT rm.id FROM rooms rm WHERE rm.id=ANY($1::uuid[]) AND rm.system_reserved=false
+           AND NOT EXISTS (
+             SELECT 1 FROM reservations r
+             WHERE r.room_id=rm.id AND NOT (r.id=ANY($2::uuid[]))
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM reservation_recurrences rr
+             WHERE rr.room_id=rm.id AND NOT (rr.id=ANY($3::uuid[]))
+           )`,
+        [roomIds, reservationIds, recurrenceIds],
+      );
       const summary = {
-        prefix,
+        prefix: normalizedPrefix,
         dryRun,
-        reservationHistoriesDeleted: number(row, "histories"),
-        reservationsDeleted: number(row, "reservations"),
-        recurrencesDeleted: number(row, "recurrences"),
-        tagsDeleted: number(row, "tags"),
-        tagsSkipped: number(row, "tags_skipped"),
-        roomsDeleted: number(row, "rooms"),
-        roomsSkipped: 0,
+        reservationHistoriesDeleted: historyIds.length,
+        reservationsDeleted: reservationIds.length,
+        recurrencesDeleted: recurrenceIds.length,
+        tagsDeleted: deletableTagIds.length,
+        tagsSkipped: tagIds.length - deletableTagIds.length,
+        roomsDeleted: deletableRoomIds.length,
+        roomsSkipped: roomIds.length - deletableRoomIds.length,
       };
       if (dryRun) return summary;
-      await client.query(
-        `DELETE FROM reservation_histories WHERE
-          coalesce(reservation_purpose,'') LIKE $1 OR coalesce(reservation_applicant_name,'') LIKE $1 OR coalesce(reservation_applicant_email,'') LIKE $1`,
-        [pattern],
+      const historiesDeleted = await client.query("DELETE FROM reservation_histories WHERE id=ANY($1::uuid[])", [historyIds]);
+      const reservationsDeleted = await client.query("DELETE FROM reservations WHERE id=ANY($1::uuid[])", [reservationIds]);
+      const recurrencesDeleted = await client.query("DELETE FROM reservation_recurrences WHERE id=ANY($1::uuid[])", [recurrenceIds]);
+      const tagsDeleted = await client.query(
+        `DELETE FROM tags t WHERE t.id=ANY($1::uuid[])
+           AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.tag_id=t.id)`,
+        [deletableTagIds],
       );
-      await client.query("DELETE FROM reservations WHERE purpose LIKE $1 OR applicant_name LIKE $1 OR applicant_email LIKE $1", [pattern]);
-      await client.query("DELETE FROM reservation_recurrences WHERE purpose LIKE $1 OR applicant_name LIKE $1 OR applicant_email LIKE $1", [pattern]);
-      await client.query(
-        `DELETE FROM tags t WHERE t.name LIKE $1
-          AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.tag_id=t.id)`,
-        [pattern],
+      const roomsDeleted = await client.query(
+        `DELETE FROM rooms rm WHERE rm.id=ANY($1::uuid[]) AND rm.system_reserved=false
+           AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.room_id=rm.id)
+           AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.room_id=rm.id)`,
+        [deletableRoomIds],
       );
-      await client.query(
-        `DELETE FROM rooms rm WHERE rm.system_reserved=false AND (rm.name LIKE $1 OR rm.location LIKE $1 OR rm.description LIKE $1)
-          AND NOT EXISTS (SELECT 1 FROM reservations r WHERE r.room_id=rm.id)
-          AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.room_id=rm.id)`,
-        [pattern],
-      );
-      return summary;
+      return {
+        ...summary,
+        reservationHistoriesDeleted: historiesDeleted.rowCount,
+        reservationsDeleted: reservationsDeleted.rowCount,
+        recurrencesDeleted: recurrencesDeleted.rowCount,
+        tagsDeleted: tagsDeleted.rowCount,
+        tagsSkipped: tagIds.length - tagsDeleted.rowCount,
+        roomsDeleted: roomsDeleted.rowCount,
+        roomsSkipped: roomIds.length - roomsDeleted.rowCount,
+      };
     });
   }
 }

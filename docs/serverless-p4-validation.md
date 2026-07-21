@@ -32,6 +32,7 @@ Hono를 domain/service에 전파하지 않았다. 일반 query는 Neon HTTP adap
 - 활성 예약의 partial GiST exclusion constraint
 - 예약·반복 예약 duration DB trigger
 - opaque session/CSRF digest 저장
+- 만료 세션 bounded cleanup을 위한 `(expires_at, session_id_hash)` index
 - Flyway table과 Spring `admins`, 가변 `slot_minutes` 없음
 - 삭제 공간 sentinel 포함
 - 공개 예약 접수 기본값 `false`
@@ -62,10 +63,10 @@ React는 기존 `type=password`를 유지하면서 해당 input 두 위치에만
 | --- | --- |
 | `worker: npm.cmd run check` | 통과 |
 | `worker: npm.cmd test` | 2 files, 6 tests 통과 |
-| `worker: npm.cmd run test:isolated-postgres` | 1 file, 12 tests 통과 |
+| `worker: npm.cmd run test:isolated-postgres` | 1 file, 22 tests 통과 |
 | baseline primary 재실행 | no-op 통과 |
 | baseline replay | 독립 DB schema 동일 |
-| schema SHA-256 | `2d9a1db6e394318274fd6d92ceb48360115b4808a95f9328b8b1f72333da22a0` |
+| schema SHA-256 | `41b0677905dd2cf45e1b5c4dbb5a13903c74cc79d27c4970fa8c3c0e97bfd5ea` |
 | transaction rollback | 통과 |
 | bcrypt 4/64, cost 12, 평문 부재 | 통과 |
 | 3/65/한글/공백/emoji/전각 거부 | 통과 |
@@ -75,7 +76,7 @@ React는 기존 `type=password`를 유지하면서 해당 input 두 위치에만
 | suite 후 cleanup preview | reservations/recurrences/tags/rooms 0 |
 | `frontend: npm.cmd run test:functions` | 9/9 통과 |
 | `frontend: npm.cmd run build` | 통과 |
-| `worker: npm.cmd run build` | dry-run bundle 성공, 356.75 KiB / gzip 87.13 KiB |
+| `worker: npm.cmd run build` | dry-run bundle 성공, 361.92 KiB / gzip 88.43 KiB |
 | disposable Neon baseline migration | 통과, 빈 DB와 전용 owner role 확인 |
 | Pages preview 전체 E2E | 기존 Playwright 80/80 통과 |
 | 원격 suite 후 cleanup preview | reservations/recurrences/tags/rooms 0 |
@@ -84,7 +85,23 @@ React는 기존 `type=password`를 유지하면서 해당 input 두 위치에만
 
 ## Cleanup 보호
 
-cleanup route 등록 조건은 `APP_ENV !== prod`와 `E2E_CLEANUP_ENABLED === true`의 논리곱이다. production에서는 flag 값과 무관하게 route 자체가 404다. 삭제 대상은 `testing-` marker나 그 marker에 연결된 row로 제한하며, ID 기반 fixture teardown 후 prefix 기반 fallback을 실행한다. suite 종료 후 preview가 0이 아니면 실패한다.
+cleanup route 등록 조건은 `APP_ENV !== prod`와 `E2E_CLEANUP_ENABLED === true`의 논리곱이다. production에서는 flag 값과 무관하게 route 자체가 404다. 삭제 대상은 직접 `testing-*` marker가 있는 공간·태그·예약·반복 예약, testing 공간에 연결된 예약·반복 예약, testing 반복 예약이 생성한 개별 예약, 그리고 이 예약 ID나 snapshot marker에 연결된 감사 이력의 ID/FK 폐쇄 집합이다. marker 또는 검증된 관계가 없는 일반 리소스는 삭제하지 않는다.
+
+preview와 execute는 같은 target ID 집합을 계산한다. 예약·반복 예약 삭제 후에도 일반 리소스가 참조하는 testing tag는 삭제하지 않고 `tagsSkipped`로 보고한다. 공간도 실제 남은 참조가 있으면 `roomsSkipped`로 보고하며 응답 값을 하드코딩하지 않는다. ID 기반 fixture teardown 후 prefix 기반 fallback을 실행하고 suite 종료 후 preview가 0이 아니면 실패한다.
+
+## 검토 보고서 정합성 보강
+
+P4 구현 검토에서 발견된 계약 공백을 Spring 기준 코드와 테스트에 맞춰 다음처럼 닫았다.
+
+- 반복 예약 검색은 목적, 신청자 이름, 공간명, 태그명만 대소문자 무시 부분검색한다. 신청자 이메일은 검색하지 않는다. 기존 `createdAt DESC`, pagination, 활성/취소, 공간과 날짜 겹침 필터를 함께 유지한다.
+- CSV는 Spring과 같이 필터 조건 전체를 `startAt ASC`로 내보내며 pagination query와 무관하다. BOM, 열 이름·순서, escaping, 서울 시간 형식과 응답 header를 PostgreSQL 계약 테스트로 고정했다.
+- UUID, 날짜, 날짜·시간, 운영 시간, enum, boolean과 pagination query를 공통 parser에서 HTTP/서비스 경계에 검증한다. 존재하지 않는 달력 날짜와 초·소수초가 있는 운영 시간을 DB cast 전에 거부하며, 예상하지 못한 DB/서버 오류는 500으로 유지한다.
+- 운영 설정은 모든 입력을 먼저 검증한 뒤 version 조건을 포함한 단일 UPDATE로 저장하므로 잘못된 입력이나 version conflict에서 일부 필드만 저장되지 않는다.
+- `FAIL_ALL` 반복 예약은 한 후보라도 충돌하면 반복 예약, 개별 예약, 감사 이력을 하나도 만들지 않는다.
+- session/CSRF 발급 시 만료 순서로 최대 100개만 CTE delete한다. 유효 세션은 유지하고 요청마다 무제한 삭제하지 않는다.
+- production cookie의 session `Secure; HttpOnly; SameSite=Lax; Path=/`, 읽기 가능한 `XSRF-TOKEN`의 `Secure; HttpOnly=false; SameSite=Lax; Path=/`, header 검증과 logout row 삭제를 직접 검증한다.
+
+GitHub Actions에는 기존 Spring backend와 Java 기반 프런트 E2E를 유지하면서 별도 `Worker validation`과 `Frontend E2E against Worker` job을 추가했다. 전자는 Node 22에서 clean install, TypeScript, unit/contract, 일회용 PostgreSQL baseline replay, Wrangler dry-run과 audit를 실행한다. 후자는 실제 Neon/Cloudflare secret 없이 새 일회용 PostgreSQL에 V1을 적용하고 로컬 Worker와 Vite same-origin `/api` proxy를 통해 기존 React Playwright 전체 E2E 및 종료 후 잔여 0건 검사를 실행한다.
 
 ## 원격 UAT 결과
 

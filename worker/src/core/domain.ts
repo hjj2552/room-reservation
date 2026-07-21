@@ -35,6 +35,8 @@ export interface ReservationInput {
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+const instantPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
 const days = new Set(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
 
 export function requireObject(value: unknown): Record<string, unknown> {
@@ -82,8 +84,52 @@ export function requireInteger(object: Record<string, unknown>, field: string, m
 
 export function requireUuid(object: Record<string, unknown>, field: string): string {
   const value = requireString(object, field);
-  if (!uuidPattern.test(value)) validation("must be a UUID", field);
+  return parseUuid(value, field);
+}
+
+export function parseUuid(value: string | null | undefined, field = "id"): string {
+  if (typeof value !== "string" || !uuidPattern.test(value)) validation("must be a UUID", field);
   return value;
+}
+
+export function parseDate(value: string | null | undefined, field = "date"): string {
+  if (typeof value !== "string") validation("Invalid date format.", field);
+  const match = datePattern.exec(value);
+  if (!match) validation("Invalid date format.", field);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    validation("Invalid date format.", field);
+  }
+  return value;
+}
+
+export function parseTime(value: string | null | undefined, field = "time"): string {
+  if (typeof value !== "string") validation("Invalid time format.", field);
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59 || (match[3] !== undefined && match[3] !== "00")) {
+    validation("Time must use HH:mm without seconds or fractional seconds.", field);
+  }
+  return `${match[1]}:${match[2]}`;
+}
+
+export function parseBooleanParameter(value: string | null, field: string, fallback: boolean): boolean {
+  if (value === null) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  validation("must be true or false", field);
+}
+
+export function parseEnumParameter<T extends string>(
+  value: string | null | undefined,
+  field: string,
+  allowed: readonly T[],
+): T | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (!allowed.includes(value as T)) validation(`must be one of ${allowed.join(", ")}`, field);
+  return value as T;
 }
 
 export function requireEmail(object: Record<string, unknown>, field: string): string {
@@ -108,8 +154,31 @@ export function parseReservationInput(object: Record<string, unknown>): Reservat
 }
 
 export function parseInstant(value: string, field = "dateTime"): Date {
+  const match = instantPattern.exec(value);
+  if (!match) validation("Invalid date/time format.", field);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendarDate.getUTCFullYear() !== year
+    || calendarDate.getUTCMonth() !== month - 1
+    || calendarDate.getUTCDate() !== day
+    || hour > 23
+    || minute > 59
+    || second > 59
+  ) {
+    validation("Invalid date/time format.", field);
+  }
+  if (match[8] !== "Z") {
+    const [offsetHour, offsetMinute] = match[8]!.slice(1).split(":").map(Number) as [number, number];
+    if (offsetHour > 23 || offsetMinute > 59) validation("Invalid date/time format.", field);
+  }
   const parsed = new Date(value);
-  if (!Number.isFinite(parsed.getTime()) || !/(Z|[+-]\d{2}:\d{2})$/.test(value)) {
+  if (!Number.isFinite(parsed.getTime())) {
     validation("Invalid date/time format.", field);
   }
   return parsed;
@@ -195,7 +264,9 @@ export function serviceOffsetDateTime(date: string, time: string): string {
 }
 
 export function datesInRange(start: string, end: string): string[] {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+  parseDate(start, "startDate");
+  parseDate(end, "endDate");
+  if (start > end) {
     validation("Start date must be before or equal to end date.", "startDate");
   }
   const result: string[] = [];

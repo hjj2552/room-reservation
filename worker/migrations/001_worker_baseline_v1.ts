@@ -293,7 +293,7 @@ export function up(pgm: MigrationBuilder): void {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
-    CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions (expires_at);
+    CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions (expires_at, session_id_hash);
 
     INSERT INTO operation_settings (
       id, organization_name, public_notice, reservation_enabled,
