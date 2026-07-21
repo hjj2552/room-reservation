@@ -13,5 +13,5 @@
     ],
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "*.ts"]
+  "include": ["src", "tests", "remote", "*.ts"]
 }
