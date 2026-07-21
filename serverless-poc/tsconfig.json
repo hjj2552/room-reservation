@@ -9,5 +9,5 @@
     "types": ["@cloudflare/workers-types", "vitest/globals"],
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "scripts", "migrations", "*.ts"]
+  "include": ["src", "tests", "scripts", "migrations", "remote-migrations", "*.ts"]
 }
