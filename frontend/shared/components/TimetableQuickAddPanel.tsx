@@ -3,6 +3,12 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { statusLabels } from '../utils/labels';
+import {
+  acceptsPublicPasswordInput,
+  publicPasswordBlockedMessage,
+  publicPasswordHelp,
+  publicPasswordPattern,
+} from '../utils/publicPassword';
 import type { ReservationTimeSelection } from '../utils/reservationTime';
 import { ReservationTimeRangeInput } from './ReservationTimeRangeInput';
 
@@ -192,8 +198,8 @@ export function ReservationRequestPanel({
     if (!values.purpose) nextErrors.purpose = '신청 목적을 입력해 주세요.';
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
-    if (!isAdmin && (!values.cancelPassword || values.cancelPassword.length < 4)) {
-      nextErrors.cancelPassword = '예약 비밀번호를 4자 이상 입력해 주세요.';
+    if (!isAdmin && !publicPasswordPattern.test(values.cancelPassword)) {
+      nextErrors.cancelPassword = publicPasswordHelp;
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -388,10 +394,20 @@ export function ReservationRequestPanel({
               type="password"
               data-testid="public-request-cancel-password-input"
               value={values.cancelPassword}
-              placeholder="4자리 이상, 수정 및 취소 시 사용"
-              onChange={(event) => updateField('cancelPassword', event.target.value)}
+              minLength={4}
+              maxLength={64}
+              pattern="[\x21-\x7E]{4,64}"
+              placeholder="영문·숫자·특수문자 4~64자"
+              onChange={(event) => {
+                if (!acceptsPublicPasswordInput(event.target.value)) {
+                  setErrors((current) => ({ ...current, cancelPassword: publicPasswordBlockedMessage }));
+                  return;
+                }
+                updateField('cancelPassword', event.target.value);
+              }}
               {...inputErrorProps('cancelPassword')}
             />
+            <span className="field-help">{publicPasswordHelp}</span>
             {fieldError('cancelPassword')}
           </label>
         )}

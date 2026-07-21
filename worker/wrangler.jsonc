@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "room-reservation-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": true,
+  "env": {
+    "uat": {
+      "name": "room-reservation-worker-uat",
+      "workers_dev": false,
+      "preview_urls": true,
+      "vars": {
+        "APP_ENV": "uat",
+        "E2E_CLEANUP_ENABLED": "true"
+      }
+    },
+    "production": {
+      "name": "room-reservation-worker-production",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "APP_ENV": "prod",
+        "E2E_CLEANUP_ENABLED": "false"
+      }
+    }
+  }
+}

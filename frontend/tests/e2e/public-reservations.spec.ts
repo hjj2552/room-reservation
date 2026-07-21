@@ -174,8 +174,20 @@ test('public toolbar request opens the shared panel without slot room context', 
     await expect(page.getByTestId('public-request-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
     await expect(page.getByTestId('public-request-cancel-password-input')).toHaveAttribute(
       'placeholder',
-      '4자리 이상, 수정 및 취소 시 사용',
+      '영문·숫자·특수문자 4~64자',
     );
+    const passwordInput = page.getByTestId('public-request-cancel-password-input');
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+    await expect(passwordInput).toHaveAttribute('minlength', '4');
+    await expect(passwordInput).toHaveAttribute('maxlength', '64');
+    await expect(passwordInput.locator('..')).toContainText('예약 비밀번호는 영문, 숫자, 특수문자를 사용해 4~64자로 입력해 주세요.');
+    await passwordInput.fill('Aa1!');
+    await expect(passwordInput).toHaveValue('Aa1!');
+    await passwordInput.fill('한글');
+    await expect(passwordInput).toHaveValue('Aa1!');
+    await expect(passwordInput.locator('..')).toContainText('한글과 공백은 사용할 수 없습니다.');
+    await passwordInput.fill(`A${'b'.repeat(61)}1!`);
+    await expect(passwordInput).toHaveValue(`A${'b'.repeat(61)}1!`);
     await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('');
   } finally {
     const latestSettings = await getSettingsByApi(request);
