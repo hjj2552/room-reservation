@@ -6,6 +6,8 @@
 
 범위: D1 채택 가능성 판단을 위한 격리된 P3 PoC. 제품 baseline V1, 전체 API, 운영 DB, Pages proxy, rate limit, 프런트엔드는 변경하지 않았다.
 
+> **P3 최종 제품 결정 (2026-07-21):** 이 문서의 `D1 채택 보류`는 당시 비교 결과로 보존한다. 최종 선택은 D1 채택 취소, TypeScript Cloudflare Worker + Neon PostgreSQL 채택이며 P4를 진행한다. 공개 예약 비밀번호는 printable ASCII 4~64자와 Neon `pgcrypto` bcrypt cost 12를 사용한다.
+
 ## 결론
 
 **최종 권고는 `D1 채택 보류`다.**

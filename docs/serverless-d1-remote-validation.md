@@ -6,6 +6,8 @@
 
 범위: 기존 local D1 PoC의 원격 gate 검증. PBKDF2 gate를 가장 먼저 실행하고, 실패 시 D1을 만들지 않는 중단 순서를 적용했다. 제품 코드, 기존 Pages, route, domain, DNS, 운영 DB와 서버리스 마이그레이션 계약은 변경하지 않았다.
 
+> **P3 최종 제품 결정 (2026-07-21):** 이 문서의 `D1 채택 보류`와 PBKDF2 진단은 비교 이력으로 보존한다. 최종 선택은 D1 채택 취소, TypeScript Cloudflare Worker + Neon PostgreSQL 채택이다. 공개 예약 비밀번호에는 PBKDF2를 사용하지 않고 printable ASCII 4~64자와 Neon `pgcrypto` bcrypt cost 12를 사용한다.
+
 > **후속 정정 (2026-07-21):** 100,000회 진단에서 계정 workers.dev가 비활성화되어 직접 URL 요청이 Worker 실행 전에 404가 된 것을 확인했다. 아래 600,000회 실행도 exact status를 보존하지 않은 채 같은 진입 방식을 사용했으므로 PBKDF2 또는 CPU 실패 근거로 사용할 수 없고 원격 판정은 미확정이다. “인증 없는 요청 401”은 반복 횟수 거부가 아니라 probe 인증 대조군이다. 상세 근거는 [PBKDF2 100,000회 원격 재검증](serverless-d1-pbkdf2-100k-validation.md)을 참조한다.
 
 ## 최종 판정

@@ -1,5 +1,7 @@
 # Cloudflare Worker + Neon PostgreSQL P3 원격 검증
 
+상태: 완료
+
 검증일: 2026-07-21 (Asia/Seoul)
 
 대상 브랜치: `codex/serverless-migration-contract`
@@ -10,11 +12,13 @@
 
 ## 최종 판정
 
-**Worker + Neon PostgreSQL 채택은 보류한다.**
+**TypeScript Cloudflare Worker + Neon PostgreSQL을 채택한다. P4 전체 재작성을 진행할 수 있다.**
 
 플랫폼과 데이터 계층의 기술 가능성은 입증됐다. 실제 Worker에서 Neon HTTP query, HTTP batch transaction, 요청 범위 WebSocket transaction, `btree_gist`, `pgcrypto`, 경쟁 예약 제약, migration replay, Pages same-origin proxy, session·CSRF와 scale-to-zero 복구가 모두 성공했다.
 
-하지만 `pgcrypto`의 bcrypt(`bf`)는 72-byte 이후 입력을 조용히 무시한다. 현재 Spring 공개 예약 비밀번호는 `@Size(min = 4, max = 100)`으로 Java 문자 100개까지 허용한다. 실험에서 처음 72 bytes가 같고 이후만 다른 두 비밀번호가 동일한 것으로 검증됐다. 요청서의 성공 조건인 “bcrypt 72-byte 제한과 현재 제품 계약 사이에 미해결 충돌 없음”을 충족하지 못하므로, 입력 계약 또는 해싱 방식을 사용자가 결정하기 전에는 P4 전체 구현을 시작하지 않는다.
+`pgcrypto`의 bcrypt(`bf`)가 72-byte 이후 입력을 조용히 무시한다는 위험은 원격 검증에서 확인됐다. 사용자는 공개 예약 비밀번호를 printable ASCII 4~64자(`^[\x21-\x7E]{4,64}$`)로 제한하는 제품 정책 변경을 승인했다. 허용 입력은 UTF-8에서도 최대 64 bytes이므로 72-byte 제한에 걸리지 않으며 blocker가 해소됐다.
+
+현재 Spring도 공통 `BCryptPasswordEncoder`로 공개 예약 비밀번호를 처리하면서 DTO는 Unicode 4~100자를 허용한다. 따라서 이 위험은 Worker 마이그레이션이 새로 만든 제약이 아니라 기존 시스템에도 존재하던 잠재 문제다. 실제 운영 데이터가 없고 DB를 초기화할 예정이므로 기존 100자·한글 비밀번호 호환 없이 정책을 명시적으로 바로잡는다.
 
 rate limit은 별도 Go-Live 보안 과제로 보류됐다. 이 결정은 이번 P4 진행 판정의 blocker가 아니지만, 완료 전 공개 예약 접수를 실제 활성화해서는 안 된다.
 
@@ -167,7 +171,7 @@ EXCLUDE USING gist (
 - 저장된 값: `$2` 형식 hash만 존재
 - 응답/일반 로그: 평문/hash/salt 없음
 
-#### 72-byte blocker
+#### 72-byte 위험과 승인된 해소
 
 | 입력 | UTF-8 bytes | hash |
 |---|---:|---:|
@@ -177,15 +181,20 @@ EXCLUDE USING gist (
 | 한글 24자 | 72 | 200 |
 | 한글 25자 | 75 | 200 |
 
-처음 72 bytes가 같고 73번째 byte부터 다른 두 문자열은 `matched=true`였다. PostgreSQL도 bcrypt `bf`의 최대 password length를 72로 명시한다. 현재 Java 문자 100자 계약에서는 ASCII 73~100자와 한글 25자 이상 등이 영향을 받는다. 조용한 truncate는 사용할 수 없다.
+처음 72 bytes가 같고 73번째 byte부터 다른 두 문자열은 `matched=true`였다. PostgreSQL도 bcrypt `bf`의 최대 password length를 72로 명시한다. 기존 Java 문자 100자 계약에서는 ASCII 73~100자와 한글 25자 이상 등이 영향을 받았고 조용한 truncate 위험이 있었다.
 
-해결 선택지는 다음과 같으며 자동 선택하지 않는다.
+최종 제품 정책은 다음과 같다.
 
-1. API와 UI의 공개 예약 비밀번호 최대를 **UTF-8 72 bytes**로 변경하고 명시적으로 초과를 거부한다. 가장 단순하지만 제품 입력 계약 변경이다.
-2. versioned pre-hash 후 bcrypt를 사용한다. OWASP가 password shucking과 binary/null 처리 위험을 경고하므로 domain separation, printable encoding, pepper/rotation, format migration을 별도 보안 설계·검증해야 한다.
-3. 100자 계약을 유지하고 Argon2id/scrypt 등 72-byte 제한이 없는 KDF를 별도 adapter에서 검증한다. Worker CPU/memory/비용 gate가 새로 필요하다.
+- 길이 4~64자
+- printable ASCII `!`~`~`만 허용
+- Worker 최종 검증 정규식 `^[\x21-\x7E]{4,64}$`
+- 영문 대·소문자, 숫자, ASCII 특수문자 허용
+- 한글, 공백, emoji, 전각 문자와 기타 Unicode 거부
+- 대·소문자 구분, trim/normalization/transliteration 없음
+- 프런트의 네이티브 `type="password"` 유지, 실제 비ASCII 입력 차단은 UX 보조
+- API 직접 호출에도 같은 Worker 검증 적용
 
-PBKDF2 100,000회는 자동 채택하지 않는다. 사용자 결정 전 `pgcrypto` bcrypt도 채택하지 않는다.
+저장은 parameterized query로 `crypt(password, gen_salt('bf', 12))`를 실행하고 bcrypt hash만 남긴다. 사용자 입력을 직접 bcrypt에 전달하며 HMAC pre-hash와 pepper를 추가하지 않는다. PBKDF2 600,000회와 100,000회 모두 채택하지 않는다. 최대 입력이 ASCII 64 bytes이므로 원격 검증에서 확인한 72-byte 위험을 회피한다.
 
 #### cost 측정
 
@@ -203,7 +212,7 @@ PBKDF2 100,000회는 자동 채택하지 않는다. 사용자 결정 전 `pgcryp
 | 12 | 정상 verify | 627.0 / 768.5 / 768.5 | 468 / 479 / 479 |
 | 12 | 오류 verify | 625.8 / 701.3 / 701.3 | 467 / 482 / 482 |
 
-OWASP는 bcrypt를 legacy 선택으로 분류하고 최소 cost 10과 최대 72-byte 입력을 권고한다. 제품 입력을 UTF-8 72 bytes로 제한하기로 승인한다면, 공개 예약 비밀번호 사용 빈도가 낮고 cost 12의 p95가 0.8초 미만이므로 **P4 시작값 cost 12**를 권고한다. 실제 UAT 부하와 사용자 지연을 다시 보되 성능 때문에 10 미만으로 낮추지 않는다. 72-byte 계약을 유지하지 않기로 하면 이 cost 권고는 무효다. [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [PostgreSQL pgcrypto](https://www.postgresql.org/docs/current/pgcrypto.html)
+OWASP는 bcrypt를 legacy 선택으로 분류하고 최소 cost 10과 최대 72-byte 입력을 권고한다. 공개 예약 비밀번호 사용 빈도가 낮고 cost 12의 p95가 0.8초 미만이므로 **P4 cost를 12로 확정**한다. 실제 UAT에서 사용자 지연을 관찰하되 성능 때문에 승인 없이 cost를 낮추지 않는다. [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html), [PostgreSQL pgcrypto](https://www.postgresql.org/docs/current/pgcrypto.html)
 
 관리자 계정은 기존 방향대로 Worker secret 기반 단일 계정이며 관리자 table/hash를 Neon에 추가하지 않았다.
 
@@ -260,6 +269,7 @@ P4에 그대로 적용할 결정:
 - session: Neon table에 session/CSRF digest와 expiry 저장
 - CSRF: 기존 `XSRF-TOKEN` cookie + `X-XSRF-TOKEN` header 계약 유지
 - 1차 배포: Pages Function proxy 유지, React의 same-origin `/api` 유지
+- 공개 예약 비밀번호: printable ASCII 4~64자, `pgcrypto` bcrypt cost 12
 - UAT/prod: 별도 Worker 이름과 명시적 `APP_ENV`; prod에서는 cleanup route 미등록
 - artifact identity: Git SHA + Worker bundle SHA-256 + baseline migration set SHA-256
 
@@ -273,7 +283,7 @@ Cloudflare/Neon 종속성은 다음 adapter에만 둔다.
 - `UnitOfWork`: HTTP batch 또는 request-scoped WebSocket
 - `SessionStore`: Neon session row
 - `ClientIpSource`: Pages ingress와 인증된 proxy 전달 경계
-- `PasswordHasher`: 미결정. bcrypt를 선택할 때만 `pgcrypto` adapter
+- `PasswordHasher`: Neon `pgcrypto` bcrypt cost 12 adapter
 - `MigrationRunner`: Node 배포/CI 전용
 
 제외한 대안:
@@ -286,23 +296,30 @@ Cloudflare/Neon 종속성은 다음 adapter에만 둔다.
 - D1: 사용자 결정으로 취소, 기존 비교 기록은 보존
 - isolate-local session/rate limit: 분산 실행 계약을 만족하지 못함
 
-## Rate limit과 계약 충돌
+## Rate limit의 Go-Live gate 이전
 
 이번 P3/P4 핵심 재작성에서는 rate limit을 구현하지 않는다. 목적은 정확한 전역 과금 제한이 아니라 공개 API의 기본 남용 완화이며, Pages proxy IP 신뢰 경계를 확정한 뒤 Go-Live 전 별도 보안 작업으로 구현·검증한다. 완료 전 공개 예약 접수를 실제 활성화하지 않는다.
 
-이는 현재 계약의 다음 위치와 충돌한다.
+최종 제품 결정에 따라 계약서는 P4 완료 조건과 Go-Live gate를 분리한다. 기존 120/min read, 24/min write 및 429 응답은 후속 작업의 외부 기준으로 유지하지만 정확한 전역 counter는 요구하지 않는다. 실제 공개 예약 접수 활성화 전에는 IP 신뢰 경계와 rate limit 구현·검증을 반드시 완료한다.
 
-- 13절 `docs/serverless-migration-contract.md:428-444`: 기존 수치 유지와 P3 공유·원자 방식 검증 요구
-- 22절 `docs/serverless-migration-contract.md:833-836`: 완료 조건으로 rate limit 수치/429 및 isolate-local 비의존 확인 요구
+## P4 구현 요구사항
 
-계약서는 이번 작업에서 수정하지 않았다. 후속 승인 시 P3 완료 조건과 Go-Live gate를 분리하도록 위 위치를 변경해야 한다.
+P4를 진행할 수 있으며 공개 예약 비밀번호에는 다음 완료 테스트를 추가한다.
 
-## P4 전 사용자 결정
+- ASCII 4자와 64자 성공
+- 3자와 65자 거부
+- 한글·공백·emoji·전각 문자 거부
+- ASCII 특수문자 성공
+- 영문 대·소문자 구분
+- 한글 자판 상태에서 브라우저 네이티브 영문 입력 동작 확인
+- 붙여넣기 비ASCII 값의 프런트 차단
+- API 직접 호출의 비ASCII 값 거부
+- bcrypt hash에 평문이 남지 않음
+- 올바른 비밀번호 성공과 잘못된 비밀번호 실패
 
-1. 공개 예약 비밀번호 계약을 UTF-8 최대 72 bytes로 바꾸고 초과를 UI/API에서 거부한 뒤 `pgcrypto` bcrypt cost 12를 쓸지 결정한다.
-2. 100자 계약을 유지한다면 pre-hash+bcrypt 보안 설계 또는 72-byte 제한이 없는 KDF의 새 Worker 비용/보안 검증 중 하나를 승인한다.
-3. rate limit 계약을 P4 완료 조건에서 Go-Live 전 gate로 옮기는 계약 변경을 승인한다.
-4. Pages→Worker client IP 전달을 Service Binding 또는 서명 header로 인증하는 방식은 rate-limit 후속에서 결정한다.
+프런트 변경은 기존 `type="password"`를 유지하면서 4~64자 printable ASCII 제한, 안내 문구와 실제 비ASCII 입력 차단을 추가하는 최소 범위로 제한한다. 다른 UI/UX, API, 시간·예약 정책은 변경하지 않는다.
+
+Pages→Worker IP 전달을 Service Binding 또는 서명 header로 인증하는 방식은 Go-Live 전 rate-limit 후속에서 결정한다.
 
 ## 재사용과 폐기
 
@@ -323,7 +340,7 @@ P4에서 재사용할 수 있는 부분:
 - 검증 probe token과 version preview 설정
 - PoC room/reservation/event/session schema
 - 원격 검증 deploy/update/runner/cleanup script
-- 제품 계약 결정 전의 직접 `pgcrypto` bcrypt adapter
+- 검증용 `pgcrypto` bcrypt endpoint와 table 자체는 폐기하되 cost 12 parameterized query 패턴은 제품 adapter에 재사용
 - P4 최종 baseline V1로 사용할 수 없는 원격 PoC migration
 
 ## 실행 명령과 결과

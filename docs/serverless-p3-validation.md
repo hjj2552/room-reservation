@@ -1,5 +1,7 @@
 # 서버리스 마이그레이션 P3 최소 기술 검증 결과
 
+상태: 완료
+
 검증일: 2026-07-20
 
 대상 브랜치: `codex/serverless-migration-contract`
@@ -8,17 +10,18 @@
 
 범위: `docs/serverless-migration-contract.md` 21절의 P3 기술 선택 검증만 수행했다. 이 문서의 `serverless-poc`은 P4 제품 백엔드나 Worker baseline V1이 아니다. 기존 Spring Boot, React, Render 설정, 현재 Neon schema와 운영 전 데이터는 변경하지 않았다.
 
-> **원격 후속 검증 정정 (2026-07-21):** D1 채택은 취소했고 1차 마이그레이션에서는 기존 Pages Function `/api` proxy를 유지한다. disposable Cloudflare Worker·Pages preview·Neon PostgreSQL에서 HTTP/batch/WebSocket transaction, 경쟁 예약 10회, migration replay, session·CSRF, scale-to-zero 복구를 모두 검증했다. 그러나 `pgcrypto` bcrypt가 72 bytes 이후를 구분하지 않아 현재 공개 예약 비밀번호 최대 100자 계약과 충돌한다. 따라서 **Worker + Neon 최종 채택과 P4 시작은 비밀번호 계약/해싱 방식 결정 전까지 보류**한다. PBKDF2 100,000회는 제품값으로 채택하지 않는다. rate limit은 P4 핵심 재작성에서 제외하고 실제 Go-Live 전 별도 필수 보안 과제로 관리한다. 아래의 기존 “P4 시작 가능”, direct Worker route, PBKDF2, P4 rate-limit 결정은 2026-07-20 로컬 검증 당시 기록이며 이 정정이 우선한다. 상세 근거는 [Worker + Neon PostgreSQL P3 원격 검증](serverless-neon-remote-validation.md)을 참조한다.
+> **P3 최종 결정 (2026-07-21):** D1 채택은 취소하고 TypeScript Cloudflare Worker + Neon PostgreSQL을 채택한다. 1차 마이그레이션에서는 기존 Pages Function `/api` proxy를 유지한다. 원격 검증에서 발견한 bcrypt 72-byte 위험은 공개 예약 비밀번호를 printable ASCII 4~64자(`^[\x21-\x7E]{4,64}$`)로 제한하는 승인된 제품 정책으로 해소했다. `pgcrypto` bcrypt cost 12를 사용하며 HMAC·pepper·PBKDF2는 채택하지 않는다. P4 전체 재작성을 진행할 수 있다. rate limit은 P4 핵심 재작성에서 제외하고 실제 Go-Live 전 필수 보안 과제로 관리하며, 완료 전 공개 예약 접수를 활성화하지 않는다. 상세 근거는 [Worker + Neon PostgreSQL P3 원격 검증](serverless-neon-remote-validation.md)을 참조한다.
 
 ## 1. 결론
 
-Cloudflare Workers + TypeScript + Neon PostgreSQL의 데이터·배포 기술 가능성은 원격 후속 검증에서 확인됐다. 다만 공개 예약 비밀번호의 72-byte 충돌이 미해결이므로 최종 채택과 P4 구현 시작은 보류한다. 다음 항목은 2026-07-20 로컬 검증 시점에 원격 gate로 남겼던 기록이며, 2026-07-21 결과는 상단 정정과 별도 원격 검증 문서를 따른다.
+Cloudflare Workers + TypeScript + Neon PostgreSQL의 데이터·배포 기술 가능성을 로컬과 원격에서 확인했고 최종 채택한다. P4 구현을 시작할 수 있다.
 
-1. Neon branch에서 `btree_gist` 설치, HTTP 쿼리, WebSocket 또는 batch transaction을 실제로 왕복 검증한다.
-2. Pages custom domain의 `/api/*` Worker route와 `CF-Connecting-IP`를 UAT에서 검증한다.
-3. PBKDF2-HMAC-SHA256 600,000회의 실제 Workers Free CPU 사용량을 원격 관측한다. 10 ms를 지속적으로 초과하면 보안 강도를 낮추지 말고 비밀번호 해싱을 PostgreSQL `pgcrypto` bcrypt로 옮기거나 Workers Paid를 선택한다.
+1. Neon branch에서 `btree_gist`, `pgcrypto`, HTTP query/batch, 요청 범위 WebSocket transaction과 migration replay를 실제 왕복 검증했다.
+2. Pages preview의 기존 Pages Function `/api` proxy에서 same-origin session·CSRF·cookie·status 보존을 검증하고 1차 구성으로 확정했다.
+3. 공개 예약 비밀번호는 printable ASCII 4~64자로 제한해 bcrypt 72-byte 위험을 제거하고 Neon `pgcrypto` bcrypt cost 12를 사용한다.
+4. rate limit은 P4 차단 조건에서 제외하지만 실제 Go-Live 전 필수이며, 완료 전 공개 예약 접수를 활성화하지 않는다.
 
-이 세 항목은 현재 계약을 불가능하게 만드는 blocker는 아니지만, 무료 운영과 실제 배포 구성을 확정하는 blocker다. 실제 Spring/Neon 초기화, production route 변경, Render 중지는 수행하지 않았다.
+실제 Spring/Neon 초기화, production route 변경, Render 중지는 P3에서 수행하지 않았다.
 
 ## 2. 검증용 PoC 구조
 
@@ -156,41 +159,28 @@ CSRF는 session-bound synchronizer token으로 구현한다.
 
 ### 공개 예약 비밀번호
 
-> 원격 후속 결과: PBKDF2는 채택하지 않으며 `pgcrypto` bcrypt도 현재 100자 입력 계약과 72-byte 제한의 충돌이 해결될 때까지 채택 보류다. 아래 내용은 로컬 단계의 초기 후보 기록이다.
+- 입력은 printable ASCII `!`~`~`의 4~64자이며 Worker가 `^[\x21-\x7E]{4,64}$`로 최종 검증한다.
+- 영문 대·소문자, 숫자와 ASCII 특수문자를 허용하고 한글·공백·emoji·전각 문자·기타 Unicode를 거부한다.
+- trim, Unicode normalization, transliteration이나 커스텀 QWERTY 변환을 하지 않는다.
+- 프런트는 기존 네이티브 `type="password"`를 유지하고 실제 비ASCII 입력 차단과 안내만 UX 보조로 추가한다.
+- Neon `pgcrypto`의 `crypt(password, gen_salt('bf', 12))`를 parameterized query로 실행하고 DB에는 hash만 저장한다.
+- 사용자 비밀번호를 직접 bcrypt에 전달하며 HMAC pre-hash와 pepper를 사용하지 않는다.
+- PBKDF2 600,000회와 100,000회 모두 채택하지 않는다.
 
-- 기본 선택은 Workers Web Crypto의 PBKDF2-HMAC-SHA256, unique 128-bit salt, 600,000 iterations, 256-bit output, versioned encoded format이다.
-- 평문이나 fast SHA-256은 저장하지 않는다. 검증은 constant-time 비교를 사용한다.
-- Argon2id WASM은 Workers Free의 128 MB memory와 10 ms CPU risk, bundle 복잡성 때문에 이번 선택에서 제외했다. 순수 JS bcrypt도 CPU risk와 구현 품질 때문에 제외했다.
-- OWASP의 현재 권고는 PBKDF2-HMAC-SHA256 600,000회이며 Cloudflare Web Crypto는 PBKDF2 `deriveBits`를 지원한다. [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2), [Cloudflare Web Crypto](https://developers.cloudflare.com/workers/runtime-apis/web-crypto/)
-
-로컬 workerd 실행 성공은 Cloudflare billing CPU가 10 ms 안이라는 뜻이 아니다. 원격 UAT telemetry에서 초과가 확인되면 iteration을 임의로 낮추지 않는다. Neon에서 지원되는 `pgcrypto` bcrypt로 adapter를 교체하는 방안과 Workers Paid를 비교한다. Neon은 `pgcrypto`를 지원하며 bcrypt 사용 예를 공개한다. [Neon pgcrypto 설명](https://neon.com/blog/ten-most-popular-postgres-extensions#pgcrypto)
+최대 64 ASCII 문자는 UTF-8에서도 64 bytes이므로 bcrypt의 72-byte 제한에 걸리지 않는다. 기존 Spring도 공통 `BCryptPasswordEncoder`를 사용하면서 DTO는 Unicode 4~100자를 허용해 같은 잠재 문제가 있었다. 이번 정책은 마이그레이션이 만든 제약이 아니라 기존 잠재 문제를 명시적으로 해결하는 승인된 제품 변경이다. 실제 운영 데이터가 없고 DB를 초기화하므로 기존 100자·한글 비밀번호 호환은 제공하지 않는다.
 
 ### rate limit과 client IP
 
-> 원격 후속 결정: 아래 PostgreSQL counter 설계는 이번 P3/P4 핵심 재작성에서 채택하지 않는다. rate limit은 Pages proxy의 인증된 IP 전달 경계를 먼저 결정한 뒤 Go-Live 전 별도 필수 보안 과제로 검증한다.
-
-- 기존 수치인 IP별 read 120/min, write 24/min을 유지한다.
-- Neon table의 `(scope, hashed_ip, window_start)` row를 `INSERT ... ON CONFLICT DO UPDATE ... WHERE count < limit RETURNING`으로 원자 증가시킨다.
-- IP는 Worker secret pepper를 포함해 digest한 값을 key로 저장한다. 평문 IP를 장기 보관하지 않는다.
-- 허용 실패 시 429, `RATE_LIMIT_EXCEEDED`, `Retry-After`와 다음 retry 시각을 반환한다.
-- 인증된 관리자 session 확인 뒤에는 기존 계약대로 이 limiter를 우회한다.
-- 오래된 bucket은 짧은 보존 기간 후 제한된 batch로 삭제한다. cleanup은 E2E cleanup route와 분리한다.
-
-Cloudflare Rate Limiting binding은 빠르지만 counter가 Cloudflare location별이고 eventually consistent이며 정확한 accounting 용도가 아니라고 공식 문서가 명시한다. 따라서 현 계약의 전역 exact limit 근거로 사용하지 않는다. [Workers Rate Limiting API의 locality와 accuracy](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/#locality)
-
-클라이언트 IP 어댑터는 production에서 `CF-Connecting-IP`만 읽고 임의 `X-Forwarded-For`를 신뢰하지 않는다. local/test에서만 명시적인 test header를 허용한다. Cloudflare는 origin이 원래 방문자 IP를 읽을 때 `CF-Connecting-IP`를 권고한다. [Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip)
+rate limit 구현과 부하 검증은 P4 핵심 재작성에서 제외한다. 정확한 전역 counter가 아니라 공개 API의 기본 남용 완화가 목적이며, Pages proxy의 원본 IP 전달을 Service Binding이나 서명 header로 인증하는 방식과 저장·판정 방식을 Go-Live 전 별도 작업에서 결정한다. 기존 120/min read, 24/min write 및 429 응답 계약은 그 후속 작업의 외부 기준으로 유지한다. 완료 전 공개 예약 접수를 활성화하지 않는다.
 
 ### Pages, Worker route와 same-origin
 
-> 원격 후속 결정: 1차 마이그레이션에서는 direct Worker route가 아니라 기존 Pages Function `/api` proxy를 유지한다. 실제 Pages preview에서 cookie·CSRF·status·body 보존을 검증했다.
-
-- 1차 전환의 우선 선택은 기존 Pages custom hostname의 `https://<host>/api/*`를 Worker route에 직접 연결하는 것이다. React의 `/api`와 credentials 동작은 바꾸지 않고 정적 경로는 Pages가 계속 제공한다.
-- 이 방식은 API 요청당 Worker 한 번만 실행하고 Worker가 직접 `CF-Connecting-IP`를 받는다.
-- 현재 Pages Function proxy는 실제 UAT route가 준비될 때까지 fallback으로 유지한다. P3에서 삭제하지 않는다.
-- Pages Function proxy를 계속 쓰면 API 요청이 Pages Function과 backend Worker를 연속 호출하고, IP 전달 신뢰 경계를 별도로 인증해야 한다. 또한 Pages Functions도 Workers 사용량에 포함된다. 이 때문에 최종 1차 구성으로는 제외한다.
-- Worker custom domain은 host 전체를 Worker origin으로 삼으므로 현재 Pages 정적 host와 `/api`만 분리하는 첫 단계에는 맞지 않는다. Workers Static Assets 통합은 계약대로 후속 작업이다.
-
-Cloudflare는 route가 URL pattern에 맞는 요청에서 Worker를 실행한다고 설명한다. 실제 Pages custom domain과의 route 우선순위는 UAT에서 확인한다. [Workers routes](https://developers.cloudflare.com/workers/configuration/routing/routes/), [Pages Functions routing](https://developers.cloudflare.com/pages/functions/routing/)
+- 1차 마이그레이션은 기존 Pages Function `/api` reverse proxy를 유지한다.
+- React의 relative `/api`, credentials, cookie와 CSRF 계약을 바꾸지 않는다.
+- Pages preview에서 query/body/status/error와 복수 `Set-Cookie`, session·CSRF·logout 왕복을 실제 검증했다.
+- production Pages domain에 direct Worker route를 추가하지 않는다.
+- Pages→Worker IP 전달의 인증 경계는 Go-Live 전 rate-limit 작업에서 확정한다.
+- Worker custom domain과 Workers Static Assets 통합은 안정화 이후 별도 작업이다.
 
 ### 실행 환경과 cleanup 보호
 
@@ -225,10 +215,10 @@ Neon Free는 카드 없이 프로젝트당 월 100 CU-hours, storage 0.5 GB, 최
 
 - API 1,000 requests/day이면 Worker 약 30,000 requests/month이고 무료 일 한도의 1%다.
 - direct Worker route에서는 API 요청당 Worker invocation 1회다. Pages proxy를 유지하면 대략 2회가 되어 무료 quota 여유가 절반으로 줄 수 있다.
-- 비인증 요청은 rate limit 판정으로 PostgreSQL write 1회가 추가된다. 예약 읽기/쓰기를 합쳐 평균 2~4 DB statement/request로 측정하고 Neon CU-hour를 UAT에서 관측한다.
-- rate bucket과 session은 retention delete를 적용한다. 0.5 GB의 70%를 경고선으로 두고 실제 row/index 크기를 측정한다.
+- 예약 읽기/쓰기를 합쳐 평균 DB statement 수와 Neon CU-hour를 UAT에서 관측한다. 이번 계산에는 보류된 rate-limit write를 포함하지 않는다.
+- session은 retention delete를 적용한다. 0.5 GB의 70%를 경고선으로 두고 실제 row/index 크기를 측정한다.
 - Workers 100,000/day 또는 Neon 100 CU-hours/0.5 GB에 근접하면 무료라는 가정을 유지한 채 기능을 축소하지 않고 사용자에게 유료 전환/구조 변경을 보고한다.
-- 가장 큰 즉시 위험은 DB 대기가 아니라 secure password hashing의 10 ms CPU limit다. 원격 telemetry gate 전에는 무료 적합성을 완료 판정하지 않는다.
+- 공개 예약 비밀번호 hash는 Neon `pgcrypto`에서 수행하므로 Worker PBKDF2 CPU gate는 더 이상 적용하지 않는다.
 
 ## 6. P4에서 재사용할 것과 폐기할 것
 
@@ -237,9 +227,8 @@ Neon Free는 카드 없이 프로젝트당 월 100 CU-hours, storage 0.5 GB, 최
 - core port와 Worker/Hono/Neon adapter 경계
 - strict environment parser와 conditional route 등록 패턴
 - session id와 CSRF token digest 저장 패턴
-- Web Crypto password encoded format과 테스트
+- `pgcrypto` bcrypt adapter와 printable ASCII 4~64자 서버 검증 규칙
 - PostgreSQL exclusion constraint 패턴과 SQLSTATE `23P01` 처리 원칙
-- PostgreSQL atomic rate limit counter 패턴
 - disposable DB migration replay와 schema hash script
 - Worker/baseline candidate manifest 방식
 
@@ -256,16 +245,14 @@ P4에서는 기존 제품 API 이름과 응답을 기준 버전에서 옮기고,
 
 ## 7. 추가 결정과 blocker
 
-원격 후속 검증에서 공개 예약 비밀번호의 100자 입력 계약과 bcrypt 72-byte 제한 충돌이 발견됐다. 입력 계약 또는 해싱 방식에 대한 사용자 결정 전에는 P4를 시작하지 않는다. rate limit을 Go-Live 전 별도 과제로 옮기는 결정도 현재 계약 13절과 22절의 완료 조건 변경 승인이 필요하다.
+공개 예약 비밀번호의 100자 입력 계약과 bcrypt 72-byte 제한 충돌은 printable ASCII 4~64자 정책 승인으로 해소됐다. Worker + Neon을 채택하며 P4를 시작할 수 있다.
 
 P4 초기에 추가로 닫아야 할 기술 항목:
 
-1. 공개 예약 비밀번호를 UTF-8 72 bytes로 제한하고 bcrypt cost 12를 사용할지, 100자 계약을 유지할 다른 KDF를 검증할지 결정한다.
-2. rate limit을 P4 완료 조건에서 Go-Live 전 gate로 옮기는 계약 변경을 승인한다.
-3. Pages→Worker IP 전달을 Service Binding 또는 서명 header로 인증하는 방식을 rate-limit 후속에서 결정한다.
-4. P4 전체 schema를 설계하면서 interactive transaction이 필요한 use case를 목록화한다. HTTP batch/atomic SQL로 충분한 동작에는 WebSocket을 사용하지 않는다.
+1. Pages→Worker IP 전달을 Service Binding 또는 서명 header로 인증하는 방식을 Go-Live 전 rate-limit 후속에서 결정한다.
+2. P4 전체 schema를 설계하면서 interactive transaction이 필요한 use case를 목록화한다. HTTP batch/atomic SQL로 충분한 동작에는 WebSocket을 사용하지 않는다.
 
-이 gate들을 통과하기 전에는 기존 Spring schema/Flyway 폐기, 현재 Neon 초기화, production route 전환 또는 Render 중지를 진행하면 안 된다.
+P4의 계약·E2E gate를 통과하기 전에는 기존 Spring schema/Flyway 폐기, 현재 Neon 초기화 또는 Render 중지를 진행하면 안 된다. rate limit은 P4 완료를 막지 않지만 완료 전 공개 예약 접수를 활성화하면 안 된다.
 
 ## 8. 참고한 1차 자료
 
