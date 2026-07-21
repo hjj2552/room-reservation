@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "room-reservation-p3-pbkdf2-100k-template",
+  "main": "remote/pbkdf2-100k-worker.ts",
+  "compatibility_date": "2026-07-21",
+  "workers_dev": false,
+  "preview_urls": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
