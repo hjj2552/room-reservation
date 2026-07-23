@@ -8,7 +8,7 @@
 
 TypeScript Cloudflare Worker + Neon PostgreSQL production 모듈, 빈 DB baseline V1, 기존 `/api` 계약 재구현과 최소 React 비밀번호 변경을 완료했다. 격리된 로컬 PostgreSQL과 Pages preview → Pages Function proxy → disposable Worker → disposable Neon 원격 경로에서 기존 Playwright 80개 전체 시나리오가 각각 통과했으므로 P4 구현은 완료 판정이다.
 
-실제 Render → Worker 전환은 이 작업에 포함하지 않는다. production DB 초기화, Render 중지, production Pages `BACKEND_ORIGIN`, route/domain/DNS, Spring 제거, D1 채택, rate limit, 공개 예약 접수 활성화는 모두 수행하지 않았다.
+실제 Render → Worker 전환은 이 작업에 포함하지 않는다. production DB 초기화, Render 중지, production Pages `BACKEND_ORIGIN`, route/domain/DNS, Spring 제거, D1 채택, rate limit, 공개 예약 접수 활성화는 모두 수행하지 않았다. rate limit과 Service Binding은 2026-07-23의 별도 Go-Live 전 후속 작업에서 구현한다.
 
 ## 구현 구조
 
@@ -127,4 +127,17 @@ Worker는 route/custom domain/production target 없이 version preview alias만 
 
 P4에서 그대로 사용하는 부분은 core/service/HTTP/Neon adapter, baseline V1, migration/검증 script와 React 비밀번호 제한이다. `local-server.ts`, local Docker runner는 검증 adapter이며 production bundle에 포함하지 않는다.
 
-별도 Go-Live 작업에는 clean commit의 Worker/Pages artifact receipt 고정, production DB 초기화 계획, backup/rollback rehearsal, Render → Worker 연결 전환, rate limit과 인증된 Pages→Worker client-IP 경계가 남는다. rate limit이 완료될 때까지 실제 공개 예약 접수를 활성화하지 않는다.
+별도 Go-Live 작업에는 clean commit의 Worker/Pages artifact receipt 고정, production DB 초기화 계획, backup/rollback rehearsal와 Render → Worker 연결 전환이 남는다. rate limit과 인증된 Pages→Worker client-IP 경계는 2026-07-23 후속 작업에서 Workers Rate Limiting binding 두 개와 `API_BACKEND` Service Binding으로 구현했다. production binding·Pages 설정과 최종 smoke는 실제 전환 작업에서 별도로 적용·확인하며 그전에는 공개 예약 접수를 활성화하지 않는다.
+
+## 2026-07-23 Go-Live 전 보안 후속
+
+- `RateLimiter`와 `ClientIpProvider` 포트를 core/application 경계에 추가하고 Cloudflare binding/header를 infra adapter에 격리했다.
+- 비관리자 GET `/api/**`는 `PUBLIC_READ_RATE_LIMITER` 120/60초, 비관리자 비GET은 `PUBLIC_WRITE_RATE_LIMITER` 24/60초다. 인증 관리자는 우회하고 비인증 관리자 API는 제한한다.
+- 429는 `Retry-After: 60`, `RATE_LIMIT_EXCEEDED`, 고정 메시지와 `details.retryAfterSeconds=60`을 사용한다.
+- Pages proxy는 browser forwarding/internal IP header를 제거하고 ingress `CF-Connecting-IP`만 `X-Room-Reservation-Client-IP`로 전달한다.
+- production 전송은 명시적인 `API_PROXY_TRANSPORT=service-binding`과 `API_BACKEND`만 허용한다. `BACKEND_ORIGIN`은 명시적인 local/transition mode에서만 선택할 수 있고 service-binding mode는 URL fallback을 하지 않는다.
+- UAT와 production의 READ/WRITE namespace 네 개는 서로 다르며 local/unit/CI는 production namespace를 호출하지 않는다.
+- 신뢰 IP 누락이나 binding 장애는 제품 서비스·Neon·bcrypt 전에 fail closed하고 원문 IP나 token을 로그에 남기지 않는다.
+- production Worker source config는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음이다. 실제 production deployment와 Pages binding 변경은 수행하지 않았다.
+
+정확한 120/121, 24/25 경계와 IP·정책 분리, 관리자 우회, 비인증 관리자 제한, `/health` 제외, 429 body/header, early rejection과 fail-closed는 deterministic unit/contract test로 검증한다. Cloudflare 실제 binding은 위치별 permissive/eventually consistent이므로 disposable UAT에서는 exact N번째 요청이 아니라 burst 차단과 60초 후 복구를 검증한다.

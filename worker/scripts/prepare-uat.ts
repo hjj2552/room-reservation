@@ -2,14 +2,18 @@ import pg from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 const expectedDatabase = process.env.P4_UAT_DATABASE;
+const expectedRole = process.env.P4_UAT_ROLE;
 
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 if (process.env.APP_ENV !== "uat") throw new Error("APP_ENV must be exactly uat");
 if (process.env.P4_UAT_CONFIRM_DISPOSABLE !== "true") {
   throw new Error("P4_UAT_CONFIRM_DISPOSABLE must be exactly true");
 }
-if (!expectedDatabase || !/^room_reservation_p4_uat_[0-9]{8}$/.test(expectedDatabase)) {
-  throw new Error("P4_UAT_DATABASE must use the room_reservation_p4_uat_YYYYMMDD naming rule");
+if (!expectedDatabase || !/^room_reservation_(?:p4|rate_limit)_uat_[0-9]{8}$/.test(expectedDatabase)) {
+  throw new Error("P4_UAT_DATABASE must use an approved disposable UAT naming rule");
+}
+if (!expectedRole || !/^[a-z][a-z0-9_]{2,62}$/.test(expectedRole)) {
+  throw new Error("P4_UAT_ROLE must name the expected disposable branch role");
 }
 
 const client = new pg.Client({ connectionString: databaseUrl });
@@ -22,7 +26,7 @@ try {
   if (!identityRow) throw new Error("Database identity query returned no row");
   const { database, role } = identityRow;
   if (database !== expectedDatabase) throw new Error(`Refusing unexpected database: ${database}`);
-  if (role !== "room_reservation_p4_validator") throw new Error(`Refusing unexpected role: ${role}`);
+  if (role !== expectedRole) throw new Error(`Refusing unexpected role: ${role}`);
 
   const ownership = await client.query<{ owner: string }>(
     "SELECT pg_catalog.pg_get_userbyid(datdba) AS owner FROM pg_catalog.pg_database WHERE datname = $1",

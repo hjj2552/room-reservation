@@ -4,6 +4,7 @@ import { createHttpApp } from "../src/http/app";
 import { ProductService } from "../src/services/product-service";
 import { SessionService } from "../src/services/session-service";
 import { PgDatabase } from "../tests/postgres/pg-database";
+import type { ClientIpProvider, RateLimiter } from "../src/core/rate-limit";
 
 const databaseUrl = process.env.DATABASE_URL;
 const adminUsername = process.env.ADMIN_USERNAME;
@@ -17,9 +18,17 @@ const config = parseRuntimeConfig({
   E2E_CLEANUP_ENABLED: process.env.E2E_CLEANUP_ENABLED ?? "false",
 });
 const database = new PgDatabase(databaseUrl);
+const allowAllRateLimiter: RateLimiter = {
+  check: async () => ({ allowed: true }),
+};
+const localClientIpProvider: ClientIpProvider = {
+  getClientIp: () => "127.0.0.1",
+};
 const app = createHttpApp(config, {
   products: new ProductService(database, () => new Date()),
   sessions: new SessionService(database, () => new Date()),
+  rateLimiter: allowAllRateLimiter,
+  clientIpProvider: localClientIpProvider,
   adminUsername,
   adminPassword,
 });

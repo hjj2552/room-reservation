@@ -4,6 +4,7 @@ import type { RuntimeConfig } from "../core/config";
 import { shouldRegisterCleanup } from "../core/config";
 import { parseUuid } from "../core/domain";
 import { AppError } from "../core/errors";
+import type { ClientIpProvider, RateLimiter, RateLimitPolicy } from "../core/rate-limit";
 import { constantTimeSecretEqual, sha256 } from "../core/security";
 import type { ProductService } from "../services/product-service";
 import type { SessionRecord, SessionService } from "../services/session-service";
@@ -21,6 +22,8 @@ type Variables = {
 interface Dependencies {
   products: ProductService;
   sessions: SessionService;
+  rateLimiter: RateLimiter;
+  clientIpProvider: ClientIpProvider;
   adminUsername: string;
   adminPassword: string;
 }
@@ -59,6 +62,9 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
   app.onError((error, context) => {
     if (error instanceof AppError) {
+      if (error.code === "RATE_LIMIT_EXCEEDED") {
+        context.header("Retry-After", "60");
+      }
       return context.json({
         code: error.code,
         message: error.message,
@@ -78,9 +84,53 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
   });
 
   app.use("/api/*", async (context, next) => {
-    const session = await dependencies.sessions.find(getCookie(context, SESSION_COOKIE));
+    const clientIp = dependencies.clientIpProvider.getClientIp(context.req.raw);
+    if (!clientIp) {
+      console.error(JSON.stringify({
+        event: "trusted_client_ip_unavailable",
+        path: new URL(context.req.url).pathname,
+        method: context.req.method,
+      }));
+      throw new AppError(
+        503,
+        "RATE_LIMIT_UNAVAILABLE",
+        "The rate limit service is temporarily unavailable.",
+      );
+    }
+
+    const sessionCookie = getCookie(context, SESSION_COOKIE);
+    const session = sessionCookie
+      ? await dependencies.sessions.find(sessionCookie)
+      : null;
     context.set("session", session);
     context.set("adminUsername", session?.adminUsername ?? null);
+    if (!session?.adminUsername) {
+      const policy: RateLimitPolicy = context.req.method.toUpperCase() === "GET" ? "READ" : "WRITE";
+      let allowed: boolean;
+      try {
+        ({ allowed } = await dependencies.rateLimiter.check({ policy, actorKey: clientIp }));
+      } catch {
+        console.error(JSON.stringify({
+          event: "rate_limiter_failed",
+          policy,
+          path: new URL(context.req.url).pathname,
+          method: context.req.method,
+        }));
+        throw new AppError(
+          503,
+          "RATE_LIMIT_UNAVAILABLE",
+          "The rate limit service is temporarily unavailable.",
+        );
+      }
+      if (!allowed) {
+        throw new AppError(
+          429,
+          "RATE_LIMIT_EXCEEDED",
+          "Too many requests. Please retry later.",
+          { retryAfterSeconds: 60 },
+        );
+      }
+    }
     if (!safeMethods.has(context.req.method.toUpperCase())) {
       const valid = await dependencies.sessions.validateCsrf(
         session,

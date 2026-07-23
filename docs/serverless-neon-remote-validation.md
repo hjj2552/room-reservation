@@ -157,7 +157,7 @@ EXCLUDE USING gist (
 - UAT Worker의 `CF-Connecting-IP`와 전달된 `X-Forwarded-For`: 불일치
 - 클라이언트가 주입한 `X-Forwarded-For`: Worker에 도달하지 않음
 
-즉 Pages Function은 Cloudflare가 제공한 원본 IP를 얻을 수 있고 현재 proxy는 spoofed header를 정제한다. 다만 backend Worker의 `CF-Connecting-IP`는 이 다단계 subrequest에서 최종 방문자 IP로 사용할 수 없고, 공개 접근 가능한 backend가 전달 `X-Forwarded-For`를 무조건 신뢰해서도 안 된다. Go-Live 전 rate-limit 작업에서 Pages→Worker 구간을 Service Binding 또는 서명된 내부 header/proxy 인증으로 고정한 뒤 전달 값을 신뢰한다. 이 미확정은 P4 기술 가능성 blocker가 아니다.
+즉 Pages Function은 Cloudflare가 제공한 원본 IP를 얻을 수 있고 당시 proxy는 spoofed header를 정제했다. 다만 backend Worker의 `CF-Connecting-IP`는 이 다단계 subrequest에서 최종 방문자 IP로 사용할 수 없고, 공개 접근 가능한 backend가 전달 `X-Forwarded-For`를 무조건 신뢰해서도 안 된다는 후속 과제가 남았다. 2026-07-23 Go-Live 전 작업에서 공개 backend URL 대신 Pages `API_BACKEND` Service Binding을 채택하고 전용 `X-Room-Reservation-Client-IP`를 Pages ingress 값으로만 덮어쓰는 방식으로 이 경계를 확정했다.
 
 ### `pgcrypto` bcrypt
 
@@ -296,11 +296,13 @@ Cloudflare/Neon 종속성은 다음 adapter에만 둔다.
 - D1: 사용자 결정으로 취소, 기존 비교 기록은 보존
 - isolate-local session/rate limit: 분산 실행 계약을 만족하지 못함
 
-## Rate limit의 Go-Live gate 이전
+## Rate limit의 Go-Live gate 후속 결정
 
-이번 P3/P4 핵심 재작성에서는 rate limit을 구현하지 않는다. 목적은 정확한 전역 과금 제한이 아니라 공개 API의 기본 남용 완화이며, Pages proxy IP 신뢰 경계를 확정한 뒤 Go-Live 전 별도 보안 작업으로 구현·검증한다. 완료 전 공개 예약 접수를 실제 활성화하지 않는다.
+P3/P4 핵심 재작성에서는 rate limit을 구현하지 않았다. 2026-07-23 후속 작업은 정확히 두 개의 Workers Rate Limiting binding을 채택했다. 비관리자 GET `/api/**`는 IP별 120/60초, 비관리자 비GET은 24/60초이며 인증 관리자는 우회한다. 세션·로그인·예약 비밀번호 전용 limiter와 WAF, Neon/KV/DO 저장소는 추가하지 않는다.
 
-최종 제품 결정에 따라 계약서는 P4 완료 조건과 Go-Live gate를 분리한다. 기존 120/min read, 24/min write 및 429 응답은 후속 작업의 외부 기준으로 유지하지만 정확한 전역 counter는 요구하지 않는다. 실제 공개 예약 접수 활성화 전에는 IP 신뢰 경계와 rate limit 구현·검증을 반드시 완료한다.
+Pages는 `API_BACKEND` Service Binding으로 공개 ingress가 없는 Worker를 호출하고, 사용자가 보낸 forwarding/internal IP header를 제거한 뒤 Pages ingress 값만 전용 header로 전달한다. UAT/production READ/WRITE namespace는 모두 분리한다. 429는 `Retry-After: 60`, `RATE_LIMIT_EXCEEDED`와 고정 재시도 정보를 유지한다. Cloudflare의 위치별 eventually consistent 동작 때문에 정확한 전역 counter는 요구하지 않는다.
+
+구현과 disposable UAT 검증은 P4 완료와 분리해 기록한다. production Pages·Worker·Neon은 이 검증에서 변경하지 않으며, 별도 전환 작업에서 production binding과 최종 smoke를 확인하기 전에는 공개 예약 접수를 활성화하지 않는다.
 
 ## P4 구현 요구사항
 
@@ -319,7 +321,7 @@ P4를 진행할 수 있으며 공개 예약 비밀번호에는 다음 완료 테
 
 프런트 변경은 기존 `type="password"`를 유지하면서 4~64자 printable ASCII 제한, 안내 문구와 실제 비ASCII 입력 차단을 추가하는 최소 범위로 제한한다. 다른 UI/UX, API, 시간·예약 정책은 변경하지 않는다.
 
-Pages→Worker IP 전달을 Service Binding 또는 서명 header로 인증하는 방식은 Go-Live 전 rate-limit 후속에서 결정한다.
+Pages→Worker IP 전달은 Go-Live 전 rate-limit 후속에서 Service Binding과 Pages 소유 내부 header로 확정했다. 서명 header와 proxy secret은 사용하지 않는다.
 
 ## 재사용과 폐기
 

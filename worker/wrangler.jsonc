@@ -5,16 +5,28 @@
   "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "preview_urls": true,
+  "preview_urls": false,
   "env": {
     "uat": {
       "name": "room-reservation-worker-uat",
       "workers_dev": false,
-      "preview_urls": true,
+      "preview_urls": false,
       "vars": {
         "APP_ENV": "uat",
         "E2E_CLEANUP_ENABLED": "true"
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "PUBLIC_READ_RATE_LIMITER",
+          "namespace_id": "2026072301",
+          "simple": { "limit": 120, "period": 60 }
+        },
+        {
+          "name": "PUBLIC_WRITE_RATE_LIMITER",
+          "namespace_id": "2026072302",
+          "simple": { "limit": 24, "period": 60 }
+        }
+      ]
     },
     "production": {
       "name": "room-reservation-worker-production",
@@ -23,7 +35,19 @@
       "vars": {
         "APP_ENV": "prod",
         "E2E_CLEANUP_ENABLED": "false"
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "PUBLIC_READ_RATE_LIMITER",
+          "namespace_id": "2026072303",
+          "simple": { "limit": 120, "period": 60 }
+        },
+        {
+          "name": "PUBLIC_WRITE_RATE_LIMITER",
+          "namespace_id": "2026072304",
+          "simple": { "limit": 24, "period": 60 }
+        }
+      ]
     }
   }
 }

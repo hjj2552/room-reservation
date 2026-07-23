@@ -51,10 +51,18 @@ baseline 적용 후 disposable UAT DB에서만 이중 guard가 있는 준비 명
 $env:APP_ENV='uat'
 $env:P4_UAT_CONFIRM_DISPOSABLE='true'
 $env:P4_UAT_DATABASE='room_reservation_p4_uat_YYYYMMDD'
+$env:P4_UAT_ROLE='<expected-disposable-branch-role>'
 npm.cmd run uat:prepare
 ```
 
-UAT Worker는 route/custom domain 없이 version preview URL만 사용한다. Pages는 기존 프로젝트의 새 preview deployment만 만들고 그 deployment의 `BACKEND_ORIGIN`만 UAT Worker preview origin으로 설정한다. 배포 전 project-level preview 설정을 snapshot하고, 테스트 후 snapshot을 복원한 뒤 production과 preview 설정을 모두 재확인한다. production Pages 변수·deployment·domain은 변경하지 않는다.
+UAT Worker는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음으로 배포하고 공개 URL을 만들지 않는다. Pages는 기존 프로젝트의 새 preview deployment만 만들고 `API_BACKEND` Service Binding을 exact UAT Worker에 연결한다. `API_PROXY_TRANSPORT=service-binding`을 명시하며 `BACKEND_ORIGIN` fallback을 사용하지 않는다. 배포 전 project-level preview 설정을 snapshot하고 테스트 후 정확히 복원한 뒤 production과 preview 설정을 모두 재확인한다. production Pages 변수·deployment·domain은 변경하지 않는다.
+
+UAT Worker에는 다음 네 namespace 중 UAT 두 개만 연결된다.
+
+- `PUBLIC_READ_RATE_LIMITER`: namespace `2026072301`, 120/60초
+- `PUBLIC_WRITE_RATE_LIMITER`: namespace `2026072302`, 24/60초
+
+production namespace `2026072303`, `2026072304`는 UAT에서 호출하지 않는다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계는 deterministic unit test가 담당한다.
 
 전체 원격 E2E는 preview URL과 이중 확인 flag를 모두 요구한다.
 
@@ -64,7 +72,7 @@ $env:P4_UAT_PAGES_URL='https://<preview>.<project>.pages.dev/'
 npm.cmd run test:uat-e2e
 ```
 
-script는 production 형태의 `<project>.pages.dev` URL을 거부한다. 테스트 종료 후 cleanup preview가 0건이어야 하며, 배포 정리는 exact Worker version/deployment와 disposable Neon 대상만 수행한다.
+script는 production 형태의 `<project>.pages.dev` URL을 거부한다. 테스트는 Pages preview → `API_BACKEND` Service Binding → UAT Worker 경로만 사용하며 공개 Worker URL을 사용하지 않는다. 테스트 종료 후 cleanup preview가 0건이어야 하며, 배포 정리는 exact Worker/Pages deployment와 disposable Neon 대상만 수행한다.
 
 ## Artifact와 baseline 동일성
 

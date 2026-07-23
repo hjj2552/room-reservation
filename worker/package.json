@@ -5,14 +5,17 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist --env uat",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && node scripts/check-rate-limit-config.mjs",
     "test": "vitest run --config vitest.config.ts",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:isolated-postgres": "node scripts/run-isolated-postgres.mjs",
     "test:local-e2e": "node scripts/run-local-e2e.mjs",
     "test:uat-e2e": "node scripts/run-uat-e2e.mjs",
+    "test:uat-rate-limit": "node scripts/validate-rate-limit-uat.mjs",
     "migrate": "tsx scripts/migrate.ts",
+    "uat:create-database": "tsx scripts/create-disposable-uat-database.ts",
     "uat:prepare": "tsx scripts/prepare-uat.ts",
+    "uat:check-residual": "tsx scripts/check-disposable-uat-residual.ts",
     "artifact:manifest": "node scripts/artifact-manifest.mjs"
   },
   "dependencies": {
@@ -30,5 +33,8 @@
     "typescript": "5.9.3",
     "vitest": "4.1.10",
     "wrangler": "4.112.0"
+  },
+  "overrides": {
+    "sharp": "0.35.3"
   }
 }

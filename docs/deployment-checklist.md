@@ -15,7 +15,9 @@ repository.
 | `DB_PASSWORD` | `local`, `dev`, `prod` | Database login password. |
 | `ADMIN_USERNAME` | `local`, `dev`, `prod` | Username for the single configured administrator login. |
 | `ADMIN_PASSWORD` | `local`, `dev`, `prod` | Password for the single configured administrator login. Use a strong unique value before deployment. |
-| `BACKEND_ORIGIN` | Cloudflare Pages production | Absolute HTTPS origin of the deployed backend. Local Pages Functions development may use HTTP only with `localhost` or `127.0.0.1`. |
+| `BACKEND_ORIGIN` | Current Spring production or explicit local/transition fallback only | Absolute HTTPS origin of the deployed backend. Local Pages Functions development may use HTTP only with `localhost` or `127.0.0.1`. The Worker target does not use this value. |
+| `API_PROXY_TRANSPORT` | Cloudflare Pages | Use `backend-origin` only during the explicit Spring/local phase. Set `service-binding` for the Worker production target. There is no automatic fallback. |
+| `API_BACKEND` | Worker production target | Cloudflare Pages Service Binding to the private backend Worker. This is a binding, not a URL or secret. |
 
 ## Optional Environment Variables
 
@@ -30,8 +32,10 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 - Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
-- Configure `BACKEND_ORIGIN` in the Cloudflare Pages environment without a path, query, fragment, or credentials. Do not commit the real backend URL.
-- Browser requests keep using relative `/api/...` URLs. The `functions/api/[[path]].ts` Pages Function forwards `/api` and `/api/*` to `BACKEND_ORIGIN` while preserving the API path and query string.
+- During the current Spring phase, explicitly select `API_PROXY_TRANSPORT=backend-origin` and configure `BACKEND_ORIGIN` without a path, query, fragment, or credentials.
+- For the Worker target, explicitly select `API_PROXY_TRANSPORT=service-binding`, bind `API_BACKEND`, and do not configure a public Worker origin fallback.
+- Browser requests keep using relative `/api/...` URLs. The Pages Function preserves the API path, query, method, body, cookies, CSRF header, response status and separate `Set-Cookie` values.
+- The Pages Function removes browser-provided `X-Forwarded-For` and `X-Room-Reservation-Client-IP`, then copies only Pages ingress `CF-Connecting-IP` to the internal header.
 - The local Vite `/api` proxy remains independent and continues to use `VITE_API_PROXY_TARGET` when configured.
 
 ## Session, CSRF, and Rate Limiting
@@ -42,8 +46,10 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 - Unauthenticated and public `GET /api/**` requests are limited to 120 requests per IP per minute.
 - Unauthenticated and public state-changing `/api/**` requests are limited to 24 requests per IP per minute.
 - Authenticated `ROLE_ADMIN` requests bypass rate limiting. Expired or unauthenticated admin requests do not bypass it.
-- Buckets are currently stored in memory and are local to one backend instance. A multi-instance deployment requires a shared bucket store.
-- Client IP resolution trusts the first `X-Forwarded-For` value when present. Configure the deployment proxy to replace untrusted inbound forwarding headers.
+- The Worker target uses exactly two Workers Rate Limiting bindings: 120 GET requests/60 seconds and 24 non-GET requests/60 seconds per trusted client IP.
+- UAT and production READ/WRITE bindings use four distinct positive-integer namespaces. Local and CI use fake/local adapters and never production namespaces.
+- Workers Rate Limiting is Cloudflare-location-local and permissive/eventually consistent. It is abuse mitigation, not exact global accounting.
+- The production Worker has no workers.dev, preview URL, route or custom domain and trusts only the Pages-owned internal IP header received through `API_BACKEND`.
 
 ## Handover Checks
 

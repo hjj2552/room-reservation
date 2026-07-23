@@ -5,6 +5,7 @@ import { createHttpApp } from "../../src/http/app";
 import { parseRuntimeConfig } from "../../src/core/config";
 import { AppError } from "../../src/core/errors";
 import { PgDatabase } from "./pg-database";
+import { allowAllRateLimiter, fixedClientIpProvider } from "../helpers/rate-limit";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -153,7 +154,12 @@ describe("public password and atomic reservations", () => {
 describe("HTTP session, CSRF, admin contracts and cleanup", () => {
   it("supports the existing cookie/header flow and guarded product routes", async () => {
     const app = createHttpApp(parseRuntimeConfig({ APP_ENV: "uat", E2E_CLEANUP_ENABLED: "true" }), {
-      products, sessions, adminUsername: "admin", adminPassword: "admin1234",
+      products,
+      sessions,
+      rateLimiter: allowAllRateLimiter,
+      clientIpProvider: fixedClientIpProvider,
+      adminUsername: "admin",
+      adminPassword: "admin1234",
     });
     const csrfResponse = await app.request("http://worker.test/api/auth/csrf");
     expect(csrfResponse.status).toBe(200);
@@ -280,7 +286,12 @@ async function insertReservation(input: {
 
 async function authenticatedApp(environment: "uat" | "prod" = "uat") {
   const app = createHttpApp(parseRuntimeConfig({ APP_ENV: environment, E2E_CLEANUP_ENABLED: "false" }), {
-    products, sessions, adminUsername: "admin", adminPassword: "admin1234",
+    products,
+    sessions,
+    rateLimiter: allowAllRateLimiter,
+    clientIpProvider: fixedClientIpProvider,
+    adminUsername: "admin",
+    adminPassword: "admin1234",
   });
   const csrfResponse = await app.request("http://worker.test/api/auth/csrf");
   const csrf = await csrfResponse.json() as { token: string };

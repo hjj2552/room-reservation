@@ -1,6 +1,8 @@
 import { createHttpApp } from "./http/app";
 import { parseRuntimeConfig } from "./core/config";
 import { NeonDatabase } from "./infra/neon-database";
+import { CloudflareRateLimiter } from "./infra/cloudflare-rate-limit";
+import { TrustedProxyClientIpProvider } from "./infra/trusted-proxy-client-ip";
 import { ProductService } from "./services/product-service";
 import { SessionService } from "./services/session-service";
 
@@ -10,6 +12,8 @@ export interface WorkerEnv {
   ADMIN_PASSWORD: string;
   APP_ENV: string;
   E2E_CLEANUP_ENABLED: string;
+  PUBLIC_READ_RATE_LIMITER: RateLimit;
+  PUBLIC_WRITE_RATE_LIMITER: RateLimit;
 }
 
 export default {
@@ -22,6 +26,11 @@ export default {
     const app = createHttpApp(config, {
       products: new ProductService(database, now),
       sessions: new SessionService(database, now),
+      rateLimiter: new CloudflareRateLimiter(
+        env.PUBLIC_READ_RATE_LIMITER,
+        env.PUBLIC_WRITE_RATE_LIMITER,
+      ),
+      clientIpProvider: new TrustedProxyClientIpProvider(),
       adminUsername: env.ADMIN_USERNAME,
       adminPassword: env.ADMIN_PASSWORD,
     });
