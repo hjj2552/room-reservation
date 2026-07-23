@@ -32,3 +32,6 @@ tests/e2e/.auth/
 .idea/
 .vscode/
 *.iml
+
+# Local DESIGN.md research corpus (large, externally sourced)
+/research/design-md-corpus-*/
