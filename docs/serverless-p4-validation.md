@@ -152,3 +152,11 @@ P4에서 그대로 사용하는 부분은 core/service/HTTP/Neon adapter, baseli
 - WAF, 기능별 limiter, Neon rate-limit table, Durable Objects, KV와 원격 DB 호출 계측 endpoint는 추가하지 않는다.
 - disposable Pages Service Binding/Worker/Neon UAT에서는 실제 INGRESS 429, 인증 관리자 적용, forged IP header 무시와 60초 후 복구를 확인했다. 내부 세션·Neon 호출 0회는 원격에서 직접 계측하지 않고 위 deterministic test로만 증명한다.
 - 검증 후 Pages preview 설정 hash를 원상 복원하고 disposable Pages deployment, Worker, Neon branch와 임시 secret 파일을 모두 exact identifier로 삭제했다. production 환경은 변경하지 않았다.
+
+## 2026-07-24 HTTP/application 경계 격리
+
+- core의 rate-limit 계약은 이미 결정된 `actorKey`만 받으며 `Request`, Hono, Cloudflare header를 알지 않는다. 신뢰 IP header 해석은 HTTP composition dependency와 기존 infrastructure adapter에만 남겼다.
+- HTTP 계층의 입력 parser가 raw JSON과 `URLSearchParams`를 기존 validation helper로 해석해 typed command/query를 만든다. `ProductService` 공개 메서드는 `URL`, `Request`, Hono `Context`, raw `unknown` body를 받지 않는다.
+- core/application 오류는 code, message, details, fieldErrors와 의미 분류만 보유한다. 400/403/404/409/422 mapping은 HTTP adapter 한 곳에 있으며 인증, CSRF, rate-limit 오류는 HTTP 전용 오류로 분리했다.
+- API path/method, JSON·CSV·cookie·header 계약, SQL, transaction, PostgreSQL schema와 제품 정책은 변경하지 않았다. Cloudflare/Neon adapter와 PostgreSQL 전용 SQL 종속성은 확정된 기술 선택으로 그대로 유지한다.
+- TypeScript AST 기반 architecture check가 core transport 의존성, `ProductService`의 transport 입력, application 계층의 numeric HTTP status 재유입을 차단한다.

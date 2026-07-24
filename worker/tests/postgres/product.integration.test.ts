@@ -154,7 +154,7 @@ describe("public password and atomic reservations", () => {
     await expect(Promise.resolve().then(() => parsePublicReservation(
       publicPayload(roomId, password, `testing-invalid-${_label}`, 12),
     )).then((command) => products.createPublicReservation(command)))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
   });
 
   it("allows exactly one winner for competing requests", async () => {
@@ -462,9 +462,9 @@ describe("direct Worker contracts", () => {
     const tagQuery = (url: string) => parseTagList(new URL(url).searchParams);
     expect(await products.listTags(tagQuery("http://worker.test/api/admin/tags"))).toMatchObject({ page: 0, size: 20, totalItems: 105, totalPages: 6 });
     expect((await products.listTags(tagQuery("http://worker.test/api/admin/tags?size=100000"))).items).toHaveLength(100);
-    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?page=-1"))).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
-    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?size=0"))).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
-    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?page=abc"))).rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?page=-1"))).rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
+    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?size=0"))).rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
+    await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?page=abc"))).rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
   });
 
   it("keeps settings updates atomic, detects version conflicts and rejects time precision", async () => {
@@ -472,20 +472,20 @@ describe("direct Worker contracts", () => {
     const before = await products.getSettings();
     const payload = { ...before, organizationName: "Updated atomically", slotMinutes: 5 };
     await expect(products.updateSettings(parseUpdateSettings({ ...payload, minReservationMinutes: 35, maxReservationMinutes: 30 }), "admin"))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
     await expect(Promise.resolve().then(() => parseUpdateSettings({ ...payload, openTime: "09:00:01" })))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
     await expect(Promise.resolve().then(() => parseUpdateSettings({ ...payload, openTime: "09:00:00.1" })))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
     await expect(products.updateSettings(parseUpdateSettings({ ...payload, openTime: "09:15" }), "admin"))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
     await expect(Promise.resolve().then(() => parseUpdateSettings({ ...payload, semesterStartDate: "2026-02-30" })))
-      .rejects.toMatchObject({ status: 400, code: "VALIDATION_ERROR" });
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
     expect(await products.getSettings()).toEqual(before);
     const command = parseUpdateSettings(payload);
     const updated = await products.updateSettings(command, "admin");
     expect(updated).toMatchObject({ organizationName: "Updated atomically", version: 1 });
-    await expect(products.updateSettings(command, "admin")).rejects.toMatchObject({ status: 409, code: "VERSION_CONFLICT" });
+    await expect(products.updateSettings(command, "admin")).rejects.toMatchObject({ kind: "CONFLICT", code: "VERSION_CONFLICT" });
   });
 
   it("leaves no recurrence, child reservation or history when FAIL_ALL sees one conflict", async () => {
@@ -508,7 +508,7 @@ describe("direct Worker contracts", () => {
       applicantPhone: "010-0000-0000", purpose: "testing-recurring-fail-all", tagId: null,
       startDate: first, endDate: second, daysOfWeek: ["MON"], startTime: "10:00", endTime: "11:00", conflictPolicy: "FAIL_ALL",
     };
-    await expect(products.createRecurrence(parseRecurrenceCreate(body), "admin")).rejects.toMatchObject({ status: 409, code: "RECURRENCE_CONFLICT" });
+    await expect(products.createRecurrence(parseRecurrenceCreate(body), "admin")).rejects.toMatchObject({ kind: "CONFLICT", code: "RECURRENCE_CONFLICT" });
     expect((await database.query("SELECT 1 FROM reservation_recurrences WHERE purpose=$1", [body.purpose])).rows).toHaveLength(0);
     expect((await database.query("SELECT 1 FROM reservations WHERE purpose=$1", [body.purpose])).rows).toHaveLength(0);
     expect((await database.query("SELECT 1 FROM reservation_histories WHERE reservation_purpose=$1", [body.purpose])).rows).toHaveLength(0);

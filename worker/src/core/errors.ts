@@ -1,6 +1,13 @@
+export type ApplicationErrorKind =
+  | "VALIDATION"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "POLICY_VIOLATION"
+  | "CREDENTIAL_MISMATCH";
+
 export class AppError extends Error {
   constructor(
-    readonly status: number,
+    readonly kind: ApplicationErrorKind,
     readonly code: string,
     message: string,
     readonly details: Record<string, unknown> = {},
@@ -12,7 +19,7 @@ export class AppError extends Error {
 
 export function validation(message: string, field?: string): never {
   throw new AppError(
-    400,
+    "VALIDATION",
     "VALIDATION_ERROR",
     message,
     {},
@@ -21,13 +28,21 @@ export function validation(message: string, field?: string): never {
 }
 
 export function notFound(resource: string): never {
-  throw new AppError(404, "NOT_FOUND", `${resource} not found.`);
+  throw new AppError("NOT_FOUND", "NOT_FOUND", `${resource} not found.`);
 }
 
 export function conflict(code: string, message: string, details: Record<string, unknown> = {}): never {
-  throw new AppError(409, code, message, details);
+  throw new AppError("CONFLICT", code, message, details);
 }
 
 export function policy(code: string, message: string): never {
-  throw new AppError(code === "VALIDATION_ERROR" ? 400 : 422, code, message);
+  throw new AppError(
+    code === "VALIDATION_ERROR" ? "VALIDATION" : "POLICY_VIOLATION",
+    code,
+    message,
+  );
+}
+
+export function credentialMismatch(code: string, message: string): never {
+  throw new AppError("CREDENTIAL_MISMATCH", code, message);
 }

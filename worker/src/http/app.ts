@@ -7,6 +7,7 @@ import type { RateLimiter, RateLimitPolicy } from "../core/rate-limit";
 import { constantTimeSecretEqual, isValidOpaqueToken, sha256 } from "../core/security";
 import type { ProductService } from "../services/product-service";
 import type { SessionRecord, SessionService } from "../services/session-service";
+import { HttpError, mapApplicationError, mapHttpError } from "./errors";
 import {
   parseAdminReservation,
   parseAvailability,
@@ -52,7 +53,7 @@ function jsonBody(context: Context): Promise<unknown> {
   const contentType = context.req.header("content-type") || "";
   if (!contentType.includes("application/json")) return Promise.resolve(undefined);
   return context.req.json().catch(() => {
-    throw new AppError(400, "VALIDATION_ERROR", "Please check the request fields.");
+    throw new HttpError(400, "VALIDATION_ERROR", "Please check the request fields.");
   });
 }
 
@@ -76,7 +77,7 @@ function setSessionCookies(context: Context, config: RuntimeConfig, sessionId: s
 function adminGuard(): MiddlewareHandler<{ Variables: Variables }> {
   return async (context, next) => {
     const username = context.get("adminUsername");
-    if (!username) throw new AppError(401, "ADMIN_UNAUTHORIZED", "Admin login is required.");
+    if (!username) throw new HttpError(401, "ADMIN_UNAUTHORIZED", "Admin login is required.");
     await next();
   };
 }
@@ -100,14 +101,14 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
         method: context.req.method,
         environment: config.appEnvironment,
       }));
-      throw new AppError(
+      throw new HttpError(
         503,
         "RATE_LIMIT_UNAVAILABLE",
         "The rate limit service is temporarily unavailable.",
       );
     }
     if (!allowed) {
-      throw new AppError(
+      throw new HttpError(
         429,
         "RATE_LIMIT_EXCEEDED",
         "Too many requests. Please retry later.",
@@ -118,16 +119,19 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
   app.onError((error, context) => {
     if (error instanceof AppError) {
-      if (error.code === "RATE_LIMIT_EXCEEDED") {
-        context.header("Retry-After", "60");
-      }
+      const mapped = mapApplicationError(error);
       return context.json({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        fieldErrors: error.fieldErrors,
+        ...mapped.body,
         path: new URL(context.req.url).pathname,
-      }, error.status as 400);
+      }, mapped.status);
+    }
+    if (error instanceof HttpError) {
+      const mapped = mapHttpError(error);
+      if (error.code === "RATE_LIMIT_EXCEEDED") context.header("Retry-After", "60");
+      return context.json({
+        ...mapped.body,
+        path: new URL(context.req.url).pathname,
+      }, mapped.status);
     }
     const databaseCode = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
     console.error(JSON.stringify({
@@ -149,7 +153,7 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
         method: context.req.method,
         environment: config.appEnvironment,
       }));
-      throw new AppError(
+      throw new HttpError(
         503,
         "RATE_LIMIT_UNAVAILABLE",
         "The rate limit service is temporarily unavailable.",
@@ -174,7 +178,7 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
         getCookie(context, CSRF_COOKIE),
         context.req.header(CSRF_HEADER),
       );
-      if (!valid) throw new AppError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+      if (!valid) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
     }
     await next();
   });
@@ -194,21 +198,21 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
   app.post("/api/auth/admin/login", async (context) => {
     const body = await jsonBody(context);
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new AppError(400, "VALIDATION_ERROR", "Please check the request fields.");
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new HttpError(400, "VALIDATION_ERROR", "Please check the request fields.");
     const username = (body as Record<string, unknown>).username;
     const password = (body as Record<string, unknown>).password;
-    if (typeof username !== "string" || typeof password !== "string") throw new AppError(400, "VALIDATION_ERROR", "Please check the request fields.");
+    if (typeof username !== "string" || typeof password !== "string") throw new HttpError(400, "VALIDATION_ERROR", "Please check the request fields.");
     const [usernameMatches, passwordMatches] = await Promise.all([
       constantTimeSecretEqual(username, dependencies.adminUsername),
       constantTimeSecretEqual(password, dependencies.adminPassword),
     ]);
-    if (!usernameMatches || !passwordMatches) throw new AppError(401, "ADMIN_UNAUTHORIZED", "Admin login is required.");
+    if (!usernameMatches || !passwordMatches) throw new HttpError(401, "ADMIN_UNAUTHORIZED", "Admin login is required.");
     const session = context.get("session");
-    if (!session) throw new AppError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+    if (!session) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
     await dependencies.sessions.authenticate(session, dependencies.adminUsername);
     const sessionId = getCookie(context, SESSION_COOKIE);
     const csrfToken = getCookie(context, CSRF_COOKIE);
-    if (!sessionId || !csrfToken) throw new AppError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+    if (!sessionId || !csrfToken) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
     setSessionCookies(context, config, sessionId, csrfToken, session.expiresAt);
     return context.json({ id: dependencies.adminUsername, username: dependencies.adminUsername, role: "OPERATOR" });
   });

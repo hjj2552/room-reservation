@@ -9,7 +9,14 @@ import {
   validateReservationPolicy,
   weekdayCode,
 } from "../core/domain";
-import { AppError, conflict, notFound, policy, validation } from "../core/errors";
+import {
+  AppError,
+  conflict,
+  credentialMismatch,
+  notFound,
+  policy,
+  validation,
+} from "../core/errors";
 import type { Database, Queryable } from "../infra/database";
 import type {
   AdminReservationCommand,
@@ -570,7 +577,10 @@ export class ProductService {
     if (!row) {
       const exists = await client.query("SELECT 1 FROM reservations WHERE id=$1", [reservationId]);
       if (!exists.rows[0]) notFound("Reservation");
-      throw new AppError(403, "PUBLIC_RESERVATION_PASSWORD_MISMATCH", "Reservation password does not match.");
+      credentialMismatch(
+        "PUBLIC_RESERVATION_PASSWORD_MISMATCH",
+        "Reservation password does not match.",
+      );
     }
     return row;
   }
@@ -634,7 +644,7 @@ export class ProductService {
       return await this.getPublicReservation(reservationId);
     } catch (error) {
       if (error instanceof AppError && error.code === "PUBLIC_RESERVATION_PASSWORD_MISMATCH") {
-        throw new AppError(403, "PUBLIC_CANCEL_PASSWORD_MISMATCH", "Cancel password does not match.");
+        credentialMismatch("PUBLIC_CANCEL_PASSWORD_MISMATCH", "Cancel password does not match.");
       }
       throw error;
     }
@@ -796,7 +806,10 @@ export class ProductService {
         ? { available: false, reason: "TIME_SLOT_CONFLICT", message: "The selected time slot is already reserved." }
         : { available: true, reason: null, message: null };
     } catch (error) {
-      if (error instanceof AppError && (error.status === 422 || error.code === "VALIDATION_ERROR")) {
+      if (
+        error instanceof AppError
+        && (error.kind === "POLICY_VIOLATION" || error.kind === "VALIDATION")
+      ) {
         return { available: false, reason: error.code, message: error.message };
       }
       throw error;
