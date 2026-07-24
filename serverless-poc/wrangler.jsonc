@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "room-reservation-p3-poc",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "APP_ENV": "local",
+    "E2E_CLEANUP_ENABLED": "false"
+  },
+  "env": {
+    "uat": {
+      "name": "room-reservation-p3-poc-uat",
+      "vars": {
+        "APP_ENV": "uat",
+        "E2E_CLEANUP_ENABLED": "false"
+      }
+    },
+    "production": {
+      "name": "room-reservation-p3-poc-production",
+      "vars": {
+        "APP_ENV": "prod",
+        "E2E_CLEANUP_ENABLED": "false"
+      }
+    }
+  }
+}

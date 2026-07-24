@@ -15,6 +15,23 @@ type UpstreamFetch = (request: Request) => Promise<Response>;
 
 class BackendOriginConfigurationError extends Error {}
 
+export const TRUSTED_CLIENT_IP_HEADER = "X-Room-Reservation-Client-IP";
+
+export interface ServiceBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
+export type ApiProxyTransport =
+  | {
+      kind: "service-binding";
+      service: ServiceBinding;
+    }
+  | {
+      kind: "backend-origin";
+      backendOrigin: string | undefined;
+      upstreamFetch?: UpstreamFetch;
+    };
+
 function parseBackendOrigin(value: string | undefined): URL {
   if (!value?.trim()) {
     throw new BackendOriginConfigurationError();
@@ -63,12 +80,14 @@ function createUpstreamHeaders(request: Request, incomingUrl: URL): Headers {
   }
 
   headers.delete("x-forwarded-for");
+  headers.delete(TRUSTED_CLIENT_IP_HEADER);
+  headers.delete("cf-connecting-ip");
   headers.set("x-forwarded-proto", "https");
   headers.set("x-forwarded-host", incomingUrl.host);
 
   const connectingIp = request.headers.get("cf-connecting-ip")?.trim();
   if (connectingIp) {
-    headers.set("x-forwarded-for", connectingIp);
+    headers.set(TRUSTED_CLIENT_IP_HEADER, connectingIp);
   }
 
   return headers;
@@ -86,22 +105,27 @@ function jsonError(status: number, code: string, message: string): Response {
 
 export async function proxyApiRequest(
   request: Request,
-  backendOriginValue: string | undefined,
-  upstreamFetch: UpstreamFetch = fetch,
+  transport: ApiProxyTransport,
 ): Promise<Response> {
-  let backendOrigin: URL;
-  try {
-    backendOrigin = parseBackendOrigin(backendOriginValue);
-  } catch {
-    return jsonError(
-      500,
-      "PROXY_CONFIGURATION_ERROR",
-      "The API proxy is not configured correctly.",
-    );
-  }
-
   const incomingUrl = new URL(request.url);
-  const targetUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, backendOrigin);
+  let targetUrl: URL;
+  let upstreamFetch: UpstreamFetch;
+  if (transport.kind === "service-binding") {
+    targetUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, incomingUrl.origin);
+    upstreamFetch = (upstreamRequest) => transport.service.fetch(upstreamRequest);
+  } else {
+    try {
+      const backendOrigin = parseBackendOrigin(transport.backendOrigin);
+      targetUrl = new URL(`${incomingUrl.pathname}${incomingUrl.search}`, backendOrigin);
+    } catch {
+      return jsonError(
+        500,
+        "PROXY_CONFIGURATION_ERROR",
+        "The API proxy is not configured correctly.",
+      );
+    }
+    upstreamFetch = transport.upstreamFetch ?? fetch;
+  }
   const method = request.method.toUpperCase();
 
   try {
