@@ -27,7 +27,7 @@ function app(appEnv: "uat" | "prod", enabled: "true" | "false") {
 
 describe("cleanup route registration", () => {
   it("registers only for non-prod with the explicit flag", async () => {
-    const headers = { cookie: "ROOM-SESSION=test-session" };
+    const headers = { cookie: `ROOM-SESSION=${"A".repeat(43)}` };
     expect((await app("uat", "true").request("/api/admin/test-data/e2e/preview", { headers })).status).toBe(200);
     expect((await app("uat", "false").request("/api/admin/test-data/e2e/preview", { headers })).status).toBe(404);
     expect((await app("prod", "true").request("/api/admin/test-data/e2e/preview", { headers })).status).toBe(404);

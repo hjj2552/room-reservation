@@ -7,6 +7,11 @@ const production = config.env?.production?.ratelimits ?? [];
 
 assert.deepEqual(uat, [
   {
+    name: "INGRESS_GUARD_RATE_LIMITER",
+    namespace_id: "2026072305",
+    simple: { limit: 600, period: 60 },
+  },
+  {
     name: "PUBLIC_READ_RATE_LIMITER",
     namespace_id: "2026072301",
     simple: { limit: 120, period: 60 },
@@ -18,6 +23,11 @@ assert.deepEqual(uat, [
   },
 ]);
 assert.deepEqual(production, [
+  {
+    name: "INGRESS_GUARD_RATE_LIMITER",
+    namespace_id: "2026072306",
+    simple: { limit: 600, period: 60 },
+  },
   {
     name: "PUBLIC_READ_RATE_LIMITER",
     namespace_id: "2026072303",
@@ -31,7 +41,7 @@ assert.deepEqual(production, [
 ]);
 
 const namespaceIds = [...uat, ...production].map((binding) => binding.namespace_id);
-assert.equal(new Set(namespaceIds).size, 4);
+assert.equal(new Set(namespaceIds).size, 6);
 assert.equal(namespaceIds.every((id) => /^[1-9][0-9]*$/.test(id)), true);
 assert.equal(config.workers_dev, false);
 assert.equal(config.preview_urls, false);

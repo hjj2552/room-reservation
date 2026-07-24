@@ -1,4 +1,6 @@
 const encoder = new TextEncoder();
+const OPAQUE_TOKEN_BYTES = 32;
+const opaqueTokenPattern = /^[A-Za-z0-9_-]{43}$/;
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -7,9 +9,13 @@ function toBase64Url(bytes: Uint8Array): string {
 }
 
 export function createOpaqueToken(): string {
-  const value = new Uint8Array(32);
+  const value = new Uint8Array(OPAQUE_TOKEN_BYTES);
   crypto.getRandomValues(value);
   return toBase64Url(value);
+}
+
+export function isValidOpaqueToken(value: unknown): value is string {
+  return typeof value === "string" && opaqueTokenPattern.test(value);
 }
 
 export async function sha256(value: string): Promise<string> {

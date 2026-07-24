@@ -6,12 +6,17 @@ interface CloudflareRateLimitBinding {
 
 export class CloudflareRateLimiter implements RateLimiter {
   constructor(
+    private readonly ingressBinding: CloudflareRateLimitBinding,
     private readonly readBinding: CloudflareRateLimitBinding,
     private readonly writeBinding: CloudflareRateLimitBinding,
   ) {}
 
   async check(request: RateLimitRequest): Promise<{ allowed: boolean }> {
-    const binding = request.policy === "READ" ? this.readBinding : this.writeBinding;
+    const binding = request.policy === "INGRESS"
+      ? this.ingressBinding
+      : request.policy === "READ"
+        ? this.readBinding
+        : this.writeBinding;
     const outcome = await binding.limit({ key: request.actorKey });
     return { allowed: outcome.success };
   }

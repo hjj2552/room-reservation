@@ -1,4 +1,4 @@
-export type RateLimitPolicy = "READ" | "WRITE";
+export type RateLimitPolicy = "INGRESS" | "READ" | "WRITE";
 
 export interface RateLimitRequest {
   policy: RateLimitPolicy;

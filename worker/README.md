@@ -57,12 +57,13 @@ npm.cmd run uat:prepare
 
 UAT Worker는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음으로 배포하고 공개 URL을 만들지 않는다. Pages는 기존 프로젝트의 새 preview deployment만 만들고 `API_BACKEND` Service Binding을 exact UAT Worker에 연결한다. `API_PROXY_TRANSPORT=service-binding`을 명시하며 `BACKEND_ORIGIN` fallback을 사용하지 않는다. 배포 전 project-level preview 설정을 snapshot하고 테스트 후 정확히 복원한 뒤 production과 preview 설정을 모두 재확인한다. production Pages 변수·deployment·domain은 변경하지 않는다.
 
-UAT Worker에는 다음 네 namespace 중 UAT 두 개만 연결된다.
+UAT Worker에는 다음 여섯 namespace 중 UAT 세 개만 연결된다.
 
+- `INGRESS_GUARD_RATE_LIMITER`: namespace `2026072305`, 모든 `/api/**` 600/60초
 - `PUBLIC_READ_RATE_LIMITER`: namespace `2026072301`, 120/60초
 - `PUBLIC_WRITE_RATE_LIMITER`: namespace `2026072302`, 24/60초
 
-production namespace `2026072303`, `2026072304`는 UAT에서 호출하지 않는다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계는 deterministic unit test가 담당한다.
+production namespace `2026072306`, `2026072303`, `2026072304`는 UAT에서 호출하지 않는다. INGRESS는 인증 여부와 무관하게 세션 DB 조회 전에 적용하고, 인증 관리자는 그 뒤의 READ/WRITE만 우회한다. `ROOM-SESSION`은 43자 padding 없는 base64url 형식일 때만 DB 조회 후보로 인정한다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 601/121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계와 내부 호출 0회는 deterministic unit test가 담당한다.
 
 전체 원격 E2E는 preview URL과 이중 확인 flag를 모두 요구한다.
 

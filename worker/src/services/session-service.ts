@@ -1,4 +1,4 @@
-import { createOpaqueToken, sha256 } from "../core/security";
+import { createOpaqueToken, isValidOpaqueToken, sha256 } from "../core/security";
 import type { Database } from "../infra/database";
 
 export interface SessionRecord {
@@ -17,7 +17,7 @@ export class SessionService {
   ) {}
 
   async find(sessionId: string | undefined): Promise<SessionRecord | null> {
-    if (!sessionId) return null;
+    if (!isValidOpaqueToken(sessionId)) return null;
     const sessionIdHash = await sha256(sessionId);
     const result = await this.database.query(
       `SELECT session_id_hash, csrf_token_hash, admin_username, expires_at

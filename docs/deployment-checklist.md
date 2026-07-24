@@ -45,9 +45,11 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 - The SPA obtains `XSRF-TOKEN` from `GET /api/auth/csrf` and sends it as `X-XSRF-TOKEN`.
 - Unauthenticated and public `GET /api/**` requests are limited to 120 requests per IP per minute.
 - Unauthenticated and public state-changing `/api/**` requests are limited to 24 requests per IP per minute.
-- Authenticated `ROLE_ADMIN` requests bypass rate limiting. Expired or unauthenticated admin requests do not bypass it.
-- The Worker target uses exactly two Workers Rate Limiting bindings: 120 GET requests/60 seconds and 24 non-GET requests/60 seconds per trusted client IP.
-- UAT and production READ/WRITE bindings use four distinct positive-integer namespaces. Local and CI use fake/local adapters and never production namespaces.
+- Every `/api/**` request first passes the 600 requests/60 seconds INGRESS guard for its trusted client IP, including authenticated administrator requests.
+- Authenticated `ROLE_ADMIN` requests bypass only the product READ/WRITE limits. Expired or unauthenticated admin requests do not bypass them.
+- Only a 43-character unpadded base64url `ROOM-SESSION` value is eligible for a session database lookup, and only after INGRESS allows the request.
+- The Worker target uses exactly three Workers Rate Limiting bindings: 600 ingress requests, 120 non-admin GET requests and 24 non-admin non-GET requests per 60 seconds per trusted client IP.
+- UAT and production INGRESS/READ/WRITE bindings use six distinct positive-integer namespaces. Local and CI use fake/local adapters and never production namespaces.
 - Workers Rate Limiting is Cloudflare-location-local and permissive/eventually consistent. It is abuse mitigation, not exact global accounting.
 - The production Worker has no workers.dev, preview URL, route or custom domain and trusts only the Pages-owned internal IP header received through `API_BACKEND`.
 

@@ -1,6 +1,14 @@
 const mode = process.argv[2];
-if (mode !== "saturate" && mode !== "saturate-read" && mode !== "recover") {
-  throw new Error("Use validate-rate-limit-uat.mjs with saturate, saturate-read, or recover");
+if (
+  mode !== "saturate"
+  && mode !== "saturate-read"
+  && mode !== "recover"
+  && mode !== "saturate-ingress"
+  && mode !== "recover-ingress"
+) {
+  throw new Error(
+    "Use validate-rate-limit-uat.mjs with saturate, saturate-read, recover, saturate-ingress, or recover-ingress",
+  );
 }
 if (process.env.P4_UAT_CONFIRM_DISPOSABLE !== "true") {
   throw new Error("P4_UAT_CONFIRM_DISPOSABLE must be exactly true");
@@ -67,7 +75,65 @@ async function firstRateLimited(method, maximum) {
   throw new Error(`${method} burst did not produce 429 within ${maximum} requests`);
 }
 
-if (mode === "saturate-read") {
+async function observeIngressLimit(adminCookie, maximum, batchSize = 100) {
+  for (let requestsAttempted = batchSize; requestsAttempted <= maximum; requestsAttempted += batchSize) {
+    const responses = await Promise.all(Array.from({ length: batchSize }, () => (
+      fetch(`${origin}/api/public/settings`, {
+        headers: { cookie: adminCookie },
+      })
+    )));
+    const limitedResponse = responses.find((response) => response.status === 429);
+    for (const response of responses) {
+      if (response.status !== 200 && response.status !== 429) {
+        throw new Error(`Authenticated ingress request failed: ${response.status}`);
+      }
+    }
+    if (limitedResponse) {
+      const body = await limitedResponse.json();
+      if (
+        limitedResponse.headers.get("Retry-After") !== "60"
+        || body.code !== "RATE_LIMIT_EXCEEDED"
+        || body.message !== "Too many requests. Please retry later."
+        || body.details?.retryAfterSeconds !== 60
+      ) {
+        throw new Error("Remote ingress 429 response contract mismatch");
+      }
+      return requestsAttempted;
+    }
+  }
+  throw new Error(`Authenticated ingress burst did not produce 429 within ${maximum} requests`);
+}
+
+if (mode === "saturate-ingress") {
+  const adminCookie = await loginAdmin();
+  const requestsAttemptedBefore429Observation = await observeIngressLimit(adminCookie, 2400);
+  const forgedResponse = await fetch(`${origin}/api/public/settings`, {
+    headers: {
+      cookie: adminCookie,
+      "X-Forwarded-For": "192.0.2.200",
+      "X-Room-Reservation-Client-IP": "192.0.2.201",
+    },
+  });
+  if (forgedResponse.status !== 429) {
+    throw new Error(`Forged client-IP headers changed the saturated ingress bucket: ${forgedResponse.status}`);
+  }
+  process.stdout.write(`${JSON.stringify({
+    serviceBindingPath: true,
+    authenticatedAdminIngressLimited: true,
+    ingress429Observed: true,
+    requestsAttemptedBefore429Observation,
+    forgedHeadersIgnored: true,
+  })}\n`);
+} else if (mode === "recover-ingress") {
+  const response = await fetch(`${origin}/api/public/settings`);
+  if (response.status !== 200) {
+    throw new Error(`Ingress recovery failed: ${response.status}`);
+  }
+  process.stdout.write(`${JSON.stringify({
+    ingressRecovered: true,
+    status: response.status,
+  })}\n`);
+} else if (mode === "saturate-read") {
   const publicRead429At = await firstRateLimited("GET", 360);
   process.stdout.write(`${JSON.stringify({
     publicRead429Observed: true,

@@ -20,7 +20,13 @@ export class DeterministicRateLimiter implements RateLimiter {
     const count = (this.counts.get(counterKey) ?? 0) + 1;
     this.counts.set(counterKey, count);
     return {
-      allowed: count <= (request.policy === "READ" ? 120 : 24),
+      allowed: count <= (
+        request.policy === "INGRESS"
+          ? 600
+          : request.policy === "READ"
+            ? 120
+            : 24
+      ),
     };
   }
 }

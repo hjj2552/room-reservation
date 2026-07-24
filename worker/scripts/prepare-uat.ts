@@ -9,7 +9,7 @@ if (process.env.APP_ENV !== "uat") throw new Error("APP_ENV must be exactly uat"
 if (process.env.P4_UAT_CONFIRM_DISPOSABLE !== "true") {
   throw new Error("P4_UAT_CONFIRM_DISPOSABLE must be exactly true");
 }
-if (!expectedDatabase || !/^room_reservation_(?:p4|rate_limit)_uat_[0-9]{8}$/.test(expectedDatabase)) {
+if (!expectedDatabase || !/^room_reservation_(?:p4|rate_limit|ingress)_uat_[0-9]{8}$/.test(expectedDatabase)) {
   throw new Error("P4_UAT_DATABASE must use an approved disposable UAT naming rule");
 }
 if (!expectedRole || !/^[a-z][a-z0-9_]{2,62}$/.test(expectedRole)) {

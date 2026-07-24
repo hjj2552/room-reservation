@@ -12,6 +12,7 @@ export interface WorkerEnv {
   ADMIN_PASSWORD: string;
   APP_ENV: string;
   E2E_CLEANUP_ENABLED: string;
+  INGRESS_GUARD_RATE_LIMITER: RateLimit;
   PUBLIC_READ_RATE_LIMITER: RateLimit;
   PUBLIC_WRITE_RATE_LIMITER: RateLimit;
 }
@@ -27,6 +28,7 @@ export default {
       products: new ProductService(database, now),
       sessions: new SessionService(database, now),
       rateLimiter: new CloudflareRateLimiter(
+        env.INGRESS_GUARD_RATE_LIMITER,
         env.PUBLIC_READ_RATE_LIMITER,
         env.PUBLIC_WRITE_RATE_LIMITER,
       ),

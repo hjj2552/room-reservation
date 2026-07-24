@@ -17,6 +17,11 @@
       },
       "ratelimits": [
         {
+          "name": "INGRESS_GUARD_RATE_LIMITER",
+          "namespace_id": "2026072305",
+          "simple": { "limit": 600, "period": 60 }
+        },
+        {
           "name": "PUBLIC_READ_RATE_LIMITER",
           "namespace_id": "2026072301",
           "simple": { "limit": 120, "period": 60 }
@@ -37,6 +42,11 @@
         "E2E_CLEANUP_ENABLED": "false"
       },
       "ratelimits": [
+        {
+          "name": "INGRESS_GUARD_RATE_LIMITER",
+          "namespace_id": "2026072306",
+          "simple": { "limit": 600, "period": 60 }
+        },
         {
           "name": "PUBLIC_READ_RATE_LIMITER",
           "namespace_id": "2026072303",
