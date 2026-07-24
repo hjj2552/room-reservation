@@ -2,12 +2,32 @@ import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import type { RuntimeConfig } from "../core/config";
 import { shouldRegisterCleanup } from "../core/config";
-import { parseUuid } from "../core/domain";
 import { AppError } from "../core/errors";
 import type { RateLimiter, RateLimitPolicy } from "../core/rate-limit";
 import { constantTimeSecretEqual, isValidOpaqueToken, sha256 } from "../core/security";
 import type { ProductService } from "../services/product-service";
 import type { SessionRecord, SessionService } from "../services/session-service";
+import {
+  parseAdminReservation,
+  parseAvailability,
+  parseDateQuery,
+  parseHistoryList,
+  parseMemo,
+  parsePublicPassword,
+  parsePublicReservation,
+  parseRecurrenceCreate,
+  parseRecurrenceList,
+  parseRecurrencePreview,
+  parseReservationFilter,
+  parseReservationList,
+  parseRoomEnabled,
+  parseRoomList,
+  parseSaveRoom,
+  parseSaveTag,
+  parseTagList,
+  parseUpdateSettings,
+  parseUuidPath,
+} from "./product-input";
 
 const SESSION_COOKIE = "ROOM-SESSION";
 const CSRF_COOKIE = "XSRF-TOKEN";
@@ -37,7 +57,11 @@ function jsonBody(context: Context): Promise<unknown> {
 }
 
 function uuidParam(context: Context, name: string): string {
-  return parseUuid(context.req.param(name), name);
+  return parseUuidPath(context.req.param(name), name);
+}
+
+function queryParams(context: Context): URLSearchParams {
+  return new URL(context.req.url).searchParams;
 }
 
 function setSessionCookies(context: Context, config: RuntimeConfig, sessionId: string, csrfToken: string, expires: Date) {
@@ -205,73 +229,165 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
   app.get("/api/public/rooms", async (context) => context.json(await dependencies.products.listPublicRooms()));
   app.get("/api/public/rooms/:roomId", async (context) => context.json(await dependencies.products.getPublicRoom(uuidParam(context, "roomId"))));
   app.get("/api/public/rooms/:roomId/weekly-reservations", async (context) => {
-    const weekStart = context.req.query("weekStart");
-    if (!weekStart) throw new AppError(400, "VALIDATION_ERROR", "weekStart is required.");
+    const weekStart = parseDateQuery(context.req.query("weekStart"), "weekStart");
     return context.json(await dependencies.products.getWeeklyReservations(uuidParam(context, "roomId"), weekStart));
   });
-  app.get("/api/public/availability", async (context) => context.json(await dependencies.products.checkAvailability(new URL(context.req.url))));
+  app.get("/api/public/availability", async (context) => context.json(
+    await dependencies.products.checkAvailability(parseAvailability(queryParams(context))),
+  ));
   app.post("/api/public/reservations", async (context) => {
-    const result = await dependencies.products.createPublicReservation(await jsonBody(context));
+    const result = await dependencies.products.createPublicReservation(
+      parsePublicReservation(await jsonBody(context)),
+    );
     context.header("Location", `/api/public/reservations/${result.id}`);
     return context.json(result, 201);
   });
   app.get("/api/public/reservations/:reservationId", async (context) => context.json(await dependencies.products.getPublicReservation(uuidParam(context, "reservationId"))));
-  app.post("/api/public/reservations/:reservationId/edit", async (context) => context.json(await dependencies.products.verifyPublicReservationForEdit(uuidParam(context, "reservationId"), await jsonBody(context))));
-  app.put("/api/public/reservations/:reservationId", async (context) => context.json(await dependencies.products.updatePublicReservation(uuidParam(context, "reservationId"), await jsonBody(context))));
-  app.post("/api/public/reservations/:reservationId/cancel", async (context) => context.json(await dependencies.products.cancelPublicReservation(uuidParam(context, "reservationId"), await jsonBody(context))));
+  app.post("/api/public/reservations/:reservationId/edit", async (context) => context.json(
+    await dependencies.products.verifyPublicReservationForEdit(
+      uuidParam(context, "reservationId"),
+      parsePublicPassword(await jsonBody(context)),
+    ),
+  ));
+  app.put("/api/public/reservations/:reservationId", async (context) => context.json(
+    await dependencies.products.updatePublicReservation(
+      uuidParam(context, "reservationId"),
+      parsePublicReservation(await jsonBody(context)),
+    ),
+  ));
+  app.post("/api/public/reservations/:reservationId/cancel", async (context) => context.json(
+    await dependencies.products.cancelPublicReservation(
+      uuidParam(context, "reservationId"),
+      parsePublicPassword(await jsonBody(context)),
+    ),
+  ));
 
   app.use("/api/admin/*", adminGuard());
   app.get("/api/admin/settings", async (context) => context.json(await dependencies.products.getSettings()));
-  app.put("/api/admin/settings", async (context) => context.json(await dependencies.products.updateSettings(await jsonBody(context), context.get("adminUsername")!)));
+  app.put("/api/admin/settings", async (context) => context.json(
+    await dependencies.products.updateSettings(
+      parseUpdateSettings(await jsonBody(context)),
+      context.get("adminUsername")!,
+    ),
+  ));
 
-  app.get("/api/admin/rooms", async (context) => context.json(await dependencies.products.listRooms(new URL(context.req.url))));
+  app.get("/api/admin/rooms", async (context) => context.json(
+    await dependencies.products.listRooms(parseRoomList(queryParams(context))),
+  ));
   app.get("/api/admin/rooms/:roomId", async (context) => context.json(await dependencies.products.getAdminRoomResponse(uuidParam(context, "roomId"))));
   app.get("/api/admin/rooms/:roomId/deletion-check", async (context) => context.json(await dependencies.products.getRoomDeletionCheck(uuidParam(context, "roomId"))));
   app.post("/api/admin/rooms", async (context) => {
-    const result = await dependencies.products.createRoom(await jsonBody(context));
+    const result = await dependencies.products.createRoom(parseSaveRoom(await jsonBody(context)));
     context.header("Location", `/api/admin/rooms/${result.id}`);
     return context.json(result, 201);
   });
-  app.put("/api/admin/rooms/:roomId", async (context) => context.json(await dependencies.products.updateRoom(uuidParam(context, "roomId"), await jsonBody(context))));
-  app.patch("/api/admin/rooms/:roomId/enabled", async (context) => context.json(await dependencies.products.updateRoomEnabled(uuidParam(context, "roomId"), await jsonBody(context))));
+  app.put("/api/admin/rooms/:roomId", async (context) => context.json(
+    await dependencies.products.updateRoom(
+      uuidParam(context, "roomId"),
+      parseSaveRoom(await jsonBody(context)),
+    ),
+  ));
+  app.patch("/api/admin/rooms/:roomId/enabled", async (context) => context.json(
+    await dependencies.products.updateRoomEnabled(
+      uuidParam(context, "roomId"),
+      parseRoomEnabled(await jsonBody(context)),
+    ),
+  ));
   app.delete("/api/admin/rooms/:roomId", async (context) => { await dependencies.products.deleteRoom(uuidParam(context, "roomId")); return context.body(null, 204); });
 
-  app.get("/api/admin/tags", async (context) => context.json(await dependencies.products.listTags(new URL(context.req.url))));
+  app.get("/api/admin/tags", async (context) => context.json(
+    await dependencies.products.listTags(parseTagList(queryParams(context))),
+  ));
   app.post("/api/admin/tags", async (context) => {
-    const result = await dependencies.products.createTag(await jsonBody(context));
+    const result = await dependencies.products.createTag(parseSaveTag(await jsonBody(context)));
     context.header("Location", `/api/admin/tags/${result.id}`);
     return context.json(result, 201);
   });
-  app.put("/api/admin/tags/:tagId", async (context) => context.json(await dependencies.products.updateTag(uuidParam(context, "tagId"), await jsonBody(context))));
+  app.put("/api/admin/tags/:tagId", async (context) => context.json(
+    await dependencies.products.updateTag(
+      uuidParam(context, "tagId"),
+      parseSaveTag(await jsonBody(context)),
+    ),
+  ));
   app.delete("/api/admin/tags/:tagId", async (context) => { await dependencies.products.deleteTag(uuidParam(context, "tagId")); return context.body(null, 204); });
 
-  app.get("/api/admin/reservations", async (context) => context.json(await dependencies.products.listReservations(new URL(context.req.url))));
+  app.get("/api/admin/reservations", async (context) => context.json(
+    await dependencies.products.listReservations(parseReservationList(queryParams(context))),
+  ));
   app.post("/api/admin/reservations", async (context) => {
-    const result = await dependencies.products.createAdminReservation(await jsonBody(context), context.get("adminUsername")!);
+    const result = await dependencies.products.createAdminReservation(
+      parseAdminReservation(await jsonBody(context), "CONFIRMED"),
+      context.get("adminUsername")!,
+    );
     context.header("Location", `/api/admin/reservations/${result.id}`);
     return context.json(result, 201);
   });
   app.get("/api/admin/reservations/:reservationId", async (context) => context.json(await dependencies.products.getReservationDetail(uuidParam(context, "reservationId"))));
-  app.put("/api/admin/reservations/:reservationId", async (context) => context.json(await dependencies.products.updateAdminReservation(uuidParam(context, "reservationId"), await jsonBody(context), context.get("adminUsername")!)));
-  app.post("/api/admin/reservations/:reservationId/approve", async (context) => context.json(await dependencies.products.changeReservationStatus(uuidParam(context, "reservationId"), "APPROVED", await jsonBody(context), context.get("adminUsername")!)));
-  app.post("/api/admin/reservations/:reservationId/cancel", async (context) => context.json(await dependencies.products.changeReservationStatus(uuidParam(context, "reservationId"), "CANCELLED", await jsonBody(context), context.get("adminUsername")!)));
-  app.delete("/api/admin/reservations/:reservationId", async (context) => { await dependencies.products.deleteReservation(uuidParam(context, "reservationId"), await jsonBody(context), context.get("adminUsername")!); return context.body(null, 204); });
+  app.put("/api/admin/reservations/:reservationId", async (context) => context.json(
+    await dependencies.products.updateAdminReservation(
+      uuidParam(context, "reservationId"),
+      parseAdminReservation(await jsonBody(context)),
+      context.get("adminUsername")!,
+    ),
+  ));
+  app.post("/api/admin/reservations/:reservationId/approve", async (context) => context.json(
+    await dependencies.products.changeReservationStatus(
+      uuidParam(context, "reservationId"),
+      "APPROVED",
+      parseMemo(await jsonBody(context)),
+      context.get("adminUsername")!,
+    ),
+  ));
+  app.post("/api/admin/reservations/:reservationId/cancel", async (context) => context.json(
+    await dependencies.products.changeReservationStatus(
+      uuidParam(context, "reservationId"),
+      "CANCELLED",
+      parseMemo(await jsonBody(context)),
+      context.get("adminUsername")!,
+    ),
+  ));
+  app.delete("/api/admin/reservations/:reservationId", async (context) => {
+    await dependencies.products.deleteReservation(
+      uuidParam(context, "reservationId"),
+      parseMemo(await jsonBody(context)),
+      context.get("adminUsername")!,
+    );
+    return context.body(null, 204);
+  });
   app.get("/api/admin/reservations/:reservationId/histories", async (context) => context.json(await dependencies.products.getReservationHistories(uuidParam(context, "reservationId"))));
-  app.get("/api/admin/audit/reservation-histories", async (context) => context.json(await dependencies.products.listHistories(new URL(context.req.url))));
+  app.get("/api/admin/audit/reservation-histories", async (context) => context.json(
+    await dependencies.products.listHistories(parseHistoryList(queryParams(context))),
+  ));
   app.get("/api/admin/exports/reservations.csv", async (context) => {
-    const csv = await dependencies.products.exportReservationsCsv(new URL(context.req.url));
+    const csv = await dependencies.products.exportReservationsCsv(
+      parseReservationFilter(queryParams(context)),
+    );
     return new Response(csv, { headers: { "Content-Type": "text/csv;charset=UTF-8", "Content-Disposition": 'attachment; filename="reservations.csv"' } });
   });
 
-  app.post("/api/admin/recurrences/preview", async (context) => context.json(await dependencies.products.previewRecurrence(await jsonBody(context))));
+  app.post("/api/admin/recurrences/preview", async (context) => context.json(
+    await dependencies.products.previewRecurrence(parseRecurrencePreview(await jsonBody(context))),
+  ));
   app.post("/api/admin/recurrences", async (context) => {
-    const result = await dependencies.products.createRecurrence(await jsonBody(context), context.get("adminUsername")!);
+    const result = await dependencies.products.createRecurrence(
+      parseRecurrenceCreate(await jsonBody(context)),
+      context.get("adminUsername")!,
+    );
     context.header("Location", `/api/admin/recurrences/${result.recurrenceId}`);
     return context.json(result, 201);
   });
-  app.get("/api/admin/recurrences", async (context) => context.json(await dependencies.products.listRecurrences(new URL(context.req.url))));
+  app.get("/api/admin/recurrences", async (context) => context.json(
+    await dependencies.products.listRecurrences(parseRecurrenceList(queryParams(context))),
+  ));
   app.get("/api/admin/recurrences/:recurrenceId", async (context) => context.json(await dependencies.products.getRecurrence(uuidParam(context, "recurrenceId"))));
-  app.post("/api/admin/recurrences/:recurrenceId/cancel", async (context) => { await dependencies.products.cancelRecurrence(uuidParam(context, "recurrenceId"), await jsonBody(context), context.get("adminUsername")!); return context.body(null, 204); });
+  app.post("/api/admin/recurrences/:recurrenceId/cancel", async (context) => {
+    await dependencies.products.cancelRecurrence(
+      uuidParam(context, "recurrenceId"),
+      parseMemo(await jsonBody(context)),
+      context.get("adminUsername")!,
+    );
+    return context.body(null, 204);
+  });
 
   if (shouldRegisterCleanup(config)) {
     app.get("/api/admin/test-data/e2e/preview", async (context) => context.json(await dependencies.products.cleanupE2e(context.req.query("prefix") || "testing-", true)));
