@@ -10,6 +10,7 @@ These rules apply to every Codex/agent task in this repository.
 
 ## Git Workflow
 
+- Use Conventional Commits-style messages without scopes. Write `fix: ...`, `feat: ...`, or `docs: ...`; do not use parenthesized forms such as `fix(frontend): ...`.
 - Do not merge `origin/main` into a task branch solely because Git reports that the branch is behind or has diverged. A previous squash merge may have produced different commit hashes for an equivalent tree.
 - After confirming that a task branch was squash-merged and has no remaining unmerged work, delete its local and remote refs. For follow-up work, recreate the same branch name from the latest `origin/main` instead of continuing from the pre-squash history.
 - Do not push a newly recreated branch until it contains an actual task commit. Creating or synchronizing an empty branch must not trigger an extra CI run.
