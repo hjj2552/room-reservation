@@ -134,3 +134,16 @@ npm.cmd run e2e:cleanup
 When running against a local/dev backend, start that backend with `E2E_CLEANUP_ENABLED=true` first. From the repository root you can use `.\start-backend-cleanup-enabled.bat`. Without that opt-in, `/api/admin/test-data/e2e/preview` returns 404 because the controller is not registered. The manual cleanup command logs in as the admin user and calls the guarded `/api/admin/test-data/e2e` cleanup endpoints. If the backend is not on `http://127.0.0.1:8080`, set `E2E_API_BASE_URL`.
 
 `start-backend-cleanup-enabled.bat` starts the normal local PostgreSQL service, then runs the backend with `--spring.profiles.active=local` and `E2E_CLEANUP_ENABLED=true`. It is intended only for local/dev test-data cleanup. Do not use it for production. For CI-shaped E2E runs against the disposable test database, prefer `postgres-test` plus the `e2e` profile.
+
+## Worker P4 E2E
+
+The production Worker HTTP app can run the same suite against a disposable local PostgreSQL container:
+
+```powershell
+cd worker
+npm.cmd run test:local-e2e
+```
+
+The runner applies Worker baseline V1, enables reservations only inside the disposable E2E database, starts a Node HTTP adapter around the same Hono app, and then reuses `frontend/scripts/run-e2e.mjs`. It requires the same before/after guarded cleanup and final zero-row preview. The container and local adapter are stopped by exact name/PID.
+
+For remote UAT, use only a Pages preview deployment connected to a disposable Worker/Neon environment. Set `P4_UAT_CONFIRM_DISPOSABLE=true` and `P4_UAT_PAGES_URL` to a branch/deployment preview URL, then run `npm.cmd run test:uat-e2e` from `worker`. The guard rejects the production-shaped Pages URL. Production has no cleanup route; UAT requires both a non-prod `APP_ENV` and `E2E_CLEANUP_ENABLED=true`.

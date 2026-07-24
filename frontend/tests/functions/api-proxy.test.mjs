@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { proxyApiRequest } from "../../cloudflare/apiProxy.ts";
+import {
+  onRequest,
+  selectApiProxyTransport,
+} from "../../functions/api/[[path]].ts";
+
+function backendOrigin(origin, upstreamFetch) {
+  return { kind: "backend-origin", backendOrigin: origin, upstreamFetch };
+}
 
 function captureUpstream(response = new Response("ok")) {
   let capturedRequest;
@@ -28,7 +36,10 @@ test("forwards a GET path and query without a body", async () => {
     "https://reservation.example/api/public/settings?name=room%20one&status=OPEN",
   );
 
-  const response = await proxyApiRequest(request, "https://backend.example", upstream.fetch);
+  const response = await proxyApiRequest(
+    request,
+    backendOrigin("https://backend.example", upstream.fetch),
+  );
 
   assert.equal(response.status, 200);
   assert.equal(
@@ -46,8 +57,7 @@ test("forwards the root API path without adding or removing path segments", asyn
 
   await proxyApiRequest(
     new Request("https://reservation.example/api?probe=true"),
-    "https://backend.example/",
-    upstream.fetch,
+    backendOrigin("https://backend.example/", upstream.fetch),
   );
 
   assert.equal(upstream.request.url, "https://backend.example/api?probe=true");
@@ -70,10 +80,14 @@ test("forwards a POST body, cookies, CSRF, authorization, and safe headers", asy
       "x-remove-me": "connection-token-value",
       "x-xsrf-token": "csrf-header",
       "x-forwarded-for": "198.51.100.20, 198.51.100.21",
+      "x-room-reservation-client-ip": "198.51.100.99",
     },
   });
 
-  await proxyApiRequest(request, "https://backend.example", upstream.fetch);
+  await proxyApiRequest(
+    request,
+    backendOrigin("https://backend.example", upstream.fetch),
+  );
 
   assert.equal(await upstream.request.text(), JSON.stringify({ purpose: "seminar" }));
   assert.equal(upstream.request.headers.get("content-type"), "application/json");
@@ -84,7 +98,12 @@ test("forwards a POST body, cookies, CSRF, authorization, and safe headers", asy
     "SESSION=session-value; XSRF-TOKEN=csrf-cookie",
   );
   assert.equal(upstream.request.headers.get("x-xsrf-token"), "csrf-header");
-  assert.equal(upstream.request.headers.get("x-forwarded-for"), "203.0.113.10");
+  assert.equal(upstream.request.headers.get("x-forwarded-for"), null);
+  assert.equal(
+    upstream.request.headers.get("x-room-reservation-client-ip"),
+    "203.0.113.10",
+  );
+  assert.equal(upstream.request.headers.get("cf-connecting-ip"), null);
   assert.equal(upstream.request.headers.get("x-forwarded-proto"), "https");
   assert.equal(upstream.request.headers.get("x-forwarded-host"), "reservation.example");
   assert.equal(upstream.request.headers.get("host"), null);
@@ -100,9 +119,13 @@ test("does not trust a client X-Forwarded-For without CF-Connecting-IP", async (
     headers: { "x-forwarded-for": "198.51.100.25" },
   });
 
-  await proxyApiRequest(request, "https://backend.example", upstream.fetch);
+  await proxyApiRequest(
+    request,
+    backendOrigin("https://backend.example", upstream.fetch),
+  );
 
   assert.equal(upstream.request.headers.get("x-forwarded-for"), null);
+  assert.equal(upstream.request.headers.get("x-room-reservation-client-ip"), null);
   assert.equal(upstream.request.headers.get("x-forwarded-proto"), "https");
   assert.equal(upstream.request.headers.get("x-forwarded-host"), "reservation.example:8443");
 });
@@ -120,8 +143,7 @@ test("returns the upstream response unchanged, including separate Set-Cookie hea
 
   const response = await proxyApiRequest(
     new Request("https://reservation.example/api/auth/login", { method: "POST" }),
-    "https://backend.example",
-    upstream.fetch,
+    backendOrigin("https://backend.example", upstream.fetch),
   );
 
   assert.strictEqual(response, upstreamResponse);
@@ -153,8 +175,7 @@ test("rejects missing or unsafe backend origins without calling upstream", async
     const upstream = captureUpstream();
     const response = await proxyApiRequest(
       new Request("https://reservation.example/api/public/settings"),
-      origin,
-      upstream.fetch,
+      backendOrigin(origin, upstream.fetch),
     );
 
     assert.equal(response.status, 500, String(origin));
@@ -173,8 +194,7 @@ test("allows HTTP only for explicit local development hosts", async () => {
     const upstream = captureUpstream();
     const response = await proxyApiRequest(
       new Request("http://localhost:8788/api/public/settings"),
-      origin,
-      upstream.fetch,
+      backendOrigin(origin, upstream.fetch),
     );
 
     assert.equal(response.status, 200);
@@ -186,11 +206,10 @@ test("returns a generic 502 without retrying or exposing the backend URL", async
   let calls = 0;
   const response = await proxyApiRequest(
     new Request("https://reservation.example/api/public/settings"),
-    "https://sensitive-backend.example",
-    async () => {
-      calls += 1;
-      throw new Error("connect ECONNREFUSED https://sensitive-backend.example");
-    },
+    backendOrigin("https://sensitive-backend.example", async () => {
+        calls += 1;
+        throw new Error("connect ECONNREFUSED https://sensitive-backend.example");
+      }),
   );
 
   assert.equal(response.status, 502);
@@ -206,10 +225,72 @@ test("does not attach a body to HEAD requests", async () => {
 
   await proxyApiRequest(
     new Request("https://reservation.example/api/public/settings", { method: "HEAD" }),
-    "https://backend.example",
-    upstream.fetch,
+    backendOrigin("https://backend.example", upstream.fetch),
   );
 
   assert.equal(upstream.request.method, "HEAD");
   assert.equal(upstream.request.body, null);
+});
+
+test("uses API_BACKEND Service Binding while preserving the same-origin API request contract", async () => {
+  const upstream = captureUpstream(new Response("bound", {
+    headers: { "set-cookie": "ROOM-SESSION=bound; Path=/; Secure; HttpOnly" },
+  }));
+  const request = new Request("https://reservation.example/api/public/settings?probe=1", {
+    headers: {
+      "cf-connecting-ip": "203.0.113.55",
+      "x-forwarded-for": "198.51.100.1",
+      "x-room-reservation-client-ip": "198.51.100.2",
+      cookie: "ROOM-SESSION=session",
+      "x-xsrf-token": "csrf",
+    },
+  });
+
+  const response = await onRequest({
+    request,
+    env: {
+      API_PROXY_TRANSPORT: "service-binding",
+      API_BACKEND: { fetch: upstream.fetch },
+      BACKEND_ORIGIN: "https://must-not-be-used.example",
+    },
+  });
+
+  assert.equal(await response.text(), "bound");
+  assert.equal(
+    upstream.request.url,
+    "https://reservation.example/api/public/settings?probe=1",
+  );
+  assert.equal(upstream.request.headers.get("cookie"), "ROOM-SESSION=session");
+  assert.equal(upstream.request.headers.get("x-xsrf-token"), "csrf");
+  assert.equal(upstream.request.headers.get("x-forwarded-for"), null);
+  assert.equal(
+    upstream.request.headers.get("x-room-reservation-client-ip"),
+    "203.0.113.55",
+  );
+  assert.deepEqual(response.headers.getSetCookie(), [
+    "ROOM-SESSION=bound; Path=/; Secure; HttpOnly",
+  ]);
+});
+
+test("requires an explicit transport and never falls back from production Service Binding mode", async () => {
+  assert.equal(selectApiProxyTransport({
+    API_PROXY_TRANSPORT: "service-binding",
+    BACKEND_ORIGIN: "https://legacy.example",
+  }), null);
+  assert.equal(selectApiProxyTransport({
+    BACKEND_ORIGIN: "https://legacy.example",
+  }), null);
+
+  const response = await onRequest({
+    request: new Request("https://reservation.example/api/public/settings"),
+    env: {
+      API_PROXY_TRANSPORT: "service-binding",
+      BACKEND_ORIGIN: "https://legacy.example",
+    },
+  });
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), {
+    code: "PROXY_CONFIGURATION_ERROR",
+    message: "The API proxy is not configured correctly.",
+  });
 });
