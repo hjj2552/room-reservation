@@ -5,7 +5,7 @@ import { createHttpApp } from "../../src/http/app";
 import { parseRuntimeConfig } from "../../src/core/config";
 import { AppError } from "../../src/core/errors";
 import { PgDatabase } from "./pg-database";
-import { allowAllRateLimiter, fixedClientIpProvider } from "../helpers/rate-limit";
+import { allowAllRateLimiter, fixedClientIpResolver } from "../helpers/rate-limit";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -157,7 +157,7 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
       products,
       sessions,
       rateLimiter: allowAllRateLimiter,
-      clientIpProvider: fixedClientIpProvider,
+      resolveClientIp: fixedClientIpResolver,
       adminUsername: "admin",
       adminPassword: "admin1234",
     });
@@ -289,7 +289,7 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
     products,
     sessions,
     rateLimiter: allowAllRateLimiter,
-    clientIpProvider: fixedClientIpProvider,
+    resolveClientIp: fixedClientIpResolver,
     adminUsername: "admin",
     adminPassword: "admin1234",
   });

@@ -4,7 +4,7 @@ import type { RuntimeConfig } from "../core/config";
 import { shouldRegisterCleanup } from "../core/config";
 import { parseUuid } from "../core/domain";
 import { AppError } from "../core/errors";
-import type { ClientIpProvider, RateLimiter, RateLimitPolicy } from "../core/rate-limit";
+import type { RateLimiter, RateLimitPolicy } from "../core/rate-limit";
 import { constantTimeSecretEqual, isValidOpaqueToken, sha256 } from "../core/security";
 import type { ProductService } from "../services/product-service";
 import type { SessionRecord, SessionService } from "../services/session-service";
@@ -23,7 +23,7 @@ interface Dependencies {
   products: ProductService;
   sessions: SessionService;
   rateLimiter: RateLimiter;
-  clientIpProvider: ClientIpProvider;
+  resolveClientIp(request: Request): string | null;
   adminUsername: string;
   adminPassword: string;
 }
@@ -116,7 +116,7 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
   });
 
   app.use("/api/*", async (context, next) => {
-    const clientIp = dependencies.clientIpProvider.getClientIp(context.req.raw);
+    const clientIp = dependencies.resolveClientIp(context.req.raw);
     if (!clientIp) {
       console.error(JSON.stringify({
         event: "trusted_client_ip_unavailable",

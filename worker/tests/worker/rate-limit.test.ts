@@ -10,7 +10,7 @@ import { ProductService } from "../../src/services/product-service";
 import { SessionService, type SessionRecord } from "../../src/services/session-service";
 import {
   DeterministicRateLimiter,
-  headerClientIpProvider,
+  headerClientIpResolver,
 } from "../helpers/rate-limit";
 
 const config = parseRuntimeConfig({
@@ -54,7 +54,7 @@ function testApp(options: {
     products,
     sessions,
     rateLimiter: options.limiter ?? new DeterministicRateLimiter(),
-    clientIpProvider: headerClientIpProvider,
+    resolveClientIp: headerClientIpResolver,
     adminUsername: "admin",
     adminPassword: "secret",
   });
@@ -265,7 +265,7 @@ describe("public API rate-limit contract", () => {
       products,
       sessions,
       rateLimiter: { check: async () => ({ allowed: false }) },
-      clientIpProvider: headerClientIpProvider,
+      resolveClientIp: headerClientIpResolver,
       adminUsername: "admin",
       adminPassword: "secret",
     });

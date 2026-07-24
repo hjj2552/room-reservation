@@ -3,7 +3,7 @@ import { createHttpApp } from "../../src/http/app";
 import { parseRuntimeConfig } from "../../src/core/config";
 import type { ProductService } from "../../src/services/product-service";
 import type { SessionService } from "../../src/services/session-service";
-import { allowAllRateLimiter, fixedClientIpProvider } from "../helpers/rate-limit";
+import { allowAllRateLimiter, fixedClientIpResolver } from "../helpers/rate-limit";
 
 function app(appEnv: "uat" | "prod", enabled: "true" | "false") {
   const products = {
@@ -19,7 +19,7 @@ function app(appEnv: "uat" | "prod", enabled: "true" | "false") {
     products,
     sessions,
     rateLimiter: allowAllRateLimiter,
-    clientIpProvider: fixedClientIpProvider,
+    resolveClientIp: fixedClientIpResolver,
     adminUsername: "admin",
     adminPassword: "secret",
   });
