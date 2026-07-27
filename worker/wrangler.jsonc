@@ -8,7 +8,7 @@
   "preview_urls": false,
   "env": {
     "uat": {
-      "name": "<uat-worker-name>",
+      "name": "<worker-name>",
       "workers_dev": false,
       "preview_urls": false,
       "vars": {
@@ -18,23 +18,23 @@
       "ratelimits": [
         {
           "name": "INGRESS_GUARD_RATE_LIMITER",
-          "namespace_id": "<uat-ingress-namespace-id>",
+          "namespace_id": "<ingress-rate-limit-namespace-id>",
           "simple": { "limit": 600, "period": 60 }
         },
         {
           "name": "PUBLIC_READ_RATE_LIMITER",
-          "namespace_id": "<uat-read-namespace-id>",
+          "namespace_id": "<read-rate-limit-namespace-id>",
           "simple": { "limit": 120, "period": 60 }
         },
         {
           "name": "PUBLIC_WRITE_RATE_LIMITER",
-          "namespace_id": "<uat-write-namespace-id>",
+          "namespace_id": "<write-rate-limit-namespace-id>",
           "simple": { "limit": 24, "period": 60 }
         }
       ]
     },
     "production": {
-      "name": "<production-worker-name>",
+      "name": "<worker-name>",
       "workers_dev": false,
       "preview_urls": false,
       "vars": {
@@ -44,17 +44,17 @@
       "ratelimits": [
         {
           "name": "INGRESS_GUARD_RATE_LIMITER",
-          "namespace_id": "<production-ingress-namespace-id>",
+          "namespace_id": "<ingress-rate-limit-namespace-id>",
           "simple": { "limit": 600, "period": 60 }
         },
         {
           "name": "PUBLIC_READ_RATE_LIMITER",
-          "namespace_id": "<production-read-namespace-id>",
+          "namespace_id": "<read-rate-limit-namespace-id>",
           "simple": { "limit": 120, "period": 60 }
         },
         {
           "name": "PUBLIC_WRITE_RATE_LIMITER",
-          "namespace_id": "<production-write-namespace-id>",
+          "namespace_id": "<write-rate-limit-namespace-id>",
           "simple": { "limit": 24, "period": 60 }
         }
       ]

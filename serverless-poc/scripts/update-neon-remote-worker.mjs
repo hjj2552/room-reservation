@@ -29,6 +29,10 @@ function run(args) {
   return `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 }
 
+const expectedDatabaseName = process.env.P3_NEON_EXPECTED_DATABASE_NAME?.trim();
+if (!expectedDatabaseName || !/^[a-z_][a-z0-9_]{0,62}$/.test(expectedDatabaseName)) {
+  throw new Error("P3_NEON_EXPECTED_DATABASE_NAME must be a valid PostgreSQL identifier");
+}
 const source = parseVars(await readFile(path.join(projectRoot, ".dev.vars.p3-neon"), "utf8"));
 const runtime = parseVars(await readFile(path.join(projectRoot, ".dev.vars.p3-neon-runtime"), "utf8"));
 const tempDir = await mkdtemp(path.join(os.tmpdir(), "room-reservation-p3-neon-worker-update-"));
@@ -49,6 +53,8 @@ try {
     runtime.P3_NEON_WORKER,
     "--preview-alias",
     "uat",
+    "--var",
+    `EXPECTED_DATABASE_NAME:${expectedDatabaseName}`,
     "--secrets-file",
     secretFile,
   ]);

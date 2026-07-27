@@ -43,7 +43,7 @@ Cloudflare는 Workers Free HTTP 요청의 CPU limit을 10 ms로 명시하며, `e
 
 ## 생성 전 자원 목록
 
-Cloudflare API와 Wrangler의 읽기 전용 목록을 사용했다. 생성 전 `room-reservation-p3-*` prefix의 Worker와 D1은 모두 0개였다. 기존 Pages 프로젝트는 1개가 조회됐으며 이름은 `<pages-project-name>`이었다.
+Cloudflare API와 Wrangler의 읽기 전용 목록을 사용했다. 생성 전 `room-reservation-p3-*` prefix의 Worker와 D1은 모두 0개였다. 기존 Pages 프로젝트는 1개가 조회됐으며 실제 프로젝트명은 저장소 기록에서 제거했다.
 
 account ID와 OAuth token은 메모리에서만 API 호출에 사용했고 출력·파일·Git에 저장하지 않았다.
 
@@ -128,9 +128,9 @@ PBKDF2 gate 실패 직후 다음 단계를 시작하지 않았다.
 
 | Worker | 실행 단계 | 삭제 |
 |---|---|---|
-| `<disposable-worker-name>` | 로컬 PowerShell 난수 API 호환 오류로 probe 전 중단 | 완료 |
-| `<disposable-worker-name>` | PowerShell HTTP 옵션 호환 오류로 probe 전 중단; 등록된 secrets 포함 Worker 삭제 | 완료 |
-| `<disposable-worker-name>` | 원격 PBKDF2 90회 gate 실행 | 완료 |
+| `<disposable-worker-name-1>` | 로컬 PowerShell 난수 API 호환 오류로 probe 전 중단 | 완료 |
+| `<disposable-worker-name-2>` | PowerShell HTTP 옵션 호환 오류로 probe 전 중단; 등록된 secrets 포함 Worker 삭제 | 완료 |
+| `<disposable-worker-name-3>` | 원격 PBKDF2 90회 gate 실행 | 완료 |
 
 D1은 생성하지 않았다. 정리 후 다시 조회한 결과 `room-reservation-p3-*` Worker 0개, D1 0개였다. probe secret을 가진 Worker는 남지 않았다.
 

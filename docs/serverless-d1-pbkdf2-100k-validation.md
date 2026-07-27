@@ -66,9 +66,9 @@ Workers Free의 HTTP 요청당 CPU 한도는 10 ms다. 100,000회 요청이 90/9
 
 | 시도 | 결과 | 생성 자원 정리 |
 |---|---|---|
-| workers.dev 직접 URL | 무인증·인증 요청 모두 404; 계정 workers.dev 비활성 확인 | `<disposable-worker-name>` 삭제 |
+| workers.dev 직접 URL | 무인증·인증 요청 모두 404; 계정 workers.dev 비활성 확인 | `<disposable-worker-name-1>` 삭제 |
 | 존재하지 않는 Worker에 preview version 직접 upload | Wrangler가 실행 전 거부 | 생성 자원 없음 |
-| route 없는 Worker 생성 후 secret-bound preview version upload | 인증된 90/90 성공 | `<disposable-worker-name>` 삭제 |
+| route 없는 Worker 생성 후 secret-bound preview version upload | 인증된 90/90 성공 | `<disposable-worker-name-2>` 삭제 |
 
 최종 재조회 결과 `room-reservation-p3-*` Worker 0개, D1 0개다. 기존 Pages, Worker, D1, route, domain, DNS, billing과 account-wide workers.dev 설정은 변경하지 않았다.
 

@@ -107,17 +107,17 @@ GitHub Actions에는 기존 Spring backend와 Java 기반 프런트 E2E를 유�
 
 운영 Neon database/schema와 저장소 `.env`를 사용하지 않고 다음 고유 자원만 만들었다.
 
-- Neon branch: `<disposable-resource-name>`
+- Neon branch: `<neon-branch-name>`
 - 빈 database: `<uat-database-name>`
 - 전용 owner role: `<uat-database-role>`
-- Worker: `<disposable-resource-name>`
+- Worker: `<disposable-worker-name>`
 - Worker version: `<worker-version-id>`
 - Pages preview branch: `<pages-preview-branch>`
 - Pages deployment: `<pages-deployment-id>`
 
 direct Neon URL은 migration shell에만 주입했고 pooled URL과 임의 UAT 관리자 자격 증명은 Wrangler secrets file을 통해 주입했다. secret 값은 출력하거나 저장소 파일에 기록하지 않았다. `npm.cmd run migrate`와 이중 guard가 있는 `npm.cmd run uat:prepare`가 database 이름, owner role, 제품 row 0건을 확인한 뒤 해당 disposable DB에서만 예약 접수를 활성화했다.
 
-Worker는 route/custom domain/production target 없이 version preview alias만 만들었다. Pages는 기존 프로젝트의 새 preview deployment만 사용했고 production `BACKEND_ORIGIN`은 전후 동일했다. Wrangler 4.112.0이 배포 중 project-level preview `BACKEND_ORIGIN`을 일시적으로 Worker alias로 바꾼 사실을 해시 비교로 발견했다. E2E 후 직전 preview deployment `<pages-deployment-id>`의 Cloudflare API snapshot 값을 사용해 preview 설정만 정확히 복원했고, production 값 불변과 preview `NODE_VERSION` 보존을 다시 확인했다. 값 자체는 문서나 로그에 남기지 않았다.
+Worker는 route/custom domain/production target 없이 version preview alias만 만들었다. Pages는 기존 프로젝트의 새 preview deployment만 사용했고 production `BACKEND_ORIGIN`은 전후 동일했다. Wrangler 4.112.0이 배포 중 project-level preview `BACKEND_ORIGIN`을 일시적으로 Worker alias로 바꾼 사실을 해시 비교로 발견했다. E2E 후 직전 `<pages-deployment-id>`의 Cloudflare API snapshot 값을 사용해 preview 설정만 정확히 복원했고, production 값 불변과 preview `NODE_VERSION` 보존을 다시 확인했다. 값 자체는 문서나 로그에 남기지 않았다.
 
 `P4_UAT_CONFIRM_DISPOSABLE=true`와 deployment-specific Pages URL을 모두 요구하는 runner로 same-origin 전체 E2E를 실행했다. 80/80이 4.9분에 통과했고 after-suite cleanup은 reservation 4건과 recurrence 4건을 삭제했다. 최종 preview는 reservations/recurrences/tags/rooms 모두 0이었다.
 

@@ -50,26 +50,37 @@ baseline 적용 후 disposable UAT DB에서만 이중 guard가 있는 준비 명
 ```powershell
 $env:APP_ENV='uat'
 $env:P4_UAT_CONFIRM_DISPOSABLE='true'
-$env:P4_UAT_DATABASE='room_reservation_p4_uat_YYYYMMDD'
+$env:P4_UAT_DATABASE='<uat-database-name>'
 $env:P4_UAT_ROLE='<expected-disposable-branch-role>'
 npm.cmd run uat:prepare
 ```
 
+Worker 배포 이름과 Cloudflare Rate Limiting namespace ID는 저장소에 넣지 않는다. 대상 환경에 맞는 값을 현재 shell에만 주입한 뒤 환경별 wrapper를 사용한다. 값이 없거나 양의 정수 형식이 아니거나 namespace가 중복되면 Wrangler 실행 전에 실패한다.
+
+```powershell
+$env:CLOUDFLARE_WORKER_NAME='<worker-name>'
+$env:CLOUDFLARE_INGRESS_RATE_LIMIT_NAMESPACE_ID='<ingress-rate-limit-namespace-id>'
+$env:CLOUDFLARE_READ_RATE_LIMIT_NAMESPACE_ID='<read-rate-limit-namespace-id>'
+$env:CLOUDFLARE_WRITE_RATE_LIMIT_NAMESPACE_ID='<write-rate-limit-namespace-id>'
+npm.cmd run deploy:uat
+```
+
 UAT Worker는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음으로 배포하고 공개 URL을 만들지 않는다. Pages는 기존 프로젝트의 새 preview deployment만 만들고 `API_BACKEND` Service Binding을 exact UAT Worker에 연결한다. `API_PROXY_TRANSPORT=service-binding`을 명시하며 `BACKEND_ORIGIN` fallback을 사용하지 않는다. 배포 전 project-level preview 설정을 snapshot하고 테스트 후 정확히 복원한 뒤 production과 preview 설정을 모두 재확인한다. production Pages 변수·deployment·domain은 변경하지 않는다.
 
-UAT Worker에는 다음 여섯 namespace 중 UAT 세 개만 연결된다.
+UAT Worker에는 환경변수로 전달한 다음 세 namespace만 연결된다.
 
-- `INGRESS_GUARD_RATE_LIMITER`: namespace `<uat-ingress-namespace-id>`, 모든 `/api/**` 600/60초
-- `PUBLIC_READ_RATE_LIMITER`: namespace `<uat-read-namespace-id>`, 120/60초
-- `PUBLIC_WRITE_RATE_LIMITER`: namespace `<uat-write-namespace-id>`, 24/60초
+- `INGRESS_GUARD_RATE_LIMITER`: `<ingress-rate-limit-namespace-id>`, 모든 `/api/**` 600/60초
+- `PUBLIC_READ_RATE_LIMITER`: `<read-rate-limit-namespace-id>`, 120/60초
+- `PUBLIC_WRITE_RATE_LIMITER`: `<write-rate-limit-namespace-id>`, 24/60초
 
-production namespace `<production-ingress-namespace-id>`, `<production-read-namespace-id>`, `<production-write-namespace-id>`는 UAT에서 호출하지 않는다. INGRESS는 인증 여부와 무관하게 세션 DB 조회 전에 적용하고, 인증 관리자는 그 뒤의 READ/WRITE만 우회한다. `ROOM-SESSION`은 43자 padding 없는 base64url 형식일 때만 DB 조회 후보로 인정한다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 601/121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계와 내부 호출 0회는 deterministic unit test가 담당한다.
+production namespace 값은 별도 운영 환경변수로만 관리하며 UAT에서 호출하지 않는다. INGRESS는 인증 여부와 무관하게 세션 DB 조회 전에 적용하고, 인증 관리자는 그 뒤의 READ/WRITE만 우회한다. `ROOM-SESSION`은 43자 padding 없는 base64url 형식일 때만 DB 조회 후보로 인정한다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 601/121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계와 내부 호출 0회는 deterministic unit test가 담당한다.
 
 전체 원격 E2E는 preview URL과 이중 확인 flag를 모두 요구한다.
 
 ```powershell
 $env:P4_UAT_CONFIRM_DISPOSABLE='true'
-$env:P4_UAT_PAGES_URL='https://<preview>.<project>.pages.dev/'
+$env:CLOUDFLARE_PAGES_PROJECT_NAME='<pages-project-name>'
+$env:P4_UAT_PAGES_URL='https://<deployment>.<pages-project-name>.pages.dev/'
 npm.cmd run test:uat-e2e
 ```
 

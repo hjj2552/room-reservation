@@ -8,8 +8,18 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
 const repositoryRoot = path.resolve(projectRoot, "..");
 const frontendRoot = path.join(repositoryRoot, "frontend");
 const wranglerPath = path.join(projectRoot, "node_modules", "wrangler", "bin", "wrangler.js");
-const projectName = "<pages-project-name>";
-const branch = "<pages-preview-branch>";
+
+function requiredResourceName(name) {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(value)) {
+    throw new Error(`${name} must contain only lowercase letters, digits, and interior hyphens`);
+  }
+  return value;
+}
+
+const projectName = requiredResourceName("CLOUDFLARE_PAGES_PROJECT_NAME");
+const branch = requiredResourceName("CLOUDFLARE_PAGES_PREVIEW_BRANCH");
 
 function parseVars(text) {
   return Object.fromEntries(
@@ -40,6 +50,27 @@ function deploymentList() {
     url: item.url ?? item.Deployment,
     branch: item.branch ?? item.Branch,
   }));
+}
+
+function exactPreviewOrigin(input) {
+  const url = new URL(input);
+  const productionHostname = `${projectName}.pages.dev`;
+  const previewSuffix = `.${productionHostname}`;
+  const deployment = url.hostname.endsWith(previewSuffix)
+    ? url.hostname.slice(0, -previewSuffix.length)
+    : "";
+  if (
+    url.protocol !== "https:"
+    || url.pathname !== "/"
+    || url.search
+    || url.hash
+    || url.hostname === productionHostname
+    || !deployment
+    || deployment.includes(".")
+  ) {
+    throw new Error("Created Pages URL was not the expected disposable preview origin");
+  }
+  return url.origin;
 }
 
 function section(text, name) {
@@ -111,6 +142,7 @@ try {
     throw new Error(`Created Pages preview deployment was not identified; fields=${JSON.stringify(Object.keys(afterDeployments[0] ?? {}))}`);
   }
   deploymentId = created.id;
+  const createdOrigin = exactPreviewOrigin(created.url);
 
   run(["pages", "download", "config", projectName, "--cwd", tempAfter], frontendRoot);
   const after = await readFile(path.join(tempAfter, "wrangler.toml"), "utf8");
@@ -119,7 +151,7 @@ try {
 
   await writeFile(
     path.join(projectRoot, ".dev.vars.p3-pages-runtime"),
-    `P3_PAGES_DEPLOYMENT_ID=${created.id}\nP3_PAGES_ORIGIN=${created.url}\nP3_PAGES_BRANCH=${branch}\n`,
+    `P3_PAGES_PROJECT_NAME=${projectName}\nP3_PAGES_DEPLOYMENT_ID=${created.id}\nP3_PAGES_ORIGIN=${createdOrigin}\nP3_PAGES_BRANCH=${branch}\n`,
     { encoding: "utf8", mode: 0o600 },
   );
   process.stdout.write(`${JSON.stringify({

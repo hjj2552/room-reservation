@@ -352,6 +352,10 @@ cd serverless-poc
 npm run check
 # PASS
 
+$env:P3_NEON_EXPECTED_DATABASE_NAME='<validation-primary-database>'
+$env:CLOUDFLARE_PAGES_PROJECT_NAME='<pages-project-name>'
+$env:CLOUDFLARE_PAGES_PREVIEW_BRANCH='<pages-preview-branch>'
+
 node scripts/run-neon-remote-migrations.mjs
 # primary/replay 적용 성공, 재적용 0, schema hash 동일, 실패 migration 부분 적용 0
 
@@ -411,7 +415,7 @@ git diff --check
 - 기존 Render/Neon DB: 변경 없음
 - Neon branch와 빈 DB/role: Neon API key가 없어 자동 삭제하지 못함
 
-남은 수동 cleanup은 Neon 콘솔에서 branch `<neon-branch-name>`을 삭제하는 것이다. branch에 설정한 자동 만료가 유효하면 만료 시 삭제되지만, 문서 확인 후 즉시 수동 삭제하는 편이 명확하다. 기존 branch/DB를 선택하거나 project 전체 reset을 사용하지 않는다.
+남은 수동 cleanup은 Neon 콘솔에서 기록해 둔 exact `<neon-branch-name>`을 삭제하는 것이다. branch에 설정한 자동 만료가 유효하면 만료 시 삭제되지만, 문서 확인 후 즉시 수동 삭제하는 편이 명확하다. 기존 branch/DB를 선택하거나 project 전체 reset을 사용하지 않는다.
 
 ## 확인한 1차 자료
 

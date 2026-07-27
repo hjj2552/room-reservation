@@ -8,6 +8,16 @@ These rules apply to every Codex/agent task in this repository.
 - Keep maintenance changes tightly scoped. Avoid schema rewrites, UI redesign, broad reset commands, or API contract changes for hygiene-only tasks.
 - Prefer existing patterns, helpers, fixtures, scripts, and controllers over ad-hoc one-off code.
 
+## Deployment Identity and Secret Hygiene
+
+- Do not hardcode real organization-specific or deployment-specific identifiers in source code, scripts, fixtures, documentation, or committed configuration. This includes Cloudflare Pages project names, account IDs, Worker version IDs, Pages deployment IDs, Neon project or branch IDs, production hostnames, Render service identifiers, operational email addresses, and database endpoints or role names.
+- Read deployment-specific identifiers from explicit environment variables. Fail before any external read or mutation when a required value is missing or invalid; do not fall back to a real production identifier.
+- Store non-secret CI/CD configuration, such as a Cloudflare Pages project name, in GitHub Actions repository variables and reference it through `vars`. Store credentials, tokens, passwords, and connection strings only in the relevant secret store, such as GitHub Actions secrets, Cloudflare Worker secrets, or an ignored local environment file.
+- Never commit real values in `.env`, `.env.*`, `.dev.vars`, Wrangler secret files, generated deployment receipts, dashboard exports, or temporary validation artifacts. Committed example files may contain variable names and unmistakable placeholders only.
+- Validation and deployment reports must redact live resource identifiers. Use generic labels or shortened non-reversible references when an exact identifier is not required for a reproducible product contract. Keep exact operational receipts outside Git.
+- Before committing work that touches external services, inspect the staged diff and tracked files for real domains, project names, account or resource IDs, email addresses, connection strings, tokens, and credentials.
+- Publicly discoverable values are not automatically appropriate to hardcode. Portability and repository neutrality still require environment-based configuration even when a value is not secret.
+
 ## Git Workflow
 
 - Use Conventional Commits-style messages without scopes. Write `fix: ...`, `feat: ...`, or `docs: ...`; do not use parenthesized forms such as `fix(frontend): ...`.

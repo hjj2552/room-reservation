@@ -5,6 +5,7 @@ import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 interface Env {
   APP_ENV: string;
   DATABASE_URL: string;
+  EXPECTED_DATABASE_NAME: string;
   PROBE_TOKEN: string;
 }
 
@@ -43,6 +44,9 @@ function errorCode(error: unknown): string | undefined {
 
 app.use("/api/p3-neon/*", async (context, next) => {
   if (context.env.APP_ENV !== "uat") return context.json({ code: "INVALID_ENVIRONMENT" }, 503);
+  if (!context.env.EXPECTED_DATABASE_NAME?.trim()) {
+    return context.json({ code: "MISSING_EXPECTED_DATABASE_NAME" }, 503);
+  }
   if (context.req.header("X-P3-Probe-Token") !== context.env.PROBE_TOKEN) {
     return context.json({ code: "UNAUTHORIZED" }, 401);
   }
@@ -56,7 +60,10 @@ app.onError((error, context) => {
 app.get("/api/p3-neon/query", async (context) => {
   const value = context.req.query("value") ?? "missing";
   const rows = await sqlFor(context)`SELECT ${value}::text AS value, current_database() AS database`;
-  return context.json({ value: String(rows[0]?.value), databaseMatches: rows[0]?.database === "<validation-primary-database>" });
+  return context.json({
+    value: String(rows[0]?.value),
+    databaseMatches: rows[0]?.database === context.env.EXPECTED_DATABASE_NAME,
+  });
 });
 
 app.post("/api/p3-neon/echo", async (context) => {

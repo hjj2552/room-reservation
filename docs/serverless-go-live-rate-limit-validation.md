@@ -24,7 +24,7 @@ Workers Rate Limiting binding 세 개와 Pages `API_BACKEND` Service Binding 구
 | `PUBLIC_READ_RATE_LIMITER` | 인증 관리자가 아닌 `GET /api/**` | IP별 120/60초 | `<uat-read-namespace-id>` | `<production-read-namespace-id>` |
 | `PUBLIC_WRITE_RATE_LIMITER` | 인증 관리자가 아닌 비GET `/api/**` | IP별 24/60초 | `<uat-write-namespace-id>` | `<production-write-namespace-id>` |
 
-여섯 namespace는 서로 다른 양의 정수 문자열이다. UAT에서는 UAT namespace만 실제 호출한다. production namespace는 source config에 예약하지만 production Worker를 배포하지 않으므로 원격 production binding은 생성하거나 변경하지 않는다. local, unit, CI와 local 전체 E2E는 allow/fake adapter를 사용하고 원격 namespace를 호출하지 않는다.
+여섯 namespace는 서로 다른 양의 정수 문자열이다. 실제 값은 저장소가 아니라 환경별 배포 환경변수로 관리한다. UAT에서는 UAT namespace만 실제 호출하고 production Worker를 배포하지 않으므로 원격 production binding은 생성하거나 변경하지 않는다. local, unit, CI와 local 전체 E2E는 allow/fake adapter를 사용하고 원격 namespace를 호출하지 않는다.
 
 인증된 관리자도 INGRESS는 우회하지 않고 기존 제품 정책인 READ/WRITE만 우회한다. 비인증 관리자 API는 INGRESS 이후 공개 요청과 같은 READ/WRITE limiter를 사용한다. `/health`는 `/api/**` 밖이라 제외한다. INGRESS 600은 위조 session cookie로 인한 세션 DB 조회를 제한하는 인프라 안전 상한이며 새로운 제품 정책이 아니다. 세션 발급·로그인·예약 비밀번호·경로별 limiter, WAF, Neon table, Durable Objects, KV와 isolate-local counter는 사용하지 않는다.
 
@@ -163,7 +163,7 @@ Pages preview 배포 메타데이터의 source는 당시 HEAD `0737793`이었고
 - 설정 복원 Pages deployment: `<pages-deployment-id>`
 - binding 설정 오류로 publish되지 않은 실패 deployment: `<pages-deployment-id>`
 
-새 빈 DB에 baseline V1을 단독 적용했고 endpoint, DB와 owner role, product row 0건을 확인한 뒤 UAT에서만 예약 접수를 활성화했다. Worker는 세 UAT namespace `<uat-ingress-namespace-id>`, `<uat-read-namespace-id>`, `<uat-write-namespace-id>`만 사용했고 `No targets deployed` 상태라 workers.dev, preview URL, route와 custom domain을 만들지 않았다. production namespace `<production-ingress-namespace-id>`, `<production-read-namespace-id>`, `<production-write-namespace-id>`는 호출하지 않았다.
+새 빈 DB에 baseline V1을 단독 적용했고 endpoint, DB와 owner role, product row 0건을 확인한 뒤 UAT에서만 예약 접수를 활성화했다. Worker는 환경변수로 주입한 세 UAT namespace만 사용했고 `No targets deployed` 상태라 workers.dev, preview URL, route와 custom domain을 만들지 않았다. production namespace는 호출하지 않았다.
 
 실제 외부 UAT 결과:
 
@@ -180,10 +180,10 @@ Ingress 차단 이전에 세션 DB 조회가 발생하지 않는 호출 순서�
 
 정리 결과:
 
-- Pages deployment 3개: 위 exact ID로 삭제, `<pages-preview-branch>` 잔여 0개
+- Pages deployment 3개: 실행 시 별도 기록한 exact ID로 삭제, `<pages-preview-branch>` 잔여 0개
 - Pages project config: Wrangler 생성 시각 주석을 제외한 canonical SHA-256 전후 동일, `7590e9a6686f7ebe860fc4105b639633e8c397b2a6e2758c81ef2de3dbb1a320`
 - UAT Worker: exact name 삭제, 재조회 `10007 does not exist`
-- Neon branch: exact ID 삭제, production branch `<neon-branch-id>` 1개만 유지
+- Neon branch: exact ID 삭제, 기존 production branch 1개만 유지
 - branch 전용 DB와 role: branch 삭제로 함께 제거
 - 임시 connection/admin/config 파일과 디렉터리: exact path로 삭제
 - production Pages deployment/domain/config, production Worker, production Neon, Render, DNS, route와 secret: 변경 없음

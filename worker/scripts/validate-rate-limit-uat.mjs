@@ -14,16 +14,30 @@ if (process.env.P4_UAT_CONFIRM_DISPOSABLE !== "true") {
   throw new Error("P4_UAT_CONFIRM_DISPOSABLE must be exactly true");
 }
 
+const pagesProjectName = process.env.CLOUDFLARE_PAGES_PROJECT_NAME?.trim();
+if (!pagesProjectName) {
+  throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME is required");
+}
+if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(pagesProjectName)) {
+  throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME must be a valid Pages project name");
+}
+
 const input = process.env.P4_UAT_PAGES_URL;
 if (!input) throw new Error("P4_UAT_PAGES_URL is required");
 const pagesUrl = new URL(input);
+const productionHostname = `${pagesProjectName}.pages.dev`;
+const previewHostnameSuffix = `.${productionHostname}`;
+const previewDeployment = pagesUrl.hostname.endsWith(previewHostnameSuffix)
+  ? pagesUrl.hostname.slice(0, -previewHostnameSuffix.length)
+  : "";
 if (
   pagesUrl.protocol !== "https:"
   || pagesUrl.pathname !== "/"
   || pagesUrl.search
   || pagesUrl.hash
-  || !pagesUrl.hostname.endsWith(".<pages-project-name>.pages.dev")
-  || pagesUrl.hostname === "<pages-project-name>.pages.dev"
+  || pagesUrl.hostname === productionHostname
+  || !previewDeployment
+  || previewDeployment.includes(".")
 ) {
   throw new Error("P4_UAT_PAGES_URL must be the exact disposable Pages preview origin");
 }

@@ -33,6 +33,10 @@ function run(args) {
   return `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 }
 
+const expectedDatabaseName = process.env.P3_NEON_EXPECTED_DATABASE_NAME?.trim();
+if (!expectedDatabaseName || !/^[a-z_][a-z0-9_]{0,62}$/.test(expectedDatabaseName)) {
+  throw new Error("P3_NEON_EXPECTED_DATABASE_NAME must be a valid PostgreSQL identifier");
+}
 const source = parseVars(await readFile(path.join(projectRoot, ".dev.vars.p3-neon"), "utf8"));
 const suffix = randomBytes(4).toString("hex");
 const worker = `room-reservation-p3-neon-${suffix}`;
@@ -42,7 +46,15 @@ const secretFile = path.join(tempDir, "secrets.json");
 let created = false;
 
 try {
-  run(["deploy", "--config", "wrangler.neon-remote.jsonc", "--name", worker]);
+  run([
+    "deploy",
+    "--config",
+    "wrangler.neon-remote.jsonc",
+    "--name",
+    worker,
+    "--var",
+    `EXPECTED_DATABASE_NAME:${expectedDatabaseName}`,
+  ]);
   created = true;
   await writeFile(
     secretFile,
@@ -58,6 +70,8 @@ try {
     worker,
     "--preview-alias",
     "uat",
+    "--var",
+    `EXPECTED_DATABASE_NAME:${expectedDatabaseName}`,
     "--secrets-file",
     secretFile,
   ]);

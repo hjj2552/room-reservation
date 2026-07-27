@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "build": "wrangler deploy --dry-run --outdir dist --env uat",
+    "build": "node scripts/run-wrangler-build.mjs",
     "check": "tsc --noEmit && node scripts/check-architecture.mjs && node scripts/check-rate-limit-config.mjs",
     "test": "vitest run --config vitest.config.ts",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
@@ -16,6 +16,8 @@
     "uat:create-database": "tsx scripts/create-disposable-uat-database.ts",
     "uat:prepare": "tsx scripts/prepare-uat.ts",
     "uat:check-residual": "tsx scripts/check-disposable-uat-residual.ts",
+    "deploy:uat": "node scripts/run-wrangler-deploy.mjs uat",
+    "deploy:production": "node scripts/run-wrangler-deploy.mjs production",
     "artifact:manifest": "node scripts/artifact-manifest.mjs"
   },
   "dependencies": {
