@@ -42,7 +42,7 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 
 Successful `main` CI runs deploy the production Worker first and then publish the existing Pages project by Direct Upload. Database migrations are not part of this workflow, and existing Worker runtime secrets remain managed by Cloudflare.
 
-Repository Variables:
+Repository Secrets:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_PAGES_PROJECT_NAME`
@@ -50,12 +50,9 @@ Repository Variables:
 - `CLOUDFLARE_PRODUCTION_INGRESS_RATE_LIMIT_NAMESPACE_ID`
 - `CLOUDFLARE_PRODUCTION_READ_RATE_LIMIT_NAMESPACE_ID`
 - `CLOUDFLARE_PRODUCTION_WRITE_RATE_LIMIT_NAMESPACE_ID`
-
-Repository Secret:
-
 - `CLOUDFLARE_API_TOKEN`
 
-Exact deployment identifiers and deployment receipts are managed outside Git. Removing the existing Pages Git integration and the GitHub `Cloudflare Workers and Pages` app is a separate manual operation and is not performed by the workflow.
+The deployment identifiers use repository Secrets so GitHub masks them before the first job step; their non-secret nature does not make them appropriate for public Actions logs. Exact deployment identifiers and deployment receipts are managed outside Git. Removing the existing Pages Git integration and the GitHub `Cloudflare Workers and Pages` app is a separate manual operation and is not performed by the workflow.
 
 ## Session, CSRF, and Rate Limiting
 
