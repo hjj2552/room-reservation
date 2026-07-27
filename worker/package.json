@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/run-wrangler-build.mjs",
-    "check": "tsc --noEmit && node scripts/check-architecture.mjs && node scripts/check-rate-limit-config.mjs",
+    "check": "tsc --noEmit && node scripts/check-architecture.mjs && node scripts/check-rate-limit-config.mjs && node scripts/check-cloudflare-deploy-config.mjs && node scripts/check-cloudflare-cicd.mjs",
     "test": "vitest run --config vitest.config.ts",
     "test:postgres": "vitest run --config vitest.postgres.config.ts",
     "test:isolated-postgres": "node scripts/run-isolated-postgres.mjs",
@@ -18,6 +18,9 @@
     "uat:check-residual": "tsx scripts/check-disposable-uat-residual.ts",
     "deploy:uat": "node scripts/run-wrangler-deploy.mjs uat",
     "deploy:production": "node scripts/run-wrangler-deploy.mjs production",
+    "deploy:validate": "node scripts/validate-cloudflare-production-config.mjs",
+    "deploy:verify-targets": "node scripts/verify-cloudflare-production-targets.mjs",
+    "deploy:pages:production": "node scripts/deploy-cloudflare-pages.mjs",
     "artifact:manifest": "node scripts/artifact-manifest.mjs"
   },
   "dependencies": {
