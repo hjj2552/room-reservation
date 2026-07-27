@@ -1,0 +1,5 @@
+name: Mask Cloudflare deployment identifiers
+description: Register non-secret deployment identifiers as masked Actions values.
+runs:
+  using: node24
+  main: index.js

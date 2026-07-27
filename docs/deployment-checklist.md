@@ -38,6 +38,25 @@ Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in
 - The Pages Function removes browser-provided `X-Forwarded-For` and `X-Room-Reservation-Client-IP`, then copies only Pages ingress `CF-Connecting-IP` to the internal header.
 - The local Vite `/api` proxy remains independent and continues to use `VITE_API_PROXY_TARGET` when configured.
 
+## GitHub Actions Cloudflare Deployment
+
+Successful `main` CI runs deploy the production Worker first and then publish the existing Pages project by Direct Upload. Database migrations are not part of this workflow, and existing Worker runtime secrets remain managed by Cloudflare.
+
+Repository Variables:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_PAGES_PROJECT_NAME`
+- `CLOUDFLARE_PRODUCTION_WORKER_NAME`
+- `CLOUDFLARE_PRODUCTION_INGRESS_RATE_LIMIT_NAMESPACE_ID`
+- `CLOUDFLARE_PRODUCTION_READ_RATE_LIMIT_NAMESPACE_ID`
+- `CLOUDFLARE_PRODUCTION_WRITE_RATE_LIMIT_NAMESPACE_ID`
+
+Repository Secret:
+
+- `CLOUDFLARE_API_TOKEN`
+
+Exact deployment identifiers and deployment receipts are managed outside Git. Removing the existing Pages Git integration and the GitHub `Cloudflare Workers and Pages` app is a separate manual operation and is not performed by the workflow.
+
 ## Session, CSRF, and Rate Limiting
 
 - Authentication uses a server-side session cookie, not JWT or browser local storage.
