@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import type { ReservationListItem } from '../api/types';
 import { formatDateTime } from '../utils/date';
 import { sourceLabels } from '../utils/labels';

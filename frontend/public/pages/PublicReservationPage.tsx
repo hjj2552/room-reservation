@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
 import type { PublicReservationBlock } from '../../shared/api/types';
 import { ReservationDateTimetable, type TimetableReservation, type TimetableRoom } from '../../shared/components/ReservationDateTimetable';

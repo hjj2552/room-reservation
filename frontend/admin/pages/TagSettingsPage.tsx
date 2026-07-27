@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { errorMessage } from '../../shared/api/http';
 import type { Tag, TagFilters } from '../../shared/api/types';

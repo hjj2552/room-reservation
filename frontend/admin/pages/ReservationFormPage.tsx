@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { ReservationPayload, ReservationStatus } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';

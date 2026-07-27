@@ -1,5 +1,5 @@
 import { CalendarDays, ShieldCheck } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { usePublicSettings } from '../../shared/hooks/usePublicReservation';
 
 export function EntryChoicePage() {
