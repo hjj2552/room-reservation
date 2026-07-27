@@ -1,6 +1,6 @@
 import { Download, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { exportReservationsCsv } from '../../shared/api/reservations';
 import type { ReservationFilters, ReservationStatus } from '../../shared/api/types';

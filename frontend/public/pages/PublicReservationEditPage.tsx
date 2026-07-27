@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail } from '../../shared/api/types';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';

@@ -9,7 +9,7 @@ import {
   Tags,
   Table2,
 } from 'lucide-react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
 
 export function AdminLayout() {

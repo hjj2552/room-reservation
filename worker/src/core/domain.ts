@@ -283,16 +283,6 @@ export function weekdayCode(date: string): string {
   return ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][new Date(`${date}T00:00:00Z`).getUTCDay()]!;
 }
 
-export function parsePage(url: URL): { page: number; size: number; offset: number } {
-  const page = url.searchParams.has("page") ? Number(url.searchParams.get("page")) : 0;
-  const requestedSize = url.searchParams.has("size") ? Number(url.searchParams.get("size")) : 20;
-  if (!Number.isSafeInteger(page) || page < 0 || !Number.isSafeInteger(requestedSize) || requestedSize < 1) {
-    validation("Page must be non-negative and size must be positive.");
-  }
-  const size = Math.min(100, requestedSize);
-  return { page, size, offset: page * size };
-}
-
 export function paged<T>(items: T[], page: number, size: number, totalItems: number) {
   return { items, page, size, totalItems, totalPages: totalItems === 0 ? 0 : Math.ceil(totalItems / size) };
 }

@@ -1,5 +1,3 @@
-import type { ClientIpProvider } from "../core/rate-limit";
-
 export const TRUSTED_CLIENT_IP_HEADER = "X-Room-Reservation-Client-IP";
 
 function isIpv4(value: string): boolean {
@@ -21,7 +19,7 @@ function isIpv6(value: string): boolean {
   }
 }
 
-export class TrustedProxyClientIpProvider implements ClientIpProvider {
+export class TrustedProxyClientIpProvider {
   getClientIp(request: Request): string | null {
     const value = request.headers.get(TRUSTED_CLIENT_IP_HEADER)?.trim();
     if (!value || (!isIpv4(value) && !isIpv6(value))) return null;

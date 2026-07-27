@@ -1,6 +1,6 @@
 import { RefreshCw, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { ConflictPolicy, RecurrenceFilters, RecurrenceStatus } from '../../shared/api/types';
 import { Pagination } from '../../shared/components/Pagination';

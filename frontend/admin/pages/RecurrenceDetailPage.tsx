@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';

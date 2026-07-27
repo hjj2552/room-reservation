@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { AdminLayout } from '../admin/AdminLayout';
 import { ProtectedRoute } from '../admin/ProtectedRoute';
 import { AuditPage } from '../admin/pages/AuditPage';

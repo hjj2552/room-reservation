@@ -1,6 +1,6 @@
 import { PenLine, X } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ModalDialog } from '../../shared/components/ModalDialog';

@@ -24,6 +24,7 @@ export default {
     if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD) throw new Error("ADMIN_USERNAME and ADMIN_PASSWORD are required");
     const database = new NeonDatabase(env.DATABASE_URL);
     const now = () => new Date();
+    const clientIpProvider = new TrustedProxyClientIpProvider();
     const app = createHttpApp(config, {
       products: new ProductService(database, now),
       sessions: new SessionService(database, now),
@@ -32,7 +33,7 @@ export default {
         env.PUBLIC_READ_RATE_LIMITER,
         env.PUBLIC_WRITE_RATE_LIMITER,
       ),
-      clientIpProvider: new TrustedProxyClientIpProvider(),
+      resolveClientIp: (request) => clientIpProvider.getClientIp(request),
       adminUsername: env.ADMIN_USERNAME,
       adminPassword: env.ADMIN_PASSWORD,
     });

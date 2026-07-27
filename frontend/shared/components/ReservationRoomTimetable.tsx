@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { ReservationStatus } from '../api/types';
 import { hexToTint } from '../utils/color';
 import { statusLabels } from '../utils/labels';

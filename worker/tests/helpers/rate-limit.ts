@@ -1,16 +1,10 @@
-import type {
-  ClientIpProvider,
-  RateLimiter,
-  RateLimitRequest,
-} from "../../src/core/rate-limit";
+import type { RateLimiter, RateLimitRequest } from "../../src/core/rate-limit";
 
 export const allowAllRateLimiter: RateLimiter = {
   check: async () => ({ allowed: true }),
 };
 
-export const fixedClientIpProvider: ClientIpProvider = {
-  getClientIp: () => "192.0.2.1",
-};
+export const fixedClientIpResolver = () => "192.0.2.1";
 
 export class DeterministicRateLimiter implements RateLimiter {
   private readonly counts = new Map<string, number>();
@@ -31,6 +25,4 @@ export class DeterministicRateLimiter implements RateLimiter {
   }
 }
 
-export const headerClientIpProvider: ClientIpProvider = {
-  getClientIp: (request) => request.headers.get("x-test-client-ip"),
-};
+export const headerClientIpResolver = (request: Request) => request.headers.get("x-test-client-ip");

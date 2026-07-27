@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router';
 import type { AdminRoom, ReservationFilters, ReservationStatus } from '../../shared/api/types';
 import { ReservationDateTimetable } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';

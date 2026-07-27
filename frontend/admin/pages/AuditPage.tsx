@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useReservationHistoryAudit } from '../../shared/hooks/useAudit';

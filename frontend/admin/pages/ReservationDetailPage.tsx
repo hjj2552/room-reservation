@@ -1,6 +1,6 @@
 import { CalendarDays, Check, Copy, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import type { ReservationHistory } from '../../shared/api/types';
 import { ApiError, errorMessage } from '../../shared/api/http';
 import { ModalDialog } from '../../shared/components/ModalDialog';

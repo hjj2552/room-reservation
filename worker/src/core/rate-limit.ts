@@ -8,7 +8,3 @@ export interface RateLimitRequest {
 export interface RateLimiter {
   check(request: RateLimitRequest): Promise<{ allowed: boolean }>;
 }
-
-export interface ClientIpProvider {
-  getClientIp(request: Request): string | null;
-}

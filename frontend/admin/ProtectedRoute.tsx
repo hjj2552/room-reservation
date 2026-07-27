@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { LoadingState } from '../shared/components/StateViews';
 import { isUnauthorized, useAdminSession } from '../shared/hooks/useAuth';
 
