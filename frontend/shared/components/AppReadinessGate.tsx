@@ -45,6 +45,8 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
 
     const finishReady = (settings: Awaited<ReturnType<typeof fetchReadinessSettings>>) => {
       if (!active || lifecycleController.signal.aborted) return;
+      const organizationName = settings.organizationName.trim();
+      document.title = organizationName || '공간 예약 시스템';
       queryClient.setQueryData(publicReservationKeys.settings, settings);
       finish('ready');
     };

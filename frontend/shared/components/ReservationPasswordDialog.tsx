@@ -59,7 +59,7 @@ export function ReservationPasswordDialog({
       initialFocusRef={inputRef}
     >
       <p id={descriptionId} className="muted">
-        {publicPasswordHelp}
+        예약할 때 설정한 비밀번호를 입력해 주세요.
       </p>
       <form className="form-stack" onSubmit={handleSubmit}>
         <label>

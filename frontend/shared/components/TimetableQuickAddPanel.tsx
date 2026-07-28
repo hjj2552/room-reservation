@@ -397,7 +397,7 @@ export function ReservationRequestPanel({
               minLength={4}
               maxLength={64}
               pattern="[\x21-\x7E]{4,64}"
-              placeholder="영문·숫자·특수문자 4~64자"
+              placeholder="4자리 이상, 수정 및 취소 시 사용"
               onChange={(event) => {
                 if (!acceptsPublicPasswordInput(event.target.value)) {
                   setErrors((current) => ({ ...current, cancelPassword: publicPasswordBlockedMessage }));
@@ -407,7 +407,6 @@ export function ReservationRequestPanel({
               }}
               {...inputErrorProps('cancelPassword')}
             />
-            <span className="field-help">{publicPasswordHelp}</span>
             {fieldError('cancelPassword')}
           </label>
         )}
