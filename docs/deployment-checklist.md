@@ -1,48 +1,39 @@
 # Deployment Checklist
 
-This project must receive real production values from the deployment platform's
-environment variable or secret-management screen. Do not commit real DB
-credentials, admin credentials, Gmail accounts, app passwords, or tokens to this
-repository.
+Production은 Cloudflare Pages → `API_BACKEND` Service Binding → private Worker → Neon PostgreSQL 경로만 사용합니다. 실제 배포 식별자와 자격 증명은 저장소에 기록하지 않습니다.
 
-## Required Environment Variables
+## Required Worker configuration
 
-| Variable | Required for | Meaning |
-|---|---|---|
-| `SPRING_PROFILES_ACTIVE` | all deployed runs | Must be set explicitly. Use `prod` for production, `dev` for shared development, and `local` only for a developer machine. |
-| `DB_URL` | `local`, `dev`, `prod` | JDBC URL for the database used by the selected profile. |
-| `DB_USERNAME` | `local`, `dev`, `prod` | Database login username. |
-| `DB_PASSWORD` | `local`, `dev`, `prod` | Database login password. |
-| `ADMIN_USERNAME` | `local`, `dev`, `prod` | Username for the single configured administrator login. |
-| `ADMIN_PASSWORD` | `local`, `dev`, `prod` | Password for the single configured administrator login. Use a strong unique value before deployment. |
-| `BACKEND_ORIGIN` | Current Spring production or explicit local/transition fallback only | Absolute HTTPS origin of the deployed backend. Local Pages Functions development may use HTTP only with `localhost` or `127.0.0.1`. The Worker target does not use this value. |
-| `API_PROXY_TRANSPORT` | Cloudflare Pages | Use `backend-origin` only during the explicit Spring/local phase. Set `service-binding` for the Worker production target. There is no automatic fallback. |
-| `API_BACKEND` | Worker production target | Cloudflare Pages Service Binding to the private backend Worker. This is a binding, not a URL or secret. |
+Worker runtime secrets:
 
-## Optional Environment Variables
+- `DATABASE_URL`: pooled Neon connection string
+- `ADMIN_USERNAME`: 단일 관리자 username
+- `ADMIN_PASSWORD`: 강한 고유 관리자 password
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `E2E_CLEANUP_ENABLED` | `false` for local/dev | Enables guarded E2E cleanup endpoints. Never enable this in production. |
+Worker environment configuration:
 
-Session cookie `HttpOnly=true`, `Secure=true`, and `SameSite=Lax` are defined in `application.yml`. Local and E2E profiles explicitly override only `Secure=false` because they run over HTTP. `SameSite=Lax` matches the production browser flow through the same-origin Cloudflare Pages `/api` proxy.
+- production `APP_ENV=prod`
+- production `E2E_CLEANUP_ENABLED=false`
+- `INGRESS_GUARD_RATE_LIMITER`: 모든 API 요청 600/60초
+- `PUBLIC_READ_RATE_LIMITER`: 비로그인 GET 120/60초
+- `PUBLIC_WRITE_RATE_LIMITER`: 비로그인 non-GET 24/60초
 
-## Cloudflare Pages Frontend
+Production Worker는 `workers.dev`, preview URL, route, custom domain을 만들지 않습니다. 세 rate-limit namespace는 서로 다른 production 전용 positive integer ID여야 합니다.
+
+## Cloudflare Pages
 
 - Root directory: `frontend`
 - Build command: `npm run build`
 - Output directory: `dist`
-- During the current Spring phase, explicitly select `API_PROXY_TRANSPORT=backend-origin` and configure `BACKEND_ORIGIN` without a path, query, fragment, or credentials.
-- For the Worker target, explicitly select `API_PROXY_TRANSPORT=service-binding`, bind `API_BACKEND`, and do not configure a public Worker origin fallback.
-- Browser requests keep using relative `/api/...` URLs. The Pages Function preserves the API path, query, method, body, cookies, CSRF header, response status and separate `Set-Cookie` values.
-- The Pages Function removes browser-provided `X-Forwarded-For` and `X-Room-Reservation-Client-IP`, then copies only Pages ingress `CF-Connecting-IP` to the internal header.
-- The local Vite `/api` proxy remains independent and continues to use `VITE_API_PROXY_TARGET` when configured.
+- `API_PROXY_TRANSPORT=service-binding`
+- `API_BACKEND`: exact production Worker Service Binding
+- `BACKEND_ORIGIN`: production에서는 설정하지 않음
 
-## GitHub Actions Cloudflare Deployment
+브라우저는 상대 `/api/...` URL만 사용합니다. Pages Function은 browser가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 제거하고 Pages ingress의 `CF-Connecting-IP`만 내부 header로 전달합니다.
 
-Successful `main` CI runs deploy the production Worker first and then publish the existing Pages project by Direct Upload. Database migrations are not part of this workflow, and existing Worker runtime secrets remain managed by Cloudflare.
+## GitHub Actions secrets
 
-Repository Secrets:
+실제 값은 모두 Repository Secrets에 저장합니다.
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_PAGES_PROJECT_NAME`
@@ -52,49 +43,44 @@ Repository Secrets:
 - `CLOUDFLARE_PRODUCTION_WRITE_RATE_LIMIT_NAMESPACE_ID`
 - `CLOUDFLARE_API_TOKEN`
 
-The deployment identifiers use repository Secrets so GitHub masks them before the first job step; their non-secret nature does not make them appropriate for public Actions logs. Exact deployment identifiers and deployment receipts are managed outside Git. Removing the existing Pages Git integration and the GitHub `Cloudflare Workers and Pages` app is a separate manual operation and is not performed by the workflow.
+공개 가능한 식별자도 portability와 log masking을 위해 Repository Variables나 committed configuration에 실제 값을 두지 않습니다. 명령 인자, artifact, cache, receipt와 log에도 운영 값을 출력하지 않습니다.
 
-## Session, CSRF, and Rate Limiting
+## CI and deployment order
 
-- Authentication uses a server-side session cookie, not JWT or browser local storage.
-- CSRF protection is enabled for state-changing requests, including public reservation create, edit, and cancel requests.
-- The SPA obtains `XSRF-TOKEN` from `GET /api/auth/csrf` and sends it as `X-XSRF-TOKEN`.
-- Unauthenticated and public `GET /api/**` requests are limited to 120 requests per IP per minute.
-- Unauthenticated and public state-changing `/api/**` requests are limited to 24 requests per IP per minute.
-- Every `/api/**` request first passes the 600 requests/60 seconds INGRESS guard for its trusted client IP, including authenticated administrator requests.
-- Authenticated `ROLE_ADMIN` requests bypass only the product READ/WRITE limits. Expired or unauthenticated admin requests do not bypass them.
-- Only a 43-character unpadded base64url `ROOM-SESSION` value is eligible for a session database lookup, and only after INGRESS allows the request.
-- The Worker target uses exactly three Workers Rate Limiting bindings: 600 ingress requests, 120 non-admin GET requests and 24 non-admin non-GET requests per 60 seconds per trusted client IP.
-- UAT and production INGRESS/READ/WRITE bindings use six distinct positive-integer namespaces. Local and CI use fake/local adapters and never production namespaces.
-- Workers Rate Limiting is Cloudflare-location-local and permissive/eventually consistent. It is abuse mitigation, not exact global accounting.
-- The production Worker has no workers.dev, preview URL, route or custom domain and trusts only the Pages-owned internal IP header received through `API_BACKEND`.
+`main` push에서 다음 순서를 지킵니다.
 
-## Handover Checks
+1. Worker validation과 disposable PostgreSQL integration 통과
+2. Pages proxy test와 Worker 기반 전체 Playwright E2E 통과
+3. production target 존재 여부와 설정 검증
+4. Frontend production build
+5. production Worker 배포
+6. production Pages Direct Upload
 
-- Confirm who owns access to the deployment platform, database, DNS, and mail account.
-- Confirm production secrets are stored only in the deployment platform or a secret manager.
-- Confirm no production value is present in `.env`, committed YAML, shell scripts, screenshots, issue comments, or chat logs.
-- Rotate `ADMIN_PASSWORD` whenever the administrator changes.
-- If email sending is enabled later, reissue the Gmail app password or mail-provider credential during administrator handover.
-- Keep `SPRING_PROFILES_ACTIVE=prod` set in production so the app never starts with local settings.
+Database migration은 자동 배포 workflow에 포함하지 않습니다. migration은 direct connection을 사용해 별도 승인된 절차로 실행하고, Worker runtime에는 pooled connection만 주입합니다.
 
-## Before First Production Deployment
+## Security checks
 
-1. Create the production database and user.
-2. Set `SPRING_PROFILES_ACTIVE=prod`.
-3. Set every required environment variable above.
-4. Start the app once and verify startup fails if any required value is missing.
-5. Verify the configured administrator can log in.
-6. Verify a state-changing request without a CSRF token returns `403` and a valid SPA request succeeds.
-7. Verify rate-limited responses return `429` and `Retry-After` through the deployment proxy.
-8. Store the final environment-variable list in the administrator handover notes, not in Git.
+- 인증은 database-backed opaque session cookie를 사용합니다.
+- 상태 변경 요청은 공개 예약 등록·수정·취소를 포함해 CSRF 검증을 거칩니다.
+- production cookie는 `HttpOnly`, `Secure`, `SameSite=Lax`입니다.
+- 모든 `/api/**` 요청은 trusted client IP가 없거나 rate-limit binding이 실패하면 fail closed 합니다.
+- 인증 관리자는 product READ/WRITE 제한만 우회하고 INGRESS 제한은 항상 적용받습니다.
+- production에는 E2E cleanup route가 등록되지 않습니다.
 
-## Reservation Time Migration Check
+## Before production deployment
 
-- Immediately before deployment, read `operation_settings.min_reservation_minutes` and `max_reservation_minutes` without exposing database credentials or connection URLs.
-- Confirm minimum is at least `30`, both values are divisible by `5`, maximum is at least minimum, and minimum fits within operating hours.
-- If a value is incompatible, do not auto-convert production data. Agree on the intended values with the operator before deployment.
-- V3 fails before changing constraints or trigger functions when existing settings are incompatible, so the migration rolls back atomically.
-- Reservation inputs use a fixed 5-minute increment; timetable candidates and operating start/end use 30-minute intervals.
-- Existing reservations and recurrences are not rewritten or retroactively validated.
-- `slot_minutes` remains temporarily as a deprecated rolling-deployment compatibility column. The API returns `5`; business logic and V3 triggers do not read it. Remove the field and column in a later coordinated contract-cleanup migration.
+1. staged diff와 tracked files에 실제 domain, project/account/resource ID, email, connection string, token, password가 없는지 검사합니다.
+2. migration 대상이 exact production database인지 외부에서 확인합니다.
+3. Worker secrets와 세 rate-limit binding을 확인합니다.
+4. Pages가 exact Worker Service Binding을 사용하는지 확인합니다.
+5. 관리자 login, CSRF `403`, 정상 state change를 확인합니다.
+6. rate-limit `429`와 `Retry-After` 전달을 확인합니다.
+7. production cleanup endpoint가 `404`인지 확인합니다.
+8. 최종 운영 receipt는 Git 밖의 승인된 위치에 보관합니다.
+
+## Handover
+
+- Cloudflare, Neon, DNS 소유자와 복구 수단을 확인합니다.
+- 관리자 변경 시 `ADMIN_PASSWORD`를 회전합니다.
+- 운영 DB backup/restore 절차와 장애 대응 연락 경로를 외부 운영 문서에 유지합니다.
+- GitHub/Cloudflare/Neon의 불필요한 기존 credential과 integration은 dashboard에서 별도로 폐기합니다.

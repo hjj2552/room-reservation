@@ -1,6 +1,6 @@
 # Room Reservation Worker
 
-P4의 Cloudflare Worker 구현이다. 기존 Spring Boot는 이 디렉터리와 독립적으로 유지되며, 이 Worker를 production에 연결하는 작업은 별도 전환 단계다.
+현재 production API를 제공하는 Cloudflare Worker 구현이다.
 
 ## 구조
 
@@ -24,6 +24,17 @@ Hono는 HTTP 경계에서만 사용한다. 일반 query는 Neon HTTP를 사용�
 - 실제 connection string과 관리자 자격 증명은 Wrangler secret으로만 주입한다.
 
 ## 로컬 검증
+
+일반 로컬 개발은 저장소 루트의 `.env`에 로컬 DB 및 관리자 값을 설정한 뒤 다음처럼 시작한다. 이 명령은 `room_reservation_worker` database를 로컬 PostgreSQL 안에 자동 생성하고 Worker migration을 적용한다. Cloudflare binding 대신 로컬 PostgreSQL/allow-all rate-limit adapter를 사용해 `http://127.0.0.1:8080`에서 서버를 열며, DB URL은 안전상 loopback 주소만 허용한다.
+
+```powershell
+cd <repo>
+.\start-worker.bat
+```
+
+Docker를 별도로 실행 중이라면 `worker` 디렉터리에서 `npm.cmd run dev`만 실행할 수도 있다. 프런트엔드는 기존 `start-frontend.bat`을 사용하며 `/api`를 이 로컬 Worker로 프록시한다.
+
+전체 검증 명령은 다음과 같다.
 
 ```powershell
 cd worker

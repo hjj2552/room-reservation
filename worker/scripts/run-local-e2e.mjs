@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -11,6 +12,22 @@ if (!/^room-reservation-worker-e2e-[0-9]+-[0-9]+$/.test(containerName)) {
 }
 
 let serverProcess;
+
+function findAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (!address || typeof address === "string") {
+        probe.close();
+        reject(new Error("Could not allocate a local E2E port"));
+        return;
+      }
+      probe.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: "utf8", stdio: "pipe", ...options });
@@ -43,6 +60,12 @@ function stopProcess(processRef) {
 }
 
 try {
+  const backendPort = await findAvailablePort();
+  let frontendPort = await findAvailablePort();
+  while (frontendPort === backendPort) frontendPort = await findAvailablePort();
+  const backendOrigin = `http://127.0.0.1:${backendPort}`;
+  const frontendOrigin = `http://127.0.0.1:${frontendPort}`;
+
   run("docker", [
     "run", "--detach", "--rm", "--name", containerName,
     "--env", "POSTGRES_USER=worker_e2e",
@@ -83,20 +106,21 @@ try {
       E2E_CLEANUP_ENABLED: "true",
       ADMIN_USERNAME: "admin",
       ADMIN_PASSWORD: "admin1234",
-      PORT: "8080",
+      PORT: String(backendPort),
     },
     stdio: "inherit",
     windowsHide: true,
   });
-  await waitFor("http://127.0.0.1:8080/api/public/settings", serverProcess);
+  await waitFor(`${backendOrigin}/api/public/settings`, serverProcess);
 
   const frontend = spawnSync(process.execPath, ["scripts/run-e2e.mjs", ...process.argv.slice(2)], {
     cwd: frontendRoot,
     env: {
       ...process.env,
-      E2E_BACKEND_URL: "http://127.0.0.1:8080/api/public/settings",
-      E2E_API_BASE_URL: "http://127.0.0.1:8080",
-      VITE_API_PROXY_TARGET: "http://127.0.0.1:8080",
+      E2E_BACKEND_URL: `${backendOrigin}/api/public/settings`,
+      E2E_API_BASE_URL: backendOrigin,
+      VITE_API_PROXY_TARGET: backendOrigin,
+      PLAYWRIGHT_BASE_URL: frontendOrigin,
       ADMIN_USERNAME: "admin",
       ADMIN_PASSWORD: "admin1234",
     },

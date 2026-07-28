@@ -8,7 +8,6 @@ const requiredFragments = [
   "production-deploy:",
   "if: github.event_name == 'push' && github.ref == 'refs/heads/main'",
   "- worker-frontend-e2e",
-  "- frontend",
   "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
   "CLOUDFLARE_PAGES_PROJECT_NAME: ${{ secrets.CLOUDFLARE_PAGES_PROJECT_NAME }}",
   "CLOUDFLARE_WORKER_NAME: ${{ secrets.CLOUDFLARE_PRODUCTION_WORKER_NAME }}",
@@ -23,6 +22,8 @@ for (const fragment of requiredFragments) assert.equal(workflow.includes(fragmen
 
 assert.equal(workflow.includes("environment: production"), false);
 assert.equal(workflow.includes("vars.CLOUDFLARE_"), false);
+assert.equal(workflow.includes("backend-test:"), false);
+assert.equal(workflow.includes("actions/setup-java"), false);
 assert.equal(workflow.indexOf("run: npm run deploy:production") < workflow.indexOf("run: npm run deploy:pages:production"), true);
 
 process.stdout.write("Cloudflare production CI/CD workflow contract verified.\n");

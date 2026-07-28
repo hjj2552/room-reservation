@@ -3,7 +3,7 @@ services:
     image: postgres:16
     container_name: room-reservation-postgres
     environment:
-      POSTGRES_DB: room_reservation
+      POSTGRES_DB: room_reservation_worker
       POSTGRES_USER: room_reservation
       POSTGRES_PASSWORD: room_reservation
     ports:
@@ -11,24 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U room_reservation -d room_reservation"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  postgres-test:
-    image: postgres:16
-    container_name: room-reservation-postgres-test
-    environment:
-      POSTGRES_DB: room_reservation_test
-      POSTGRES_USER: room_reservation
-      POSTGRES_PASSWORD: room_reservation
-    ports:
-      - "5433:5432"
-    tmpfs:
-      - /var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U room_reservation -d room_reservation_test"]
+      test: ["CMD-SHELL", "pg_isready -U room_reservation -d room_reservation_worker"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -59,15 +59,15 @@
 
 ## 운영상 주의가 필요한 것
 
-관리자 인증은 현재 MVP 수준입니다. 백엔드 설정값의 관리자 계정으로 로그인하며, `admins` 테이블 기반의 계정 관리와 역할 분리는 아직 실제 로그인 흐름에 연결되어 있지 않습니다.
+관리자 인증은 현재 MVP 수준입니다. Worker secret으로 주입한 단일 관리자 계정으로 로그인하며, 계정 관리와 역할 분리는 아직 제공하지 않습니다.
 
-local/dev/prod profile은 `ADMIN_USERNAME`, `ADMIN_PASSWORD` 환경변수가 없으면 시작하지 않습니다. `admin` / `admin1234`는 test/E2E profile의 폐기 가능한 기본값일 뿐 운영 계정으로 사용하면 안 됩니다.
+Worker는 `ADMIN_USERNAME`, `ADMIN_PASSWORD`가 없으면 요청 처리를 거부합니다. `admin` / `admin1234`는 격리된 E2E runner의 폐기 가능한 기본값일 뿐 local 또는 운영 계정으로 사용하면 안 됩니다.
 
 관리자 인증은 서버 세션 쿠키를 사용합니다. 상태 변경 요청은 공개 예약 등록·수정·취소를 포함해 CSRF 검증을 거치며, SPA는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 전송합니다.
 
-공개·비로그인 API 요청은 인메모리 토큰 버킷으로 IP별 제한됩니다. GET은 분당 120회, 그 밖의 메서드는 분당 24회이며 인증된 `ROLE_ADMIN` 요청은 제외됩니다. 현재 버킷은 서버 인스턴스별 메모리에 있으므로 다중 인스턴스 배포에서는 전역 제한을 보장하지 않습니다.
+모든 API 요청에는 Cloudflare location-local INGRESS 제한이 적용되고, 비로그인 요청에는 READ/WRITE 제한이 추가로 적용됩니다. 이 제한은 abuse mitigation이며 전역 정밀 집계를 보장하지 않습니다. 로컬 adapter와 unit/E2E test는 외부 namespace를 호출하지 않습니다.
 
-세션 쿠키는 모든 profile에서 `SameSite=Lax`, `HttpOnly=true`를 사용합니다. common/prod 기본은 `Secure=true`이고 local/E2E의 HTTP 실행만 `Secure=false`로 덮어씁니다.
+세션 쿠키는 `SameSite=Lax`, `HttpOnly=true`를 사용합니다. UAT/production에서는 `Secure=true`이고 local/test의 HTTP 실행에서는 `Secure=false`입니다.
 
 시간대는 서비스 로직과 CSV 내보내기에서 `Asia/Seoul` 기준으로 처리합니다. 해외 사용자 또는 다른 시간대 운영은 별도 검토가 필요합니다.
 
@@ -83,7 +83,7 @@ CSV 내보내기에는 신청자 이름, 이메일, 전화번호, 목적이 포�
 
 로컬 개발 DB는 Docker volume을 사용합니다. `docker compose down`만으로 데이터가 지워지지는 않지만, volume 삭제나 DB 초기화 작업은 데이터 손실을 만들 수 있습니다.
 
-테스트 DB인 `postgres-test`는 tmpfs 기반입니다. 컨테이너를 다시 만들면 데이터가 사라지는 전제입니다.
+Worker 통합 test와 전체 E2E는 고유 이름의 일회용 PostgreSQL container를 사용하고 exact container만 종료합니다.
 
 ## 향후 확장 후보
 
@@ -117,7 +117,7 @@ CSV 내보내기에는 신청자 이름, 이메일, 전화번호, 목적이 포�
 
 ## 테스트는 있지만 아직 UI로 완전히 검증하지 않은 부분
 
-백엔드 통합 테스트는 다음 영역을 다룹니다.
+Worker 통합 테스트는 다음 영역을 다룹니다.
 
 - 공개 예약 등록, 충돌, 정책 검증
 - 관리자 예약 목록/상세/승인/취소

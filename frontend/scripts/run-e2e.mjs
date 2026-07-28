@@ -7,28 +7,23 @@ import { cleanupE2eData } from './cleanup-e2e-data.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(frontendRoot, '..');
-const backendRoot = path.join(repoRoot, 'backend');
 const backendUrl = process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8080/api/public/settings';
 const frontendUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const cleanupRequired = process.env.E2E_CLEANUP_REQUIRED !== 'false';
 
-let backendProcess = null;
 let frontendProcess = null;
-let backendOutFd = null;
-let backendErrFd = null;
 let frontendOutFd = null;
 let frontendErrFd = null;
 
 async function main() {
   try {
-    const backendAlreadyRunning = await isReachable(backendUrl);
-    if (!backendAlreadyRunning) {
-      console.log('Starting E2E backend...');
-      backendProcess = await startBackend();
-    } else {
-      console.log('Using existing E2E backend.');
+    if (!(await isReachable(backendUrl))) {
+      throw new Error(
+        `E2E Worker is not reachable at ${backendUrl}. ` +
+          'Run npm.cmd run test:local-e2e from the worker directory for an isolated local suite.',
+      );
     }
+    console.log('Using existing E2E Worker.');
 
     const frontendAlreadyRunning = await isReachable(frontendUrl);
     if (!frontendAlreadyRunning) {
@@ -56,45 +51,8 @@ async function main() {
       }
     } finally {
       stopFrontend();
-      stopBackend();
     }
   }
-}
-
-async function startBackend() {
-  const logDir = path.join(frontendRoot, 'test-results', 'backend');
-  await mkdir(logDir, { recursive: true });
-
-  backendOutFd = openSync(path.join(logDir, 'backend.out.log'), 'a');
-  backendErrFd = openSync(path.join(logDir, 'backend.err.log'), 'a');
-  const processRef = spawn('java', ['-jar', 'build/libs/room-reservation-backend-0.0.1-SNAPSHOT.jar'], {
-    cwd: backendRoot,
-    env: {
-      ...process.env,
-      SPRING_PROFILES_ACTIVE: process.env.SPRING_PROFILES_ACTIVE || process.env.E2E_BACKEND_PROFILE || 'e2e',
-    },
-    stdio: ['ignore', backendOutFd, backendErrFd],
-    windowsHide: true,
-    detached: true,
-  });
-
-  await waitForBackend(processRef);
-  processRef.unref();
-  return processRef;
-}
-
-async function waitForBackend(processRef) {
-  const deadline = Date.now() + 120_000;
-  while (Date.now() < deadline) {
-    if (processRef.exitCode !== null) {
-      throw new Error('E2E backend process exited before it became ready.');
-    }
-    if (await isReachable(backendUrl)) {
-      return;
-    }
-    await delay(1_000);
-  }
-  throw new Error(`E2E backend did not become ready at ${backendUrl}.`);
 }
 
 async function startFrontend() {
@@ -190,21 +148,6 @@ function assertNoE2eDataLeft(summary) {
   }
 }
 
-function stopBackend() {
-  if (!backendProcess || backendProcess.exitCode !== null) {
-    return;
-  }
-
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/PID', String(backendProcess.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    killProcessGroup(backendProcess);
-  }
-
-  closeBackendLogs();
-  backendProcess = null;
-}
-
 function stopFrontend() {
   if (!frontendProcess || frontendProcess.exitCode !== null) {
     return;
@@ -218,16 +161,6 @@ function stopFrontend() {
 
   closeFrontendLogs();
   frontendProcess = null;
-}
-
-function closeBackendLogs() {
-  for (const fd of [backendOutFd, backendErrFd]) {
-    if (fd !== null) {
-      closeSync(fd);
-    }
-  }
-  backendOutFd = null;
-  backendErrFd = null;
 }
 
 function closeFrontendLogs() {
@@ -250,16 +183,13 @@ function killProcessGroup(processRef) {
 
 process.on('exit', () => {
   stopFrontend();
-  stopBackend();
 });
 process.on('SIGINT', () => {
   stopFrontend();
-  stopBackend();
   process.exit(130);
 });
 process.on('SIGTERM', () => {
   stopFrontend();
-  stopBackend();
   process.exit(143);
 });
 

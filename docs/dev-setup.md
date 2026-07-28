@@ -1,318 +1,106 @@
 # 개발자 실행/검증 문서
 
-이 문서는 로컬 개발자와 미래 인수자가 프로젝트를 실행하고 검증하기 위한 기준 절차입니다. 명령 예시는 Windows PowerShell 기준이며, macOS/Linux에서는 `.\gradlew.bat` 대신 `./gradlew`를 사용하면 됩니다.
-
-아래 명령의 `<repo>`는 이 저장소를 내려받은 프로젝트 루트 경로를 뜻합니다.
+이 문서는 Worker 백엔드와 React 프런트엔드를 로컬에서 실행하고 검증하는 기준 절차입니다. 명령 예시는 Windows PowerShell 기준입니다.
 
 ## 프로젝트 구성
 
 ```text
 room-reservation/
-  docker-compose.yml
-  backend/
-    build.gradle
-    gradlew.bat
-    src/main/java/com/school/reservation
-    src/main/resources/application-*.yml
-    src/main/resources/db/migration
-    src/test/java/com/school/reservation
-  frontend/
-    package.json
-    vite.config.mjs
-    playwright.config.ts
-    src/
-    tests/e2e/
+  worker/                 # Cloudflare Worker/Hono API
+  frontend/               # React/Vite SPA와 Pages API proxy
   docs/
+  docker-compose.yml      # 로컬 Worker PostgreSQL
+  start-worker.bat
+  start-frontend.bat
 ```
 
-주요 구성은 다음과 같습니다.
+로컬 개발에는 Docker Desktop 또는 Docker Engine, Node.js 22, npm, PowerShell이 필요합니다. Cloudflare 계정은 로컬 실행에 필요하지 않습니다.
 
-- `backend`: Java 21, Spring Boot, Spring Web, Spring Security, Spring Data JPA, Bean Validation, Flyway 기반 API 서버입니다.
-- `frontend`: React, Vite, TypeScript, React Router, TanStack Query 기반 관리자 SPA입니다.
-- `docker-compose.yml`: 로컬 개발 DB와 테스트/E2E DB를 실행합니다.
-- `.github/workflows/ci.yml`: 백엔드 테스트와 프런트엔드 build/E2E를 검증합니다.
-
-## 사전 준비
-
-- JDK 21
-- Docker Desktop 또는 Docker Engine
-- Node.js 22 권장
-- npm
-- PowerShell
-
-버전 확인 예시는 다음과 같습니다.
-
-```powershell
-java -version
-docker --version
-node --version
-npm --version
-```
-
-## Docker/Postgres 실행 방법
-
-일반 로컬 개발 DB를 실행합니다.
-
-```powershell
-cd <repo>
-docker compose up -d postgres
-docker compose ps
-```
-
-테스트와 E2E용 DB를 실행합니다.
-
-```powershell
-cd <repo>
-docker compose up -d postgres-test
-docker compose ps postgres-test
-```
-
-중지하려면 다음 명령을 사용합니다.
-
-```powershell
-docker compose down
-```
-
-로컬 개발 DB 접속 정보는 다음과 같습니다.
-
-```text
-url: jdbc:postgresql://localhost:5432/room_reservation
-username: room_reservation
-password: room_reservation
-```
-
-테스트 DB 접속 정보는 다음과 같습니다.
-
-```text
-url: jdbc:postgresql://localhost:5433/room_reservation_test
-username: room_reservation
-password: room_reservation
-```
-
-## 백엔드 실행
-
-1. 최초 실행 전 로컬 전용 설정을 준비합니다.
+## 최초 설정
 
 ```powershell
 cd <repo>
 Copy-Item .env.example .env
-Copy-Item backend\src\main\resources\application-local.example.yml backend\src\main\resources\application-local.yml
 ```
 
-`.env`에서 다음 필수 값을 실제 로컬 값으로 채웁니다.
+`.env`의 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 로컬 값으로 채웁니다. `.env`는 Git에 커밋하지 않습니다. 로컬 실행기는 외부 DB에 실수로 migration을 적용하지 않도록 loopback `DB_URL`만 허용합니다.
 
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `ADMIN_USERNAME`
-- `ADMIN_PASSWORD`
+## 로컬 실행
 
-`.env`와 `application-local.yml`은 Git에 커밋하지 않습니다. `application-local.yml`은 저장소 루트의 `.env`를 가져옵니다.
-
-2. 개발 DB를 실행합니다.
+첫 번째 터미널에서 Worker를 시작합니다.
 
 ```powershell
 cd <repo>
-docker compose up -d postgres
+.\start-worker.bat
 ```
 
-3. `local` profile을 명시하여 Spring Boot 서버를 실행합니다.
+이 스크립트는 PostgreSQL 기동, Worker 의존성 설치, `room_reservation_worker` database 생성, migration 적용과 HTTP adapter 시작을 처리합니다. Worker는 `http://127.0.0.1:8080`에서 실행됩니다. Docker를 이미 실행했다면 다음 명령만 실행해도 됩니다.
 
 ```powershell
-cd backend
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
+cd <repo>\worker
+npm.cmd run dev
 ```
 
-기본 서버 주소는 `http://localhost:8080`입니다. 백엔드는 활성 profile이 없으면 시작을 거부하므로 `local`, `dev`, `prod`, `test`, `e2e` 중 하나를 반드시 명시해야 합니다. 저장소 루트에서 다음 스크립트를 사용해도 PostgreSQL과 local profile 백엔드를 함께 시작할 수 있습니다.
-
-```powershell
-.\start-backend.bat
-```
-
-로컬 관리자 계정은 `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`입니다. `admin` / `admin1234`는 test/E2E profile의 폐기 가능한 기본값이며 local 또는 운영 계정으로 사용하지 않습니다.
-
-## 프런트엔드 실행
-
-1. 의존성을 설치합니다.
-
-```powershell
-cd <repo>\frontend
-npm ci
-```
-
-2. 개발 서버를 실행합니다.
-
-```powershell
-npm run dev
-```
-
-기본 Vite 주소는 `http://localhost:5173`입니다. 프런트엔드는 `/api` 요청을 백엔드로 프록시합니다. 백엔드는 `http://localhost:8080`에서 실행 중이어야 합니다.
-
-## 백엔드 테스트 실행
-
-통합 테스트는 `postgres-test`가 필요합니다.
+두 번째 터미널에서 프런트엔드를 시작합니다.
 
 ```powershell
 cd <repo>
-docker compose up -d postgres-test
-cd backend
-.\gradlew.bat test
+.\start-frontend.bat
 ```
 
-특정 영역만 빠르게 확인할 때는 `--tests`를 사용할 수 있습니다.
+프런트엔드는 `http://localhost:5173`에서 실행되고 `/api`를 로컬 Worker로 프록시합니다.
+
+## 검사와 테스트
+
+Worker 정적 검사, unit/contract test, 격리 PostgreSQL 통합 test와 dry-run build:
 
 ```powershell
-.\gradlew.bat test --tests "*RecurrenceIntegrationTest"
-.\gradlew.bat test --tests "*AdminReservationIntegrationTest"
-.\gradlew.bat test --tests "*ReservationCsvExportIntegrationTest"
+cd <repo>\worker
+npm.cmd ci --ignore-scripts
+npm.cmd run check
+npm.cmd test
+npm.cmd run test:isolated-postgres
+npm.cmd run build
 ```
 
-상세 테스트 기준은 [testing-workflow.md](testing-workflow.md)를 참고하세요.
-
-## 프런트엔드 build 실행
-
-```powershell
-cd <repo>\frontend
-npm ci
-npm run build
-```
-
-`npm run build`는 TypeScript 타입 검사(`tsc --noEmit`)와 Vite production build를 함께 실행합니다.
-
-## 관리자 E2E 실행
-
-E2E는 Playwright 기반입니다. `postgres-test`를 먼저 실행합니다.
-
-```powershell
-cd <repo>
-docker compose up -d postgres-test
-```
-
-백엔드 jar를 빌드합니다.
-
-```powershell
-cd backend
-.\gradlew.bat bootJar
-```
-
-프런트엔드에서 E2E를 실행합니다.
-
-```powershell
-cd ..\frontend
-npm ci
-npx playwright install --with-deps chromium
-npm run e2e
-```
-
-CI와 같은 형태로 실행하려면 다음 명령을 사용합니다.
-
-```powershell
-npm run e2e:ci
-```
-
-E2E runner는 기본적으로 백엔드 readiness URL이 열려 있지 않으면 `e2e` profile로 백엔드 jar를 실행하고, 프런트엔드 URL이 열려 있지 않으면 Vite 개발 서버를 실행합니다.
-E2E가 만든 공간, 태그, 예약, 반복 예약은 `testing-` prefix를 사용하며, runner가 suite 전후로 cleanup을 시도합니다. 수동 인수테스트 전에 한 번 더 정리하려면 다음 명령을 실행합니다.
-
-```powershell
-npm run e2e:cleanup:preview
-npm run e2e:cleanup
-```
-
-`local` 또는 `dev` profile 백엔드에 대해 이 명령을 쓰려면 백엔드를 `E2E_CLEANUP_ENABLED=true`로 실행해야 합니다. cleanup은 `testing-` prefix가 붙은 데이터와 그 반복예약 하위 예약만 삭제합니다. `prod` profile에서는 endpoint가 로드되지 않습니다.
-
-로컬 백엔드에서 수동 cleanup endpoint를 열어 실행하는 예시는 다음과 같습니다.
-
-```powershell
-.\start-backend-cleanup-enabled.bat
-```
-
-또는 직접 실행하려면 다음과 같이 환경 변수를 켜고 백엔드를 시작합니다.
-
-```powershell
-cd <repo>\backend
-$env:E2E_CLEANUP_ENABLED="true"
-.\gradlew.bat bootRun --args="--spring.profiles.active=local"
-```
-
-다른 터미널에서 프런트엔드 cleanup 명령을 실행합니다.
+프런트엔드 Pages proxy test와 production build:
 
 ```powershell
 cd <repo>\frontend
-npm run e2e:cleanup:preview
+npm.cmd ci
+npm.cmd run test:functions
+npm.cmd run build
 ```
 
-`E2E_CLEANUP_ENABLED=true` 없이 local/dev 백엔드를 실행하면 `/api/admin/test-data/e2e/preview`는 404를 반환합니다. 이는 endpoint 미등록을 통한 보호 장치입니다. 백엔드 주소가 기본값이 아니면 `E2E_API_BASE_URL=http://host:port` 또는 `E2E_BACKEND_URL=http://host:port/api/public/settings`를 지정합니다.
+전체 Playwright E2E는 고유 이름의 일회용 PostgreSQL container와 같은 Hono app을 사용하는 로컬 Worker adapter를 자동으로 시작합니다.
 
-자세한 E2E 범위와 환경 변수는 [admin-e2e.md](admin-e2e.md)를 참고하세요.
+```powershell
+cd <repo>\worker
+npm.cmd run test:local-e2e
+```
+
+E2E가 만든 데이터는 `testing-` 표식을 사용하며 suite 전후 id 기반 best-effort teardown과 guarded prefix cleanup을 수행합니다. 자세한 내용은 [admin-e2e.md](admin-e2e.md)를 참고하세요.
 
 ## GitHub Actions 검증 범위
 
-CI workflow는 `.github/workflows/ci.yml`에 있습니다. 현재 `pull_request`, `push`, `workflow_dispatch`에서 실행됩니다.
+`.github/workflows/ci.yml`은 다음 두 검증 job을 배포 전에 요구합니다.
 
-`backend-test` job은 다음을 검증합니다.
+- `worker-validation`: Worker 검사, unit/contract test, 격리 PostgreSQL test, dry-run build와 dependency audit
+- `worker-frontend-e2e`: Pages proxy test, 프런트엔드 build와 Worker 기반 전체 Playwright E2E
 
-- PostgreSQL 16 테스트 서비스 실행
-- JDK 21 설정
-- Gradle wrapper 실행 권한 설정
-- `backend/./gradlew test`
-
-`frontend` job은 `backend-test` 성공 후 다음을 검증합니다.
-
-- PostgreSQL 16 테스트 서비스 실행
-- JDK 21 설정
-- Node.js 22 설정
-- `frontend/npm ci`
-- `npm run build`
-- `backend/./gradlew bootJar`
-- Playwright Chromium 설치
-- `npm run e2e:ci`
-
-E2E 실패 시 다음 artifact가 업로드됩니다.
-
-- `admin-playwright-report`
-- `admin-e2e-test-results`
+`main` push의 production 배포는 두 검증 중 Worker E2E 경로가 성공한 뒤에만 실행됩니다.
 
 ## 트러블슈팅
 
-DB 연결 실패가 나면 다음을 확인합니다.
-
-```powershell
-docker compose ps
-docker compose up -d postgres
-docker compose up -d postgres-test
-```
-
-백엔드 테스트가 `connection refused`로 실패하면 `postgres-test`가 켜져 있는지 확인합니다. 테스트 DB 포트는 호스트 기준 `5433`입니다.
-
-Flyway 또는 JPA validate 오류가 나면 최근 migration과 엔티티 필드가 맞는지 확인합니다. 로컬 개발 DB가 오래된 상태라면 데이터 보존 필요 여부를 먼저 판단한 뒤 DB 초기화를 검토합니다.
-
-관리자 로그인이 실패하면 profile별 관리자 계정을 확인합니다.
-
-- `local`: 저장소 루트 `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`
-- `dev`, `prod`: 배포 플랫폼의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`
-- `test`: `backend/src/main/resources/application-test.yml`
-- `e2e`: `ADMIN_USERNAME`, `ADMIN_PASSWORD` 환경 변수 또는 기본값
-
-프런트엔드에서 API가 401을 반환하면 로그인 세션이 없거나 만료된 상태입니다. 다시 로그인합니다.
-
-프런트엔드에서 API가 404 또는 프록시 오류를 반환하면 백엔드가 `http://localhost:8080`에서 실행 중인지 확인합니다.
-
-E2E가 브라우저 설치 오류로 실패하면 다음 명령을 다시 실행합니다.
-
-```powershell
-cd <repo>\frontend
-npx playwright install --with-deps chromium
-```
-
-포트 충돌이 나면 `8080`, `5173`, `5432`, `5433`을 사용하는 프로세스가 있는지 확인합니다. 이미 서버가 떠 있다면 종료하거나 환경 변수로 다른 URL을 지정합니다.
-
-CSV 한글 또는 Excel 표시가 이상하면 파일이 UTF-8로 열리는지 확인합니다. 현재 CSV는 UTF-8 BOM을 포함합니다.
+- DB 연결 실패: `docker compose ps`와 `.env`의 loopback DB 설정을 확인합니다.
+- API proxy 오류: Worker가 `http://127.0.0.1:8080`에서 실행 중인지 확인합니다.
+- 포트 충돌: `5432`, `8080`, `5173`을 사용하는 프로세스를 확인합니다.
+- Playwright browser 오류: `frontend`에서 `npx playwright install --with-deps chromium`을 다시 실행합니다.
+- 관리자 로그인 실패: `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 확인합니다.
 
 ## 문서 유지 기준
 
-기능이 추가되면 다음 문서를 함께 확인합니다.
-
-- 관리자 절차가 바뀌면 `docs/admin-manual.md`
-- 실행 명령, CI, 테스트 방식이 바뀌면 `docs/dev-setup.md`
-- 구현 범위나 미지원 범위가 바뀌면 `docs/known-limitations.md`
-- E2E 범위가 바뀌면 `docs/admin-e2e.md`
+- 관리자 절차 변경: `docs/admin-manual.md`
+- 실행·CI·테스트 방식 변경: `docs/dev-setup.md`
+- 구현 범위 변경: `docs/known-limitations.md`
+- E2E data workflow 변경: `docs/admin-e2e.md`와 `frontend/AGENTS.md`

@@ -70,7 +70,7 @@ afterAll(async () => {
 });
 
 describe("baseline V1", () => {
-  it("starts without Spring tables/slot_minutes and has required system data", async () => {
+  it("starts from the Worker baseline without legacy migration tables and has required system data", async () => {
     const columns = await database.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_schema='public' AND table_name='operation_settings'`,
@@ -329,7 +329,7 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
   return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
 }
 
-describe("Spring-compatible recurrence search", () => {
+describe("recurrence search contract", () => {
   it("searches purpose, applicant name, room name and tag name, but not email", async () => {
     await resetProductData();
     const purposeRoom = await insertRoom("ordinary-purpose-room");

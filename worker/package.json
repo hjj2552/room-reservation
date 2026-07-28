@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "node scripts/run-local-dev.mjs",
     "build": "node scripts/run-wrangler-build.mjs",
     "check": "tsc --noEmit && node scripts/check-architecture.mjs && node scripts/check-rate-limit-config.mjs && node scripts/check-cloudflare-deploy-config.mjs && node scripts/check-cloudflare-cicd.mjs",
     "test": "vitest run --config vitest.config.ts",

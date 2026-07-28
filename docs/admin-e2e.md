@@ -1,129 +1,65 @@
 # Frontend E2E
 
-This document describes the Playwright E2E profile for the frontend.
+Playwright E2E는 실제 프런트엔드와 Worker HTTP app의 제품 계약을 검증합니다. 전역 운영 설정 충돌을 피하기 위해 `workers: 1`, `fullyParallel: false`로 실행합니다.
 
-## Covered Smoke Flows
+## 검증 범위
 
-- Auth and protected route behavior.
-- Root entry choices for the public timetable and admin login.
-- Reservations list query persistence.
-- Audit query persistence and deleted reservation snapshot rendering.
-- Admin reservation registration, edit, detail/list reflection, timetable links, duplication, and hard deletion.
-- Admin timetable date/room views and reservation creation from empty slots or the toolbar.
-- Public reservation timetable request, detail, and reservation-password cancellation.
-- Public edit of a confirmed reservation and transition back to `REQUESTED`.
-- Rooms smoke: list render, one successful update, deletion modal confirmation, and preserved reservation-record copy.
-- Settings smoke: settings load, save, and success feedback.
-- Recurrence list, preview, create, detail, cancel, `SKIP_CONFLICTS`, and tag selection.
-- Tag create, update, and delete.
+- 관리자 인증과 보호 route
+- 예약 목록·상세·등록·수정·승인·취소·삭제
+- 감사 이력과 삭제 snapshot
+- 날짜별·공간별 시간표와 빠른 예약
+- 공개 예약 신청·조회·수정·취소
+- 공간, 운영 설정, 반복 예약과 태그 smoke flow
 
-현재 E2E 스위트는 CSV 내보내기와 rooms/settings 전체 CRUD matrix를 아직 다루지 않습니다.
+CSV 내보내기와 rooms/settings 전체 CRUD matrix는 아직 E2E 범위가 아닙니다.
 
-Playwright는 전역 운영 설정처럼 singleton 데이터를 바꾸는 테스트 사이의 충돌을 피하기 위해 `workers: 1`, `fullyParallel: false`로 실행합니다.
+## 로컬 실행
 
-## Local Run
-
-Prerequisites:
-
-- JDK 21.
-- Node dependencies installed in `frontend`.
-- Playwright browsers installed.
-- PostgreSQL test database running from the repository root:
+다음 명령 하나가 고유 이름의 일회용 PostgreSQL container를 만들고 Worker baseline을 적용한 뒤, 사용 가능한 로컬 port에 Worker adapter와 Vite를 실행하여 전체 suite를 수행합니다.
 
 ```powershell
-docker compose up -d postgres-test
+cd worker
+npm.cmd run test:local-e2e
 ```
 
-Build the backend jar when it is missing or stale:
+runner는 종료 시 자신이 만든 exact container와 process만 정리합니다. 프런트 runner인 `frontend/scripts/run-e2e.mjs`는 Worker가 이미 준비된 경우에만 직접 사용할 수 있습니다.
 
-```powershell
-cd backend
-.\gradlew.bat bootJar
-```
+## GitHub Actions
 
-Run the E2E suite:
+`.github/workflows/ci.yml`의 `worker-frontend-e2e` job은 다음을 수행합니다.
 
-```powershell
-cd frontend
-npm.cmd run e2e
-```
+- Worker와 Frontend clean dependency install
+- Pages same-origin API proxy test
+- Frontend production build
+- Playwright Chromium 설치
+- disposable Worker PostgreSQL 기반 전체 E2E
 
-`npm run e2e` starts a backend only when `E2E_BACKEND_URL` is not reachable. The started backend uses `SPRING_PROFILES_ACTIVE=e2e` by default. It also starts the Vite dev server when `PLAYWRIGHT_BASE_URL` is not reachable.
+실패 여부와 관계없이 `worker-playwright-report`와 `worker-e2e-test-results` artifact를 7일 보관합니다.
 
-If a backend is already reachable on `E2E_BACKEND_URL`, the runner reuses it. Make sure that existing backend is either running with the `e2e` profile or was started with cleanup explicitly enabled. The runner treats before/after cleanup as required by default, so a reachable backend without the cleanup endpoint fails fast instead of silently leaving E2E data behind.
-
-## GitHub Actions CI
-
-The repository CI workflow lives at `.github/workflows/ci.yml` and runs on pull requests, pushes to any branch, and manual `workflow_dispatch` runs.
-
-Jobs:
-
-- `backend-test`: starts a PostgreSQL 16 service on host port `5433` and runs `backend/./gradlew test` with the backend test profile.
-- `frontend`: starts a fresh PostgreSQL 16 service on host port `5433`, runs `npm ci`, builds the frontend, builds the backend jar, installs Chromium for Playwright, and runs `npm run e2e:ci`.
-
-The E2E job reuses `frontend/scripts/run-e2e.mjs`. In CI, that runner starts the backend jar with the `e2e` profile and starts the Vite dev server if they are not already reachable.
-
-Artifacts:
-
-- `admin-playwright-report`: Playwright HTML report from `frontend/playwright-report`.
-- `admin-e2e-test-results`: Playwright traces, screenshots, error contexts, and backend/frontend logs from `frontend/test-results`.
-
-Artifacts are uploaded with `if: always()`, so failed E2E runs should still leave debugging output.
-
-## Manual CI-Shaped Run
-
-Recommended CI shape:
-
-```powershell
-docker compose up -d postgres-test
-cd backend
-.\gradlew.bat bootJar
-cd ..\frontend
-npm ci
-npx playwright install --with-deps chromium
-npm run e2e:ci
-```
-
-Useful environment variables:
+## 환경 변수
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PLAYWRIGHT_BASE_URL` | `http://127.0.0.1:5173` | Frontend URL used by Playwright. |
-| `E2E_BACKEND_URL` | `http://127.0.0.1:8080/api/public/settings` | Backend readiness probe. |
-| `E2E_API_BASE_URL` | Derived from `E2E_BACKEND_URL` | Backend API origin used by manual cleanup scripts. |
-| `E2E_BACKEND_PROFILE` | `e2e` | Spring profile used when the runner starts the backend. |
-| `E2E_CLEANUP_REQUIRED` | `true` | Requires before/after suite cleanup to reach the guarded cleanup endpoint. Set to `false` only for intentional debugging against a cleanup-disabled backend. |
-| `E2E_DB_URL` | `jdbc:postgresql://localhost:5433/room_reservation_test` | Database URL for `application-e2e.yml`. |
-| `E2E_DB_USERNAME` | `room_reservation` | E2E database username. |
-| `E2E_DB_PASSWORD` | `room_reservation` | E2E database password. |
-| `E2E_CLEANUP_ENABLED` | `true` for `e2e`, `false` for `local`/`dev` | Enables the guarded E2E cleanup API outside `prod`. |
-| `E2E_TEST_DATA_PREFIX` | `testing-` | Prefix used by the manual cleanup script. The backend only accepts prefixes that start with `testing-`. |
-| `ADMIN_USERNAME` | `admin` | Admin login username for auth setup and API helpers. |
-| `ADMIN_PASSWORD` | `admin1234` | Admin login password for auth setup and API helpers. |
-| `VITE_API_PROXY_TARGET` | `http://127.0.0.1:8080` | Vite `/api` proxy target. |
+| `PLAYWRIGHT_BASE_URL` | `http://127.0.0.1:5173` | Playwright가 사용하는 Frontend URL |
+| `E2E_BACKEND_URL` | `http://127.0.0.1:8080/api/public/settings` | Worker readiness probe |
+| `E2E_API_BASE_URL` | `E2E_BACKEND_URL`에서 파생 | cleanup API origin |
+| `E2E_CLEANUP_REQUIRED` | `true` | suite 전후 guarded cleanup 필수 여부 |
+| `E2E_TEST_DATA_PREFIX` | `testing-` | cleanup이 허용하는 test-data prefix |
+| `ADMIN_USERNAME` | E2E runner가 주입 | cleanup용 관리자 계정 |
+| `ADMIN_PASSWORD` | E2E runner가 주입 | cleanup용 관리자 비밀번호 |
+| `VITE_API_PROXY_TARGET` | `http://127.0.0.1:8080` | Vite `/api` proxy target |
 
-## Isolation and Data Cleanup
+## Test data와 cleanup
 
-- Playwright still uses browser context isolation per test.
-- Admin authentication is reused through `tests/e2e/.auth/admin.json`, but E2E-owned rooms, tags, reservations, recurrences, applicant names, emails, memos, and purposes use the `testing-` prefix.
-- Data-creating specs import from `tests/e2e/fixtures.ts` and use the `e2eData` factory. Prefer `e2eData.createTestRoom`, `e2eData.createTestTag`, `e2eData.createTestReservation`, `e2eData.createTestPublicReservation`, `e2eData.createTestRecurringReservation`, `e2eData.name`, and the id registration helpers over direct setup calls.
-- Public UI-created reservations use `testing-` applicant names, emails, and purposes, then register returned ids for cleanup.
-- Data-creating specs use a Playwright fixture registry for created room, tag, reservation, and recurrence ids. Fixture teardown tries best-effort API deletion for reservations, cancellation for recurrences, deletion for tags, and deletion for rooms by id.
-- `npm run e2e` also runs cleanup before and after the full suite through `frontend/scripts/run-e2e.mjs`. After the final cleanup, the runner performs a cleanup preview and fails if any matching E2E data remains.
-- The cleanup endpoint can preview or hard-delete rows identified by the `testing-` prefix:
-  - rooms whose name starts with `testing-`;
-  - tags whose name starts with `testing-` and are not still referenced by a remaining recurrence;
-  - recurrences whose purpose/applicant/email starts with `testing-`, plus recurrences attached to a `testing-` room;
-  - reservations whose purpose/applicant/email starts with `testing-`, plus reservations attached to a `testing-` room or a `testing-` recurrence;
-  - reservation histories for those reservations, including hard-deleted reservation histories identified by E2E snapshot purpose or room name.
-- Recurring reservations are cleaned by deleting the recurrence row and every generated reservation linked by `recurrence_id`.
-- `testing-` rooms are deleted only after their matching reservations and recurrences are removed. If any non-E2E row still references the room, the room is skipped instead of deleting or reassigning unrelated data.
-- `testing-` tags are deleted only after matching recurrences are removed. If any remaining recurrence still references the tag, the tag is skipped instead of clearing that recurrence's tag.
-- Settings are global state. The settings smoke test reads the original payload first and restores it in a `finally` block.
-- The cleanup controller is not loaded in the `prod` profile and is disabled by default in `local`/`dev` unless `E2E_CLEANUP_ENABLED=true` is set.
-- The `e2e` backend profile points at the tmpfs-backed `postgres-test` database by default, so CI can still start from a disposable database without a broad reset command.
+- 모든 생성 데이터는 `frontend/tests/e2e/fixtures.ts`의 공유 factory를 우선 사용합니다.
+- room은 `testing-room-*`, reservation은 `testing-reservation-*`, recurrence 및 신청자 식별자는 `testing-*` 규칙을 사용합니다.
+- 생성된 id는 fixture registry에 등록하고 teardown에서 id 기반 정리를 먼저 시도합니다.
+- interrupted run의 fallback cleanup도 `testing-` 소유권을 증명할 수 있는 row와 연결 row만 대상으로 합니다.
+- production에는 cleanup route가 등록되지 않습니다.
+- non-prod에서도 `E2E_CLEANUP_ENABLED=true`가 명시돼야 cleanup route가 등록됩니다.
+- suite 종료 후 preview 결과가 0건이 아니면 test가 실패합니다.
 
-Manual cleanup before acceptance testing:
+수동 cleanup은 반드시 preview를 먼저 실행합니다.
 
 ```powershell
 cd frontend
@@ -131,19 +67,22 @@ npm.cmd run e2e:cleanup:preview
 npm.cmd run e2e:cleanup
 ```
 
-When running against a local/dev backend, start that backend with `E2E_CLEANUP_ENABLED=true` first. From the repository root you can use `.\start-backend-cleanup-enabled.bat`. Without that opt-in, `/api/admin/test-data/e2e/preview` returns 404 because the controller is not registered. The manual cleanup command logs in as the admin user and calls the guarded `/api/admin/test-data/e2e` cleanup endpoints. If the backend is not on `http://127.0.0.1:8080`, set `E2E_API_BASE_URL`.
+로컬 Worker에 cleanup route가 필요하면 시작 전에 명시적으로 활성화합니다.
 
-`start-backend-cleanup-enabled.bat` starts the normal local PostgreSQL service, then runs the backend with `--spring.profiles.active=local` and `E2E_CLEANUP_ENABLED=true`. It is intended only for local/dev test-data cleanup. Do not use it for production. For CI-shaped E2E runs against the disposable test database, prefer `postgres-test` plus the `e2e` profile.
+```powershell
+$env:E2E_CLEANUP_ENABLED='true'
+.\start-worker.bat
+```
 
-## Worker P4 E2E
+## Remote UAT
 
-The production Worker HTTP app can run the same suite against a disposable local PostgreSQL container:
+Remote UAT는 disposable Neon/Worker와 Pages preview만 사용합니다. production 형태의 Pages URL은 runner가 거부합니다.
 
 ```powershell
 cd worker
-npm.cmd run test:local-e2e
+$env:P4_UAT_CONFIRM_DISPOSABLE='true'
+$env:P4_UAT_PAGES_URL='https://<preview-deployment>.pages.dev/'
+npm.cmd run test:uat-e2e
 ```
 
-The runner applies Worker baseline V1, enables reservations only inside the disposable E2E database, starts a Node HTTP adapter around the same Hono app, and then reuses `frontend/scripts/run-e2e.mjs`. It requires the same before/after guarded cleanup and final zero-row preview. The container and local adapter are stopped by exact name/PID.
-
-For remote UAT, use only a Pages preview deployment connected to a disposable Worker/Neon environment. Set `P4_UAT_CONFIRM_DISPOSABLE=true` and `P4_UAT_PAGES_URL` to a branch/deployment preview URL, then run `npm.cmd run test:uat-e2e` from `worker`. The guard rejects the production-shaped Pages URL. Production has no cleanup route; UAT requires both a non-prod `APP_ENV` and `E2E_CLEANUP_ENABLED=true`.
+UAT에서도 non-prod `APP_ENV`, explicit cleanup enable, suite 종료 후 0건 preview가 모두 필요합니다.
