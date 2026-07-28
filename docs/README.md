@@ -27,4 +27,4 @@
 - [D1 원격 후속 검증](serverless-d1-remote-validation.md)
 - [PBKDF2 100,000회 원격 재검증](serverless-d1-pbkdf2-100k-validation.md)
 
-최종 채택은 Cloudflare Worker + Neon PostgreSQL입니다. D1과 PBKDF2 실험은 채택되지 않았으며 제품 실행 경로가 아닙니다.
+최종 채택은 Cloudflare Worker + Neon PostgreSQL입니다. D1과 PBKDF2 실험은 채택되지 않았으며 제품 실행 경로가 아닙니다. 검증에 사용한 `serverless-poc/`와 `serverless-d1-poc/` 소스는 최종 제품 구현 후 현재 트리에서 제거했으며, 아래 문서와 Git 이력에 당시 구조와 결과를 보존합니다.

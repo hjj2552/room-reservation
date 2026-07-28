@@ -2,6 +2,8 @@
 
 > **역사적 검증 기록:** 이 문서는 아래 검증일 당시의 격리 PoC 결과를 보존합니다. D1 PoC는 제품 실행 경로가 아니며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
 
+> **PoC 소스 정리:** 당시 사용한 `serverless-d1-poc/`와 비교 대상 `serverless-poc/` 소스는 현재 트리에서 제거했습니다. 아래 디렉터리 구조와 실행 명령은 역사적 검증 기록이며, 원본 소스는 Git 이력에서 확인할 수 있습니다.
+
 검증일: 2026-07-21 (Asia/Seoul)
 
 대상 브랜치: `codex/serverless-migration-contract`
@@ -23,9 +25,9 @@
 
 또한 현재 `docs/serverless-migration-contract.md`는 PostgreSQL을 확정한 계약이다. D1 채택은 단순 어댑터 교체가 아니라 원자성, transaction, SQL, 시간 타입, migration/backup 계약을 바꾸므로 별도 승인 없이 P4에서 선택할 수 없다. 이 P3에서는 계약 문서를 수정하지 않았다.
 
-## PoC 구조와 경계
+## 당시 PoC 구조와 경계
 
-`serverless-d1-poc/`는 기존 `serverless-poc/`(Neon PostgreSQL)를 보존한 별도 실험이다.
+`serverless-d1-poc/`는 기존 `serverless-poc/`(Neon PostgreSQL)를 보존해 비교한 별도 실험이었다.
 
 ```text
 serverless-d1-poc/

@@ -2,6 +2,8 @@
 
 > **역사적 검증 기록:** 이 문서는 아래 검증일 당시의 기술 선택 결과를 보존합니다. P3/P4 단계 표현은 당시 상태이며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
 
+> **PoC 소스 정리:** 당시 사용한 `serverless-poc/` 소스는 최종 `worker/` 구현 이후 현재 트리에서 제거했습니다. 아래 디렉터리 구조와 실행 명령은 역사적 검증 기록이며, 원본 소스는 Git 이력에서 확인할 수 있습니다.
+
 상태: 완료
 
 검증일: 2026-07-20
@@ -25,7 +27,7 @@ Cloudflare Workers + TypeScript + Neon PostgreSQL의 데이터·배포 기술 �
 
 실제 Spring/Neon 초기화, production route 변경, Render 중지는 P3에서 수행하지 않았다.
 
-## 2. 검증용 PoC 구조
+## 2. 당시 검증용 PoC 구조
 
 ```text
 serverless-poc/

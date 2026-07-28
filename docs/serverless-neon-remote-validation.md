@@ -2,6 +2,8 @@
 
 > **역사적 검증 기록:** 이 문서는 아래 검증일 당시 Worker + Neon 채택 근거를 보존합니다. P3/P4 진행형 표현은 당시 상태이며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
 
+> **PoC 소스 정리:** 당시 사용한 `serverless-poc/` 소스는 최종 `worker/` 구현 이후 현재 트리에서 제거했습니다. 아래 디렉터리 구조와 실행 명령은 역사적 검증 기록이며, 원본 소스는 Git 이력에서 확인할 수 있습니다.
+
 상태: 완료
 
 검증일: 2026-07-21 (Asia/Seoul)
@@ -38,7 +40,7 @@ pooled URL은 Worker의 HTTP/WebSocket 요청에, direct URL은 migration과 검
 
 검증 전 두 DB는 non-system table이 0개였고 `btree_gist`, `pgcrypto`가 설치되지 않은 상태였다. 기존 Render/Neon URL은 사용하지 않았다.
 
-## 최소 PoC 구조
+## 당시 최소 PoC 구조
 
 ```text
 serverless-poc/
