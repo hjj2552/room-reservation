@@ -4,6 +4,7 @@ Cloudflare Worker 백엔드와 React 기반 프런트엔드로 구성된 공간 
 
 ## 문서
 
+- [문서 안내와 현재/역사 기록 구분](docs/README.md)
 - [관리자 매뉴얼](docs/admin-manual.md)
 - [개발자 실행/검증 문서](docs/dev-setup.md)
 - [현재 제한 사항](docs/known-limitations.md)

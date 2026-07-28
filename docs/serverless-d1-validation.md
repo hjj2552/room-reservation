@@ -1,5 +1,7 @@
 # Cloudflare D1 P3 최소 기술 검증
 
+> **역사적 검증 기록:** 이 문서는 아래 검증일 당시의 격리 PoC 결과를 보존합니다. D1 PoC는 제품 실행 경로가 아니며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
+
 검증일: 2026-07-21 (Asia/Seoul)
 
 대상 브랜치: `codex/serverless-migration-contract`

@@ -1,5 +1,7 @@
 # Serverless Migration P4 Implementation Validation
 
+> **역사적 검증 기록:** 이 문서는 아래 검증일 당시 구현 완료와 전환 전 잔여 작업을 기록합니다. production 전환과 legacy backend 정리는 이후 완료됐으며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
+
 검증일: 2026-07-21
 브랜치: `codex/serverless-migration-contract`
 시작 commit: `32a1a76eb7d78459df2bcba839ae09a7de32bd88`

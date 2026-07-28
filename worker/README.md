@@ -2,6 +2,8 @@
 
 현재 production API를 제공하는 Cloudflare Worker 구현이다.
 
+프로젝트 전체 문서의 현재 기준과 역사적 검증 기록 구분은 [`docs/README.md`](../docs/README.md)를 따른다.
+
 ## 구조
 
 - `src/core`: Cloudflare/Neon API를 모르는 입력·시간·오류·보안 규칙
@@ -105,4 +107,4 @@ script는 production 형태의 `<project>.pages.dev` URL을 거부한다. 테스
 npm.cmd run artifact:manifest
 ```
 
-receipt의 `gitCommit`, Worker bundle SHA-256, baseline migration SHA-256, 결합 candidate SHA-256을 배포 기록에 함께 보관한다. receipt는 build 결과이므로 Git에 커밋하지 않는다. 실제 배포 직전 같은 commit에서 다시 생성하고 UAT에서 검증한 receipt와 일치할 때만 별도 Go-Live 작업의 후보로 사용한다.
+receipt의 `gitCommit`, Worker bundle SHA-256, baseline migration SHA-256, 결합 candidate SHA-256을 배포 기록에 함께 보관한다. receipt는 build 결과이므로 Git에 커밋하지 않는다. production 변경 후보는 배포 직전 같은 commit에서 다시 생성하고, UAT에서 검증한 receipt와 일치할 때만 배포한다.

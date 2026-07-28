@@ -1,5 +1,7 @@
 # Cloudflare Worker + Neon PostgreSQL P3 원격 검증
 
+> **역사적 검증 기록:** 이 문서는 아래 검증일 당시 Worker + Neon 채택 근거를 보존합니다. P3/P4 진행형 표현은 당시 상태이며 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
+
 상태: 완료
 
 검증일: 2026-07-21 (Asia/Seoul)

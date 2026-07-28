@@ -1,5 +1,7 @@
 # Cloudflare Workers PBKDF2 100,000회 원격 재검증
 
+> **역사적 검증 기록:** 이 문서는 아래 검증일 당시의 실험과 판단을 보존합니다. 현재 제품은 Cloudflare Worker + Neon PostgreSQL과 `pgcrypto` bcrypt cost 12를 사용하며 D1/PBKDF2를 채택하지 않았습니다. 현재 운영 기준은 [문서 안내](README.md)를 참조하세요.
+
 검증일: 2026-07-21 (Asia/Seoul)
 
 대상 브랜치: `codex/serverless-migration-contract`

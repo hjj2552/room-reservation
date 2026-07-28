@@ -55,7 +55,7 @@ The public frontend maps `TIME_SLOT_CONFLICT` to:
 - Past timetable candidates remain clickable so users can inspect the exact interval. Public creation, editing, and availability checks reject past start times with `이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
 - Administrators can create and edit past reservations; public users cannot save them.
 - Existing reservations are not rewritten. A later time/content edit is validated against the fixed 5-minute increment and current duration/operating policy.
-- The `slotMinutes` API/DB field is temporarily retained only for rolling-deployment compatibility, always returns `5`, and is not a product setting. Remove it in a later contract-cleanup migration.
+- The `slotMinutes` API field is retained only for frontend contract compatibility, always returns `5`, and is not a product setting. The Worker database has no `slot_minutes` column.
 
 ## Request Protection
 
