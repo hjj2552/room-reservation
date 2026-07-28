@@ -178,6 +178,14 @@ test('public and admin can open a past slot while public submission shows the po
   await page.getByTestId('public-request-cancel-password-input').fill('testing-password');
   await page.getByTestId('public-request-submit-button').click();
   await expect(page.getByTestId('public-quick-request-panel')).toContainText(publicPastMessage);
+  await page.evaluate(() => {
+    document.body.style.zoom = '2';
+  });
+  const submitError = page.getByTestId('public-quick-request-panel').locator('.quick-add-submit-error');
+  expect(await submitError.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+  await page.evaluate(() => {
+    document.body.style.zoom = '';
+  });
   expect(publicCreateRequests).toBe(0);
 
   await page.goto('/admin/timetable?view=date&date=2026-07-13');
