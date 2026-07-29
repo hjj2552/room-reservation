@@ -1730,9 +1730,10 @@ button:disabled {
 }
 
 .entry-option strong {
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-size: 19px;
   font-weight: 600;
+  line-height: 1.45;
 }
 
 .entry-option span span {

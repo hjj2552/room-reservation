@@ -471,6 +471,54 @@ test('root shows public and admin entry choices', async ({ page }) => {
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
 });
 
+test('entry choice title and description spacing is 8px', async ({ page }) => {
+  const viewports = [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    for (const testId of ['entry-public-link', 'entry-admin-link']) {
+      const metrics = await page.getByTestId(testId).evaluate((element) => {
+        const title = element.querySelector('strong');
+        const description = title?.nextElementSibling;
+        if (!(title instanceof HTMLElement) || !(description instanceof HTMLElement)) {
+          throw new Error('Entry option title or description is missing');
+        }
+
+        const titleRect = title.getBoundingClientRect();
+        const descriptionRect = description.getBoundingClientRect();
+        const descriptionStyle = getComputedStyle(description);
+        const optionStyle = getComputedStyle(element);
+
+        return {
+          textGap: descriptionRect.top - titleRect.bottom,
+          optionHeight: element.getBoundingClientRect().height,
+          alignItems: optionStyle.alignItems,
+          arrowContent: getComputedStyle(element, '::after').content,
+          minHeight: optionStyle.minHeight,
+          paddingBlockStart: optionStyle.paddingBlockStart,
+          paddingBlockEnd: optionStyle.paddingBlockEnd,
+          descriptionHeight: descriptionRect.height,
+          descriptionLineHeight: Number.parseFloat(descriptionStyle.lineHeight),
+        };
+      });
+
+      expect(metrics.textGap).toBe(8);
+      expect(metrics.optionHeight).toBe(96);
+      expect(metrics.minHeight).toBe('96px');
+      expect(metrics.paddingBlockStart).toBe('18px');
+      expect(metrics.paddingBlockEnd).toBe('18px');
+      expect(metrics.alignItems).toBe('center');
+      expect(metrics.arrowContent).toContain(String.fromCodePoint(0x2192));
+      expect(metrics.descriptionHeight).toBeLessThanOrEqual(metrics.descriptionLineHeight + 1);
+    }
+  }
+});
+
 test('root public choice opens the public timetable UI', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('entry-public-link').click();
