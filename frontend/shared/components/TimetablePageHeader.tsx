@@ -1,7 +1,5 @@
-import { Plus } from 'lucide-react';
-
 interface TimetablePageHeaderProps {
-  eyebrow: string;
+  eyebrow?: string;
   helperText?: string;
   buttonTestId: string;
   buttonDisabled?: boolean;
@@ -28,7 +26,7 @@ export function TimetablePageHeader({
   return (
     <div className="page-header timetable-entry-header">
       <div>
-        <p className="eyebrow">{eyebrow}</p>
+        {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
         <h1 id="timetable-title">{timetableCopy.title}</h1>
         <p className="muted">{timetableCopy.description}</p>
         {helperText ? <p className="muted timetable-helper-text">{helperText}</p> : null}
@@ -41,7 +39,6 @@ export function TimetablePageHeader({
           disabled={buttonDisabled}
           data-testid={buttonTestId}
         >
-          <Plus size={16} aria-hidden="true" />
           예약 신청
         </button>
       </div>

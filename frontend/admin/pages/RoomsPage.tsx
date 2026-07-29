@@ -129,7 +129,6 @@ export function RoomsPage() {
     <section className="page-section" aria-labelledby="rooms-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="rooms-title">공간 관리</h1>
           <p className="muted">예약에 사용할 공간을 등록하고, 삭제된 공간의 예약 기록은 보존합니다.</p>
         </div>

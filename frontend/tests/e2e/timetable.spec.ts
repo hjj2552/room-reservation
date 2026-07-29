@@ -139,15 +139,37 @@ test('toolbar request opens the shared panel without slot room context', async (
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     const closeButton = page.getByTestId('timetable-quick-add-close');
     const closeButtonBox = await closeButton.boundingBox();
-    expect(closeButtonBox?.width).toBe(42);
-    await expect(page.locator('.reservation-request-panel .quick-add-form')).toHaveCSS('overscroll-behavior-x', 'none');
-    await expect(page.locator('.reservation-request-panel .quick-add-form')).toHaveCSS('overscroll-behavior-y', 'auto');
+    expect(closeButtonBox?.width).toBe(44);
+    const panelBody = page.locator('.reservation-request-panel .quick-add-panel-body');
+    await expect(panelBody).toHaveCSS('overflow-y', 'auto');
+    await expect(panelBody).toHaveCSS('overscroll-behavior-x', 'none');
+    await expect(panelBody).toHaveCSS('overscroll-behavior-y', 'contain');
+    await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
+    await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+    await expect(page.locator('body')).toHaveCSS('position', 'fixed');
+    const panelScroll = await panelBody.evaluate((element) => {
+      const before = element.scrollTop;
+      element.scrollTop = element.scrollHeight;
+      return {
+        before,
+        after: element.scrollTop,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      };
+    });
+    expect(panelScroll.scrollHeight).toBeGreaterThan(panelScroll.clientHeight);
+    expect(panelScroll.after).toBeGreaterThan(panelScroll.before);
     await expect(page.getByTestId('quick-add-room-select')).toHaveValue('');
     await expect(page.getByTestId('quick-add-start-input')).not.toHaveValue('');
     await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue('');
     await expect(page.getByTestId('quick-add-applicant-name-input')).toHaveValue('');
     await expect(page.getByTestId('quick-add-email-input')).toHaveValue('');
     await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue('');
+    await closeButton.click();
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
+    await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden');
+    await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
+    await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
   } finally {
     await deleteRoomByApi(request, room.id);
   }

@@ -160,7 +160,6 @@ export function PublicReservationEditPage() {
     <main className="public-shell" aria-labelledby="public-reservation-edit-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">일반 사용자</p>
           <h1 id="public-reservation-edit-title">예약 수정</h1>
           <p className="muted">
             {reservation.room.name} · {formatDateTime(reservation.startAt)} · {statusLabels[reservation.status]}

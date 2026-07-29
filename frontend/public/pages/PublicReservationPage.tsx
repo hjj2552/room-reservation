@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
@@ -242,7 +242,6 @@ export function PublicReservationPage() {
   return (
     <div className="public-shell" aria-labelledby="timetable-title">
       <TimetablePageHeader
-        eyebrow="일반 사용자"
         helperText="신청은 승인 대기 상태로 저장되며 관리자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
         buttonDisabled={Boolean(isUnavailable) || !settings.data}
@@ -255,7 +254,6 @@ export function PublicReservationPage() {
 
       {settings.data ? (
         <section className="public-notice" aria-live="polite">
-          <CalendarDays size={18} aria-hidden="true" />
           <div>
             {settings.data.publicNotice ? <strong className="public-notice-message">{settings.data.publicNotice}</strong> : null}
             <strong>
@@ -283,7 +281,6 @@ export function PublicReservationPage() {
             onClick={() => setViewMode('date')}
             data-testid="public-timetable-view-date"
           >
-            <CalendarDays size={16} aria-hidden="true" />
             날짜별
           </button>
           <button
@@ -294,7 +291,6 @@ export function PublicReservationPage() {
             onClick={() => setViewMode('room')}
             data-testid="public-timetable-view-room"
           >
-            <DoorOpen size={16} aria-hidden="true" />
             공간별
           </button>
         </div>

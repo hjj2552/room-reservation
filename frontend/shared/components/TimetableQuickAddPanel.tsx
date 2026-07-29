@@ -179,6 +179,36 @@ export function ReservationRequestPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyPosition = body.style.position;
+    const previousBodyTop = body.style.top;
+    const previousBodyLeft = body.style.left;
+    const previousBodyWidth = body.style.width;
+
+    root.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = `-${scrollX}px`;
+    body.style.width = '100%';
+
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+      body.style.position = previousBodyPosition;
+      body.style.top = previousBodyTop;
+      body.style.left = previousBodyLeft;
+      body.style.width = previousBodyWidth;
+      window.scrollTo(scrollX, scrollY);
+    };
+  }, []);
+
   function updateField<K extends keyof ReservationRequestValues>(name: K, value: ReservationRequestValues[K]) {
     setValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => {
@@ -265,13 +295,14 @@ export function ReservationRequestPanel({
         </button>
       </div>
 
-      {unavailableMessage ? (
-        <div className="inline-error" role="alert" data-testid="reservation-time-unavailable">
-          {unavailableMessage}
-        </div>
-      ) : null}
+      <div className="quick-add-panel-body">
+        {unavailableMessage ? (
+          <div className="inline-error" role="alert" data-testid="reservation-time-unavailable">
+            {unavailableMessage}
+          </div>
+        ) : null}
 
-      <form className="quick-add-form compact-request-form" onSubmit={handleSubmit}>
+        <form className="quick-add-form compact-request-form" onSubmit={handleSubmit}>
         <label className="full-span request-title-field">
           신청 목적
           <input
@@ -430,7 +461,8 @@ export function ReservationRequestPanel({
             {isPending ? '신청 중...' : isAdmin ? '예약 신청 저장' : '예약 신청'}
           </button>
         </div>
-      </form>
+        </form>
+      </div>
     </aside>
   );
 }

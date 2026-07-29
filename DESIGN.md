@@ -155,7 +155,8 @@ visual implementation, but their roles must remain stable.
 
 | Role | Starting token | Usage |
 | --- | --- | --- |
-| Canvas | `#f4f3ed` | App background |
+| Canvas | `#f4f3ed` | Warm app background |
+| Canvas light | `#f8f8f5` | Lighter near-white app background |
 | Surface | `#faf9f5` | Inputs and bounded work surfaces |
 | Surface strong | `#ebe9e1` | Selected or grouped neutral area |
 | Ink | `#222521` | Primary text |
@@ -172,6 +173,9 @@ visual implementation, but their roles must remain stable.
 
 - Pure white is allowed only where contrast or layering requires it; it should
   not create a field of floating white cards.
+- Choose the warm or light canvas deliberately for a complete product surface.
+  Do not alternate canvas colors between neighboring pages without a structural
+  reason.
 - Semantic colors keep one meaning throughout the product.
 - Action and status tokens remain semantically separate even when two tokens
   temporarily share the same color value. Button color must not define
@@ -247,6 +251,11 @@ At mobile widths:
 - icon glyphs may remain visually small while their public/mobile hit target is
   at least `44px`.
 
+Full-height entry and gateway screens must account for persistent global
+elements such as the footer. Do not combine an unconditional `100vh` content
+region with an additional footer in a way that creates empty space or needless
+document scrolling when all content fits in one viewport.
+
 ### Administrator
 
 - Keep navigation compact and text-led. Active navigation should use text
@@ -256,6 +265,9 @@ At mobile widths:
 - Connect filters visually to the data they affect. A filter toolbar should not
   look like an unrelated promotional card.
 - Keep primary actions scarce: normally one per page or task region.
+- Group settings by meaning rather than allowing a generic auto-placement grid
+  to determine reading order. Start/end dates, opening/closing times, and
+  minimum/maximum values remain adjacent pairs across supported layouts.
 
 ### Reservation list
 
@@ -341,6 +353,9 @@ At mobile widths:
 - The title states the decision, the body explains consequences, and the action
   order remains consistent.
 - Destructive actions require explicit confirmation as defined by product rules.
+- When a modal or mobile bottom sheet owns vertical scrolling, lock document
+  scrolling behind it. Present one clear active scroll region instead of nested
+  page and overlay scrollbars.
 
 ## 8. Motion and Interaction
 

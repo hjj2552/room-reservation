@@ -1,4 +1,3 @@
-import { Download, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -86,13 +85,11 @@ export function ReservationsPage() {
     <section className="page-section" aria-labelledby="reservation-list-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="reservation-list-title">예약 목록</h1>
           <p className="muted">예약을 검색하고 상세 화면에서 승인, 취소, 수정을 처리합니다.</p>
         </div>
         <div className="header-actions">
           <button type="button" className="secondary-button" onClick={handleCsvDownload}>
-            <Download size={16} aria-hidden="true" />
             CSV 내보내기
           </button>
         </div>
@@ -149,7 +146,6 @@ export function ReservationsPage() {
           />
         </label>
         <button type="submit" className="secondary-button" data-testid="reservation-search-button">
-          <Search size={16} aria-hidden="true" />
           조회
         </button>
       </form>

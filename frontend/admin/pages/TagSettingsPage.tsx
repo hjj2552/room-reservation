@@ -123,7 +123,6 @@ export function TagSettingsPage() {
     <section className="page-section" aria-labelledby="tag-settings-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="tag-settings-title">태그 설정</h1>
           <p className="muted">반복 예약에 사용할 태그 이름과 색상을 관리합니다.</p>
         </div>

@@ -104,6 +104,40 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('settings keep related fields paired on desktop and stacked in order on mobile', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/admin/settings');
+
+  const pairIds = ['settings-semester-pair', 'settings-hours-pair', 'settings-duration-pair'];
+  for (const pairId of pairIds) {
+    const pair = page.getByTestId(pairId);
+    const labels = pair.locator('label');
+    await expect(labels).toHaveCount(2);
+    const desktopBoxes = await labels.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top };
+      }),
+    );
+    expect(Math.abs(desktopBoxes[0].top - desktopBoxes[1].top)).toBeLessThanOrEqual(1);
+    expect(desktopBoxes[1].left).toBeGreaterThan(desktopBoxes[0].left);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const pairId of pairIds) {
+    const labels = page.getByTestId(pairId).locator('label');
+    const mobileBoxes = await labels.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top };
+      }),
+    );
+    expect(Math.abs(mobileBoxes[0].left - mobileBoxes[1].left)).toBeLessThanOrEqual(1);
+    expect(mobileBoxes[1].top).toBeGreaterThan(mobileBoxes[0].top);
+  }
+});
+
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
   await loginByApi(request);
   await page.goto('/admin/reservations');
