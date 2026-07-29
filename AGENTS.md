@@ -56,3 +56,8 @@ These rules apply to every Codex/agent task in this repository.
 - When adding or changing E2E data creation, update `frontend/AGENTS.md` or `docs/admin-e2e.md` if the shared workflow changes.
 - Keep manual acceptance-test cleanup commands documented.
 - New Codex chats and future agents should treat these rules as the project baseline before editing tests or cleanup code.
+
+## UI Design
+
+- Read and follow the repository-root `DESIGN.md` before changing frontend layout, styling, typography, or visual components.
+- Treat `DESIGN.md` as the visual design authority while preserving the product and policy scope rules above.
