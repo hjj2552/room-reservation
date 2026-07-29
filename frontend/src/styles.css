@@ -1,5 +1,7 @@
+@import "./assets/fonts/wanted-sans/WantedSansVariable.css";
+
 :root {
-  font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+  font-family: "Wanted Sans Variable", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
   color: #222521;
   background: #f8f8f5;
   --canvas-warm: #f4f3ed;
@@ -675,6 +677,7 @@ button:disabled {
 
 .timetable-grid {
   display: grid;
+  font-variant-numeric: tabular-nums;
   width: 100%;
 }
 
@@ -1961,7 +1964,13 @@ button:disabled {
 
 @media (min-width: 981px) {
   .form-grid input:not([type="checkbox"]):not([type="radio"]),
-  .form-grid select {
+  .form-grid select,
+  .filter-bar input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .filter-bar select,
+  .filter-bar button,
+  .inline-filter input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  .inline-filter select,
+  .inline-filter button {
     height: 40px;
     min-height: 40px;
   }

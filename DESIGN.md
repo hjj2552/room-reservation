@@ -94,11 +94,12 @@ the project is replacing.
 
 ### Font family
 
-The product uses a Korean-first system sans stack and must not depend on a
-remote font request:
+The product uses the self-hosted Wanted Sans variable font and must not depend
+on a runtime external font request:
 
 ```css
 font-family:
+  "Wanted Sans Variable",
   "Noto Sans KR",
   "Apple SD Gothic Neo",
   "Malgun Gothic",
@@ -106,6 +107,11 @@ font-family:
   sans-serif;
 ```
 
+- Bundle the official Wanted Sans `v1.0.3` split variable WOFF2 set and serve it
+  from the application origin. Do not use Google Fonts, a CDN, or another
+  runtime external font source.
+- `Noto Sans KR` and the existing system families are fallbacks for the rare
+  case where the bundled font cannot load.
 - Do not use `Inter` as the primary family. Its Korean fallback creates a mixed,
   generic SaaS appearance.
 - Do not use a display serif in the administrator UI.
@@ -114,16 +120,14 @@ font-family:
 - Use a monospace family only for technical identifiers, never for ordinary
   dates or times.
 - Use tabular numerals for timetables, date/time columns, counts, and capacities.
-
-The initial implementation may accept the platform differences of this system
-stack. Do not add a remote font request merely to make rendering identical.
-Consider a bundled Korean font only after cross-platform review demonstrates a
-material consistency problem and the asset cost and loading behavior have been
-explicitly approved.
+- Wanted Sans is chosen to support restraint, readability, and warm modernity;
+  it is not a device for directly imitating Aesop or another external brand.
 
 ### Weight
 
-Use only weights that render predictably across the fallback stack:
+Wanted Sans Variable supports `400` through `1000`. The product normally uses
+only these weights so that the hierarchy remains restrained and the fallback
+stack renders predictably:
 
 - `400`: body copy, table cells, input values;
 - `500`: controls, labels, navigation, metadata emphasis;

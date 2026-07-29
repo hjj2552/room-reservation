@@ -60,6 +60,30 @@ async function expectFormControlsContained(container: Locator) {
   }
 }
 
+test('desktop filter controls share a 40px height', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  const filters = [
+    { route: '/admin/reservations', selector: '.filter-bar' },
+    { route: '/admin/audit', selector: '.filter-bar' },
+    { route: '/admin/recurrences', selector: '.filter-bar' },
+    { route: '/admin/rooms', selector: '.inline-filter' },
+  ];
+
+  for (const filter of filters) {
+    await page.goto(filter.route);
+    const controls = page
+      .locator(filter.selector)
+      .locator('input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, button');
+    await expect(controls.first()).toBeVisible();
+    const heights = await controls.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().height),
+    );
+    expect(heights).toEqual(heights.map(() => 40));
+  }
+});
+
 test('form controls stay within admin panels on narrow screens', async ({ page, request }) => {
   await loginByApi(request);
   await page.setViewportSize({ width: 390, height: 844 });
