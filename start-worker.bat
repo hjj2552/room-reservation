@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableExtensions EnableDelayedExpansion
 
 pushd "%~dp0"
 
@@ -18,11 +18,57 @@ if errorlevel 1 (
 )
 
 pushd worker
-if not exist "node_modules\.bin\tsx.cmd" (
-  echo Installing Worker dependencies...
+if not exist "package-lock.json" (
+  echo Missing Worker package-lock.json.
+  popd
+  popd
+  exit /b 1
+)
+
+set "LOCKFILE_HASH="
+for /f "usebackq delims=" %%H in (`powershell.exe -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; (Get-FileHash -LiteralPath 'package-lock.json' -Algorithm SHA256).Hash" 2^>nul`) do set "LOCKFILE_HASH=%%H"
+if not defined LOCKFILE_HASH (
+  echo Failed to calculate Worker dependency lockfile hash.
+  popd
+  popd
+  exit /b 1
+)
+
+set "LOCKFILE_STAMP=node_modules\.room-reservation-package-lock.sha256"
+set "INSTALL_WORKER_DEPENDENCIES="
+if not exist "node_modules\.bin\tsx.cmd" set "INSTALL_WORKER_DEPENDENCIES=1"
+if not exist "!LOCKFILE_STAMP!" set "INSTALL_WORKER_DEPENDENCIES=1"
+
+if not defined INSTALL_WORKER_DEPENDENCIES (
+  set "STAMP_HASH="
+  set /p "STAMP_HASH="<"!LOCKFILE_STAMP!" 2>nul
+  if not defined STAMP_HASH set "INSTALL_WORKER_DEPENDENCIES=1"
+  if /i not "!STAMP_HASH!"=="!LOCKFILE_HASH!" set "INSTALL_WORKER_DEPENDENCIES=1"
+)
+
+if defined INSTALL_WORKER_DEPENDENCIES (
+  echo Worker dependencies are missing or out of sync. Installing...
   call npm.cmd ci --ignore-scripts
   if errorlevel 1 (
     echo Failed to install Worker dependencies.
+    popd
+    popd
+    exit /b 1
+  )
+
+  set "LOCKFILE_STAMP_TMP=!LOCKFILE_STAMP!.tmp.!RANDOM!"
+  >"!LOCKFILE_STAMP_TMP!" echo(!LOCKFILE_HASH!
+  if errorlevel 1 (
+    echo Failed to record Worker dependency state.
+    if exist "!LOCKFILE_STAMP_TMP!" del /q "!LOCKFILE_STAMP_TMP!" >nul 2>&1
+    popd
+    popd
+    exit /b 1
+  )
+  move /y "!LOCKFILE_STAMP_TMP!" "!LOCKFILE_STAMP!" >nul
+  if errorlevel 1 (
+    echo Failed to record Worker dependency state.
+    if exist "!LOCKFILE_STAMP_TMP!" del /q "!LOCKFILE_STAMP_TMP!" >nul 2>&1
     popd
     popd
     exit /b 1
