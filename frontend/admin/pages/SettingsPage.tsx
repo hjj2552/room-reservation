@@ -62,7 +62,6 @@ export function SettingsPage() {
     <section className="page-section settings-page" aria-labelledby="settings-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="settings-title">운영 설정</h1>
           <p className="muted">예약 가능 기간, 시간, 안내 문구를 관리합니다.</p>
         </div>
@@ -103,74 +102,80 @@ export function SettingsPage() {
             onChange={(event) => updateField('reservationDisabledMessage', event.target.value)}
           />
         </label>
-        <label>
-          학기 시작일
-          <input
-            type="date"
-            value={form.semesterStartDate}
-            onChange={(event) => updateField('semesterStartDate', event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          학기 종료일
-          <input
-            type="date"
-            value={form.semesterEndDate}
-            onChange={(event) => updateField('semesterEndDate', event.target.value)}
-            required
-          />
-        </label>
-        <label>
-          운영 시작 시간
-          <select
-            data-testid="settings-open-time-input"
-            value={form.openTime}
-            onChange={(event) => updateField('openTime', event.target.value)}
-            required
-          >
-            {operatingTimeOptions().map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          운영 종료 시간
-          <select
-            data-testid="settings-close-time-input"
-            value={form.closeTime}
-            onChange={(event) => updateField('closeTime', event.target.value)}
-            required
-          >
-            {operatingTimeOptions().map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          최소 예약 시간(분)
-          <input
-            type="number"
-            min={30}
-            step={5}
-            data-testid="settings-min-reservation-input"
-            value={form.minReservationMinutes}
-            onChange={(event) => updateField('minReservationMinutes', Number(event.target.value))}
-            required
-          />
-        </label>
-        <label>
-          최대 예약 시간(분)
-          <input
-            type="number"
-            min={form.minReservationMinutes}
-            step={5}
-            data-testid="settings-max-reservation-input"
-            value={form.maxReservationMinutes}
-            onChange={(event) => updateField('maxReservationMinutes', Number(event.target.value))}
-            required
-          />
-        </label>
+        <div className="settings-field-pair full-span" data-testid="settings-semester-pair">
+          <label>
+            학기 시작일
+            <input
+              type="date"
+              value={form.semesterStartDate}
+              onChange={(event) => updateField('semesterStartDate', event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            학기 종료일
+            <input
+              type="date"
+              value={form.semesterEndDate}
+              onChange={(event) => updateField('semesterEndDate', event.target.value)}
+              required
+            />
+          </label>
+        </div>
+        <div className="settings-field-pair full-span" data-testid="settings-hours-pair">
+          <label>
+            운영 시작 시간
+            <select
+              data-testid="settings-open-time-input"
+              value={form.openTime}
+              onChange={(event) => updateField('openTime', event.target.value)}
+              required
+            >
+              {operatingTimeOptions().map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            운영 종료 시간
+            <select
+              data-testid="settings-close-time-input"
+              value={form.closeTime}
+              onChange={(event) => updateField('closeTime', event.target.value)}
+              required
+            >
+              {operatingTimeOptions().map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="settings-field-pair full-span" data-testid="settings-duration-pair">
+          <label>
+            최소 예약 시간(분)
+            <input
+              type="number"
+              min={30}
+              step={5}
+              data-testid="settings-min-reservation-input"
+              value={form.minReservationMinutes}
+              onChange={(event) => updateField('minReservationMinutes', Number(event.target.value))}
+              required
+            />
+          </label>
+          <label>
+            최대 예약 시간(분)
+            <input
+              type="number"
+              min={form.minReservationMinutes}
+              step={5}
+              data-testid="settings-max-reservation-input"
+              value={form.maxReservationMinutes}
+              onChange={(event) => updateField('maxReservationMinutes', Number(event.target.value))}
+              required
+            />
+          </label>
+        </div>
         <p className="compact-note muted full-span">
           최소·최대 예약 시간을 5(분)의 배수로 입력해 주세요. 최소 예약 시간은 30분 이상이어야 합니다.
         </p>

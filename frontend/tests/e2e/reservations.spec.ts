@@ -60,6 +60,30 @@ async function expectFormControlsContained(container: Locator) {
   }
 }
 
+test('desktop filter controls share a 40px height', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  const filters = [
+    { route: '/admin/reservations', selector: '.filter-bar' },
+    { route: '/admin/audit', selector: '.filter-bar' },
+    { route: '/admin/recurrences', selector: '.filter-bar' },
+    { route: '/admin/rooms', selector: '.inline-filter' },
+  ];
+
+  for (const filter of filters) {
+    await page.goto(filter.route);
+    const controls = page
+      .locator(filter.selector)
+      .locator('input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, button');
+    await expect(controls.first()).toBeVisible();
+    const heights = await controls.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().height),
+    );
+    expect(heights).toEqual(heights.map(() => 40));
+  }
+});
+
 test('form controls stay within admin panels on narrow screens', async ({ page, request }) => {
   await loginByApi(request);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -95,8 +119,10 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto('/admin/rooms');
+  await page.getByTestId('room-create-button').click();
   await expectFormControlsContained(page.getByTestId('room-form'));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByTestId('room-form-close').click();
 
   await page.goto('/admin/settings/tags');
   await page.locator('.page-header .primary-button').click();
@@ -104,9 +130,51 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('settings keep related fields paired on desktop and stacked in order on mobile', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/admin/settings');
+
+  const pairIds = ['settings-semester-pair', 'settings-hours-pair', 'settings-duration-pair'];
+  for (const pairId of pairIds) {
+    const pair = page.getByTestId(pairId);
+    const labels = pair.locator('label');
+    await expect(labels).toHaveCount(2);
+    const desktopBoxes = await labels.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top };
+      }),
+    );
+    expect(Math.abs(desktopBoxes[0].top - desktopBoxes[1].top)).toBeLessThanOrEqual(1);
+    expect(desktopBoxes[1].left).toBeGreaterThan(desktopBoxes[0].left);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const pairId of pairIds) {
+    const labels = page.getByTestId(pairId).locator('label');
+    const mobileBoxes = await labels.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top };
+      }),
+    );
+    expect(Math.abs(mobileBoxes[0].left - mobileBoxes[1].left)).toBeLessThanOrEqual(1);
+    expect(mobileBoxes[1].top).toBeGreaterThan(mobileBoxes[0].top);
+  }
+});
+
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
   await loginByApi(request);
   await page.goto('/admin/reservations');
+
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'CSV 내보내기' })).toHaveCount(0);
+  const csvButton = page.locator('.page-header').getByRole('button', { name: 'CSV 내보내기' });
+  await expect(csvButton).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await csvButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('reservations.csv');
 
   await page.getByTestId('reservation-status-filter').selectOption('CONFIRMED');
   await expect(page).toHaveURL(/status=CONFIRMED/);

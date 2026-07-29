@@ -55,6 +55,9 @@ test('immediate readiness success shows the entry choices and reuses the setting
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe('rgb(248, 248, 245)');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(248, 248, 245)');
 });
 
 test('readiness shows the loading message only after 300ms', async ({ page }) => {

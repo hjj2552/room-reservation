@@ -18,9 +18,9 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
         <caption className="sr-only">예약 목록</caption>
         <thead>
           <tr>
-            <th scope="col">상태</th>
-            <th scope="col">공간</th>
             <th scope="col">예약 시간</th>
+            <th scope="col">공간</th>
+            <th scope="col">상태</th>
             <th scope="col">신청자</th>
             <th scope="col">목적</th>
             <th scope="col">신청 경로</th>
@@ -39,14 +39,14 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
                 if (event.key === 'Enter') navigate(`/admin/reservations/${reservation.id}`);
               }}
             >
-              <td>
-                <StatusBadge status={reservation.status} />
-              </td>
-              <td>{reservation.roomName}</td>
-              <td>
-                {formatDateTime(reservation.startAt)}
+              <td className="reservation-time-cell">
+                <strong>{formatDateTime(reservation.startAt)}</strong>
                 <br />
                 <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+              </td>
+              <td className="reservation-room-cell"><strong>{reservation.roomName}</strong></td>
+              <td>
+                <StatusBadge status={reservation.status} />
               </td>
               <td>
                 {reservation.applicantName}

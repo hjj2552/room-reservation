@@ -93,7 +93,6 @@ export function ReservationDetailPage() {
     <section className="page-section" aria-labelledby="reservation-detail-title">
       <div className="page-header reservation-detail-page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="reservation-detail-title">{detail.room.name}</h1>
           <p className="muted">{formatDateTime(detail.startAt)} 예약</p>
         </div>

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, DoorOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { AdminRoom, ReservationFilters, ReservationStatus } from '../../shared/api/types';
@@ -55,11 +55,6 @@ function startOfWeekInputValue(value: string) {
 
 function isTimetableViewMode(value: string | null): value is TimetableViewMode {
   return timetableViewModes.includes(value as TimetableViewMode);
-}
-
-function ViewModeIcon({ mode }: { mode: TimetableViewMode }) {
-  if (mode === 'room') return <DoorOpen size={16} aria-hidden="true" />;
-  return <CalendarDays size={16} aria-hidden="true" />;
 }
 
 function enabledActiveRooms(rooms: AdminRoom[] = []) {
@@ -261,7 +256,6 @@ export function TimetablePage() {
   return (
     <section className="page-section timetable-page" aria-labelledby="timetable-title">
       <TimetablePageHeader
-        eyebrow="관리자 메뉴"
         helperText={timetableCopy.adminHelper}
         buttonTestId="timetable-new-request-button"
         buttonDisabled={!settings.data}
@@ -279,7 +273,6 @@ export function TimetablePage() {
             onClick={() => setViewMode(mode)}
             data-testid={`timetable-view-${mode}`}
           >
-            <ViewModeIcon mode={mode} />
             {mode === 'date' ? '날짜별' : '공간별'}
           </button>
         ))}

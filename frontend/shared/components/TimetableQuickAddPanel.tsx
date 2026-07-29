@@ -1,5 +1,4 @@
-import { X } from 'lucide-react';
-import { FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { statusLabels } from '../utils/labels';
@@ -11,6 +10,7 @@ import {
 } from '../utils/publicPassword';
 import type { ReservationTimeSelection } from '../utils/reservationTime';
 import { ReservationTimeRangeInput } from './ReservationTimeRangeInput';
+import { SidePanel } from './SidePanel';
 
 export type TimetableSlotSelection = ReservationTimeSelection;
 
@@ -157,7 +157,6 @@ export function ReservationRequestPanel({
   onClose,
   onSubmit,
 }: ReservationRequestPanelProps) {
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [values, setValues] = useState<ReservationRequestValues>(
     () => initialValues ?? initialReservationRequestValues(selection, variant),
   );
@@ -168,16 +167,7 @@ export function ReservationRequestPanel({
   useEffect(() => {
     setValues(initialValues ?? initialReservationRequestValues(selection, variant));
     setErrors({});
-    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
   }, [initialValues, selection.date, selection.endAt, selection.roomId, selection.startAt, variant]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   function updateField<K extends keyof ReservationRequestValues>(name: K, value: ReservationRequestValues[K]) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -232,39 +222,31 @@ export function ReservationRequestPanel({
   }
 
   const submitErrorMessage = submitError ? errorMessage(submitError) : '';
+  const panelDescription = (
+    <>
+      {selection.source === 'slot'
+        ? `${selection.date} 선택 슬롯`
+        : selection.date
+          ? `${selection.date} 새 신청`
+          : '예약 가능한 미래 시간 없음'}
+      {isAdmin
+        ? ' · 관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.'
+        : ' · 신청은 승인 대기 상태로 저장됩니다.'}
+    </>
+  );
 
   return (
-    <aside
-      className="quick-add-panel reservation-request-panel"
-      aria-labelledby="reservation-request-title"
-      data-testid={ids.panel}
+    <SidePanel
+      title="예약 신청"
+      titleId="reservation-request-title"
+      description={panelDescription}
+      className="reservation-request-panel"
+      onClose={onClose}
+      testId={ids.panel}
+      backdropTestId={`${ids.panel}-backdrop`}
+      closeTestId={ids.close}
+      closeButtonLabel="예약 신청 패널 닫기"
     >
-      <div className="quick-add-header">
-        <div>
-          <h2 id="reservation-request-title">예약 신청</h2>
-          <p className="muted">
-            {selection.source === 'slot'
-              ? `${selection.date} 선택 슬롯`
-              : selection.date
-                ? `${selection.date} 새 신청`
-                : '예약 가능한 미래 시간 없음'}
-            {isAdmin
-              ? ' · 관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.'
-              : ' · 신청은 승인 대기 상태로 저장됩니다.'}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="ghost-button icon-button"
-          onClick={onClose}
-          ref={closeButtonRef}
-          aria-label="예약 신청 패널 닫기"
-          data-testid={ids.close}
-        >
-          <X size={16} aria-hidden="true" />
-        </button>
-      </div>
-
       {unavailableMessage ? (
         <div className="inline-error" role="alert" data-testid="reservation-time-unavailable">
           {unavailableMessage}
@@ -431,6 +413,6 @@ export function ReservationRequestPanel({
           </button>
         </div>
       </form>
-    </aside>
+    </SidePanel>
   );
 }

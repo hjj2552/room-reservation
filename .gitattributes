@@ -1,0 +1,2 @@
+# Preserve the vendored official font license byte-for-byte.
+frontend/src/assets/fonts/wanted-sans/OFL.txt -whitespace

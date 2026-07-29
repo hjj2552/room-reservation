@@ -1,14 +1,3 @@
-import {
-  Building2,
-  CalendarDays,
-  FileClock,
-  FileText,
-  LogOut,
-  Repeat,
-  SlidersHorizontal,
-  Tags,
-  Table2,
-} from 'lucide-react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
 
@@ -26,37 +15,26 @@ export function AdminLayout() {
         </div>
         <nav className="nav-list">
           <NavLink to="/admin/reservations" end>
-            <CalendarDays size={18} aria-hidden="true" />
             예약 목록
           </NavLink>
           <NavLink to="/admin/timetable">
-            <Table2 size={18} aria-hidden="true" />
             시간표
           </NavLink>
           <NavLink to="/admin/recurrences">
-            <Repeat size={18} aria-hidden="true" />
             반복 예약
           </NavLink>
           <NavLink to="/admin/rooms">
-            <Building2 size={18} aria-hidden="true" />
             공간 관리
           </NavLink>
           <NavLink to="/admin/settings" end>
-            <SlidersHorizontal size={18} aria-hidden="true" />
             운영 설정
           </NavLink>
           <NavLink to="/admin/settings/tags">
-            <Tags size={18} aria-hidden="true" />
             태그 설정
           </NavLink>
           <NavLink to="/admin/audit">
-            <FileClock size={18} aria-hidden="true" />
             감사 이력
           </NavLink>
-          <a href="/api/admin/exports/reservations.csv">
-            <FileText size={18} aria-hidden="true" />
-            CSV 내보내기
-          </a>
         </nav>
         <div className="sidebar-footer">
           <span className="session-name">{session?.username || '관리자'}</span>
@@ -69,7 +47,6 @@ export function AdminLayout() {
               })
             }
           >
-            <LogOut size={16} aria-hidden="true" />
             로그아웃
           </button>
         </div>

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { errorMessage } from '../../shared/api/http';
 import type { AdminRoom, RoomPayload } from '../../shared/api/types';
 import { ModalDialog } from '../../shared/components/ModalDialog';
+import { SidePanel } from '../../shared/components/SidePanel';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCreateRoom,
@@ -33,6 +34,7 @@ export function RoomsPage() {
   const [keyword, setKeyword] = useState('');
   const [appliedKeyword, setAppliedKeyword] = useState('');
   const [editingRoom, setEditingRoom] = useState<AdminRoom | null>(null);
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminRoom | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [form, setForm] = useState<RoomFormState>(emptyForm);
@@ -72,13 +74,35 @@ export function RoomsPage() {
     const payload = toPayload();
     if (editingRoom) {
       updateRoom.mutate(payload, {
-        onSuccess: (room) => setEditingRoom(room),
+        onSuccess: closeFormPanel,
       });
       return;
     }
     createRoom.mutate(payload, {
-      onSuccess: () => setForm(emptyForm),
+      onSuccess: closeFormPanel,
     });
+  }
+
+  function openCreatePanel() {
+    setEditingRoom(null);
+    setForm(emptyForm);
+    createRoom.reset();
+    updateRoom.reset();
+    setIsFormPanelOpen(true);
+  }
+
+  function openEditPanel(room: AdminRoom) {
+    setEditingRoom(room);
+    createRoom.reset();
+    updateRoom.reset();
+    setIsFormPanelOpen(true);
+  }
+
+  function closeFormPanel() {
+    setIsFormPanelOpen(false);
+    setEditingRoom(null);
+    createRoom.reset();
+    updateRoom.reset();
   }
 
   function openDeleteModal(room: AdminRoom) {
@@ -101,13 +125,14 @@ export function RoomsPage() {
       onSuccess: () => {
         if (editingRoom?.id === deleteTarget.id) {
           setEditingRoom(null);
+          setIsFormPanelOpen(false);
         }
         closeDeleteModal();
       },
     });
   }
 
-  const mutationError = createRoom.error || updateRoom.error || toggleEnabled.error;
+  const mutationError = createRoom.error || updateRoom.error;
   const canDelete =
     Boolean(deleteTarget) &&
     deleteConfirmation === deleteTarget?.name &&
@@ -126,17 +151,23 @@ export function RoomsPage() {
   }
 
   return (
-    <section className="page-section" aria-labelledby="rooms-title">
+    <section className="page-section rooms-page" aria-labelledby="rooms-title">
       <div className="page-header">
         <div>
-          <p className="eyebrow">관리자 메뉴</p>
           <h1 id="rooms-title">공간 관리</h1>
           <p className="muted">예약에 사용할 공간을 등록하고, 삭제된 공간의 예약 기록은 보존합니다.</p>
         </div>
+        <button
+          type="button"
+          className="primary-button"
+          data-testid="room-create-button"
+          onClick={openCreatePanel}
+        >
+          공간 등록
+        </button>
       </div>
 
-      <div className="detail-grid">
-        <section className="panel" aria-labelledby="room-list-title">
+      <section className="panel room-list-panel" aria-labelledby="room-list-title">
           <div className="panel-header">
             <h2 id="room-list-title">공간 목록</h2>
           </div>
@@ -161,6 +192,7 @@ export function RoomsPage() {
 
           {rooms.isLoading ? <LoadingState /> : null}
           {rooms.isError ? <ErrorState error={rooms.error} /> : null}
+          {toggleEnabled.error ? <div className="inline-error" role="alert">{errorMessage(toggleEnabled.error)}</div> : null}
           {rooms.data?.items.length === 0 ? <EmptyState message="등록된 공간이 없습니다." /> : null}
           {rooms.data?.items.length ? (
             <div className="table-wrap">
@@ -196,7 +228,7 @@ export function RoomsPage() {
                             type="button"
                             className="ghost-button"
                             data-testid="room-edit-button"
-                            onClick={() => setEditingRoom(room)}
+                            onClick={() => openEditPanel(room)}
                           >
                             수정
                           </button>
@@ -224,17 +256,26 @@ export function RoomsPage() {
               </table>
             </div>
           ) : null}
-        </section>
+      </section>
 
-        <section className="panel" aria-labelledby="room-form-title">
-          <div className="panel-header">
-            <h2 id="room-form-title">{editingRoom ? '공간 수정' : '공간 등록'}</h2>
-            {editingRoom ? (
-              <button type="button" className="ghost-button" onClick={() => setEditingRoom(null)}>
+      {isFormPanelOpen ? (
+        <SidePanel
+          title={editingRoom ? '공간 수정' : '공간 등록'}
+          titleId="room-form-title"
+          className="room-form-panel"
+          onClose={closeFormPanel}
+          testId="room-form-panel"
+          backdropTestId="room-form-backdrop"
+          closeTestId="room-form-close"
+          closeButtonLabel={`${editingRoom ? '공간 수정' : '공간 등록'} 패널 닫기`}
+        >
+          {editingRoom ? (
+            <div className="room-form-mode-actions">
+              <button type="button" className="ghost-button" onClick={openCreatePanel}>
                 새 공간 입력
               </button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           <form className="form-stack" data-testid="room-form" onSubmit={handleSubmit}>
             <label>
               공간 이름
@@ -291,8 +332,8 @@ export function RoomsPage() {
               {editingRoom ? '수정 저장' : '공간 등록'}
             </button>
           </form>
-        </section>
-      </div>
+        </SidePanel>
+      ) : null}
 
       {deleteTarget ? (
         <ModalDialog
