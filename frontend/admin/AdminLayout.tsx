@@ -35,9 +35,6 @@ export function AdminLayout() {
           <NavLink to="/admin/audit">
             감사 이력
           </NavLink>
-          <a href="/api/admin/exports/reservations.csv">
-            CSV 내보내기
-          </a>
         </nav>
         <div className="sidebar-footer">
           <span className="session-name">{session?.username || '관리자'}</span>

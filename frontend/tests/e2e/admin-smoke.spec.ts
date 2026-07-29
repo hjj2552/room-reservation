@@ -17,18 +17,95 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
 
     const row = page.getByRole('row').filter({ hasText: room.name });
     await expect(row).toBeVisible();
-    await row.getByTestId('room-edit-button').click();
+    const editButton = row.getByTestId('room-edit-button');
+    await editButton.click();
 
     const updatedLocation = e2eData.name('updated-location');
+    await expect(page.getByTestId('room-form-panel')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '공간 수정' })).toBeVisible();
     await expect(page.getByTestId('room-name-input')).toHaveValue(room.name);
     await expect(page.getByLabel('공간 이용 안내')).toBeVisible();
     await page.getByTestId('room-location-input').fill(updatedLocation);
     await page.getByTestId('room-save-button').click();
 
+    await expect(page.getByTestId('room-form-panel')).toBeHidden();
     await expect(row).toContainText(updatedLocation);
+    await expect(editButton).toBeFocused();
   } finally {
     await deleteRoomByApi(request, room.id);
   }
+});
+
+test('rooms layout uses the page width and registration runs in the shared side panel', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  await e2eData.createTestRoom('rooms-drawer-layout');
+  const createdRoomName = e2eData.name('room-drawer-create');
+  const createdLocation = e2eData.name('room-drawer-location');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/admin/rooms');
+
+  const listPanel = page.locator('.room-list-panel');
+  const tableWrap = listPanel.locator('.table-wrap');
+  const layoutMetrics = await listPanel.evaluate((element) => {
+    const pageSection = element.closest('.rooms-page');
+    const listBox = element.getBoundingClientRect();
+    const pageBox = pageSection?.getBoundingClientRect();
+    return {
+      listWidth: listBox.width,
+      pageWidth: pageBox?.width || 0,
+    };
+  });
+  expect(Math.abs(layoutMetrics.pageWidth - layoutMetrics.listWidth)).toBeLessThanOrEqual(1);
+  expect(await tableWrap.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  const createButton = page.getByTestId('room-create-button');
+  await createButton.click();
+  await expect(page.getByTestId('room-form-panel')).toBeVisible();
+  await expect(page.getByTestId('room-form-close')).toBeFocused();
+  await page.getByTestId('room-form-close').click();
+  await expect(page.getByTestId('room-form-panel')).toBeHidden();
+  await expect(createButton).toBeFocused();
+
+  await createButton.click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('room-form-panel')).toBeHidden();
+  await expect(createButton).toBeFocused();
+
+  await createButton.click();
+  await page.getByTestId('room-form-backdrop').click({ position: { x: 4, y: 4 } });
+  await expect(page.getByTestId('room-form-panel')).toBeHidden();
+  await expect(createButton).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await createButton.click();
+  await expect(page.getByTestId('room-form-panel')).toBeVisible();
+  await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
+  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+  await expect(page.locator('body')).toHaveCSS('position', 'fixed');
+  await expect(page.locator('.room-form-panel .side-panel-body')).toHaveCSS('overflow-y', 'auto');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByTestId('room-form-close').click();
+  await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await createButton.click();
+  await page.getByTestId('room-name-input').fill(createdRoomName);
+  await page.getByTestId('room-location-input').fill(createdLocation);
+  await page.getByTestId('room-capacity-input').fill('18');
+  await page.getByTestId('room-description-input').fill('testing-created-from-room-drawer');
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes('/api/admin/rooms') && response.request().method() === 'POST',
+  );
+  await page.getByTestId('room-save-button').click();
+  const createdRoom = await (await createResponsePromise).json() as { id: string };
+  e2eData.registerRoom(createdRoom.id);
+
+  await expect(page.getByTestId('room-form-panel')).toBeHidden();
+  await expect(createButton).toBeFocused();
+  const createdRow = page.getByRole('row').filter({ hasText: createdRoomName });
+  await expect(createdRow).toContainText(createdLocation);
 });
 
 test('rooms smoke: deletion requires matching room name and server checks', async ({ page, request, e2eData }) => {

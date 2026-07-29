@@ -134,13 +134,15 @@ test('toolbar request opens the shared panel without slot room context', async (
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/admin/timetable');
     await page.getByTestId('timetable-date-room-select').selectOption(room.id);
-    await page.getByTestId('timetable-new-request-button').click();
+    const newRequestButton = page.getByTestId('timetable-new-request-button');
+    await newRequestButton.click();
 
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('timetable-quick-add-panel-backdrop')).toBeVisible();
     const closeButton = page.getByTestId('timetable-quick-add-close');
     const closeButtonBox = await closeButton.boundingBox();
     expect(closeButtonBox?.width).toBe(44);
-    const panelBody = page.locator('.reservation-request-panel .quick-add-panel-body');
+    const panelBody = page.locator('.reservation-request-panel .side-panel-body');
     await expect(panelBody).toHaveCSS('overflow-y', 'auto');
     await expect(panelBody).toHaveCSS('overscroll-behavior-x', 'none');
     await expect(panelBody).toHaveCSS('overscroll-behavior-y', 'contain');
@@ -170,6 +172,7 @@ test('toolbar request opens the shared panel without slot room context', async (
     await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden');
     await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
     await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
+    await expect(newRequestButton).toBeFocused();
   } finally {
     await deleteRoomByApi(request, room.id);
   }

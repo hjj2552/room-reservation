@@ -95,8 +95,10 @@ test('form controls stay within admin panels on narrow screens', async ({ page, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.goto('/admin/rooms');
+  await page.getByTestId('room-create-button').click();
   await expectFormControlsContained(page.getByTestId('room-form'));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByTestId('room-form-close').click();
 
   await page.goto('/admin/settings/tags');
   await page.locator('.page-header .primary-button').click();
@@ -141,6 +143,14 @@ test('settings keep related fields paired on desktop and stacked in order on mob
 test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
   await loginByApi(request);
   await page.goto('/admin/reservations');
+
+  await expect(page.locator('.sidebar').getByRole('link', { name: 'CSV 내보내기' })).toHaveCount(0);
+  const csvButton = page.locator('.page-header').getByRole('button', { name: 'CSV 내보내기' });
+  await expect(csvButton).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await csvButton.click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('reservations.csv');
 
   await page.getByTestId('reservation-status-filter').selectOption('CONFIRMED');
   await expect(page).toHaveURL(/status=CONFIRMED/);
