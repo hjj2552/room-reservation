@@ -11,7 +11,6 @@ export function EntryChoicePage() {
         <div className="entry-heading">
           <p className="eyebrow entry-organization-name">{organizationName}</p>
           <h1 id="entry-title">이용할 메뉴를 선택해 주세요</h1>
-          <p className="muted">예약 신청 또는 관리자 메뉴로 바로 이동할 수 있습니다.</p>
         </div>
 
         <div className="entry-options">
