@@ -1694,7 +1694,7 @@ button:disabled {
   border: 0;
   border-bottom: 1px solid var(--rule);
   border-radius: 0;
-  padding: 18px 2px;
+  padding: 18px 16px;
   background: transparent;
   box-shadow: none;
 }
@@ -1725,10 +1725,9 @@ button:disabled {
 }
 
 .entry-option strong {
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   font-size: 19px;
   font-weight: 600;
-  line-height: 1.45;
 }
 
 .entry-option span span {
