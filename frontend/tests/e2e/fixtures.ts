@@ -27,7 +27,7 @@ interface E2eDataFactory {
   name(label: string): string;
   createTestRoom(
     label: string,
-    options?: { location?: string | null; description?: string | null },
+    options?: { location?: string | null; capacity?: number | null; description?: string | null },
   ): Promise<E2eRoom>;
   createTestTag(label: string, options?: { color?: string }): Promise<E2eTag>;
   createTestReservation(

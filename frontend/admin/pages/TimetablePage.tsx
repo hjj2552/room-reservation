@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import type { AdminRoom, ReservationFilters, ReservationStatus } from '../../shared/api/types';
 import { ReservationDateTimetable } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
+import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
 import {
@@ -72,6 +73,7 @@ export function TimetablePage() {
   const [quickAddSelection, setQuickAddSelection] = useState<TimetableSlotSelection | null>(null);
   const [quickAddUnavailableMessage, setQuickAddUnavailableMessage] = useState<string>();
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
+  const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoRoom | null>(null);
   const duplicateQuickAddAppliedRef = useRef<string | null>(null);
   const rooms = useRooms();
   const settings = useSettings();
@@ -327,6 +329,7 @@ export function TimetablePage() {
               minReservationMinutes={settings.data.minReservationMinutes}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
+              onRoomInfoClick={(room) => setRoomInfoDialog(room)}
             />
           ) : null}
           {dateTimetableReservations.data && dateTimetableReservations.data.totalPages > 1 ? (
@@ -406,6 +409,9 @@ export function TimetablePage() {
               minReservationMinutes={settings.data.minReservationMinutes}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
+              onRoomInfoClick={hasRoomDescription(selectedRoomViewRoom.description)
+                ? () => setRoomInfoDialog(selectedRoomViewRoom)
+                : undefined}
             />
           ) : null}
           {roomTimetableReservations.data && roomTimetableReservations.data.totalPages > 1 ? (
@@ -432,6 +438,7 @@ export function TimetablePage() {
           isPending={createReservation.isPending}
         />
       ) : null}
+      <RoomInfoModal room={roomInfoDialog} onClose={() => setRoomInfoDialog(null)} />
     </section>
   );
 }

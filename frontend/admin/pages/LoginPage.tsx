@@ -31,7 +31,6 @@ export function LoginPage() {
       <section className="login-panel" aria-labelledby="login-title">
         <div>
           <h1 id="login-title">공간 예약 운영 로그인</h1>
-          <p className="muted">예약 승인, 수정, 반복 예약 관리를 처리합니다.</p>
         </div>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label>

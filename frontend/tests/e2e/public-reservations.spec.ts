@@ -45,7 +45,7 @@ test('legacy public routes fall through to the current root fallback', async ({ 
   }
 });
 
-test('public timetable exposes room descriptions without changing timetable context', async ({ page, e2eData }) => {
+test('public timetable exposes room information without changing timetable context', async ({ page, e2eData }) => {
   const description = [
     '프로젝터와 HDMI 케이블을 사용할 수 있습니다.',
     '음식물 반입은 허용되지 않습니다.',
@@ -53,6 +53,7 @@ test('public timetable exposes room descriptions without changing timetable cont
   ].join('\n');
   const informedRoom = await e2eData.createTestRoom('public-room-info', {
     location: '본관 2층',
+    capacity: 0,
     description,
   });
   const blankRoom = await e2eData.createTestRoom('public-room-info-blank', {
@@ -62,7 +63,7 @@ test('public timetable exposes room descriptions without changing timetable cont
   await page.goto('/timetable?view=date&date=2026-09-10');
   const timetableScroll = page.getByRole('region', { name: '2026-09-10 날짜별 예약 시간표' });
   const informedHeader = page.locator('.timetable-room-header').filter({ hasText: informedRoom.name });
-  const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 공간 이용 안내 보기` });
+  const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 공간 정보 보기` });
   const blankHeader = page.locator('.timetable-room-header').filter({ hasText: blankRoom.name });
 
   await expect(infoTrigger).toBeVisible();
@@ -78,15 +79,16 @@ test('public timetable exposes room descriptions without changing timetable cont
   }));
 
   await infoTrigger.click();
-  const dialog = page.getByRole('dialog', { name: '공간 이용 안내' });
+  const dialog = page.getByRole('dialog', { name: '공간 정보' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(informedRoom.name);
   await expect(dialog).toContainText('본관 2층');
+  await expect(dialog).toContainText('수용 인원 0명');
   await expect(dialog.locator('.room-info-description')).toHaveCSS('white-space', 'pre-wrap');
   await expect(dialog.locator('.room-info-description')).toContainText('음식물 반입은 허용되지 않습니다.');
   await expect(dialog.getByRole('button', { name: '접기' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '공간 이용 안내 닫기' })).toBeFocused();
-  await page.getByRole('button', { name: '공간 이용 안내 닫기' }).click();
+  await expect(page.getByRole('button', { name: '공간 정보 닫기' })).toBeFocused();
+  await page.getByRole('button', { name: '공간 정보 닫기' }).click();
   await expect(dialog).toBeHidden();
   await expect(infoTrigger).toBeFocused();
   expect(page.url()).toBe(urlBeforeModal);
@@ -111,7 +113,7 @@ test('public timetable exposes room descriptions without changing timetable cont
   await moreButton.click();
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText('본관 2층');
-  await page.getByRole('button', { name: '공간 이용 안내 닫기' }).click();
+  await page.getByRole('button', { name: '공간 정보 닫기' }).click();
   await expect(dialog).toBeHidden();
   await expect(moreButton).toBeFocused();
 

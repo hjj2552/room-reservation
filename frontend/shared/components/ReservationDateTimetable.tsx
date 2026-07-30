@@ -22,6 +22,7 @@ export interface TimetableRoom {
   id: string;
   name: string;
   location?: string | null;
+  capacity?: number | null;
   description?: string | null;
 }
 
@@ -171,7 +172,7 @@ export function ReservationDateTimetable({
                     type="button"
                     className="timetable-room-info-trigger"
                     onClick={() => onRoomInfoClick?.(room)}
-                    aria-label={`${room.name} 공간 이용 안내 보기`}
+                    aria-label={`${room.name} 공간 정보 보기`}
                     data-testid="timetable-room-info-trigger"
                   >
                     <strong>{room.name}</strong>

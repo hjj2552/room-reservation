@@ -79,6 +79,77 @@ test('room view shows a weekly timetable block and opens the reservation detail 
   }
 });
 
+test('admin timetable exposes the shared room information dialog in both views', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const description = [
+    '프로젝터와 HDMI 케이블을 사용할 수 있습니다.',
+    '음식물 반입은 허용되지 않습니다.',
+  ].join('\n');
+  const informedRoom = await e2eData.createTestRoom('admin-room-info', {
+    location: '본관 3층',
+    capacity: 0,
+    description,
+  });
+  const blankRoom = await e2eData.createTestRoom('admin-room-info-blank', {
+    description: '   ',
+  });
+
+  try {
+    await page.goto('/admin/timetable?view=date&date=2026-09-10');
+    const informedHeader = page.locator('.timetable-room-header').filter({ hasText: informedRoom.name });
+    const infoTrigger = informedHeader.getByRole('button', { name: `${informedRoom.name} 공간 정보 보기` });
+    const blankHeader = page.locator('.timetable-room-header').filter({ hasText: blankRoom.name });
+
+    await expect(infoTrigger).toBeVisible();
+    await expect(blankHeader.getByRole('button')).toHaveCount(0);
+    await infoTrigger.click();
+
+    const dialog = page.getByRole('dialog', { name: '공간 정보' });
+    const closeButton = page.getByRole('button', { name: '공간 정보 닫기' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(informedRoom.name);
+    await expect(dialog).toContainText('본관 3층');
+    await expect(dialog).toContainText('수용 인원 0명');
+    await expect(dialog.locator('.room-info-description')).toContainText('음식물 반입은 허용되지 않습니다.');
+    await expect(closeButton).toBeFocused();
+    await closeButton.click();
+    await expect(dialog).toBeHidden();
+    await expect(infoTrigger).toBeFocused();
+
+    await infoTrigger.click();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(infoTrigger).toBeFocused();
+
+    await infoTrigger.click();
+    await page.getByTestId('room-info-backdrop').click({ position: { x: 4, y: 4 } });
+    await expect(dialog).toBeHidden();
+
+    await page.getByTestId('timetable-view-room').click();
+    await page.getByTestId('timetable-room-select').selectOption(informedRoom.id);
+    const moreButton = page.getByTestId('room-info-more-button');
+    await expect(moreButton).toBeVisible();
+    await moreButton.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('수용 인원 0명');
+    await closeButton.click();
+    await expect(dialog).toBeHidden();
+    await expect(moreButton).toBeFocused();
+
+    await page.getByTestId('timetable-room-select').selectOption(blankRoom.id);
+    await expect(page.getByTestId('room-info-more-button')).toHaveCount(0);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId('timetable-room-select').selectOption(informedRoom.id);
+    await page.getByTestId('room-info-more-button').click();
+    await expect(dialog).toContainText('프로젝터와 HDMI 케이블을 사용할 수 있습니다.');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  } finally {
+    await deleteRoomByApi(request, informedRoom.id);
+    await deleteRoomByApi(request, blankRoom.id);
+  }
+});
+
 test('date view can create a reservation from an empty slot', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('date-quick-add-room');
