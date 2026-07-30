@@ -101,9 +101,6 @@ export function SidePanel({
     <div
       className="side-panel-backdrop"
       role="presentation"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
       data-testid={backdropTestId}
     >
       <aside

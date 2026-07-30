@@ -25,6 +25,7 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
     await expect(page.getByRole('heading', { name: '공간 수정' })).toBeVisible();
     await expect(page.getByTestId('room-name-input')).toHaveValue(room.name);
     await expect(page.getByLabel('공간 이용 안내')).toBeVisible();
+    await expect(page.getByRole('button', { name: '새 공간 입력' })).toHaveCount(0);
     await page.getByTestId('room-location-input').fill(updatedLocation);
     await page.getByTestId('room-save-button').click();
 
@@ -74,7 +75,11 @@ test('rooms layout uses the page width and registration runs in the shared side 
   await expect(createButton).toBeFocused();
 
   await createButton.click();
+  await page.getByTestId('room-name-input').fill(createdRoomName);
   await page.getByTestId('room-form-backdrop').click({ position: { x: 4, y: 4 } });
+  await expect(page.getByTestId('room-form-panel')).toBeVisible();
+  await expect(page.getByTestId('room-name-input')).toHaveValue(createdRoomName);
+  await page.getByTestId('room-form-close').click();
   await expect(page.getByTestId('room-form-panel')).toBeHidden();
   await expect(createButton).toBeFocused();
 

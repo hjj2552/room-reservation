@@ -269,13 +269,6 @@ export function RoomsPage() {
           closeTestId="room-form-close"
           closeButtonLabel={`${editingRoom ? '공간 수정' : '공간 등록'} 패널 닫기`}
         >
-          {editingRoom ? (
-            <div className="room-form-mode-actions">
-              <button type="button" className="ghost-button" onClick={openCreatePanel}>
-                새 공간 입력
-              </button>
-            </div>
-          ) : null}
           <form className="form-stack" data-testid="room-form" onSubmit={handleSubmit}>
             <label>
               공간 이름

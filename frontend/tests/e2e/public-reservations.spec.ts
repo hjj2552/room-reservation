@@ -189,7 +189,12 @@ test('public toolbar request opens the shared panel without slot room context', 
     await expect(passwordInput.locator('..')).toContainText('한글과 공백은 사용할 수 없습니다.');
     await passwordInput.fill(`A${'b'.repeat(61)}1!`);
     await expect(passwordInput).toHaveValue(`A${'b'.repeat(61)}1!`);
-    await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('');
+    const draftPurpose = e2eData.name('public-backdrop-draft');
+    await page.getByTestId('public-request-purpose-input').fill(draftPurpose);
+    await page.getByTestId('public-quick-request-panel-backdrop').click({ position: { x: 4, y: 4 } });
+    await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
+    await expect(page.getByTestId('public-request-purpose-input')).toHaveValue(draftPurpose);
+    await page.getByTestId('public-quick-request-close').click();
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });

@@ -237,7 +237,11 @@ test('toolbar request opens the shared panel without slot room context', async (
     await expect(page.getByTestId('quick-add-end-input')).not.toHaveValue('');
     await expect(page.getByTestId('quick-add-applicant-name-input')).toHaveValue('');
     await expect(page.getByTestId('quick-add-email-input')).toHaveValue('');
-    await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue('');
+    const draftPurpose = e2eData.name('admin-backdrop-draft');
+    await page.getByTestId('quick-add-purpose-input').fill(draftPurpose);
+    await page.getByTestId('timetable-quick-add-panel-backdrop').click({ position: { x: 4, y: 4 } });
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
+    await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(draftPurpose);
     await closeButton.click();
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
     await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden');

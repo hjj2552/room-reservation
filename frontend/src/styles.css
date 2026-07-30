@@ -505,11 +505,6 @@ button:disabled {
   width: 100%;
 }
 
-.room-form-mode-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .clickable-row {
   cursor: pointer;
 }
