@@ -57,6 +57,7 @@ beforeAll(async () => {
   await database.query("DELETE FROM reservation_recurrences");
   await database.query("DELETE FROM tags");
   await database.query("DELETE FROM rooms WHERE system_reserved=false");
+  await database.query("UPDATE room_order_state SET version=0 WHERE id=1");
   await database.query(
     `UPDATE operation_settings SET reservation_enabled=true,
       semester_start_date=(current_date - interval '1 day')::date,
@@ -69,7 +70,7 @@ afterAll(async () => {
   await database.close();
 });
 
-describe("baseline V1", () => {
+describe("Worker migrations", () => {
   it("starts from the Worker baseline without legacy migration tables and has required system data", async () => {
     const columns = await database.query(
       `SELECT column_name FROM information_schema.columns
@@ -106,6 +107,193 @@ describe("baseline V1", () => {
         $2, $3, 'REQUESTED', 'PUBLIC_FORM', 'PUBLIC_USER', crypt('Db1!', gen_salt('bf', 12)))`,
       [room.id, startAt, new Date(new Date(startAt).getTime() + 25 * 60_000).toISOString()],
     )).rejects.toMatchObject({ code: "23514" });
+  });
+});
+
+describe("room display order V2", () => {
+  const roomCommand = (
+    name: string,
+    overrides: Partial<{ location: string | null; capacity: number; description: string | null; enabled: boolean }> = {},
+  ) => ({
+    name,
+    location: overrides.location ?? null,
+    capacity: overrides.capacity ?? 10,
+    description: overrides.description ?? null,
+    enabled: overrides.enabled ?? true,
+  });
+
+  it("enforces positive unique orders for ordinary rooms and excludes the system room", async () => {
+    await resetProductData();
+    const first = await products.createRoom(roomCommand("testing-room-constraint-a"));
+    const sentinel = await database.query("SELECT display_order FROM rooms WHERE system_reserved=true");
+    expect(sentinel.rows).toEqual([{ display_order: null }]);
+    await expect(database.query(
+      "INSERT INTO rooms(name,capacity,enabled) VALUES('testing-room-order-missing',10,true)",
+    )).rejects.toMatchObject({ code: "23514" });
+    await expect(database.query(
+      `INSERT INTO rooms(name,capacity,enabled,display_order)
+       VALUES('testing-room-order-duplicate',10,true,$1)`,
+      [first.displayOrder],
+    )).rejects.toMatchObject({ code: "23505" });
+  });
+
+  it("uses MAX + 1 across empty, middle-delete, last-delete and same-name recreation cases", async () => {
+    await resetProductData();
+    const first = await products.createRoom(roomCommand("testing-room-order-a"));
+    const second = await products.createRoom(roomCommand("testing-room-order-b"));
+    const third = await products.createRoom(roomCommand("testing-room-order-c"));
+    const fourth = await products.createRoom(roomCommand("testing-room-order-d"));
+    expect([first.displayOrder, second.displayOrder, third.displayOrder, fourth.displayOrder]).toEqual([1, 2, 3, 4]);
+
+    await products.deleteRoom(second.id);
+    const afterMiddleDelete = await products.createRoom(roomCommand("testing-room-order-e"));
+    expect(afterMiddleDelete.displayOrder).toBe(5);
+
+    await products.deleteRoom(afterMiddleDelete.id);
+    const afterLastDelete = await products.createRoom(roomCommand("testing-room-order-f"));
+    expect(afterLastDelete.displayOrder).toBe(5);
+
+    await products.deleteRoom(first.id);
+    const recreated = await products.createRoom(roomCommand("testing-room-order-a"));
+    expect(recreated.displayOrder).toBe(6);
+  });
+
+  it("preserves order and version across disable, edit and re-enable, then normalizes a saved order", async () => {
+    await resetProductData();
+    const a = await products.createRoom(roomCommand("testing-room-policy-a", { description: "A", enabled: true }));
+    const b = await products.createRoom(roomCommand("testing-room-policy-b", { description: "B", enabled: true }));
+    const c = await products.createRoom(roomCommand("testing-room-policy-c"));
+    const d = await products.createRoom(roomCommand("testing-room-policy-d"));
+    const beforeDisable = await products.getRoomOrder();
+
+    await products.updateRoomEnabled(b.id, false);
+    await products.updateRoom(a.id, roomCommand("testing-room-policy-a-renamed", {
+      location: "testing-location",
+      capacity: 17,
+      description: "A edited",
+      enabled: true,
+    }));
+    const afterMetadata = await products.getRoomOrder();
+    expect(afterMetadata.orderVersion).toBe(beforeDisable.orderVersion);
+    expect(afterMetadata.items.find((room) => room.id === b.id)?.displayOrder).toBe(2);
+
+    await products.deleteRoom(c.id);
+    const e = await products.createRoom(roomCommand("testing-room-policy-e"));
+    const beforeSave = await products.getRoomOrder();
+    const saved = await products.saveRoomOrder({
+      orderVersion: beforeSave.orderVersion,
+      roomIds: [d.id, b.id, a.id, e.id],
+    });
+    expect(saved.items.map((room) => [room.id, room.displayOrder])).toEqual([
+      [d.id, 1],
+      [b.id, 2],
+      [a.id, 3],
+      [e.id, 4],
+    ]);
+    expect(saved.items.find((room) => room.id === a.id)).toMatchObject({
+      name: "testing-room-policy-a-renamed",
+      location: "testing-location",
+      capacity: 17,
+      description: "A edited",
+      enabled: true,
+    });
+    expect(saved.items.find((room) => room.id === b.id)?.enabled).toBe(false);
+
+    await products.updateRoomEnabled(b.id, true);
+    const reactivated = await products.getRoomOrder();
+    expect(reactivated.orderVersion).toBe(saved.orderVersion);
+    expect(reactivated.items.map((room) => room.id)).toEqual([d.id, b.id, a.id, e.id]);
+    expect((await products.listPublicRooms()).map((room) => room.id)).toEqual([d.id, b.id, a.id, e.id]);
+  });
+
+  it("rejects incomplete, duplicate, unknown and system room sets with full rollback", async () => {
+    await resetProductData();
+    const a = await products.createRoom(roomCommand("testing-room-validation-a"));
+    const b = await products.createRoom(roomCommand("testing-room-validation-b"));
+    const baseline = await products.getRoomOrder();
+    const sentinel = await database.query("SELECT id FROM rooms WHERE system_reserved=true");
+    const sentinelId = String(sentinel.rows[0]?.id);
+    const unknownId = "33333333-3333-4333-8333-333333333333";
+
+    for (const roomIds of [
+      [a.id],
+      [a.id, a.id],
+      [a.id, unknownId],
+      [a.id, sentinelId],
+    ]) {
+      await expect(products.saveRoomOrder({
+        orderVersion: baseline.orderVersion,
+        roomIds,
+      })).rejects.toMatchObject({ kind: "CONFLICT", code: "ROOM_ORDER_CONFLICT" });
+      expect(await products.getRoomOrder()).toEqual(baseline);
+    }
+    expect((await products.getRoomOrder()).items.map((room) => room.id)).toEqual([a.id, b.id]);
+  });
+
+  it("rejects stale saves after create or delete without partial order changes", async () => {
+    await resetProductData();
+    const a = await products.createRoom(roomCommand("testing-room-stale-a"));
+    const b = await products.createRoom(roomCommand("testing-room-stale-b"));
+    const beforeCreate = await products.getRoomOrder();
+    const c = await products.createRoom(roomCommand("testing-room-stale-c"));
+    await expect(products.saveRoomOrder({
+      orderVersion: beforeCreate.orderVersion,
+      roomIds: [b.id, a.id],
+    })).rejects.toMatchObject({ kind: "CONFLICT", code: "ROOM_ORDER_CONFLICT" });
+    expect((await products.getRoomOrder()).items.map((room) => room.id)).toEqual([a.id, b.id, c.id]);
+
+    const beforeDelete = await products.getRoomOrder();
+    await products.deleteRoom(c.id);
+    await expect(products.saveRoomOrder({
+      orderVersion: beforeDelete.orderVersion,
+      roomIds: [b.id, a.id, c.id],
+    })).rejects.toMatchObject({ kind: "CONFLICT", code: "ROOM_ORDER_CONFLICT" });
+    expect((await products.getRoomOrder()).items.map((room) => room.id)).toEqual([a.id, b.id]);
+  });
+
+  it("serializes concurrent creates and accepts only one concurrent save version", async () => {
+    await resetProductData();
+    const created = await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        products.createRoom(roomCommand(`testing-room-concurrent-${String(index).padStart(2, "0")}`))),
+    );
+    const displayOrders = created.map((room) => room.displayOrder);
+    expect(displayOrders.every((order) => typeof order === "number")).toBe(true);
+    expect(new Set(displayOrders).size).toBe(12);
+    expect(displayOrders.map(Number).sort((a, b) => a - b)).toEqual(
+      Array.from({ length: 12 }, (_, index) => index + 1),
+    );
+
+    const beforeSave = await products.getRoomOrder();
+    const ids = beforeSave.items.map((room) => room.id);
+    const saves = await Promise.allSettled([
+      products.saveRoomOrder({ orderVersion: beforeSave.orderVersion, roomIds: [...ids].reverse() }),
+      products.saveRoomOrder({ orderVersion: beforeSave.orderVersion, roomIds: [...ids.slice(1), ids[0]!] }),
+    ]);
+    expect(saves.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = saves.find((result): result is PromiseRejectedResult => result.status === "rejected");
+    expect(rejected?.reason).toMatchObject({ kind: "CONFLICT", code: "ROOM_ORDER_CONFLICT" });
+    expect((await products.getRoomOrder()).orderVersion).toBe(beforeSave.orderVersion + 1);
+  });
+
+  it("keeps version and data unchanged when create, delete or save fails", async () => {
+    await resetProductData();
+    const a = await products.createRoom(roomCommand("testing-room-failure-a"));
+    const b = await products.createRoom(roomCommand("testing-room-failure-b"));
+    const baseline = await products.getRoomOrder();
+
+    await expect(products.createRoom(roomCommand(a.name))).rejects.toMatchObject({
+      kind: "CONFLICT",
+      code: "ROOM_NAME_DUPLICATED",
+    });
+    await expect(products.deleteRoom("44444444-4444-4444-8444-444444444444")).rejects.toMatchObject({
+      kind: "NOT_FOUND",
+    });
+    await expect(products.saveRoomOrder({
+      orderVersion: baseline.orderVersion,
+      roomIds: [b.id],
+    })).rejects.toMatchObject({ kind: "CONFLICT", code: "ROOM_ORDER_CONFLICT" });
+    expect(await products.getRoomOrder()).toEqual(baseline);
   });
 });
 
@@ -231,6 +419,7 @@ async function resetProductData() {
   await database.query("DELETE FROM reservation_recurrences");
   await database.query("DELETE FROM tags");
   await database.query("DELETE FROM rooms WHERE system_reserved=false");
+  await database.query("UPDATE room_order_state SET version=0 WHERE id=1");
   await database.query(
     `UPDATE operation_settings SET organization_name='Room Reservation', public_notice=NULL,
       reservation_enabled=true, reservation_disabled_message=NULL,
@@ -244,11 +433,13 @@ async function resetProductData() {
 }
 
 async function insertRoom(name: string) {
-  const result = await database.query(
-    "INSERT INTO rooms(name,capacity,enabled) VALUES($1,10,true) RETURNING id",
-    [name],
-  );
-  return String(result.rows[0]?.id);
+  return (await products.createRoom({
+    name,
+    location: null,
+    capacity: 10,
+    description: null,
+    enabled: true,
+  })).id;
 }
 
 async function insertTag(name: string) {
@@ -328,6 +519,86 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
   expect(login.status).toBe(200);
   return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
 }
+
+describe("room display order HTTP contract", () => {
+  it("returns the complete ordinary-room order and rejects invalid or stale saves", async () => {
+    await resetProductData();
+    const first = await products.createRoom({
+      name: "testing-room-http-order-a",
+      location: null,
+      capacity: 10,
+      description: null,
+      enabled: true,
+    });
+    const second = await products.createRoom({
+      name: "testing-room-http-order-b",
+      location: null,
+      capacity: 10,
+      description: null,
+      enabled: false,
+    });
+    const { app, cookie, writeHeaders } = await authenticatedApp();
+
+    const orderResponse = await app.request("http://worker.test/api/admin/rooms/order", {
+      headers: { cookie },
+    });
+    expect(orderResponse.status).toBe(200);
+    const order = await orderResponse.json() as {
+      orderVersion: number;
+      items: Array<{ id: string; enabled: boolean; displayOrder: number }>;
+    };
+    expect(order.items).toEqual([
+      expect.objectContaining({ id: first.id, enabled: true, displayOrder: 1 }),
+      expect.objectContaining({ id: second.id, enabled: false, displayOrder: 2 }),
+    ]);
+
+    const saveResponse = await app.request("http://worker.test/api/admin/rooms/order", {
+      method: "PUT",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        orderVersion: order.orderVersion,
+        roomIds: [second.id, first.id],
+      }),
+    });
+    expect(saveResponse.status).toBe(200);
+    const saved = await saveResponse.json() as {
+      orderVersion: number;
+      items: Array<{ id: string; displayOrder: number }>;
+    };
+    expect(saved.orderVersion).toBe(order.orderVersion + 1);
+    expect(saved.items.map((room) => [room.id, room.displayOrder])).toEqual([
+      [second.id, 1],
+      [first.id, 2],
+    ]);
+
+    const staleResponse = await app.request("http://worker.test/api/admin/rooms/order", {
+      method: "PUT",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        orderVersion: order.orderVersion,
+        roomIds: [first.id, second.id],
+      }),
+    });
+    expect(staleResponse.status).toBe(409);
+    expect((await staleResponse.json() as { code: string }).code).toBe("ROOM_ORDER_CONFLICT");
+
+    for (const roomIds of [
+      [first.id, first.id],
+      ["not-a-uuid", second.id],
+    ]) {
+      const invalidResponse = await app.request("http://worker.test/api/admin/rooms/order", {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({
+          orderVersion: saved.orderVersion,
+          roomIds,
+        }),
+      });
+      expect(invalidResponse.status).toBe(400);
+      expect((await invalidResponse.json() as { code: string }).code).toBe("VALIDATION_ERROR");
+    }
+  });
+});
 
 describe("recurrence search contract", () => {
   it("searches purpose, applicant name, room name and tag name, but not email", async () => {

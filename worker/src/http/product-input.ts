@@ -12,6 +12,7 @@ import type {
   ReservationListQuery,
   RoomListQuery,
   SaveRoomCommand,
+  SaveRoomOrderCommand,
   SaveTagCommand,
   TagListQuery,
   UpdateSettingsCommand,
@@ -185,6 +186,21 @@ export function parseSaveRoom(body: unknown): SaveRoomCommand {
 
 export function parseRoomEnabled(body: unknown): boolean {
   return requireBoolean(requireObject(body), "enabled");
+}
+
+export function parseSaveRoomOrder(body: unknown): SaveRoomOrderCommand {
+  const input = requireObject(body);
+  const orderVersion = requireInteger(input, "orderVersion", 0);
+  if (!Array.isArray(input.roomIds)) validation("roomIds must be an array.", "roomIds");
+  if (input.roomIds.length > 10_000) validation("roomIds is too large.", "roomIds");
+  const roomIds = input.roomIds.map((roomId, index) => {
+    if (typeof roomId !== "string") validation("roomIds must contain UUID strings.", `roomIds[${index}]`);
+    return parseUuid(roomId, `roomIds[${index}]`);
+  });
+  if (new Set(roomIds).size !== roomIds.length) {
+    validation("roomIds must not contain duplicates.", "roomIds");
+  }
+  return { orderVersion, roomIds };
 }
 
 export function parseTagList(params: URLSearchParams): TagListQuery {

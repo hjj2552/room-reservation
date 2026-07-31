@@ -24,6 +24,7 @@ import {
   parseRoomEnabled,
   parseRoomList,
   parseSaveRoom,
+  parseSaveRoomOrder,
   parseSaveTag,
   parseTagList,
   parseUpdateSettings,
@@ -277,6 +278,12 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
   app.get("/api/admin/rooms", async (context) => context.json(
     await dependencies.products.listRooms(parseRoomList(queryParams(context))),
+  ));
+  app.get("/api/admin/rooms/order", async (context) => context.json(
+    await dependencies.products.getRoomOrder(),
+  ));
+  app.put("/api/admin/rooms/order", async (context) => context.json(
+    await dependencies.products.saveRoomOrder(parseSaveRoomOrder(await jsonBody(context))),
   ));
   app.get("/api/admin/rooms/:roomId", async (context) => context.json(await dependencies.products.getAdminRoomResponse(uuidParam(context, "roomId"))));
   app.get("/api/admin/rooms/:roomId/deletion-check", async (context) => context.json(await dependencies.products.getRoomDeletionCheck(uuidParam(context, "roomId"))));

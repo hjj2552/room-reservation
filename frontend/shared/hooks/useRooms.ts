@@ -5,18 +5,21 @@ import {
   deleteRoom,
   getRoom,
   getRoomDeletionCheck,
+  getRoomOrder,
   listRooms,
+  saveRoomOrder,
   type RoomListFilters,
   updateRoom,
   updateRoomEnabled,
 } from '../api/rooms';
-import type { RoomPayload } from '../api/types';
+import type { RoomOrderPayload, RoomPayload } from '../api/types';
 
 export const roomKeys = {
   all: ['rooms'] as const,
   list: (filters: RoomListFilters) => ['rooms', 'list', filters] as const,
   detail: (id: string) => ['rooms', 'detail', id] as const,
   deletionCheck: (id: string) => ['rooms', 'deletion-check', id] as const,
+  order: () => ['rooms', 'order'] as const,
 };
 
 export function useRooms(filters: RoomListFilters = { enabled: true, includeDeleted: false, size: 100 }) {
@@ -31,6 +34,24 @@ export function useRoom(id?: string) {
     queryKey: roomKeys.detail(id || ''),
     queryFn: () => getRoom(id || ''),
     enabled: Boolean(id),
+  });
+}
+
+export function useRoomOrder(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: roomKeys.order(),
+    queryFn: getRoomOrder,
+    enabled: options.enabled ?? true,
+  });
+}
+
+export function useRoomOptions(options: { includeDisabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: roomKeys.order(),
+    queryFn: getRoomOrder,
+    select: (response) => options.includeDisabled
+      ? response.items
+      : response.items.filter((room) => room.enabled),
   });
 }
 
@@ -80,6 +101,17 @@ export function useDeleteRoom() {
   return useMutation({
     mutationFn: deleteRoom,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: roomKeys.all });
+    },
+  });
+}
+
+export function useSaveRoomOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: RoomOrderPayload) => saveRoomOrder(payload),
+    onSuccess: (response) => {
+      queryClient.setQueryData(roomKeys.order(), response);
       queryClient.invalidateQueries({ queryKey: roomKeys.all });
     },
   });

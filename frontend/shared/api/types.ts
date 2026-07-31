@@ -21,6 +21,7 @@ export type ApiErrorCode =
   | 'ROOM_DELETE_BLOCKED'
   | 'ROOM_DISABLED'
   | 'ROOM_NAME_DUPLICATED'
+  | 'ROOM_ORDER_CONFLICT'
   | 'SYSTEM_ROOM_PROTECTED'
   | 'TAG_NAME_DUPLICATED'
   | 'TIME_SLOT_CONFLICT'
@@ -55,6 +56,7 @@ export interface AdminRoom {
   capacity: number | null;
   description: string | null;
   enabled: boolean;
+  displayOrder: number;
   deleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +87,26 @@ export interface RoomPayload {
   capacity: number;
   description?: string;
   enabled: boolean;
+}
+
+export interface RoomOrderItem {
+  id: string;
+  name: string;
+  location: string | null;
+  capacity: number;
+  description: string | null;
+  enabled: boolean;
+  displayOrder: number;
+}
+
+export interface RoomOrderResponse {
+  orderVersion: number;
+  items: RoomOrderItem[];
+}
+
+export interface RoomOrderPayload {
+  orderVersion: number;
+  roomIds: string[];
 }
 
 export interface OperationSettings {

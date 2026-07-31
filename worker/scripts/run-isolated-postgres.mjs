@@ -59,6 +59,41 @@ try {
   const replayUrl = `${baseUrl}/worker_replay`;
   runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], replayUrl);
 
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_upgrade"]);
+  const upgradeUrl = `${baseUrl}/worker_upgrade`;
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate-v1-for-test.ts"], upgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c",
+    `INSERT INTO rooms(name,capacity,enabled)
+     VALUES ('testing-room-zulu',10,true),('testing-room-alpha',10,true),('testing-room-middle',10,true)`,
+  ]);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], upgradeUrl);
+  const upgradedOrder = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT name || '|' || display_order
+     FROM rooms
+     WHERE system_reserved=false
+     ORDER BY display_order`,
+  ]).split("\n").map((line) => line.trim()).filter(Boolean);
+  if (JSON.stringify(upgradedOrder) !== JSON.stringify([
+    "testing-room-alpha|1",
+    "testing-room-middle|2",
+    "testing-room-zulu|3",
+  ])) {
+    throw new Error(`V1 to V2 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
+  }
+  const sentinelDisplayOrder = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    "SELECT display_order IS NULL FROM rooms WHERE system_reserved=true",
+  ]).trim();
+  if (sentinelDisplayOrder !== "t") throw new Error("System room received a display order");
+
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
     "-U", "worker_test", database,

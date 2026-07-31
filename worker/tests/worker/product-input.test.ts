@@ -6,6 +6,7 @@ import {
   parseRecurrencePreview,
   parseReservationFilter,
   parseRoomList,
+  parseSaveRoomOrder,
   parseUpdateSettings,
 } from "../../src/http/product-input";
 
@@ -72,6 +73,27 @@ describe("typed HTTP product input", () => {
     expect(() => parseRoomList(new URLSearchParams("enabled=yes"))).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
+  });
+
+  it("validates room order version, array size, UUIDs and duplicates before database casts", () => {
+    const secondRoomId = "22222222-2222-4222-8222-222222222222";
+    expect(parseSaveRoomOrder({
+      orderVersion: 3,
+      roomIds: [ROOM_ID, secondRoomId],
+    })).toEqual({
+      orderVersion: 3,
+      roomIds: [ROOM_ID, secondRoomId],
+    });
+    for (const invalid of [
+      { orderVersion: -1, roomIds: [ROOM_ID] },
+      { orderVersion: 0, roomIds: "not-an-array" },
+      { orderVersion: 0, roomIds: ["not-a-uuid"] },
+      { orderVersion: 0, roomIds: [ROOM_ID, ROOM_ID] },
+    ]) {
+      expect(() => parseSaveRoomOrder(invalid)).toThrowError(
+        expect.objectContaining({ code: "VALIDATION_ERROR" }),
+      );
+    }
   });
 
   it("rejects invalid query dates and missing availability fields", () => {

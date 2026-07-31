@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, lazy, Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { AdminRoom, RoomPayload } from '../../shared/api/types';
 import { ModalDialog } from '../../shared/components/ModalDialog';
+import { Pagination } from '../../shared/components/Pagination';
 import { SidePanel } from '../../shared/components/SidePanel';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
@@ -30,20 +32,51 @@ const emptyForm: RoomFormState = {
   enabled: true,
 };
 
+const pageSize = 20;
+const RoomOrderPanel = lazy(() => import('../components/RoomOrderPanel').then((module) => ({
+  default: module.RoomOrderPanel,
+})));
+
+function numberParam(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 export function RoomsPage() {
-  const [keyword, setKeyword] = useState('');
-  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const appliedKeyword = searchParams.get('keyword') || '';
+  const page = numberParam(searchParams.get('page'), 0);
+  const [keyword, setKeyword] = useState(appliedKeyword);
   const [editingRoom, setEditingRoom] = useState<AdminRoom | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
+  const [isOrderPanelOpen, setIsOrderPanelOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminRoom | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [form, setForm] = useState<RoomFormState>(emptyForm);
-  const rooms = useRooms({ includeDeleted: false, keyword: appliedKeyword, size: 100 });
+  const rooms = useRooms({
+    includeDeleted: false,
+    keyword: appliedKeyword,
+    page,
+    size: pageSize,
+  });
   const deletionCheck = useRoomDeletionCheck(deleteTarget?.id);
   const createRoom = useCreateRoom();
   const updateRoom = useUpdateRoom(editingRoom?.id || '');
   const toggleEnabled = useUpdateRoomEnabled();
   const deleteRoom = useDeleteRoom();
+
+  useEffect(() => {
+    setKeyword(appliedKeyword);
+  }, [appliedKeyword]);
+
+  useEffect(() => {
+    if (!rooms.data || page < rooms.data.totalPages) return;
+    const nextPage = Math.max(rooms.data.totalPages - 1, 0);
+    if (page === nextPage) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    setSearchParams(next, { replace: true });
+  }, [page, rooms.data, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!editingRoom) {
@@ -105,6 +138,21 @@ export function RoomsPage() {
     updateRoom.reset();
   }
 
+  function applySearch(nextKeyword: string) {
+    const next = new URLSearchParams(searchParams);
+    const normalized = nextKeyword.trim();
+    if (normalized) next.set('keyword', normalized);
+    else next.delete('keyword');
+    next.set('page', '0');
+    setSearchParams(next);
+  }
+
+  function setPage(nextPage: number) {
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    setSearchParams(next);
+  }
+
   function openDeleteModal(room: AdminRoom) {
     setDeleteTarget(room);
     setDeleteConfirmation('');
@@ -157,14 +205,24 @@ export function RoomsPage() {
           <h1 id="rooms-title">공간 관리</h1>
           <p className="muted">예약에 사용할 공간을 등록하고, 삭제된 공간의 예약 기록은 보존합니다.</p>
         </div>
-        <button
-          type="button"
-          className="primary-button"
-          data-testid="room-create-button"
-          onClick={openCreatePanel}
-        >
-          공간 등록
-        </button>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            data-testid="room-order-button"
+            onClick={() => setIsOrderPanelOpen(true)}
+          >
+            순서 변경
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            data-testid="room-create-button"
+            onClick={openCreatePanel}
+          >
+            공간 등록
+          </button>
+        </div>
       </div>
 
       <section className="panel room-list-panel" aria-labelledby="room-list-title">
@@ -175,19 +233,31 @@ export function RoomsPage() {
             className="inline-filter"
             onSubmit={(event) => {
               event.preventDefault();
-              setAppliedKeyword(keyword);
+              applySearch(keyword);
             }}
           >
             <label>
               검색어
               <input
+                data-testid="room-keyword-input"
                 type="search"
                 value={keyword}
                 placeholder="공간명 또는 위치"
                 onChange={(event) => setKeyword(event.target.value)}
               />
             </label>
-            <button type="submit" className="secondary-button">조회</button>
+            <button type="submit" className="secondary-button" data-testid="room-search-button">조회</button>
+            <button
+              type="button"
+              className="ghost-button"
+              data-testid="room-search-reset"
+              onClick={() => {
+                setKeyword('');
+                applySearch('');
+              }}
+            >
+              초기화
+            </button>
           </form>
 
           {rooms.isLoading ? <LoadingState /> : null}
@@ -195,8 +265,9 @@ export function RoomsPage() {
           {toggleEnabled.error ? <div className="inline-error" role="alert">{errorMessage(toggleEnabled.error)}</div> : null}
           {rooms.data?.items.length === 0 ? <EmptyState message="등록된 공간이 없습니다." /> : null}
           {rooms.data?.items.length ? (
-            <div className="table-wrap">
-              <table className="data-table rooms-table" data-testid="rooms-table">
+            <>
+              <div className="table-wrap">
+                <table className="data-table rooms-table" data-testid="rooms-table">
                 <caption className="sr-only">공간 목록</caption>
                 <thead>
                   <tr>
@@ -253,10 +324,24 @@ export function RoomsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              <Pagination
+                page={rooms.data.page}
+                totalPages={rooms.data.totalPages}
+                totalItems={rooms.data.totalItems}
+                size={rooms.data.size}
+                onPageChange={setPage}
+              />
+            </>
           ) : null}
       </section>
+
+      {isOrderPanelOpen ? (
+        <Suspense fallback={<LoadingState />}>
+          <RoomOrderPanel onClose={() => setIsOrderPanelOpen(false)} />
+        </Suspense>
+      ) : null}
 
       {isFormPanelOpen ? (
         <SidePanel

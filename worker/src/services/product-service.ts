@@ -30,6 +30,7 @@ import type {
   ReservationListQuery,
   RoomListQuery,
   SaveRoomCommand,
+  SaveRoomOrderCommand,
   SaveTagCommand,
   TagListQuery,
   UpdateSettingsCommand,
@@ -115,6 +116,7 @@ function mapRoom(row: Row) {
     capacity: number(row, "capacity"),
     description: nullableText(row, "description"),
     enabled: bool(row, "enabled"),
+    displayOrder: value(row, "display_order") === null ? null : number(row, "display_order"),
     deleted: value(row, "deleted_at") !== null,
     createdAt: iso(value(row, "created_at")),
     updatedAt: iso(value(row, "updated_at")),
@@ -208,7 +210,7 @@ export class ProductService {
     const result = await this.database.query(
       `SELECT * FROM rooms
        WHERE enabled = true AND deleted_at IS NULL AND system_reserved = false
-       ORDER BY name ASC`,
+       ORDER BY display_order ASC`,
     );
     return result.rows.map((row) => {
       const room = mapRoom(row);
@@ -243,10 +245,140 @@ export class ProductService {
     const where = conditions.join(" AND ");
     const count = await this.database.query(`SELECT count(*) AS total FROM rooms WHERE ${where}`, values);
     const rows = await this.database.query(
-      `SELECT * FROM rooms WHERE ${where} ORDER BY name ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      `SELECT * FROM rooms WHERE ${where} ORDER BY display_order ASC LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
       [...values, size, offset],
     );
     return paged(rows.rows.map(mapRoom), page, size, Number(count.rows[0]?.total ?? 0));
+  }
+
+  private async lockRoomOrderState(client: Queryable): Promise<number> {
+    const result = await client.query(
+      "SELECT version FROM room_order_state WHERE id=1 FOR UPDATE",
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("Room order state is missing.");
+    return number(row, "version");
+  }
+
+  private async incrementRoomOrderVersion(client: Queryable): Promise<number> {
+    const result = await client.query(
+      "UPDATE room_order_state SET version=version+1 WHERE id=1 RETURNING version",
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error("Room order state is missing.");
+    return number(row, "version");
+  }
+
+  async getRoomOrder(queryable?: Queryable): Promise<{
+    orderVersion: number;
+    items: Array<{
+      id: string;
+      name: string;
+      location: string | null;
+      capacity: number;
+      description: string | null;
+      enabled: boolean;
+      displayOrder: number;
+    }>;
+  }> {
+    if (!queryable) {
+      return this.database.transaction((client) => this.getRoomOrder(client));
+    }
+
+    const state = await queryable.query(
+      "SELECT version FROM room_order_state WHERE id=1 FOR SHARE",
+    );
+    const rooms = await queryable.query(
+      `SELECT id, name, location, capacity, description, enabled, display_order
+       FROM rooms
+       WHERE system_reserved=false AND deleted_at IS NULL
+       ORDER BY display_order ASC`,
+    );
+    const stateRow = state.rows[0];
+    if (!stateRow) throw new Error("Room order state is missing.");
+    return {
+      orderVersion: number(stateRow, "version"),
+      items: rooms.rows.map((row) => ({
+        id: text(row, "id"),
+        name: text(row, "name"),
+        location: nullableText(row, "location"),
+        capacity: number(row, "capacity"),
+        description: nullableText(row, "description"),
+        enabled: bool(row, "enabled"),
+        displayOrder: number(row, "display_order"),
+      })),
+    };
+  }
+
+  async saveRoomOrder(command: SaveRoomOrderCommand) {
+    return this.database.transaction(async (client) => {
+      const currentVersion = await this.lockRoomOrderState(client);
+      if (command.orderVersion !== currentVersion) {
+        conflict(
+          "ROOM_ORDER_CONFLICT",
+          "The room list changed. Reload the room order and try again.",
+          { currentOrderVersion: currentVersion },
+        );
+      }
+
+      const current = await client.query(
+        `SELECT id, display_order
+         FROM rooms
+         WHERE system_reserved=false AND deleted_at IS NULL
+         ORDER BY display_order ASC
+         FOR UPDATE`,
+      );
+      const currentIds = current.rows.map((row) => text(row, "id"));
+      const submitted = new Set(command.roomIds);
+      const currentSet = new Set(currentIds);
+      const missingRoomIds = currentIds.filter((id) => !submitted.has(id));
+      const unknownRoomIds = command.roomIds.filter((id) => !currentSet.has(id));
+      if (
+        command.roomIds.length !== currentIds.length
+        || missingRoomIds.length > 0
+        || unknownRoomIds.length > 0
+      ) {
+        conflict(
+          "ROOM_ORDER_CONFLICT",
+          "The submitted room list does not match the current room list.",
+          { missingRoomIds, unknownRoomIds },
+        );
+      }
+
+      if (currentIds.length > 0) {
+        const maxOrder = current.rows.reduce(
+          (maximum, row) => Math.max(maximum, number(row, "display_order")),
+          0,
+        );
+        const temporaryStart = maxOrder + currentIds.length + 1;
+        await client.query(
+          `WITH temporary_order AS (
+             SELECT id, $1::bigint + row_number() OVER (ORDER BY display_order ASC) AS next_order
+             FROM rooms
+             WHERE system_reserved=false AND deleted_at IS NULL
+           )
+           UPDATE rooms
+           SET display_order=temporary_order.next_order
+           FROM temporary_order
+           WHERE rooms.id=temporary_order.id`,
+          [temporaryStart],
+        );
+        await client.query(
+          `WITH desired_order AS (
+             SELECT room_id, ordinality::bigint AS next_order
+             FROM unnest($1::uuid[]) WITH ORDINALITY AS submitted(room_id, ordinality)
+           )
+           UPDATE rooms
+           SET display_order=desired_order.next_order
+           FROM desired_order
+           WHERE rooms.id=desired_order.room_id`,
+          [command.roomIds],
+        );
+      }
+
+      await this.incrementRoomOrderVersion(client);
+      return this.getRoomOrder(client);
+    });
   }
 
   async getAdminRoom(roomId: string, queryable: Queryable = this.database): Promise<Row> {
@@ -263,12 +395,19 @@ export class ProductService {
   async createRoom(command: SaveRoomCommand) {
     const { name, location, capacity, description, enabled } = command;
     try {
-      const result = await this.database.query(
-        `INSERT INTO rooms (name, location, capacity, description, enabled)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [name, location, capacity, description, enabled],
-      );
-      return mapRoom(result.rows[0]!);
+      return await this.database.transaction(async (client) => {
+        await this.lockRoomOrderState(client);
+        const result = await client.query(
+          `INSERT INTO rooms (name, location, capacity, description, enabled, display_order)
+           SELECT $1, $2, $3, $4, $5, COALESCE(MAX(display_order), 0) + 1
+           FROM rooms
+           WHERE system_reserved=false AND deleted_at IS NULL
+           RETURNING *`,
+          [name, location, capacity, description, enabled],
+        );
+        await this.incrementRoomOrderVersion(client);
+        return mapRoom(result.rows[0]!);
+      });
     } catch (error) {
       if (isDatabaseCode(error, "23505")) conflict("ROOM_NAME_DUPLICATED", "Room name already exists.", { name });
       throw error;
@@ -326,6 +465,7 @@ export class ProductService {
 
   async deleteRoom(roomId: string): Promise<void> {
     await this.database.transaction(async (client) => {
+      await this.lockRoomOrderState(client);
       const room = await this.getAdminRoom(roomId, client);
       if (value(room, "deleted_at") !== null) notFound("Room");
       const sentinel = await client.query("SELECT id FROM rooms WHERE system_reserved=true AND deleted_at IS NULL");
@@ -335,6 +475,7 @@ export class ProductService {
       await client.query("UPDATE reservations SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
       await client.query("UPDATE reservation_recurrences SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
       await client.query("DELETE FROM rooms WHERE id=$1", [roomId]);
+      await this.incrementRoomOrderVersion(client);
     });
   }
 
@@ -1175,6 +1316,7 @@ export class ProductService {
       validation("E2E cleanup prefix must start with testing- and cannot contain SQL wildcards.");
     }
     return this.database.transaction(async (client) => {
+      if (!dryRun) await this.lockRoomOrderState(client);
       const pattern = `${normalizedPrefix}%`;
       const ids = async (sql: string, values: unknown[]): Promise<string[]> => {
         const result = await client.query(sql, values);
@@ -1250,6 +1392,7 @@ export class ProductService {
            AND NOT EXISTS (SELECT 1 FROM reservation_recurrences rr WHERE rr.room_id=rm.id)`,
         [deletableRoomIds],
       );
+      if (roomsDeleted.rowCount > 0) await this.incrementRoomOrderVersion(client);
       return {
         ...summary,
         reservationHistoriesDeleted: historiesDeleted.rowCount,

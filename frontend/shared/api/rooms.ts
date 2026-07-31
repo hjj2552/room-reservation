@@ -1,5 +1,12 @@
 import { apiRequest, buildQuery } from './http';
-import type { AdminRoom, PagedResponse, RoomDeletionCheck, RoomPayload } from './types';
+import type {
+  AdminRoom,
+  PagedResponse,
+  RoomDeletionCheck,
+  RoomOrderPayload,
+  RoomOrderResponse,
+  RoomPayload,
+} from './types';
 
 export interface RoomListFilters {
   enabled?: boolean;
@@ -23,6 +30,17 @@ export function listRooms(filters: RoomListFilters = { enabled: true, includeDel
 
 export function getRoom(roomId: string) {
   return apiRequest<AdminRoom>(`/api/admin/rooms/${roomId}`);
+}
+
+export function getRoomOrder() {
+  return apiRequest<RoomOrderResponse>('/api/admin/rooms/order');
+}
+
+export function saveRoomOrder(payload: RoomOrderPayload) {
+  return apiRequest<RoomOrderResponse>('/api/admin/rooms/order', {
+    method: 'PUT',
+    body: payload,
+  });
 }
 
 export function getRoomDeletionCheck(roomId: string) {

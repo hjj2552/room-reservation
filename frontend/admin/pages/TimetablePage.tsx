@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { AdminRoom, ReservationFilters, ReservationStatus } from '../../shared/api/types';
+import type { ReservationFilters, ReservationStatus, RoomOrderItem } from '../../shared/api/types';
 import { ReservationDateTimetable } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
 import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
@@ -15,7 +15,7 @@ import {
   type TimetableSlotSelection,
 } from '../../shared/components/TimetableQuickAddPanel';
 import { useCreateReservation, useReservation, useReservations } from '../../shared/hooks/useReservations';
-import { useRooms } from '../../shared/hooks/useRooms';
+import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import {
   fromServiceDateTimeLocal,
@@ -58,11 +58,11 @@ function isTimetableViewMode(value: string | null): value is TimetableViewMode {
   return timetableViewModes.includes(value as TimetableViewMode);
 }
 
-function enabledActiveRooms(rooms: AdminRoom[] = []) {
-  return rooms.filter((room) => room.enabled && !room.deleted);
+function enabledActiveRooms(rooms: RoomOrderItem[] = []) {
+  return rooms.filter((room) => room.enabled);
 }
 
-function activeRooms(rooms: AdminRoom[] = [], selectedRoomId: string) {
+function activeRooms(rooms: RoomOrderItem[] = [], selectedRoomId: string) {
   const active = enabledActiveRooms(rooms);
   return selectedRoomId ? active.filter((room) => room.id === selectedRoomId) : active;
 }
@@ -75,7 +75,7 @@ export function TimetablePage() {
   const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoRoom | null>(null);
   const duplicateQuickAddAppliedRef = useRef<string | null>(null);
-  const rooms = useRooms();
+  const rooms = useRoomOptions();
   const settings = useSettings();
   const createReservation = useCreateReservation();
 
@@ -106,9 +106,9 @@ export function TimetablePage() {
     [status, roomId, keyword, selectedDate],
   );
   const dateTimetableReservations = useReservations(dateTimetableFilters, { enabled: viewMode === 'date' });
-  const dateTimetableRooms = useMemo(() => activeRooms(rooms.data?.items, roomId), [rooms.data?.items, roomId]);
+  const dateTimetableRooms = useMemo(() => activeRooms(rooms.data, roomId), [rooms.data, roomId]);
 
-  const roomViewRooms = useMemo(() => enabledActiveRooms(rooms.data?.items), [rooms.data?.items]);
+  const roomViewRooms = useMemo(() => enabledActiveRooms(rooms.data), [rooms.data]);
   const roomViewRoomIdParam = searchParams.get('roomViewRoomId') || '';
   const selectedRoomViewRoomId = roomViewRooms.some((room) => room.id === roomViewRoomIdParam)
     ? roomViewRoomIdParam
@@ -296,7 +296,7 @@ export function TimetablePage() {
                   data-testid="timetable-date-room-select"
                 >
                   <option value="">전체</option>
-                  {rooms.data?.items.map((room) => (
+                  {rooms.data?.map((room) => (
                     <option key={room.id} value={room.id}>
                       {room.name}
                     </option>
