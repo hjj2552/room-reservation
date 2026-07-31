@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useReservationHistoryAudit } from '../../shared/hooks/useAudit';
-import { useRooms } from '../../shared/hooks/useRooms';
+import { useRoomOptions } from '../../shared/hooks/useRooms';
 import type { ReservationHistory } from '../../shared/api/types';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
@@ -74,7 +74,7 @@ function formatSnapshotEndTime(startAt: string, endAt: string) {
 export function AuditPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
-  const rooms = useRooms();
+  const rooms = useRoomOptions();
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
@@ -142,7 +142,7 @@ export function AuditPage() {
             onChange={(event) => setParam('roomId', event.target.value)}
           >
             <option value="">전체</option>
-            {rooms.data?.items.map((room) => (
+            {rooms.data?.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.name}
               </option>

@@ -44,6 +44,11 @@ export interface SaveRoomCommand {
   enabled: boolean;
 }
 
+export interface SaveRoomOrderCommand {
+  orderVersion: number;
+  roomIds: string[];
+}
+
 export interface SaveTagCommand {
   name: string;
   color: string;

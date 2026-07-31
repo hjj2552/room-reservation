@@ -9,7 +9,7 @@ import {
   useReservation,
   useUpdateReservation,
 } from '../../shared/hooks/useReservations';
-import { useRooms } from '../../shared/hooks/useRooms';
+import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { statusLabels } from '../../shared/utils/labels';
 import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
@@ -41,7 +41,7 @@ const defaultReservationFormValues: ReservationFormValues = {
 export function ReservationFormPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
-  const rooms = useRooms();
+  const rooms = useRoomOptions();
   const settings = useSettings();
   const reservation = useReservation(reservationId);
   const update = useUpdateReservation(reservationId);
@@ -126,7 +126,7 @@ export function ReservationFormPage() {
           예약 공간
           <select data-testid="reservation-room-select" {...register('roomId', { required: '예약 공간을 선택해 주세요.' })}>
             <option value="">선택</option>
-            {rooms.data?.items.map((room) => (
+            {rooms.data?.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.name}
               </option>

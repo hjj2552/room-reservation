@@ -7,7 +7,7 @@ import { Pagination } from '../../shared/components/Pagination';
 import { ReservationTable } from '../../shared/components/ReservationTable';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useReservations } from '../../shared/hooks/useReservations';
-import { useRooms } from '../../shared/hooks/useRooms';
+import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { statusLabels } from '../../shared/utils/labels';
 import {
   toServiceEndOfDayOffset,
@@ -25,7 +25,7 @@ export function ReservationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [csvError, setCsvError] = useState('');
-  const rooms = useRooms();
+  const rooms = useRoomOptions();
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
@@ -113,9 +113,13 @@ export function ReservationsPage() {
         </label>
         <label>
           공간
-          <select value={roomId} onChange={(event) => setParam('roomId', event.target.value)}>
+          <select
+            data-testid="reservation-room-filter"
+            value={roomId}
+            onChange={(event) => setParam('roomId', event.target.value)}
+          >
             <option value="">전체</option>
-            {rooms.data?.items.map((room) => (
+            {rooms.data?.map((room) => (
               <option key={room.id} value={room.id}>
                 {room.name}
               </option>

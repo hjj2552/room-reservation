@@ -319,7 +319,7 @@ textarea[aria-invalid='true']:focus-visible {
 
 .inline-filter {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) auto;
+  grid-template-columns: minmax(160px, 1fr) auto auto;
   gap: 10px;
   align-items: end;
   margin: 14px 0;
@@ -503,6 +503,11 @@ button:disabled {
 
 .room-list-panel {
   width: 100%;
+}
+
+.room-list-panel .pagination,
+.room-list-panel .result-summary {
+  margin-top: 14px;
 }
 
 .clickable-row {
@@ -1071,6 +1076,104 @@ button:disabled {
 .side-panel-body .quick-add-form {
   overflow: visible;
   padding: 0;
+}
+
+.room-order-panel {
+  width: min(460px, calc(100vw - 48px));
+}
+
+.room-order-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-order-item {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.room-order-item.is-dragging {
+  border-color: var(--action);
+  border-style: dashed;
+  background: var(--action-soft);
+}
+
+.room-order-item.is-dragging .room-order-item-content {
+  opacity: 0.38;
+}
+
+.room-order-item-content {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 4px 12px 4px 4px;
+}
+
+.room-order-item-content.is-overlay {
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: min(410px, calc(100vw - 56px));
+  border: 1px solid var(--action);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(34, 37, 33, 0.16);
+}
+
+.room-order-handle {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-ink);
+  cursor: grab;
+  font-size: 22px;
+  line-height: 1;
+  touch-action: none;
+}
+
+.room-order-handle:hover {
+  background: var(--action-soft);
+  color: var(--action);
+}
+
+.room-order-handle:active {
+  cursor: grabbing;
+}
+
+.room-order-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-order-status {
+  color: var(--muted-ink);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.side-panel-actions {
+  position: sticky;
+  bottom: -8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--rule);
+  padding: 12px 0 0;
+  background: var(--surface);
 }
 
 .compact-request-form {

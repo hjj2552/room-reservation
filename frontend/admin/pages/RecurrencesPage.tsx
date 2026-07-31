@@ -11,7 +11,7 @@ import {
   usePreviewRecurrence,
   useRecurrences,
 } from '../../shared/hooks/useRecurrences';
-import { useRooms } from '../../shared/hooks/useRooms';
+import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { useTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
@@ -62,7 +62,7 @@ export function RecurrencesPage() {
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const defaultTimesAppliedRef = useRef(false);
-  const rooms = useRooms();
+  const rooms = useRoomOptions();
   const settings = useSettings();
   const tags = useTags({ size: 1000 });
   const preview = usePreviewRecurrence();
@@ -186,7 +186,7 @@ export function RecurrencesPage() {
               required
             >
               <option value="">선택</option>
-              {rooms.data?.items.map((room) => (
+              {rooms.data?.map((room) => (
                 <option key={room.id} value={room.id}>{room.name}</option>
               ))}
             </select>
@@ -403,7 +403,7 @@ export function RecurrencesPage() {
               onChange={(event) => setParam('roomId', event.target.value)}
             >
               <option value="">전체</option>
-              {rooms.data?.items.map((room) => (
+              {rooms.data?.map((room) => (
                 <option key={room.id} value={room.id}>
                   {room.name}
                 </option>

@@ -170,6 +170,7 @@ const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   ROOM_DELETE_BLOCKED: '공간 삭제 조건을 충족하지 못했습니다. 삭제 가능 조건과 차단 사유를 확인하세요.',
   ROOM_DISABLED: '선택한 공간은 현재 예약할 수 없습니다.',
   ROOM_NAME_DUPLICATED: '같은 이름의 공간이 이미 있습니다.',
+  ROOM_ORDER_CONFLICT: '공간 목록이 변경되었습니다. 다시 불러온 뒤 순서를 다시 저장해 주세요.',
   SYSTEM_ROOM_PROTECTED: '시스템 보존용 공간은 수정하거나 삭제할 수 없습니다.',
   TAG_NAME_DUPLICATED: '같은 이름의 태그가 이미 있습니다.',
   TIME_SLOT_CONFLICT: '같은 공간의 동일 시간대에 이미 예약이 있습니다.',

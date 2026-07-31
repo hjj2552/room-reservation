@@ -9,6 +9,11 @@ export interface E2eRoom {
   enabled?: boolean;
 }
 
+export interface E2eRoomOrder {
+  orderVersion: number;
+  items: Array<E2eRoom & { displayOrder: number }>;
+}
+
 export interface E2eReservation {
   id: string;
   purpose?: string;
@@ -110,7 +115,12 @@ export async function loginByApi(request: APIRequestContext) {
 export async function createRoomByApi(
   request: APIRequestContext,
   name: string,
-  options?: { location?: string | null; capacity?: number | null; description?: string | null },
+  options?: {
+    location?: string | null;
+    capacity?: number | null;
+    description?: string | null;
+    enabled?: boolean;
+  },
 ) {
   const response = await request.post('/api/admin/rooms', {
     headers: await csrfHeaders(request),
@@ -121,7 +131,7 @@ export async function createRoomByApi(
       description: options?.description === undefined
         ? `${E2E_TEST_DATA_PREFIX}created-by-frontend-e2e`
         : options.description,
-      enabled: true,
+      enabled: options?.enabled ?? true,
     },
   });
   await expectApiOk(response, 'create room');
@@ -133,6 +143,24 @@ export async function deleteRoomByApi(request: APIRequestContext, roomId: string
     headers: await csrfHeaders(request),
   });
   expect([204, 404, 409]).toContain(response.status());
+}
+
+export async function getRoomOrderByApi(request: APIRequestContext) {
+  const response = await request.get('/api/admin/rooms/order');
+  await expectApiOk(response, 'get room order');
+  return response.json() as Promise<E2eRoomOrder>;
+}
+
+export async function saveRoomOrderByApi(
+  request: APIRequestContext,
+  payload: { orderVersion: number; roomIds: string[] },
+) {
+  const response = await request.put('/api/admin/rooms/order', {
+    headers: await csrfHeaders(request),
+    data: payload,
+  });
+  await expectApiOk(response, 'save room order');
+  return response.json() as Promise<E2eRoomOrder>;
 }
 
 export async function createTagByApi(request: APIRequestContext, name: string, color = '#2563eb') {
