@@ -42,8 +42,14 @@ Production Worker는 `workers.dev`, preview URL, route, custom domain을 만들�
 - `CLOUDFLARE_PRODUCTION_READ_RATE_LIMIT_NAMESPACE_ID`
 - `CLOUDFLARE_PRODUCTION_WRITE_RATE_LIMIT_NAMESPACE_ID`
 - `CLOUDFLARE_API_TOKEN`
+- `NEON_MIGRATION_DATABASE_URL`
+- `NEON_MIGRATION_EXPECTED_HOST`
+- `NEON_MIGRATION_EXPECTED_DATABASE`
+- `NEON_MIGRATION_EXPECTED_ROLE`
 
 공개 가능한 식별자도 portability와 log masking을 위해 Repository Variables나 committed configuration에 실제 값을 두지 않습니다. 명령 인자, artifact, cache, receipt와 log에도 운영 값을 출력하지 않습니다.
+
+`NEON_MIGRATION_DATABASE_URL`은 production Neon direct connection URL이며 pooled endpoint를 사용하지 않습니다. `NEON_MIGRATION_EXPECTED_HOST`, `NEON_MIGRATION_EXPECTED_DATABASE`, `NEON_MIGRATION_EXPECTED_ROLE`은 연결 대상의 exact identity를 fail-closed로 검증합니다. schema 변경 권한이 있는 migration role과 Worker runtime role은 분리합니다.
 
 ## CI and deployment order
 
@@ -53,10 +59,14 @@ Production Worker는 `workers.dev`, preview URL, route, custom domain을 만들�
 2. Pages proxy test와 Worker 기반 전체 Playwright E2E 통과
 3. production target 존재 여부와 설정 검증
 4. Frontend production build
-5. production Worker 배포
-6. production Pages Direct Upload
+5. production Neon identity와 `worker_migrations` 정합성 검증
+6. pending production migration 적용
+7. migration ledger와 V2 schema 검증
+8. production Worker 배포
+9. production Pages Direct Upload
+10. same-origin read-only smoke
 
-Database migration은 자동 배포 workflow에 포함하지 않습니다. migration은 direct connection을 사용해 별도 승인된 절차로 실행하고, Worker runtime에는 pooled connection만 주입합니다.
+Migration secret, identity, ledger 또는 schema 검증이 실패하면 Worker와 Pages를 배포하지 않습니다. pending migration이 없으면 성공적인 no-op으로 처리합니다. V2 적용 후 자동 down migration이나 DB rollback은 수행하지 않으며, 이후 장애는 공간 관리 통제를 유지한 상태에서 forward-fix합니다. Worker runtime에는 계속 pooled connection만 주입합니다.
 
 ## Security checks
 

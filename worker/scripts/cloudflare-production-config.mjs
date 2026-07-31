@@ -9,7 +9,8 @@ function requireAccountId(value) {
   return normalized;
 }
 
-function requirePagesProjectName(value) {
+export function pagesProjectNameFromEnv(env = process.env) {
+  const value = env.CLOUDFLARE_PAGES_PROJECT_NAME;
   const normalized = value?.trim();
   if (!normalized) throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME is required");
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalized)) {
@@ -27,7 +28,7 @@ function requireApiToken(value) {
 export function productionCloudflareValuesFromEnv(env = process.env) {
   return {
     accountId: requireAccountId(env.CLOUDFLARE_ACCOUNT_ID),
-    pagesProjectName: requirePagesProjectName(env.CLOUDFLARE_PAGES_PROJECT_NAME),
+    pagesProjectName: pagesProjectNameFromEnv(env),
     apiToken: requireApiToken(env.CLOUDFLARE_API_TOKEN),
     ...deploymentValuesFromEnv(env),
   };

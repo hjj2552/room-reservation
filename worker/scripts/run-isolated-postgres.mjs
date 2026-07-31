@@ -70,6 +70,14 @@ try {
      VALUES ('testing-room-zulu',10,true),('testing-room-alpha',10,true),('testing-room-middle',10,true)`,
   ]);
   runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], upgradeUrl);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], upgradeUrl);
+  runProject([
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "vitest.postgres.config.ts",
+    "tests/postgres/production-migration.integration.test.ts",
+  ], upgradeUrl);
   const upgradedOrder = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
     "--tuples-only", "--no-align",

@@ -146,6 +146,15 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Verify production database identity and migration ledger
+        working-directory: worker
+        env:
+          NEON_MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}
+          NEON_MIGRATION_EXPECTED_HOST: ${{ secrets.NEON_MIGRATION_EXPECTED_HOST }}
+          NEON_MIGRATION_EXPECTED_DATABASE: ${{ secrets.NEON_MIGRATION_EXPECTED_DATABASE }}
+          NEON_MIGRATION_EXPECTED_ROLE: ${{ secrets.NEON_MIGRATION_EXPECTED_ROLE }}
+        run: npm run migrate:production:preflight
+
       - name: Validate production deployment configuration
         working-directory: worker
         env:
@@ -162,6 +171,24 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Apply pending production database migrations
+        working-directory: worker
+        env:
+          NEON_MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}
+          NEON_MIGRATION_EXPECTED_HOST: ${{ secrets.NEON_MIGRATION_EXPECTED_HOST }}
+          NEON_MIGRATION_EXPECTED_DATABASE: ${{ secrets.NEON_MIGRATION_EXPECTED_DATABASE }}
+          NEON_MIGRATION_EXPECTED_ROLE: ${{ secrets.NEON_MIGRATION_EXPECTED_ROLE }}
+        run: npm run migrate:production:apply
+
+      - name: Verify production migration ledger and V2 schema
+        working-directory: worker
+        env:
+          NEON_MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}
+          NEON_MIGRATION_EXPECTED_HOST: ${{ secrets.NEON_MIGRATION_EXPECTED_HOST }}
+          NEON_MIGRATION_EXPECTED_DATABASE: ${{ secrets.NEON_MIGRATION_EXPECTED_DATABASE }}
+          NEON_MIGRATION_EXPECTED_ROLE: ${{ secrets.NEON_MIGRATION_EXPECTED_ROLE }}
+        run: npm run migrate:production:verify
+
       - name: Deploy production Worker
         working-directory: worker
         env:
@@ -174,3 +201,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npm run deploy:pages:production
+
+      - name: Run production same-origin read-only smoke
+        working-directory: worker
+        run: npm run deploy:smoke:production

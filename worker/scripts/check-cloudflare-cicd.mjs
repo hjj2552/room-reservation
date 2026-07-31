@@ -15,8 +15,16 @@ const requiredFragments = [
   "CLOUDFLARE_READ_RATE_LIMIT_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_PRODUCTION_READ_RATE_LIMIT_NAMESPACE_ID }}",
   "CLOUDFLARE_WRITE_RATE_LIMIT_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_PRODUCTION_WRITE_RATE_LIMIT_NAMESPACE_ID }}",
   "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
+  "NEON_MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}",
+  "NEON_MIGRATION_EXPECTED_HOST: ${{ secrets.NEON_MIGRATION_EXPECTED_HOST }}",
+  "NEON_MIGRATION_EXPECTED_DATABASE: ${{ secrets.NEON_MIGRATION_EXPECTED_DATABASE }}",
+  "NEON_MIGRATION_EXPECTED_ROLE: ${{ secrets.NEON_MIGRATION_EXPECTED_ROLE }}",
+  "run: npm run migrate:production:preflight",
+  "run: npm run migrate:production:apply",
+  "run: npm run migrate:production:verify",
   "run: npm run deploy:production",
   "run: npm run deploy:pages:production",
+  "run: npm run deploy:smoke:production",
 ];
 for (const fragment of requiredFragments) assert.equal(workflow.includes(fragment), true, fragment);
 
@@ -24,6 +32,27 @@ assert.equal(workflow.includes("environment: production"), false);
 assert.equal(workflow.includes("vars.CLOUDFLARE_"), false);
 assert.equal(workflow.includes("backend-test:"), false);
 assert.equal(workflow.includes("actions/setup-java"), false);
+assert.equal(workflow.includes("NEON_MIGRATION_DATABASE_URL:"), true);
+assert.equal(
+  workflow.indexOf("run: npm run migrate:production:preflight")
+    < workflow.indexOf("run: npm run migrate:production:apply"),
+  true,
+);
+assert.equal(
+  workflow.indexOf("run: npm run migrate:production:apply")
+    < workflow.indexOf("run: npm run migrate:production:verify"),
+  true,
+);
+assert.equal(
+  workflow.indexOf("run: npm run migrate:production:verify")
+    < workflow.indexOf("run: npm run deploy:production"),
+  true,
+);
 assert.equal(workflow.indexOf("run: npm run deploy:production") < workflow.indexOf("run: npm run deploy:pages:production"), true);
+assert.equal(
+  workflow.indexOf("run: npm run deploy:pages:production")
+    < workflow.indexOf("run: npm run deploy:smoke:production"),
+  true,
+);
 
 process.stdout.write("Cloudflare production CI/CD workflow contract verified.\n");
