@@ -37,11 +37,14 @@ export function useRoom(id?: string) {
   });
 }
 
-export function useRoomOrder(options: { enabled?: boolean } = {}) {
+export function useRoomOrder(
+  options: { enabled?: boolean; refetchOnMount?: boolean | 'always' } = {},
+) {
   return useQuery({
     queryKey: roomKeys.order(),
     queryFn: getRoomOrder,
     enabled: options.enabled ?? true,
+    refetchOnMount: options.refetchOnMount,
   });
 }
 

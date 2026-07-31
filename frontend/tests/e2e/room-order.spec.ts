@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, Route } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   getRoomOrderByApi,
@@ -203,6 +203,78 @@ test('room order panel refreshes after room state and collection changes', async
   const current = await getRoomOrderByApi(request);
   await expect(page.getByTestId('room-order-item')).toHaveCount(current.items.length);
   await expect(page.getByTestId('room-order-item').filter({ hasText: deleted.name })).toHaveCount(0);
+});
+
+test('room order panel blocks stale cached editing when its fresh request fails', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('order-stale-cache');
+
+  await page.goto('/admin/rooms');
+  const orderButton = page.getByTestId('room-order-button');
+  await orderButton.click();
+  await expect(page.getByTestId('room-order-item').filter({ hasText: room.name })).toBeVisible();
+  await page.getByTestId('room-order-cancel').click();
+
+  let failedGetRequests = 0;
+  let putRequests = 0;
+  let pendingGetRoute: Route | undefined;
+  const failGet = (route: Route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      code: 'TEMPORARY_FAILURE',
+      message: 'Temporary room order failure.',
+    }),
+  });
+  page.on('request', (request) => {
+    if (request.method() === 'PUT' && request.url().includes('/api/admin/rooms/order')) {
+      putRequests += 1;
+    }
+  });
+  await page.route('**/api/admin/rooms/order', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    failedGetRequests += 1;
+    if (failedGetRequests === 1) {
+      pendingGetRoute = route;
+      return;
+    }
+    await failGet(route);
+  });
+
+  await orderButton.click();
+  const panel = page.getByTestId('room-order-panel');
+  await expect.poll(() => failedGetRequests).toBe(1);
+  await expect(panel.getByRole('status')).toBeVisible();
+  await expect(panel.getByTestId('room-order-item')).toHaveCount(0);
+  await expect(panel.getByTestId('room-order-handle')).toHaveCount(0);
+  const saveButton = panel.getByTestId('room-order-save');
+  await expect(saveButton).toBeDisabled();
+
+  if (!pendingGetRoute) throw new Error('Fresh room order request did not start.');
+  await failGet(pendingGetRoute);
+  await expect(panel.getByRole('alert')).toBeVisible();
+  expect(failedGetRequests).toBeGreaterThan(0);
+  await expect(panel.getByTestId('room-order-item')).toHaveCount(0);
+  await expect(panel.getByTestId('room-order-handle')).toHaveCount(0);
+  await expect(saveButton).toBeDisabled();
+  await saveButton.evaluate((button: HTMLButtonElement) => button.click());
+  expect(putRequests).toBe(0);
+
+  await page.unroute('**/api/admin/rooms/order');
+  await panel.getByTestId('room-order-cancel').click();
+  await orderButton.click();
+  await expect(page.getByTestId('room-order-item').filter({ hasText: room.name })).toBeVisible();
+  await expect(page.getByTestId('room-order-handle')).toHaveCount(
+    await page.getByTestId('room-order-item').count(),
+  );
+  await expect(page.getByTestId('room-order-save')).toBeEnabled();
 });
 
 test('room order panel saves a desktop handle drag', async ({ page, request, e2eData }) => {
