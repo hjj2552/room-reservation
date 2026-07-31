@@ -2,6 +2,12 @@
 
 이 문서는 Worker 백엔드와 React 프런트엔드를 로컬에서 실행하고 검증하는 기준 절차입니다. 명령 예시는 Windows PowerShell 기준입니다.
 
+## 로컬 환경 선택 기준
+
+Windows와 PowerShell을 기준으로 문서화한 이유는 현재 이 저장소의 주 개발 장비가 Windows이고, Docker Desktop·Node.js·npm을 이용한 반복 실행과 Windows의 경로·프로세스·포트 확인을 별도 호환 계층 없이 처리할 수 있기 때문입니다. 루트의 `start-worker.bat`과 `start-frontend.bat`은 이 로컬 작업을 한 명령으로 시작하기 위한 Windows용 편의 진입점입니다.
+
+이는 제품이나 배포 환경이 Windows에 의존한다는 의미가 아닙니다. 핵심 빌드·검사·테스트는 `npm run`과 플랫폼 독립적인 Node.js 스크립트에 두고 있으며, GitHub Actions는 `ubuntu-latest`와 Bash에서 전체 검증 및 배포를 수행합니다. 프런트엔드는 브라우저에서, 백엔드는 일반 Linux 서버가 아닌 Cloudflare Worker에서 실행됩니다. 따라서 로컬 PowerShell은 현재 개발 장비에 맞춘 선택이고, Linux CI는 POSIX 환경 호환성을 확인하는 기준입니다.
+
 ## 프로젝트 구성
 
 ```text
