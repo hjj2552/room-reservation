@@ -56,7 +56,7 @@ export interface AdminRoom {
   capacity: number | null;
   description: string | null;
   enabled: boolean;
-  displayOrder: number;
+  displayOrder: number | null;
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

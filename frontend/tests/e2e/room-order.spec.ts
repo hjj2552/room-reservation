@@ -181,7 +181,11 @@ test('room order panel saves a desktop handle drag', async ({ page, request, e2e
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2 - 6);
-  await expect(page.locator('.room-order-item-content.is-overlay')).toBeVisible();
+  const overlay = page.locator('.room-order-item-content.is-overlay');
+  await expect(overlay).toBeVisible();
+  const overlayName = overlay.locator('.room-order-name');
+  await expect(overlayName).toHaveText(second.name);
+  expect(await overlayName.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(200);
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
   await page.waitForTimeout(100);
   await page.mouse.up();

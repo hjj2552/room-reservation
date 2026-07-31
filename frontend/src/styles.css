@@ -1116,6 +1116,7 @@ button:disabled {
 }
 
 .room-order-item-content.is-overlay {
+  grid-template-columns: minmax(0, 1fr) auto;
   width: min(410px, calc(100vw - 56px));
   border: 1px solid var(--action);
   border-radius: 4px;
