@@ -109,12 +109,42 @@ async function waitFor(url, processRef) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-function stopProcess(processRef) {
-  if (!processRef || processRef.exitCode !== null) return;
+function hasExited(processRef) {
+  return !processRef || processRef.exitCode !== null || processRef.signalCode !== null;
+}
+
+function waitForProcessExit(processRef, timeoutMs) {
+  if (hasExited(processRef)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (exited) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      processRef.off("exit", onExit);
+      resolve(exited);
+    };
+    const onExit = () => finish(true);
+    const timeout = setTimeout(() => finish(hasExited(processRef)), timeoutMs);
+    processRef.once("exit", onExit);
+    if (hasExited(processRef)) finish(true);
+  });
+}
+
+async function stopProcess(processRef) {
+  if (hasExited(processRef)) return;
   if (process.platform === "win32") {
     spawnSync("taskkill", ["/PID", String(processRef.pid), "/T", "/F"], { stdio: "ignore" });
   } else {
     processRef.kill("SIGTERM");
+  }
+  if (await waitForProcessExit(processRef, 10_000)) return;
+
+  if (process.platform !== "win32") {
+    processRef.kill("SIGKILL");
+  }
+  if (!await waitForProcessExit(processRef, 5_000)) {
+    process.stderr.write("Local Worker adapter did not exit before PostgreSQL shutdown.\n");
   }
 }
 
@@ -178,6 +208,6 @@ try {
   if (frontend.error) throw frontend.error;
   if (frontend.status !== 0) throw new Error(`Frontend E2E failed with ${frontend.status}`);
 } finally {
-  stopProcess(serverProcess);
+  await stopProcess(serverProcess);
   spawnSync("docker", ["stop", "--time", "5", containerName], { stdio: "ignore" });
 }

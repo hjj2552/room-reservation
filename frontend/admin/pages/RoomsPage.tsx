@@ -1,4 +1,4 @@
-import { FormEvent, lazy, Suspense, useEffect, useState } from 'react';
+import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { AdminRoom, RoomPayload } from '../../shared/api/types';
@@ -47,6 +47,7 @@ export function RoomsPage() {
   const appliedKeyword = searchParams.get('keyword') || '';
   const page = numberParam(searchParams.get('page'), 0);
   const [keyword, setKeyword] = useState(appliedKeyword);
+  const previousAppliedKeywordRef = useRef(appliedKeyword);
   const [editingRoom, setEditingRoom] = useState<AdminRoom | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [isOrderPanelOpen, setIsOrderPanelOpen] = useState(false);
@@ -66,7 +67,11 @@ export function RoomsPage() {
   const deleteRoom = useDeleteRoom();
 
   useEffect(() => {
-    setKeyword(appliedKeyword);
+    const previousAppliedKeyword = previousAppliedKeywordRef.current;
+    previousAppliedKeywordRef.current = appliedKeyword;
+    setKeyword((currentKeyword) => (
+      currentKeyword === previousAppliedKeyword ? appliedKeyword : currentKeyword
+    ));
   }, [appliedKeyword]);
 
   useEffect(() => {
