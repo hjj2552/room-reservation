@@ -67,9 +67,20 @@ test('room management paginates 20 at a time, resets search, and corrects an inv
   await page.getByTestId('room-search-button').click();
   await expect(page).toHaveURL(/page=0/);
   await expect(page.getByTestId('rooms-table').locator('tbody tr')).toHaveCount(1);
+  const unfilteredRoomsResponse = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'GET'
+      && url.pathname === '/api/admin/rooms'
+      && url.searchParams.get('page') === '0'
+      && !url.searchParams.has('keyword')
+      && response.ok();
+  });
   await page.getByTestId('room-search-reset').click();
+  await unfilteredRoomsResponse;
   await expect(page).toHaveURL(/page=0/);
   expect(new URL(page.url()).searchParams.has('keyword')).toBe(false);
+  await expect(page.getByTestId('room-keyword-input')).toHaveValue('');
+  await expect(page.getByTestId('rooms-table').locator('tbody tr')).toHaveCount(20);
 
   await page.getByTestId('room-keyword-input').fill(batch);
   await page.getByTestId('room-search-button').click();
