@@ -73,7 +73,10 @@ test('room management paginates 20 at a time, resets search, and corrects an inv
 
   await page.getByTestId('room-keyword-input').fill(batch);
   await page.getByTestId('room-search-button').click();
+  await expect(page).toHaveURL(new RegExp(`keyword=${batch}.*page=0|page=0.*keyword=${batch}`));
+  await expect(page.getByTestId('rooms-table').locator('tbody tr')).toHaveCount(20);
   await page.getByRole('button', { name: '다음' }).click();
+  await expect(page).toHaveURL(new RegExp(`keyword=${batch}.*page=1|page=1.*keyword=${batch}`));
   await expect(lastPageRows).toHaveCount(1);
   const lastRoomName = (await lastPageRows.first().locator('strong').textContent()) || '';
   await lastPageRows.first().getByTestId('room-delete-button').click();
@@ -193,6 +196,7 @@ test('room order panel saves a desktop handle drag', async ({ page, request, e2e
   const draft = await displayedOrderIds(page);
   expect(draft.indexOf(second.id)).toBeLessThan(draft.indexOf(first.id));
   await page.getByTestId('room-order-save').click();
+  await expect(page.getByTestId('room-order-panel')).toBeHidden();
 
   const saved = await getRoomOrderByApi(request);
   expect(saved.items.findIndex((room) => room.id === second.id)).toBeLessThan(
