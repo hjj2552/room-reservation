@@ -30,7 +30,7 @@ interface RoomOrderPanelProps {
 }
 
 export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
-  const roomOrder = useRoomOrder();
+  const roomOrder = useRoomOrder({ refetchOnMount: 'always' });
   const saveRoomOrder = useSaveRoomOrder();
   const [items, setItems] = useState<RoomOrderItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -47,13 +47,17 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
     }),
   );
 
+  const hasFreshOrder = roomOrder.isFetchedAfterMount
+    && roomOrder.isSuccess
+    && !roomOrder.isFetching;
+
   useEffect(() => {
-    if (!roomOrder.data || roomOrder.isFetching || initializedRef.current) return;
+    if (!roomOrder.data || !hasFreshOrder || initializedRef.current) return;
     setItems(roomOrder.data.items);
     initializedRef.current = true;
-  }, [roomOrder.data, roomOrder.isFetching]);
+  }, [hasFreshOrder, roomOrder.data]);
 
-  const isInitializing = !initializedRef.current && roomOrder.isFetching;
+  const isInitializing = !hasFreshOrder && roomOrder.isFetching;
 
   const activeItem = useMemo(
     () => items.find((item) => item.id === activeId) || null,
@@ -114,7 +118,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
   }
 
   function handleSave() {
-    if (!roomOrder.data || saveRoomOrder.isPending) return;
+    if (!hasFreshOrder || !roomOrder.data || saveRoomOrder.isPending) return;
     saveRoomOrder.mutate(
       {
         orderVersion: roomOrder.data.orderVersion,
@@ -141,7 +145,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
       </div>
       {roomOrder.isLoading || isInitializing ? <LoadingState /> : null}
       {roomOrder.isError ? <ErrorState error={roomOrder.error} /> : null}
-      {roomOrder.data && !isInitializing ? (
+      {roomOrder.data && hasFreshOrder ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -205,7 +209,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
           type="button"
           className="primary-button"
           onClick={handleSave}
-          disabled={!roomOrder.data || saveRoomOrder.isPending}
+          disabled={!hasFreshOrder || !roomOrder.data || saveRoomOrder.isPending}
           data-testid="room-order-save"
         >
           {saveRoomOrder.isPending ? '저장 중...' : '저장'}
