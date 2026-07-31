@@ -48,10 +48,12 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
   );
 
   useEffect(() => {
-    if (!roomOrder.data || initializedRef.current) return;
+    if (!roomOrder.data || roomOrder.isFetching || initializedRef.current) return;
     setItems(roomOrder.data.items);
     initializedRef.current = true;
-  }, [roomOrder.data]);
+  }, [roomOrder.data, roomOrder.isFetching]);
+
+  const isInitializing = !initializedRef.current && roomOrder.isFetching;
 
   const activeItem = useMemo(
     () => items.find((item) => item.id === activeId) || null,
@@ -137,9 +139,9 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
       <div className="sr-only" aria-live="assertive" aria-atomic="true">
         {keyboardStatus}
       </div>
-      {roomOrder.isLoading ? <LoadingState /> : null}
+      {roomOrder.isLoading || isInitializing ? <LoadingState /> : null}
       {roomOrder.isError ? <ErrorState error={roomOrder.error} /> : null}
-      {roomOrder.data ? (
+      {roomOrder.data && !isInitializing ? (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

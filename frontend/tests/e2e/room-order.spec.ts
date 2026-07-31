@@ -167,6 +167,44 @@ test('room order panel supports keyboard save, discard, conflict retention, and 
   expect(first.id).toBeTruthy();
 });
 
+test('room order panel refreshes after room state and collection changes', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const toggled = await e2eData.createTestRoom('order-refresh-enabled');
+  const deleted = await e2eData.createTestRoom('order-refresh-deleted');
+
+  await page.goto('/admin/rooms');
+  const orderButton = page.getByTestId('room-order-button');
+  await orderButton.click();
+  await expect(page.getByTestId('room-order-item').filter({ hasText: toggled.name })).toBeVisible();
+  await expect(page.getByTestId('room-order-item').filter({ hasText: deleted.name })).toBeVisible();
+  await page.getByTestId('room-order-cancel').click();
+
+  const toggledRow = page.getByTestId('rooms-table').locator('tbody tr').filter({ hasText: toggled.name });
+  await toggledRow.getByTestId('room-enabled-toggle').click();
+  await expect(toggledRow).toContainText('제외됨');
+
+  await orderButton.click();
+  await expect(
+    page.getByTestId('room-order-item').filter({ hasText: toggled.name }),
+  ).toContainText('사용 안 함');
+  await page.getByTestId('room-order-cancel').click();
+
+  const deletedRow = page.getByTestId('rooms-table').locator('tbody tr').filter({ hasText: deleted.name });
+  await deletedRow.getByTestId('room-delete-button').click();
+  await page.getByTestId('room-delete-confirm-input').fill(deleted.name);
+  await page.getByTestId('room-delete-confirm-button').click();
+  await expect(deletedRow).toBeHidden();
+
+  await orderButton.click();
+  const current = await getRoomOrderByApi(request);
+  await expect(page.getByTestId('room-order-item')).toHaveCount(current.items.length);
+  await expect(page.getByTestId('room-order-item').filter({ hasText: deleted.name })).toHaveCount(0);
+});
+
 test('room order panel saves a desktop handle drag', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const first = await e2eData.createTestRoom('order-mouse-a');

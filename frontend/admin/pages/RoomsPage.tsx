@@ -306,6 +306,7 @@ export function RoomsPage() {
                           <button
                             type="button"
                             className="ghost-button"
+                            data-testid="room-enabled-toggle"
                             disabled={toggleEnabled.isPending}
                             onClick={() => toggleEnabled.mutate({ roomId: room.id, enabled: !room.enabled })}
                           >
