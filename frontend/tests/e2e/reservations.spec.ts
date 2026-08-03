@@ -135,6 +135,11 @@ test('settings keep related fields paired on desktop and stacked in order on mob
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/admin/settings');
 
+  await expect(page.getByLabel('예약 가능 시작일')).toBeVisible();
+  await expect(page.getByLabel('예약 가능 종료일')).toBeVisible();
+  await expect(page.getByTestId('settings-form')).not.toContainText('학기 시작일');
+  await expect(page.getByTestId('settings-form')).not.toContainText('학기 종료일');
+
   const pairIds = ['settings-semester-pair', 'settings-hours-pair', 'settings-duration-pair'];
   for (const pairId of pairIds) {
     const pair = page.getByTestId(pairId);

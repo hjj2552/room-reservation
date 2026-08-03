@@ -621,10 +621,7 @@ button:disabled {
   padding: 16px 0 0;
 }
 
-.compact-date-picker {
-  min-width: 164px;
-}
-
+.compact-date-picker,
 .compact-room-picker {
   min-width: 196px;
 }
@@ -2076,6 +2073,25 @@ button:disabled {
   .inline-filter button {
     height: 40px;
     min-height: 40px;
+  }
+
+  .room-week-controls .compact-date-picker,
+  .room-week-controls .compact-room-picker {
+    flex: 0 0 196px;
+    width: 196px;
+    max-width: 196px;
+  }
+
+  .room-week-controls input[type="date"],
+  .room-week-controls select,
+  .room-week-controls .week-navigation > .icon-button {
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .room-week-controls .week-navigation > .icon-button {
+    width: 40px;
+    min-width: 40px;
   }
 }
 

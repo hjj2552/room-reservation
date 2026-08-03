@@ -100,7 +100,10 @@ test('public blocks unavailable future suggestions while admin allows manual pas
 
   await page.goto('/timetable');
   await page.getByTestId('public-new-request-button').click();
-  await expect(page.getByTestId('reservation-time-unavailable')).toContainText('예약 가능한 미래 운영 시간이 없습니다');
+  await expect(page.getByTestId('reservation-time-unavailable')).toContainText(
+    '설정된 예약 가능 기간에 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.',
+  );
+  await expect(page.getByTestId('reservation-time-unavailable')).not.toContainText('학기');
   await expect(page.getByTestId('public-request-start-input')).toHaveValue('');
   await expect(page.getByTestId('public-request-end-input')).toHaveValue('');
   await expect(page.getByTestId('public-request-submit-button')).toBeDisabled();
