@@ -7,6 +7,13 @@ import {
   type E2eRoom,
 } from './helpers';
 
+// dnd-kit removes the pointer sensor's document click blocker after 50ms.
+const POINTER_SENSOR_CLICK_TEARDOWN_MS = 60;
+
+async function waitForPointerSensorClickTeardown(page: Page) {
+  await page.waitForTimeout(POINTER_SENSOR_CLICK_TEARDOWN_MS);
+}
+
 async function displayedOrderIds(page: Page) {
   const items = page.getByTestId('room-order-item');
   await expect.poll(() => items.count()).toBeGreaterThan(0);
@@ -96,6 +103,115 @@ test('room management paginates 20 at a time, resets search, and corrects an inv
   await page.getByTestId('room-delete-confirm-button').click();
   await expect(page).toHaveURL(new RegExp(`keyword=${batch}.*page=0|page=0.*keyword=${batch}`));
   await expect(page.getByTestId('rooms-table').locator('tbody tr')).toHaveCount(20);
+});
+
+test('room order shell keeps the room page stable while its chunk and data load', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('order-lazy-shell');
+
+  let releaseChunk!: () => void;
+  const chunkRelease = new Promise<void>((resolve) => {
+    releaseChunk = resolve;
+  });
+  let chunkRequests = 0;
+  await page.route('**/admin/components/RoomOrderPanel.tsx*', async (route) => {
+    chunkRequests += 1;
+    await Promise.all([
+      new Promise((resolve) => setTimeout(resolve, 500)),
+      chunkRelease,
+    ]);
+    await route.continue();
+  });
+
+  await page.goto('/admin/rooms');
+  const pageSection = page.locator('.rooms-page');
+  const orderButton = page.getByTestId('room-order-button');
+  const createButton = page.getByTestId('room-create-button');
+  const measureBackground = async () => {
+    const [pageBox, orderButtonBox, createButtonBox] = await Promise.all([
+      pageSection.boundingBox(),
+      orderButton.boundingBox(),
+      createButton.boundingBox(),
+    ]);
+    if (!pageBox || !orderButtonBox || !createButtonBox) {
+      throw new Error('Could not measure the room management background.');
+    }
+    return {
+      pageHeight: pageBox.height,
+      orderButtonX: orderButtonBox.x,
+      orderButtonY: orderButtonBox.y,
+      createButtonX: createButtonBox.x,
+      createButtonY: createButtonBox.y,
+    };
+  };
+  const expectStableBackground = (
+    actual: Awaited<ReturnType<typeof measureBackground>>,
+    expected: Awaited<ReturnType<typeof measureBackground>>,
+  ) => {
+    for (const key of Object.keys(expected) as Array<keyof typeof expected>) {
+      expect(Math.abs(actual[key] - expected[key]), `${key} should stay stable`).toBeLessThanOrEqual(1);
+    }
+  };
+  const beforeOpen = await measureBackground();
+
+  await orderButton.click();
+  const panel = page.getByTestId('room-order-panel');
+  const panelBody = panel.locator('.side-panel-body');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('heading', { name: '순서 변경' })).toBeVisible();
+  await expect(panel.getByTestId('room-order-close')).toBeVisible();
+  await expect(panelBody.getByRole('status')).toHaveText('불러오는 중입니다.');
+  await expect(page.locator('.rooms-page > .state-box')).toHaveCount(0);
+  await expect.poll(() => chunkRequests).toBe(1);
+  await expect(page.locator('body')).toHaveCSS('position', 'fixed');
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  const chunkResponse = page.waitForResponse((response) => (
+    response.url().includes('/admin/components/RoomOrderPanel.tsx') && response.ok()
+  ));
+  await panel.getByTestId('room-order-close').click();
+  await expect(panel).toBeHidden();
+  releaseChunk();
+  await chunkResponse;
+  await page.waitForTimeout(50);
+  await expect(panel).toBeHidden();
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  let releaseOrderRequest!: () => void;
+  const orderRequestRelease = new Promise<void>((resolve) => {
+    releaseOrderRequest = resolve;
+  });
+  let orderRequests = 0;
+  await page.route('**/api/admin/rooms/order', async (route) => {
+    if (route.request().method() === 'GET') {
+      orderRequests += 1;
+      await orderRequestRelease;
+    }
+    await route.continue();
+  });
+
+  await orderButton.click();
+  await expect(panel).toBeVisible();
+  await expect(panelBody.getByRole('status')).toHaveText('불러오는 중입니다.');
+  await expect(page.locator('.rooms-page > .state-box')).toHaveCount(0);
+  await expect.poll(() => orderRequests).toBe(1);
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  const orderResponse = page.waitForResponse((response) => (
+    response.request().method() === 'GET'
+      && response.url().includes('/api/admin/rooms/order')
+      && response.ok()
+  ));
+  releaseOrderRequest();
+  await orderResponse;
+  await expect(panel.getByTestId('room-order-item').filter({ hasText: room.name })).toBeVisible();
+  await expect(panel.getByTestId('room-order-save')).toBeVisible();
+  await expect(panel.getByTestId('room-order-cancel')).toBeVisible();
+  expectStableBackground(await measureBackground(), beforeOpen);
 });
 
 test('room order panel supports keyboard save, discard, conflict retention, and focus return', async ({
@@ -288,35 +404,281 @@ test('room order panel blocks stale cached editing when its fresh request fails'
   await expect(page.getByTestId('room-order-save')).toBeEnabled();
 });
 
+test('room order panel locks scrolling without shifting or accumulating background compensation', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  test.setTimeout(120_000);
+  await loginByApi(request);
+  for (let index = 0; index < 12; index += 1) {
+    await e2eData.createTestRoom(`order-scroll-lock-${index}`);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto('/admin/rooms');
+  const emulatedClassicScrollbarWidth = 17;
+  await page.addStyleTag({
+    content: `body { width: calc(100% - ${emulatedClassicScrollbarWidth}px); min-height: 1200px; }`,
+  });
+  await page.evaluate((classicScrollbarWidth) => {
+    const root = document.documentElement;
+    const unlockedClientWidth = root.clientWidth;
+    Object.defineProperty(root, 'clientWidth', {
+      configurable: true,
+      get: () => unlockedClientWidth - (root.style.overflow === 'hidden' ? 0 : classicScrollbarWidth),
+    });
+  }, emulatedClassicScrollbarWidth);
+  const orderButton = page.getByTestId('room-order-button');
+  const pageSection = page.locator('.rooms-page');
+  const scrollbarWidth = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+  expect(scrollbarWidth).toBeGreaterThan(0);
+
+  await page.evaluate(() => window.scrollTo(0, 160));
+  const scrollY = await page.evaluate(() => window.scrollY);
+  expect(scrollY).toBeGreaterThan(0);
+  const initialStyles = await page.evaluate(() => ({
+    rootOverflow: document.documentElement.style.overflow,
+    bodyOverflow: document.body.style.overflow,
+    bodyPosition: document.body.style.position,
+    bodyTop: document.body.style.top,
+    bodyLeft: document.body.style.left,
+    bodyWidth: document.body.style.width,
+    bodyPaddingRight: document.body.style.paddingRight,
+  }));
+  const buttonBefore = await orderButton.boundingBox();
+  const pageBefore = await pageSection.boundingBox();
+  if (!buttonBefore || !pageBefore) throw new Error('Could not measure the room management background.');
+
+  await orderButton.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.getByTestId('room-order-panel')).toBeVisible();
+  await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
+  await expect(page.locator('body')).toHaveCSS('overflow', 'hidden');
+  await expect(page.locator('body')).toHaveCSS('position', 'fixed');
+  const buttonWhileOpen = await orderButton.boundingBox();
+  const pageWhileOpen = await pageSection.boundingBox();
+  if (!buttonWhileOpen || !pageWhileOpen) throw new Error('Could not measure the locked room management background.');
+  expect(Math.abs(buttonWhileOpen.x + buttonWhileOpen.width - (buttonBefore.x + buttonBefore.width)))
+    .toBeLessThanOrEqual(1);
+  expect(Math.abs(pageWhileOpen.width - pageBefore.width)).toBeLessThanOrEqual(1);
+  const firstLockedPadding = await page.evaluate(() => document.body.style.paddingRight);
+  expect(Number.parseFloat(firstLockedPadding)).toBeGreaterThanOrEqual(scrollbarWidth);
+
+  await page.getByTestId('room-order-close').click();
+  await expect(page.getByTestId('room-order-panel')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+  expect(await page.evaluate(() => ({
+    rootOverflow: document.documentElement.style.overflow,
+    bodyOverflow: document.body.style.overflow,
+    bodyPosition: document.body.style.position,
+    bodyTop: document.body.style.top,
+    bodyLeft: document.body.style.left,
+    bodyWidth: document.body.style.width,
+    bodyPaddingRight: document.body.style.paddingRight,
+  }))).toEqual(initialStyles);
+
+  await orderButton.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(page.getByTestId('room-order-panel')).toBeVisible();
+  expect(await page.evaluate(() => document.body.style.paddingRight)).toBe(firstLockedPadding);
+  await page.getByTestId('room-order-cancel').click();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollY);
+  expect(await page.evaluate(() => document.body.style.paddingRight)).toBe(initialStyles.bodyPaddingRight);
+  await page.evaluate(() => {
+    Reflect.deleteProperty(document.documentElement, 'clientWidth');
+  });
+});
+
+test('room order drag stays inside the visible list while desktop auto-scroll reaches its limits', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  test.setTimeout(120_000);
+  await loginByApi(request);
+  for (let index = 0; index < 12; index += 1) {
+    await e2eData.createTestRoom(`order-bounds-${index}`);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto('/admin/rooms');
+  await page.getByTestId('room-order-button').click();
+
+  const panelBody = page.locator('.room-order-panel .side-panel-body');
+  const list = page.getByTestId('room-order-list');
+  const actions = page.locator('.room-order-actions');
+  const items = page.getByTestId('room-order-item');
+  const overlay = page.locator('.room-order-item-content.is-overlay');
+  await expect(items).toHaveCount(12);
+
+  await panelBody.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  const firstHandleBox = await items.first().getByTestId('room-order-handle').boundingBox();
+  const initialBodyBox = await panelBody.boundingBox();
+  const initialListBox = await list.boundingBox();
+  if (!firstHandleBox || !initialBodyBox || !initialListBox) {
+    throw new Error('Could not measure the upper room order boundary.');
+  }
+  const firstPoint = {
+    x: firstHandleBox.x + firstHandleBox.width / 2,
+    y: firstHandleBox.y + firstHandleBox.height / 2,
+  };
+  await page.mouse.move(firstPoint.x, firstPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(firstPoint.x, firstPoint.y - 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(firstPoint.x + 120, initialBodyBox.y - initialBodyBox.height, { steps: 4 });
+  const upperBoundaryBox = await overlay.boundingBox();
+  if (!upperBoundaryBox) throw new Error('Could not measure the upper-bounded drag overlay.');
+  expect(upperBoundaryBox.y).toBeGreaterThanOrEqual(Math.max(initialBodyBox.y, initialListBox.y) - 1);
+  await page.mouse.move(firstPoint.x + 120, initialBodyBox.y - initialBodyBox.height * 2, { steps: 2 });
+  const upperLimitBox = await overlay.boundingBox();
+  if (!upperLimitBox) throw new Error('Could not remeasure the upper-bounded drag overlay.');
+  expect(Math.abs(upperLimitBox.y - upperBoundaryBox.y)).toBeLessThanOrEqual(1);
+  expect(await panelBody.evaluate((element) => element.scrollTop)).toBe(0);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
+
+  const beforeAutoScroll = await displayedOrderIds(page);
+  const middleHandleBox = await items.nth(1).getByTestId('room-order-handle').boundingBox();
+  const bodyBox = await panelBody.boundingBox();
+  const actionsBox = await actions.boundingBox();
+  if (!middleHandleBox || !bodyBox || !actionsBox) {
+    throw new Error('Could not measure the room order auto-scroll boundary.');
+  }
+  const middlePoint = {
+    x: middleHandleBox.x + middleHandleBox.width / 2,
+    y: middleHandleBox.y + middleHandleBox.height / 2,
+  };
+  await page.mouse.move(middlePoint.x, middlePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(middlePoint.x, middlePoint.y + 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(middlePoint.x + 120, bodyBox.y + bodyBox.height - 4, { steps: 6 });
+  await expect.poll(() => panelBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => displayedOrderIds(page)).not.toEqual(beforeAutoScroll);
+  const scrollingOverlayBox = await overlay.boundingBox();
+  if (!scrollingOverlayBox) throw new Error('Could not measure the auto-scrolling drag overlay.');
+  expect(scrollingOverlayBox.y + scrollingOverlayBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
+  expect(await displayedOrderIds(page)).not.toEqual(beforeAutoScroll);
+
+  await panelBody.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const maximumScrollTop = await panelBody.evaluate((element) => element.scrollHeight - element.clientHeight);
+  await expect.poll(() => panelBody.evaluate((element) => element.scrollTop)).toBe(maximumScrollTop);
+  await items.last().scrollIntoViewIfNeeded();
+  const lastHandleBox = await items.last().getByTestId('room-order-handle').boundingBox();
+  const finalBodyBox = await panelBody.boundingBox();
+  const finalListBox = await list.boundingBox();
+  const finalActionsBox = await actions.boundingBox();
+  if (!lastHandleBox || !finalBodyBox || !finalListBox || !finalActionsBox) {
+    throw new Error('Could not measure the lower room order boundary.');
+  }
+  const lastPoint = {
+    x: lastHandleBox.x + lastHandleBox.width / 2,
+    y: lastHandleBox.y + lastHandleBox.height / 2,
+  };
+  await page.mouse.move(lastPoint.x, lastPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(lastPoint.x, lastPoint.y + 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(lastPoint.x + 120, finalBodyBox.y + finalBodyBox.height * 2, { steps: 4 });
+  const lowerBoundaryBox = await overlay.boundingBox();
+  if (!lowerBoundaryBox) throw new Error('Could not measure the lower-bounded drag overlay.');
+  const lowerBoundary = Math.min(
+    finalBodyBox.y + finalBodyBox.height,
+    finalListBox.y + finalListBox.height,
+    finalActionsBox.y,
+  );
+  expect(lowerBoundaryBox.y + lowerBoundaryBox.height).toBeLessThanOrEqual(lowerBoundary + 1);
+  await page.waitForTimeout(150);
+  expect(await panelBody.evaluate((element) => element.scrollTop)).toBe(maximumScrollTop);
+  await page.mouse.move(lastPoint.x + 120, finalBodyBox.y + finalBodyBox.height * 3, { steps: 2 });
+  const lowerLimitBox = await overlay.boundingBox();
+  if (!lowerLimitBox) throw new Error('Could not remeasure the lower-bounded drag overlay.');
+  expect(Math.abs(lowerLimitBox.y - lowerBoundaryBox.y)).toBeLessThanOrEqual(1);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+});
+
 test('room order panel saves a desktop handle drag', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const first = await e2eData.createTestRoom('order-mouse-a');
-  const second = await e2eData.createTestRoom('order-mouse-b');
+  const second = await e2eData.createTestRoom('order-mouse-b', { enabled: false });
+  await e2eData.createTestRoom('order-mouse-c');
   await page.goto('/admin/rooms');
   await page.getByTestId('room-order-button').click();
 
   const source = page.getByTestId('room-order-item').filter({ hasText: second.name });
   const target = page.getByTestId('room-order-item').filter({ hasText: first.name });
   await source.scrollIntoViewIfNeeded();
+  const sourceItemBox = await source.boundingBox();
+  const sourceLayout = await source.locator('.room-order-item-content').evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      alignItems: style.alignItems,
+      gridTemplateColumns: style.gridTemplateColumns,
+      padding: style.padding,
+    };
+  });
   const sourceBox = await source.getByTestId('room-order-handle').boundingBox();
   const targetBox = await target.getByTestId('room-order-handle').boundingBox();
-  if (!sourceBox || !targetBox) throw new Error('Could not measure room order drag handles.');
+  if (!sourceItemBox || !sourceBox || !targetBox) throw new Error('Could not measure room order drag handles.');
 
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2 - 6);
   const overlay = page.locator('.room-order-item-content.is-overlay');
   await expect(overlay).toBeVisible();
+  await expect(overlay.getByTestId('room-order-overlay-handle')).toHaveText('⠿');
+  await expect(overlay.getByRole('button')).toHaveCount(0);
   const overlayName = overlay.locator('.room-order-name');
   await expect(overlayName).toHaveText(second.name);
-  expect(await overlayName.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(200);
-  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
+  await expect(overlay.locator('.room-order-status')).toHaveText(
+    await source.locator('.room-order-status').innerText(),
+  );
+  await expect(source.locator('.room-order-item-content')).toHaveCSS('opacity', '0.38');
+  const overlayBox = await overlay.boundingBox();
+  if (!overlayBox) throw new Error('Could not measure the room order drag overlay.');
+  expect(Math.abs(overlayBox.width - sourceItemBox.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(overlayBox.height - sourceItemBox.height)).toBeLessThanOrEqual(1);
+  const overlayLayout = await overlay.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      alignItems: style.alignItems,
+      gridTemplateColumns: style.gridTemplateColumns,
+      padding: style.padding,
+    };
+  });
+  expect(overlayLayout).toEqual(sourceLayout);
+  const diagonalX = sourceBox.x + sourceBox.width / 2 + 120;
+  await page.mouse.move(diagonalX, sourceBox.y + sourceBox.height / 2 - 24, { steps: 4 });
+  const diagonalOverlayBox = await overlay.boundingBox();
+  if (!diagonalOverlayBox) throw new Error('Could not measure the diagonal room order drag overlay.');
+  expect(Math.abs(diagonalOverlayBox.x - overlayBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(diagonalOverlayBox.y - overlayBox.y)).toBeGreaterThan(1);
+  await page.mouse.move(diagonalX, targetBox.y + targetBox.height / 2, { steps: 8 });
   await page.waitForTimeout(100);
   await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
   await expect.poll(() => displayedOrderIds(page)).toEqual(expect.arrayContaining([first.id, second.id]));
   const draft = await displayedOrderIds(page);
   expect(draft.indexOf(second.id)).toBeLessThan(draft.indexOf(first.id));
-  await page.getByTestId('room-order-save').click();
+  const saveButton = page.getByTestId('room-order-save');
+  await expect(saveButton).toBeEnabled();
+  const [saveResponse] = await Promise.all([
+    page.waitForResponse((response) => (
+      response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+    )),
+    saveButton.click(),
+  ]);
+  expect(saveResponse.status(), await saveResponse.text()).toBe(200);
   await expect(page.getByTestId('room-order-panel')).toBeHidden();
 
   const saved = await getRoomOrderByApi(request);
@@ -348,19 +710,30 @@ test.describe('mobile room order panel', () => {
     await page.getByTestId('room-order-button').click();
     await expect(page.getByTestId('room-order-panel')).toBeVisible();
     await expect(page.locator('body')).toHaveCSS('position', 'fixed');
-    await expect(page.locator('.room-order-panel .side-panel-body')).toHaveCSS('overflow-y', 'auto');
+    const panelBody = page.locator('.room-order-panel .side-panel-body');
+    await expect(panelBody).toHaveCSS('overflow-y', 'auto');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+    const listItems = page.getByTestId('room-order-item');
+    const listHandles = page.getByTestId('room-order-handle');
+    const itemCount = await listItems.count();
+    await expect(listHandles).toHaveCount(itemCount);
+    expect(await listHandles.allTextContents()).toEqual(Array(itemCount).fill('⠿'));
+    await listHandles.last().scrollIntoViewIfNeeded();
+    await expect(listHandles.last()).toBeVisible();
+    await expect(listHandles.last()).toHaveText('⠿');
 
     const source = page.getByTestId('room-order-item').filter({ hasText: second.name });
     const target = page.getByTestId('room-order-item').filter({ hasText: first.name });
     await source.scrollIntoViewIfNeeded();
-    const sourceBox = await source.getByTestId('room-order-handle').boundingBox();
-    const targetBox = await target.getByTestId('room-order-handle').boundingBox();
-    if (!sourceBox || !targetBox) throw new Error('Could not measure mobile room order drag handles.');
+    const initialOrder = await displayedOrderIds(page);
+    const sourceItemBox = await source.boundingBox();
+    let sourceBox = await source.getByTestId('room-order-handle').boundingBox();
+    let targetBox = await target.getByTestId('room-order-handle').boundingBox();
+    if (!sourceItemBox || !sourceBox || !targetBox) throw new Error('Could not measure mobile room order drag handles.');
 
     const session = await page.context().newCDPSession(page);
-    const sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
-    const targetPoint = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+    let sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
     await session.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
       touchPoints: [sourcePoint],
@@ -368,7 +741,55 @@ test.describe('mobile room order panel', () => {
     await page.waitForTimeout(150);
     await expect(page.locator('.room-order-item-content.is-overlay')).toHaveCount(0);
     await page.waitForTimeout(130);
-    await expect(page.locator('.room-order-item-content.is-overlay')).toBeVisible();
+    const overlay = page.locator('.room-order-item-content.is-overlay');
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByTestId('room-order-overlay-handle')).toHaveText('⠿');
+    await expect(overlay.getByRole('button')).toHaveCount(0);
+    const overlayBox = await overlay.boundingBox();
+    if (!overlayBox) throw new Error('Could not measure the mobile room order drag overlay.');
+    expect(Math.abs(overlayBox.width - sourceItemBox.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(overlayBox.height - sourceItemBox.height)).toBeLessThanOrEqual(1);
+
+    const scrollBeforeAutoScroll = await panelBody.evaluate((element) => element.scrollTop);
+    const panelBodyBox = await panelBody.boundingBox();
+    const actionsBox = await page.locator('.room-order-actions').boundingBox();
+    if (!panelBodyBox || !actionsBox) throw new Error('Could not measure the mobile room order panel body.');
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{
+        x: sourcePoint.x + 120,
+        y: panelBodyBox.y + panelBodyBox.height - 8,
+      }],
+    });
+    const diagonalOverlayBox = await overlay.boundingBox();
+    if (!diagonalOverlayBox) throw new Error('Could not measure the diagonal mobile room order drag overlay.');
+    expect(Math.abs(diagonalOverlayBox.x - overlayBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(diagonalOverlayBox.y - overlayBox.y)).toBeGreaterThan(1);
+    expect(diagonalOverlayBox.y + diagonalOverlayBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+    await expect.poll(() => panelBody.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(scrollBeforeAutoScroll);
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchCancel',
+      touchPoints: [],
+    });
+    await expect(overlay).toHaveCount(0);
+    expect(await displayedOrderIds(page)).toEqual(initialOrder);
+
+    await panelBody.evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await source.scrollIntoViewIfNeeded();
+    sourceBox = await source.getByTestId('room-order-handle').boundingBox();
+    targetBox = await target.getByTestId('room-order-handle').boundingBox();
+    if (!sourceBox || !targetBox) throw new Error('Could not remeasure mobile room order drag handles.');
+    sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+    const targetPoint = { x: targetBox.x + targetBox.width / 2 + 120, y: targetBox.y + targetBox.height / 2 };
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [sourcePoint],
+    });
+    await page.waitForTimeout(280);
+    await expect(overlay).toBeVisible();
     await session.send('Input.dispatchTouchEvent', {
       type: 'touchMove',
       touchPoints: [targetPoint],
@@ -379,7 +800,18 @@ test.describe('mobile room order panel', () => {
       touchPoints: [],
     });
 
-    await page.getByTestId('room-order-save').click();
+    await expect(overlay).toHaveCount(0);
+    await waitForPointerSensorClickTeardown(page);
+    const saveButton = page.getByTestId('room-order-save');
+    await expect(saveButton).toBeEnabled();
+    const [saveResponse] = await Promise.all([
+      page.waitForResponse((response) => (
+        response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+      )),
+      saveButton.click(),
+    ]);
+    expect(saveResponse.status(), await saveResponse.text()).toBe(200);
+    await expect(page.getByTestId('room-order-panel')).toBeHidden();
     const saved = await getRoomOrderByApi(request);
     expect(saved.items.findIndex((room) => room.id === second.id)).toBeLessThan(
       saved.items.findIndex((room) => room.id === first.id),
