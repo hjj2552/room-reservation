@@ -424,10 +424,16 @@ test('room order panel saves a desktop handle drag', async ({ page, request, e2e
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
   await page.waitForTimeout(100);
   await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
   await expect.poll(() => displayedOrderIds(page)).toEqual(expect.arrayContaining([first.id, second.id]));
   const draft = await displayedOrderIds(page);
   expect(draft.indexOf(second.id)).toBeLessThan(draft.indexOf(first.id));
+  const saveResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+  ));
   await page.getByTestId('room-order-save').click();
+  const saveResponse = await saveResponsePromise;
+  expect(saveResponse.status(), await saveResponse.text()).toBe(200);
   await expect(page.getByTestId('room-order-panel')).toBeHidden();
 
   const saved = await getRoomOrderByApi(request);
