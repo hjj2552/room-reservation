@@ -170,8 +170,6 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue('12:30');
 
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
-    await page.getByTestId('quick-add-email-input').fill(`testing-quick-add-${Date.now()}@example.test`);
-    await page.getByTestId('quick-add-phone-input').fill('010-3333-4444');
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
 
     const createResponsePromise = page.waitForResponse((response) =>
@@ -181,8 +179,14 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await page.getByTestId('quick-add-save-button').click();
     const createResponse = await createResponsePromise;
     const createResponseBody = await createResponse.text();
-    const createRequestBody = JSON.parse(createResponse.request().postData() || '{}') as { roomId?: string };
+    const createRequestBody = JSON.parse(createResponse.request().postData() || '{}') as {
+      roomId?: string;
+      applicantEmail?: string | null;
+      applicantPhone?: string | null;
+    };
     expect(createRequestBody.roomId).toBe(room.id);
+    expect(createRequestBody.applicantEmail).toBeNull();
+    expect(createRequestBody.applicantPhone).toBeNull();
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
     createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
     e2eData.registerReservation(createdReservationId);

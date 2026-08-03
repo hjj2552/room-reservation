@@ -303,11 +303,26 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
+    await page.getByTestId('reservation-email-input').fill('');
+    await page.getByTestId('reservation-phone-input').fill('');
     await page.getByTestId('reservation-memo-input').fill('testing-reservation-edit-smoke');
+    const updateResponsePromise = page.waitForResponse((response) =>
+      response.url().includes(`/api/admin/reservations/${reservation.id}`) &&
+      response.request().method() === 'PUT',
+    );
     await page.getByTestId('reservation-save-button').click();
+    const updateResponse = await updateResponsePromise;
+    const updatePayload = JSON.parse(updateResponse.request().postData() || '{}') as {
+      applicantEmail?: string | null;
+      applicantPhone?: string | null;
+    };
+    expect(updatePayload.applicantEmail).toBeNull();
+    expect(updatePayload.applicantPhone).toBeNull();
 
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(updatedPurpose);
+    await expect(page.locator('.description-list > div').filter({ hasText: '이메일' }).locator('dd')).toHaveText('-');
+    await expect(page.locator('.description-list > div').filter({ hasText: '전화번호' }).locator('dd')).toHaveText('-');
 
     await page.goto(`/admin/reservations?keyword=${encodeURIComponent(updatedPurpose)}`);
     await expect(page.getByTestId('reservations-table')).toContainText(updatedPurpose);

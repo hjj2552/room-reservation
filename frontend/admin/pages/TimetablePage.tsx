@@ -25,6 +25,7 @@ import {
   toServiceEndOfDayOffset,
   toServiceStartOfDayOffset,
 } from '../../shared/utils/reservationTime';
+import { optionalContact } from '../utils/optionalContact';
 
 const timetablePageSize = 500;
 const timetableViewModes = ['date', 'room'] as const;
@@ -241,8 +242,8 @@ export function TimetablePage() {
       {
         roomId: values.roomId,
         applicantName: values.applicantName,
-        applicantEmail: values.applicantEmail,
-        applicantPhone: values.applicantPhone,
+        applicantEmail: optionalContact(values.applicantEmail),
+        applicantPhone: optionalContact(values.applicantPhone),
         purpose: values.purpose,
         startAt: fromServiceDateTimeLocal(values.startAt),
         endAt: fromServiceDateTimeLocal(values.endAt),

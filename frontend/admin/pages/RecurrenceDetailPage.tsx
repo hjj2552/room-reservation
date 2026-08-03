@@ -98,7 +98,7 @@ export function RecurrenceDetailPage() {
             </div>
             <div>
               <dt>연락처</dt>
-              <dd>{detail.applicantEmail} / {detail.applicantPhone || '-'}</dd>
+              <dd>{detail.applicantEmail || '-'} / {detail.applicantPhone || '-'}</dd>
             </div>
             <div>
               <dt>등록일</dt>

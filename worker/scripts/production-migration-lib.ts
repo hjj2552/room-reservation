@@ -9,6 +9,7 @@ const { Pool } = pg;
 const EXPECTED_SCHEMA = "public";
 const MIGRATIONS_TABLE = "worker_migrations";
 const V2_MIGRATION = "002_room_display_order_v2";
+const V3_MIGRATION = "003_admin_optional_contact_v3";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -425,6 +426,82 @@ export async function verifyProductionV2Schema(
   }
 }
 
+export async function verifyProductionV3Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV2Schema(client, config);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V3_MIGRATION],
+    );
+    if (migration.rows[0]?.count !== 1) {
+      throw new ProductionMigrationError("schema", "Required V3 migration record is invalid.");
+    }
+
+    const schema = await client.query(
+      `SELECT
+         count(*) FILTER (
+           WHERE table_name IN ('reservations', 'reservation_recurrences')
+             AND column_name='applicant_email'
+             AND is_nullable='YES'
+         )::integer AS nullable_email_columns,
+         EXISTS (
+           SELECT 1 FROM pg_constraint
+           WHERE conname='chk_reservations_applicant_email_optional'
+             AND conrelid='public.reservations'::regclass
+         ) AS reservation_constraint_exists,
+         EXISTS (
+           SELECT 1 FROM pg_constraint
+           WHERE conname='chk_recurrences_applicant_email_optional'
+             AND conrelid='public.reservation_recurrences'::regclass
+         ) AS recurrence_constraint_exists,
+         NOT EXISTS (
+           SELECT 1 FROM pg_constraint
+           WHERE conname IN (
+             'chk_reservations_applicant_email_not_blank',
+             'chk_recurrences_applicant_email_not_blank'
+           )
+         ) AS old_constraints_removed
+       FROM information_schema.columns
+       WHERE table_schema='public'`,
+    );
+    const schemaState = schema.rows[0];
+    if (
+      !schemaState
+      || schemaState.nullable_email_columns !== 2
+      || schemaState.reservation_constraint_exists !== true
+      || schemaState.recurrence_constraint_exists !== true
+      || schemaState.old_constraints_removed !== true
+    ) {
+      throw new ProductionMigrationError("schema", "Production V3 contact schema objects are incomplete.");
+    }
+
+    const values = await client.query(
+      `SELECT
+         (SELECT count(*) FROM public.reservations
+          WHERE applicant_email IS NOT NULL AND length(trim(applicant_email))=0)::integer
+           AS invalid_reservation_count,
+         (SELECT count(*) FROM public.reservation_recurrences
+          WHERE applicant_email IS NOT NULL AND length(trim(applicant_email))=0)::integer
+           AS invalid_recurrence_count`,
+    );
+    if (
+      values.rows[0]?.invalid_reservation_count !== 0
+      || values.rows[0]?.invalid_recurrence_count !== 0
+    ) {
+      throw new ProductionMigrationError("schema", "Production V3 contact values are invalid.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V3 schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -432,6 +509,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV2Schema(client, config);
+    await verifyProductionV3Schema(client, config);
   });
 }

@@ -619,7 +619,7 @@ export class ProductService {
       roomId: text(row, "room_id"),
       roomName: nullableText(row, "original_room_name") || text(row, "current_room_name"),
       applicantName: text(row, "applicant_name"),
-      applicantEmail: text(row, "applicant_email"),
+      applicantEmail: nullableText(row, "applicant_email"),
       applicantPhone: nullableText(row, "applicant_phone"),
       purpose: text(row, "purpose"),
       recurrenceId: nullableText(row, "recurrence_id"),
@@ -674,7 +674,8 @@ export class ProductService {
     return `${chars[0]}*${chars.at(-1)}`;
   }
 
-  private maskEmail(input: string): string {
+  private maskEmail(input: string | null): string | null {
+    if (!input) return input;
     const at = input.indexOf("@");
     if (at <= 0) return this.maskName(input);
     const local = input.slice(0, at);
@@ -780,7 +781,7 @@ export class ProductService {
             updated_by_actor_id=applicant_email, updated_at=now() WHERE id=$1 RETURNING *`,
           [reservationId],
         );
-        await this.insertHistory(client, result.rows[0]!, "CANCELLED", before, null, "PUBLIC_USER", text(before, "applicant_email"));
+        await this.insertHistory(client, result.rows[0]!, "CANCELLED", before, null, "PUBLIC_USER", nullableText(before, "applicant_email"));
       });
       return await this.getPublicReservation(reservationId);
     } catch (error) {
@@ -877,7 +878,7 @@ export class ProductService {
     if (query.keyword) {
       values.push(`%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`);
       const base = values.length - 2;
-      conditions.push(`(lower(r.applicant_name) LIKE $${base} OR lower(r.applicant_email) LIKE $${base + 1} OR lower(r.purpose) LIKE $${base + 2})`);
+      conditions.push(`(lower(r.applicant_name) LIKE $${base} OR lower(coalesce(r.applicant_email,'')) LIKE $${base + 1} OR lower(r.purpose) LIKE $${base + 2})`);
     }
     return { where: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "", values };
   }
@@ -964,7 +965,7 @@ export class ProductService {
     before: Row | null,
     memo: string | null,
     actorType: "PUBLIC_USER" | "ADMIN" | "SYSTEM",
-    actorId: string,
+    actorId: string | null,
     deleted = false,
   ): Promise<void> {
     const roomName = nullableText(current, "original_room_name") || nullableText(current, "current_room_name")
@@ -1243,7 +1244,7 @@ export class ProductService {
       id: list.id,
       room: { id: list.roomId, name: list.roomName, location: nullableText(row, "room_location") },
       applicantName: text(row, "applicant_name"),
-      applicantEmail: text(row, "applicant_email"),
+      applicantEmail: nullableText(row, "applicant_email"),
       applicantPhone: nullableText(row, "applicant_phone"),
       purpose: list.purpose,
       tagId: list.tagId,
@@ -1329,13 +1330,13 @@ export class ProductService {
       const tagIds = await ids("SELECT id FROM tags WHERE lower(name) LIKE $1", [pattern]);
       const recurrenceIds = await ids(
         `SELECT id FROM reservation_recurrences
-         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(applicant_email) LIKE $1
+         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(coalesce(applicant_email,'')) LIKE $1
            OR room_id=ANY($2::uuid[])`,
         [pattern, roomIds],
       );
       const reservationIds = await ids(
         `SELECT id FROM reservations
-         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(applicant_email) LIKE $1
+         WHERE lower(purpose) LIKE $1 OR lower(applicant_name) LIKE $1 OR lower(coalesce(applicant_email,'')) LIKE $1
            OR room_id=ANY($2::uuid[]) OR recurrence_id=ANY($3::uuid[])`,
         [pattern, roomIds, recurrenceIds],
       );

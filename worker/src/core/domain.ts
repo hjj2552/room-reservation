@@ -26,11 +26,16 @@ export interface OperationSettings {
 export interface ReservationInput {
   roomId: string;
   applicantName: string;
-  applicantEmail: string;
-  applicantPhone: string;
+  applicantEmail: string | null;
+  applicantPhone: string | null;
   purpose: string;
   startAt: string;
   endAt: string;
+}
+
+export interface PublicReservationInput extends ReservationInput {
+  applicantEmail: string;
+  applicantPhone: string;
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -138,12 +143,32 @@ export function requireEmail(object: Record<string, unknown>, field: string): st
   return value;
 }
 
-export function parseReservationInput(object: Record<string, unknown>): ReservationInput {
+export function optionalTrimmedString(
+  object: Record<string, unknown>,
+  field: string,
+  max: number,
+): string | null {
+  const value = object[field];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") validation("must be a string", field);
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (normalized.length > max) validation(`size must be between 0 and ${max}`, field);
+  return normalized;
+}
+
+export function optionalEmail(object: Record<string, unknown>, field: string): string | null {
+  const value = optionalTrimmedString(object, field, 255);
+  if (value !== null && !emailPattern.test(value)) {
+    validation("must be a well-formed email address", field);
+  }
+  return value;
+}
+
+function parseReservationFields(object: Record<string, unknown>) {
   const input = {
     roomId: requireUuid(object, "roomId"),
     applicantName: requireString(object, "applicantName", { max: 100 }),
-    applicantEmail: requireEmail(object, "applicantEmail"),
-    applicantPhone: requireString(object, "applicantPhone", { max: 50 }),
     purpose: requireString(object, "purpose", { max: 500 }),
     startAt: requireString(object, "startAt"),
     endAt: requireString(object, "endAt"),
@@ -151,6 +176,22 @@ export function parseReservationInput(object: Record<string, unknown>): Reservat
   parseInstant(input.startAt, "startAt");
   parseInstant(input.endAt, "endAt");
   return input;
+}
+
+export function parsePublicReservationInput(object: Record<string, unknown>): PublicReservationInput {
+  return {
+    ...parseReservationFields(object),
+    applicantEmail: requireEmail(object, "applicantEmail"),
+    applicantPhone: requireString(object, "applicantPhone", { max: 50 }),
+  };
+}
+
+export function parseAdminReservationInput(object: Record<string, unknown>): ReservationInput {
+  return {
+    ...parseReservationFields(object),
+    applicantEmail: optionalEmail(object, "applicantEmail"),
+    applicantPhone: optionalTrimmedString(object, "applicantPhone", 50),
+  };
 }
 
 export function parseInstant(value: string, field = "dateTime"): Date {

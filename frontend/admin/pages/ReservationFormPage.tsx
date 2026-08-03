@@ -13,6 +13,7 @@ import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { statusLabels } from '../../shared/utils/labels';
 import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
+import { optionalContact } from '../utils/optionalContact';
 
 interface ReservationFormValues {
   roomId: string;
@@ -63,7 +64,7 @@ export function ReservationFormPage() {
       reset({
         roomId: reservation.data.room.id,
         applicantName: reservation.data.applicantName,
-        applicantEmail: reservation.data.applicantEmail,
+        applicantEmail: reservation.data.applicantEmail || '',
         applicantPhone: reservation.data.applicantPhone || '',
         purpose: reservation.data.purpose,
         startAt: toServiceDateTimeLocal(reservation.data.startAt),
@@ -78,8 +79,8 @@ export function ReservationFormPage() {
     return {
       roomId: values.roomId,
       applicantName: values.applicantName,
-      applicantEmail: values.applicantEmail,
-      applicantPhone: values.applicantPhone,
+      applicantEmail: optionalContact(values.applicantEmail),
+      applicantPhone: optionalContact(values.applicantPhone),
       purpose: values.purpose,
       startAt: fromServiceDateTimeLocal(values.startAt),
       endAt: fromServiceDateTimeLocal(values.endAt),
@@ -160,20 +161,20 @@ export function ReservationFormPage() {
           {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
         </label>
         <label>
-          이메일
+          이메일 (선택)
           <input
             data-testid="reservation-email-input"
             type="email"
-            {...register('applicantEmail', { required: '이메일을 입력해 주세요.' })}
+            {...register('applicantEmail')}
           />
           {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
         </label>
         <label>
-          전화번호
+          전화번호 (선택)
           <input
             data-testid="reservation-phone-input"
             placeholder="- 제외하고 입력"
-            {...register('applicantPhone', { required: '전화번호를 입력해 주세요.' })}
+            {...register('applicantPhone')}
           />
           {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
         </label>

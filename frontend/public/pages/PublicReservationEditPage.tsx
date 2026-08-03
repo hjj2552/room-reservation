@@ -43,7 +43,7 @@ function valuesFromReservation(reservation: PublicReservationEditDetail): Public
   return {
     roomId: reservation.room.id,
     applicantName: reservation.applicantName,
-    applicantEmail: reservation.applicantEmail,
+    applicantEmail: reservation.applicantEmail || '',
     applicantPhone: reservation.applicantPhone || '',
     purpose: reservation.purpose,
     startAt: toServiceDateTimeLocal(reservation.startAt),

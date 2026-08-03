@@ -19,11 +19,14 @@ import type {
 } from "../application/product-contracts";
 import {
   normalizeDays,
+  optionalEmail,
+  optionalTrimmedString,
   parseBooleanParameter,
   parseDate,
   parseEnumParameter,
+  parseAdminReservationInput,
   parseInstant,
-  parseReservationInput,
+  parsePublicReservationInput,
   parseTime,
   parseUuid,
   requireBoolean,
@@ -123,14 +126,14 @@ function recurrence(
     daysOfWeek: normalizeDays(object.daysOfWeek),
     startTime: parseTime(requireString(object, "startTime"), "startTime"),
     endTime: parseTime(requireString(object, "endTime"), "endTime"),
-    applicantPhone: requireString(object, "applicantPhone", { max: 50 }),
+    applicantPhone: optionalTrimmedString(object, "applicantPhone", 50),
     conflictPolicy,
   };
   if (!requireApplicant) return common;
   return {
     ...common,
     applicantName: requireString(object, "applicantName", { max: 100 }),
-    applicantEmail: requireEmail(object, "applicantEmail"),
+    applicantEmail: optionalEmail(object, "applicantEmail"),
     purpose: requireString(object, "purpose", { max: 500 }),
     tagId: object.tagId === undefined || object.tagId === null || object.tagId === ""
       ? null
@@ -216,7 +219,7 @@ export function parseSaveTag(body: unknown): SaveTagCommand {
 
 export function parsePublicReservation(body: unknown): PublicReservationCommand {
   const input = requireObject(body);
-  return { reservation: parseReservationInput(input), password: publicPassword(input) };
+  return { reservation: parsePublicReservationInput(input), password: publicPassword(input) };
 }
 
 export function parsePublicPassword(body: unknown): string {
@@ -226,7 +229,7 @@ export function parsePublicPassword(body: unknown): string {
 export function parseAdminReservation(body: unknown, fallbackStatus?: ReservationStatus): AdminReservationCommand {
   const input = requireObject(body);
   return {
-    reservation: parseReservationInput(input),
+    reservation: parseAdminReservationInput(input),
     status: reservationStatus(input.status, fallbackStatus),
     memo: input.memo === undefined || input.memo === null
       ? null

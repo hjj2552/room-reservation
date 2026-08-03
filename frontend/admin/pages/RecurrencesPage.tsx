@@ -17,6 +17,7 @@ import { useTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
+import { optionalContact } from '../utils/optionalContact';
 
 interface RecurrenceForm {
   roomId: string;
@@ -114,7 +115,7 @@ export function RecurrencesPage() {
       daysOfWeek: form.daysOfWeek,
       startTime: `${form.startTime}:00`,
       endTime: `${form.endTime}:00`,
-      applicantPhone: form.applicantPhone,
+      applicantPhone: optionalContact(form.applicantPhone),
       conflictPolicy: form.conflictPolicy,
     };
   }
@@ -128,8 +129,8 @@ export function RecurrencesPage() {
     create.mutate({
       ...basePayload(),
       applicantName: form.applicantName,
-      applicantEmail: form.applicantEmail,
-      applicantPhone: form.applicantPhone,
+      applicantEmail: optionalContact(form.applicantEmail),
+      applicantPhone: optionalContact(form.applicantPhone),
       purpose: form.purpose,
       tagId: form.tagId || null,
     });
@@ -202,24 +203,22 @@ export function RecurrencesPage() {
             />
           </label>
           <label>
-            이메일
+            이메일 (선택)
             <input
               data-testid="recurrence-email-input"
               name="applicantEmail"
               type="email"
               value={form.applicantEmail}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantEmail: event.target.value }))}
-              required
             />
           </label>
           <label>
-            전화번호
+            전화번호 (선택)
             <input
               data-testid="recurrence-phone-input"
               name="applicantPhone"
               value={form.applicantPhone}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
-              required
             />
           </label>
           <label className="full-span">

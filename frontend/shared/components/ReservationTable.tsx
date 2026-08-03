@@ -50,8 +50,12 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               </td>
               <td>
                 {reservation.applicantName}
-                <br />
-                <span className="muted">{reservation.applicantEmail}</span>
+                {reservation.applicantEmail ? (
+                  <>
+                    <br />
+                    <span className="muted">{reservation.applicantEmail}</span>
+                  </>
+                ) : null}
               </td>
               <td className="purpose-cell">{reservation.purpose}</td>
               <td>{sourceLabels[reservation.source]}</td>

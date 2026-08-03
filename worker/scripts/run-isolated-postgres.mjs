@@ -92,7 +92,7 @@ try {
     "testing-room-middle|2",
     "testing-room-zulu|3",
   ])) {
-    throw new Error(`V1 to V2 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
+    throw new Error(`V1 to V3 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
   }
   const sentinelDisplayOrder = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
@@ -101,6 +101,25 @@ try {
     "SELECT display_order IS NULL FROM rooms WHERE system_reserved=true",
   ]).trim();
   if (sentinelDisplayOrder !== "t") throw new Error("System room received a display order");
+  const upgradedContactSchema = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations
+        WHERE name='003_admin_optional_contact_v3') = 1
+       AND (SELECT count(*) FROM information_schema.columns
+            WHERE table_schema='public'
+              AND table_name IN ('reservations','reservation_recurrences')
+              AND column_name='applicant_email'
+              AND is_nullable='YES') = 2
+       AND (SELECT count(*) FROM pg_constraint
+            WHERE conname IN (
+              'chk_reservations_applicant_email_optional',
+              'chk_recurrences_applicant_email_optional'
+            )) = 2`,
+  ]).trim();
+  if (upgradedContactSchema !== "t") throw new Error("V1 to V3 contact migration failed");
 
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",

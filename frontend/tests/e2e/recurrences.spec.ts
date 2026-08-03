@@ -29,8 +29,6 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
     await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
-    await page.getByTestId('recurrence-email-input').fill(`testing-recurrence-${Date.now()}@example.test`);
-    await page.getByTestId('recurrence-phone-input').fill('010-2222-3333');
     await page.getByTestId('recurrence-purpose-input').fill(purpose);
     await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
     await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
@@ -46,6 +44,10 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-preview-button').click();
     const previewResponse = await previewResponsePromise;
     const previewBody = await previewResponse.text();
+    const previewRequest = JSON.parse(previewResponse.request().postData() || '{}') as {
+      applicantPhone?: string | null;
+    };
+    expect(previewRequest.applicantPhone).toBeNull();
     expect(previewResponse.ok(), previewBody).toBeTruthy();
     const preview = JSON.parse(previewBody) as { availableCount: number; totalCandidates: number };
     expect(preview.totalCandidates, previewBody).toBeGreaterThan(0);
@@ -60,6 +62,12 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-create-button').click();
     const createResponse = await createResponsePromise;
     const createBody = await createResponse.text();
+    const createRequest = JSON.parse(createResponse.request().postData() || '{}') as {
+      applicantEmail?: string | null;
+      applicantPhone?: string | null;
+    };
+    expect(createRequest.applicantEmail).toBeNull();
+    expect(createRequest.applicantPhone).toBeNull();
     expect(createResponse.ok(), createBody).toBeTruthy();
     const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
     recurrenceId = created.recurrenceId;
@@ -71,6 +79,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
+    await expect(page.locator('.description-list').getByText('- / -')).toBeVisible();
 
     await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>
