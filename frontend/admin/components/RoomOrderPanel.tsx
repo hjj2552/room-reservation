@@ -184,7 +184,21 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
             </ol>
           </SortableContext>
           <DragOverlay>
-            {activeItem ? <RoomOrderItemContent item={activeItem} overlay /> : null}
+            {activeItem ? (
+              <RoomOrderItemContent
+                item={activeItem}
+                overlay
+                handle={(
+                  <span
+                    className="room-order-handle room-order-overlay-handle"
+                    aria-hidden="true"
+                    data-testid="room-order-overlay-handle"
+                  >
+                    ⠿
+                  </span>
+                )}
+              />
+            ) : null}
           </DragOverlay>
         </DndContext>
       ) : null}

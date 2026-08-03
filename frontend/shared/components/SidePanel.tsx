@@ -20,6 +20,80 @@ interface SidePanelProps {
   closeButtonLabel?: string;
 }
 
+interface DocumentScrollLock {
+  count: number;
+  root: HTMLElement;
+  body: HTMLElement;
+  scrollX: number;
+  scrollY: number;
+  previousRootOverflow: string;
+  previousBodyOverflow: string;
+  previousBodyPosition: string;
+  previousBodyTop: string;
+  previousBodyLeft: string;
+  previousBodyWidth: string;
+  previousBodyPaddingRight: string;
+}
+
+let documentScrollLock: DocumentScrollLock | null = null;
+
+function acquireDocumentScrollLock() {
+  if (documentScrollLock) {
+    documentScrollLock.count += 1;
+    return releaseDocumentScrollLock;
+  }
+
+  const root = document.documentElement;
+  const body = document.body;
+  const scrollbarWidth = Math.max(0, window.innerWidth - root.clientWidth);
+  const computedBodyPaddingRight = Number.parseFloat(getComputedStyle(body).paddingRight) || 0;
+
+  documentScrollLock = {
+    count: 1,
+    root,
+    body,
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    previousRootOverflow: root.style.overflow,
+    previousBodyOverflow: body.style.overflow,
+    previousBodyPosition: body.style.position,
+    previousBodyTop: body.style.top,
+    previousBodyLeft: body.style.left,
+    previousBodyWidth: body.style.width,
+    previousBodyPaddingRight: body.style.paddingRight,
+  };
+
+  root.style.overflow = 'hidden';
+  body.style.overflow = 'hidden';
+  body.style.position = 'fixed';
+  body.style.top = `-${documentScrollLock.scrollY}px`;
+  body.style.left = `-${documentScrollLock.scrollX}px`;
+  body.style.width = '100%';
+  if (scrollbarWidth > 0) {
+    body.style.paddingRight = `${computedBodyPaddingRight + scrollbarWidth}px`;
+  }
+
+  return releaseDocumentScrollLock;
+}
+
+function releaseDocumentScrollLock() {
+  const lock = documentScrollLock;
+  if (!lock) return;
+
+  lock.count -= 1;
+  if (lock.count > 0) return;
+  documentScrollLock = null;
+
+  lock.root.style.overflow = lock.previousRootOverflow;
+  lock.body.style.overflow = lock.previousBodyOverflow;
+  lock.body.style.position = lock.previousBodyPosition;
+  lock.body.style.top = lock.previousBodyTop;
+  lock.body.style.left = lock.previousBodyLeft;
+  lock.body.style.width = lock.previousBodyWidth;
+  lock.body.style.paddingRight = lock.previousBodyPaddingRight;
+  window.scrollTo(lock.scrollX, lock.scrollY);
+}
+
 export function SidePanel({
   title,
   children,
@@ -41,33 +115,11 @@ export function SidePanel({
   );
 
   useEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    const previousRootOverflow = root.style.overflow;
-    const previousBodyOverflow = body.style.overflow;
-    const previousBodyPosition = body.style.position;
-    const previousBodyTop = body.style.top;
-    const previousBodyLeft = body.style.left;
-    const previousBodyWidth = body.style.width;
-
-    root.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
-    body.style.position = 'fixed';
-    body.style.top = `-${scrollY}px`;
-    body.style.left = `-${scrollX}px`;
-    body.style.width = '100%';
+    const releaseScrollLock = acquireDocumentScrollLock();
     closeButtonRef.current?.focus();
 
     return () => {
-      root.style.overflow = previousRootOverflow;
-      body.style.overflow = previousBodyOverflow;
-      body.style.position = previousBodyPosition;
-      body.style.top = previousBodyTop;
-      body.style.left = previousBodyLeft;
-      body.style.width = previousBodyWidth;
-      window.scrollTo(scrollX, scrollY);
+      releaseScrollLock();
       if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
     };
   }, []);
