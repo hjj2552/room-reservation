@@ -11,6 +11,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
   arrayMove,
   SortableContext,
@@ -24,6 +25,8 @@ import type { RoomOrderItem } from '../../shared/api/types';
 import { SidePanel } from '../../shared/components/SidePanel';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useRoomOrder, useSaveRoomOrder } from '../../shared/hooks/useRooms';
+
+const verticalDragModifiers = [restrictToVerticalAxis];
 
 interface RoomOrderPanelProps {
   onClose: () => void;
@@ -149,6 +152,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
+          modifiers={verticalDragModifiers}
           autoScroll
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
@@ -183,7 +187,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
               ))}
             </ol>
           </SortableContext>
-          <DragOverlay>
+          <DragOverlay modifiers={verticalDragModifiers}>
             {activeItem ? (
               <RoomOrderItemContent
                 item={activeItem}

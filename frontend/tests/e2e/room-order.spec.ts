@@ -421,7 +421,13 @@ test('room order panel saves a desktop handle drag', async ({ page, request, e2e
     };
   });
   expect(overlayLayout).toEqual(sourceLayout);
-  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
+  const diagonalX = sourceBox.x + sourceBox.width / 2 + 120;
+  await page.mouse.move(diagonalX, sourceBox.y + sourceBox.height / 2 - 24, { steps: 4 });
+  const diagonalOverlayBox = await overlay.boundingBox();
+  if (!diagonalOverlayBox) throw new Error('Could not measure the diagonal room order drag overlay.');
+  expect(Math.abs(diagonalOverlayBox.x - overlayBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(diagonalOverlayBox.y - overlayBox.y)).toBeGreaterThan(1);
+  await page.mouse.move(diagonalX, targetBox.y + targetBox.height / 2, { steps: 8 });
   await page.waitForTimeout(100);
   await page.mouse.up();
   await expect(overlay).toHaveCount(0);
@@ -511,10 +517,14 @@ test.describe('mobile room order panel', () => {
     await session.send('Input.dispatchTouchEvent', {
       type: 'touchMove',
       touchPoints: [{
-        x: sourcePoint.x,
+        x: sourcePoint.x + 120,
         y: panelBodyBox.y + panelBodyBox.height - 8,
       }],
     });
+    const diagonalOverlayBox = await overlay.boundingBox();
+    if (!diagonalOverlayBox) throw new Error('Could not measure the diagonal mobile room order drag overlay.');
+    expect(Math.abs(diagonalOverlayBox.x - overlayBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(diagonalOverlayBox.y - overlayBox.y)).toBeGreaterThan(1);
     await expect.poll(() => panelBody.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(scrollBeforeAutoScroll);
     await session.send('Input.dispatchTouchEvent', {
@@ -532,7 +542,7 @@ test.describe('mobile room order panel', () => {
     targetBox = await target.getByTestId('room-order-handle').boundingBox();
     if (!sourceBox || !targetBox) throw new Error('Could not remeasure mobile room order drag handles.');
     sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
-    const targetPoint = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+    const targetPoint = { x: targetBox.x + targetBox.width / 2 + 120, y: targetBox.y + targetBox.height / 2 };
     await session.send('Input.dispatchTouchEvent', {
       type: 'touchStart',
       touchPoints: [sourcePoint],
