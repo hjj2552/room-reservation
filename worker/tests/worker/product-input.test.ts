@@ -3,6 +3,7 @@ import {
   parseAdminReservation,
   parseAvailability,
   parsePublicReservation,
+  parseRecurrenceCreate,
   parseRecurrencePreview,
   parseReservationFilter,
   parseRoomList,
@@ -57,6 +58,41 @@ describe("typed HTTP product input", () => {
     expect(() => parseAdminReservation({ ...publicBody(), status: "UNKNOWN" })).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
+  });
+
+  it.each(["applicantEmail", "applicantPhone"])(
+    "keeps public %s required for missing, null, empty, and whitespace values",
+    (field) => {
+      for (const value of [undefined, null, "", "   "]) {
+        expect(() => parsePublicReservation(publicBody({ [field]: value }))).toThrowError(
+          expect.objectContaining({ code: "VALIDATION_ERROR" }),
+        );
+      }
+    },
+  );
+
+  it("normalizes optional admin contacts and preserves validation for supplied values", () => {
+    for (const value of [undefined, null, "", "   "]) {
+      const command = parseAdminReservation(publicBody({
+        applicantEmail: value,
+        applicantPhone: value,
+        status: "CONFIRMED",
+      }));
+      expect(command.reservation.applicantEmail).toBeNull();
+      expect(command.reservation.applicantPhone).toBeNull();
+    }
+    expect(parseAdminReservation(publicBody({
+      applicantEmail: "  admin@example.test  ",
+      applicantPhone: "  010-1234-5678  ",
+      status: "CONFIRMED",
+    })).reservation).toMatchObject({
+      applicantEmail: "admin@example.test",
+      applicantPhone: "010-1234-5678",
+    });
+    expect(() => parseAdminReservation(publicBody({
+      applicantEmail: "invalid-email",
+      status: "CONFIRMED",
+    }))).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
 
   it("parses and validates pagination and booleans", () => {
@@ -122,6 +158,24 @@ describe("typed HTTP product input", () => {
     expect(() => parseRecurrencePreview({ ...recurrence, conflictPolicy: "PARTIAL" })).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
+  });
+
+  it("allows missing contacts in recurrence preview and create commands", () => {
+    const recurrence = {
+      roomId: ROOM_ID,
+      startDate: "2026-08-03",
+      endDate: "2026-08-10",
+      daysOfWeek: ["MON"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "FAIL_ALL",
+    };
+    expect(parseRecurrencePreview(recurrence).applicantPhone).toBeNull();
+    expect(parseRecurrenceCreate({
+      ...recurrence,
+      applicantName: "Applicant",
+      purpose: "Purpose",
+    })).toMatchObject({ applicantEmail: null, applicantPhone: null });
   });
 
   it("rejects settings seconds before the service policy checks", () => {

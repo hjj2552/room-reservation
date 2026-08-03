@@ -108,6 +108,37 @@ describe("Worker migrations", () => {
       [room.id, startAt, new Date(new Date(startAt).getTime() + 25 * 60_000).toISOString()],
     )).rejects.toMatchObject({ code: "23514" });
   });
+
+  it("applies the V3 nullable email contract without removing the email index", async () => {
+    const columns = await database.query(
+      `SELECT table_name, is_nullable
+       FROM information_schema.columns
+       WHERE table_schema='public'
+         AND table_name IN ('reservations','reservation_recurrences')
+         AND column_name='applicant_email'
+       ORDER BY table_name`,
+    );
+    expect(columns.rows).toEqual([
+      { table_name: "reservation_recurrences", is_nullable: "YES" },
+      { table_name: "reservations", is_nullable: "YES" },
+    ]);
+    const constraints = await database.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conname IN (
+         'chk_reservations_applicant_email_optional',
+         'chk_recurrences_applicant_email_optional',
+         'chk_reservations_applicant_email_not_blank',
+         'chk_recurrences_applicant_email_not_blank'
+       ) ORDER BY conname`,
+    );
+    expect(constraints.rows).toEqual([
+      { conname: "chk_recurrences_applicant_email_optional" },
+      { conname: "chk_reservations_applicant_email_optional" },
+    ]);
+    expect((await database.query(
+      "SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_reservations_applicant_email'",
+    )).rows).toHaveLength(1);
+  });
 });
 
 describe("room display order V2", () => {
@@ -697,6 +728,170 @@ describe("E2E cleanup ownership closure", () => {
 });
 
 describe("direct Worker contracts", () => {
+  it("stores optional admin contacts as NULL while public create and update remain strict", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-optional-contact");
+    const { app, cookie, writeHeaders } = await authenticatedApp();
+    const adminStartAt = futureWeekday(42, 10);
+    const adminPayload = {
+      roomId,
+      applicantName: "testing-admin-no-contact",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-admin-optional-contact",
+      startAt: adminStartAt,
+      endAt: addHour(adminStartAt),
+      status: "CONFIRMED",
+    };
+    const adminCreate = await app.request("http://worker.test/api/admin/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(adminPayload),
+    });
+    expect(adminCreate.status).toBe(201);
+    const adminReservation = await adminCreate.json() as { id: string; applicantEmail: string | null; applicantPhone: string | null };
+    expect(adminReservation).toMatchObject({ applicantEmail: null, applicantPhone: null });
+    await expect(database.query(
+      "UPDATE reservations SET applicant_email='   ' WHERE id=$1",
+      [adminReservation.id],
+    )).rejects.toMatchObject({ code: "23514" });
+
+    const adminList = await app.request(
+      "http://worker.test/api/admin/reservations?keyword=testing-admin-no-contact",
+      { headers: { cookie } },
+    );
+    expect(adminList.status).toBe(200);
+    expect((await adminList.json() as { items: Array<{ applicantEmail: string | null }> }).items[0]?.applicantEmail).toBeNull();
+    const adminDetail = await app.request(
+      `http://worker.test/api/admin/reservations/${adminReservation.id}`,
+      { headers: { cookie } },
+    );
+    expect(await adminDetail.json()).toMatchObject({ applicantEmail: null, applicantPhone: null });
+    const adminHistory = await app.request(
+      `http://worker.test/api/admin/reservations/${adminReservation.id}/histories`,
+      { headers: { cookie } },
+    );
+    expect((await adminHistory.json() as Array<{ reservationApplicantEmail: string | null }>)[0]?.reservationApplicantEmail).toBeNull();
+    const csvResponse = await app.request(
+      "http://worker.test/api/admin/exports/reservations.csv?keyword=testing-admin-no-contact",
+      { headers: { cookie } },
+    );
+    const csv = await csvResponse.text();
+    expect(csv).toContain(`testing-admin-no-contact,,,testing-admin-optional-contact`);
+
+    const password = "Public1!";
+    const publicRequest = publicPayload(roomId, password, "testing-public-contact-removal", 12);
+    for (const missingField of ["applicantEmail", "applicantPhone"] as const) {
+      const invalid = { ...publicRequest } as Record<string, unknown>;
+      delete invalid[missingField];
+      const response = await app.request("http://worker.test/api/public/reservations", {
+        method: "POST",
+        headers: writeHeaders,
+        body: JSON.stringify(invalid),
+      });
+      expect(response.status).toBe(400);
+    }
+    const publicCreate = await app.request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(publicRequest),
+    });
+    expect(publicCreate.status).toBe(201);
+    const publicReservation = await publicCreate.json() as { id: string };
+    const adminErase = await app.request(
+      `http://worker.test/api/admin/reservations/${publicReservation.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({
+          ...publicRequest,
+          applicantEmail: "   ",
+          applicantPhone: "",
+          status: "REQUESTED",
+        }),
+      },
+    );
+    expect(adminErase.status).toBe(200);
+    expect(await adminErase.json()).toMatchObject({ applicantEmail: null, applicantPhone: null });
+    const verified = await app.request(
+      `http://worker.test/api/public/reservations/${publicReservation.id}/edit`,
+      {
+        method: "POST",
+        headers: writeHeaders,
+        body: JSON.stringify({ cancelPassword: password }),
+      },
+    );
+    expect(verified.status).toBe(200);
+    expect(await verified.json()).toMatchObject({ applicantEmail: null, applicantPhone: null });
+    for (const missingField of ["applicantEmail", "applicantPhone"] as const) {
+      const invalid = { ...publicRequest } as Record<string, unknown>;
+      delete invalid[missingField];
+      const response = await app.request(
+        `http://worker.test/api/public/reservations/${publicReservation.id}`,
+        {
+          method: "PUT",
+          headers: writeHeaders,
+          body: JSON.stringify(invalid),
+        },
+      );
+      expect(response.status).toBe(400);
+    }
+
+    const recurrenceDate = futureWeekday(63, 10).slice(0, 10);
+    const recurrencePayload = {
+      roomId,
+      applicantName: "testing-recurring-no-contact",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-recurring-optional-contact",
+      tagId: null,
+      startDate: recurrenceDate,
+      endDate: recurrenceDate,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+      startTime: "14:00",
+      endTime: "15:00",
+      conflictPolicy: "FAIL_ALL",
+    };
+    const recurrencePreview = await app.request("http://worker.test/api/admin/recurrences/preview", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(recurrencePayload),
+    });
+    expect(recurrencePreview.status).toBe(200);
+    const recurrenceCreate = await app.request("http://worker.test/api/admin/recurrences", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(recurrencePayload),
+    });
+    expect(recurrenceCreate.status).toBe(201);
+    const recurrence = await recurrenceCreate.json() as { recurrenceId: string; createdCount: number };
+    expect(recurrence.createdCount).toBe(1);
+    const storedContacts = await database.query(
+      `SELECT
+         (SELECT applicant_email FROM reservation_recurrences WHERE id=$1) AS recurrence_email,
+         (SELECT applicant_phone FROM reservation_recurrences WHERE id=$1) AS recurrence_phone,
+         (SELECT applicant_email FROM reservations WHERE recurrence_id=$1 LIMIT 1) AS reservation_email,
+         (SELECT applicant_phone FROM reservations WHERE recurrence_id=$1 LIMIT 1) AS reservation_phone`,
+      [recurrence.recurrenceId],
+    );
+    expect(storedContacts.rows[0]).toEqual({
+      recurrence_email: null,
+      recurrence_phone: null,
+      reservation_email: null,
+      reservation_phone: null,
+    });
+    await expect(database.query(
+      "UPDATE reservation_recurrences SET applicant_email='   ' WHERE id=$1",
+      [recurrence.recurrenceId],
+    )).rejects.toMatchObject({ code: "23514" });
+    const recurrenceDetail = await app.request(
+      `http://worker.test/api/admin/recurrences/${recurrence.recurrenceId}`,
+      { headers: { cookie } },
+    );
+    expect(recurrenceDetail.status).toBe(200);
+    expect(await recurrenceDetail.json()).toMatchObject({ applicantEmail: null, applicantPhone: null });
+  });
+
   it("exports the exact BOM CSV contract, all filtered rows, escaping and Seoul timestamps", async () => {
     await resetProductData();
     const roomId = await insertRoom("ordinary-csv-room");

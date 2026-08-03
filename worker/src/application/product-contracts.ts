@@ -1,5 +1,6 @@
 import type {
   ConflictPolicy,
+  PublicReservationInput,
   ReservationInput,
   ReservationSource,
   ReservationStatus,
@@ -59,7 +60,7 @@ export interface TagListQuery extends PageQuery {
 }
 
 export interface PublicReservationCommand {
-  reservation: ReservationInput;
+  reservation: PublicReservationInput;
   password: string;
 }
 
@@ -112,13 +113,13 @@ export interface RecurrencePreviewCommand {
   daysOfWeek: string[];
   startTime: string;
   endTime: string;
-  applicantPhone: string;
+  applicantPhone: string | null;
   conflictPolicy: ConflictPolicy;
 }
 
 export interface RecurrenceCreateCommand extends RecurrencePreviewCommand {
   applicantName: string;
-  applicantEmail: string;
+  applicantEmail: string | null;
   purpose: string;
   tagId: string | null;
 }

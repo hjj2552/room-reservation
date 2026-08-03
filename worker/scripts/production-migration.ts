@@ -16,7 +16,7 @@ try {
     process.stdout.write("Production database migrations completed.\n");
   } else if (operation === "verify") {
     await verifyProductionMigration();
-    process.stdout.write("Production migration ledger and V2 schema verified.\n");
+    process.stdout.write("Production migration ledger and current schema verified.\n");
   } else {
     throw new ProductionMigrationError("configuration", "Production migration operation is invalid.");
   }

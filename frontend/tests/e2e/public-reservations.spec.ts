@@ -1,9 +1,11 @@
 import { expect, test } from './fixtures';
 import {
   approveReservationByApi,
+  csrfHeaders,
   expectTestIdPairsOnSameRow,
   expectTestIdsInDomOrder,
   getSettingsByApi,
+  loginByApi,
   nextWeekdayReservationLocalInputs,
   updateSettingsByApi,
 } from './helpers';
@@ -346,6 +348,54 @@ function mondayOf(dateString: string) {
   date.setUTCDate(date.getUTCDate() + diff);
   return date.toISOString().slice(0, 10);
 }
+
+test('public edit re-requires contacts after an administrator clears them', async ({ page, request, e2eData }) => {
+  const room = await e2eData.createTestRoom('public-cleared-contact-room');
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-cleared-contact', {
+    cancelPassword: 'testing-cleared-contact-password',
+  });
+  await loginByApi(request);
+  const detailResponse = await request.get(`/api/admin/reservations/${reservation.id}`);
+  expect(detailResponse.ok(), await detailResponse.text()).toBeTruthy();
+  const detail = await detailResponse.json() as {
+    room: { id: string };
+    applicantName: string;
+    purpose: string;
+    startAt: string;
+    endAt: string;
+    status: string;
+  };
+  const eraseResponse = await request.put(`/api/admin/reservations/${reservation.id}`, {
+    headers: await csrfHeaders(request),
+    data: {
+      roomId: detail.room.id,
+      applicantName: detail.applicantName,
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: detail.purpose,
+      startAt: detail.startAt,
+      endAt: detail.endAt,
+      status: detail.status,
+      memo: 'testing-clear-public-contacts',
+    },
+  });
+  expect(eraseResponse.ok(), await eraseResponse.text()).toBeTruthy();
+
+  await page.goto(`/reservations/${reservation.id}`);
+  await expect(page.locator('.reservation-detail-main')).toBeVisible();
+  await page.getByTestId('public-reservation-edit-link').click();
+  await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
+  await page.getByTestId('public-edit-verify-button').click();
+
+  const emailInput = page.getByTestId('public-edit-email-input');
+  const phoneInput = page.getByTestId('public-edit-phone-input');
+  await expect(emailInput).toHaveValue('');
+  await expect(phoneInput).toHaveValue('');
+  await page.getByTestId('public-edit-save-button').click();
+  await expect(page.getByText('이메일을 입력해 주세요.')).toBeVisible();
+  await expect(page.getByText('전화번호를 입력해 주세요.')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
+});
 
 test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);

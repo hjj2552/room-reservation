@@ -183,8 +183,8 @@ export function ReservationRequestPanel({
     const nextErrors: Partial<Record<keyof ReservationRequestValues, string>> = {};
     if (!values.roomId) nextErrors.roomId = '예약 공간을 선택해 주세요.';
     if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
-    if (!values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
-    if (!values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
+    if (!isAdmin && !values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
+    if (!isAdmin && !values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
     if (!values.purpose) nextErrors.purpose = '신청 목적을 입력해 주세요.';
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
@@ -313,7 +313,7 @@ export function ReservationRequestPanel({
           {fieldError('applicantName')}
         </label>
         <label>
-          이메일
+          이메일{isAdmin ? ' (선택)' : ''}
           <input
             data-testid={ids.email}
             type="email"
@@ -324,7 +324,7 @@ export function ReservationRequestPanel({
           {fieldError('applicantEmail')}
         </label>
         <label>
-          전화번호
+          전화번호{isAdmin ? ' (선택)' : ''}
           <input
             data-testid={ids.phone}
             value={values.applicantPhone}

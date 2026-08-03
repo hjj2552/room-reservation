@@ -180,7 +180,7 @@ jobs:
           NEON_MIGRATION_EXPECTED_ROLE: ${{ secrets.NEON_MIGRATION_EXPECTED_ROLE }}
         run: npm run migrate:production:apply
 
-      - name: Verify production migration ledger and V2 schema
+      - name: Verify production migration ledger and current schema
         working-directory: worker
         env:
           NEON_MIGRATION_DATABASE_URL: ${{ secrets.NEON_MIGRATION_DATABASE_URL }}

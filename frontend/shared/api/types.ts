@@ -223,17 +223,14 @@ export interface PublicReservationDetail {
   editable: boolean;
 }
 
-export interface PublicReservationEditDetail extends PublicReservationDetail {
-  applicantEmail: string;
-  applicantPhone: string;
-}
+export type PublicReservationEditDetail = PublicReservationDetail;
 
 export interface ReservationListItem {
   id: string;
   roomId: string;
   roomName: string;
   applicantName: string;
-  applicantEmail: string;
+  applicantEmail: string | null;
   applicantPhone: string | null;
   purpose: string;
   startAt: string;
@@ -262,7 +259,7 @@ export interface ReservationDetail {
   } | null;
   recurrenceException: boolean;
   applicantName: string;
-  applicantEmail: string;
+  applicantEmail: string | null;
   applicantPhone: string | null;
   purpose: string;
   startAt: string;
@@ -315,8 +312,8 @@ export interface ReservationFilters {
 export interface ReservationPayload {
   roomId: string;
   applicantName: string;
-  applicantEmail: string;
-  applicantPhone: string;
+  applicantEmail: string | null;
+  applicantPhone: string | null;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -331,7 +328,7 @@ export interface RecurrencePreviewPayload {
   daysOfWeek: string[];
   startTime: string;
   endTime: string;
-  applicantPhone: string;
+  applicantPhone: string | null;
   conflictPolicy: ConflictPolicy;
 }
 
@@ -348,8 +345,8 @@ export interface RecurrenceFilters {
 
 export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
   applicantName: string;
-  applicantEmail: string;
-  applicantPhone: string;
+  applicantEmail: string | null;
+  applicantPhone: string | null;
   purpose: string;
   tagId?: string | null;
 }
@@ -413,7 +410,7 @@ export interface RecurrenceDetail {
     location: string | null;
   };
   applicantName: string;
-  applicantEmail: string;
+  applicantEmail: string | null;
   applicantPhone: string | null;
   purpose: string;
   tagId: string | null;
