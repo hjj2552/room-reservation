@@ -5,6 +5,7 @@ import { createHttpApp } from "../../src/http/app";
 import { parseRuntimeConfig } from "../../src/core/config";
 import { AppError } from "../../src/core/errors";
 import {
+  parseAdminReservation,
   parsePublicPassword,
   parsePublicReservation,
   parseRecurrenceCreate,
@@ -728,6 +729,73 @@ describe("E2E cleanup ownership closure", () => {
 });
 
 describe("direct Worker contracts", () => {
+  it("limits the public intake toggle to public create and update flows", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-intake-toggle");
+    const password = "Toggle1!";
+    const existingPublicPayload = publicPayload(roomId, password, "testing-public-before-disabled", 10);
+    const existingPublic = await products.createPublicReservation(parsePublicReservation(existingPublicPayload));
+
+    await database.query(
+      `UPDATE operation_settings
+       SET reservation_enabled=false,
+           reservation_disabled_message='testing-public-intake-disabled'`,
+    );
+
+    await expect(products.createPublicReservation(parsePublicReservation(
+      publicPayload(roomId, password, "testing-public-create-disabled", 11),
+    ))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
+    const publicUpdateStartAt = futureWeekday(21, 12);
+    await expect(products.updatePublicReservation(existingPublic.id, parsePublicReservation({
+      ...existingPublicPayload,
+      purpose: "testing-public-update-disabled",
+      startAt: publicUpdateStartAt,
+      endAt: addHour(publicUpdateStartAt),
+    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
+
+    const adminStartAt = futureWeekday(21, 13);
+    const adminCreated = await products.createAdminReservation(parseAdminReservation({
+      roomId,
+      applicantName: "testing-admin-toggle",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-admin-create-disabled",
+      startAt: adminStartAt,
+      endAt: addHour(adminStartAt),
+      status: "CONFIRMED",
+    }), "admin");
+    expect(adminCreated).toMatchObject({ purpose: "testing-admin-create-disabled" });
+
+    const adminUpdatedStartAt = futureWeekday(21, 14);
+    await expect(products.updateAdminReservation(adminCreated.id, parseAdminReservation({
+      roomId,
+      applicantName: "testing-admin-toggle",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-admin-update-disabled",
+      startAt: adminUpdatedStartAt,
+      endAt: addHour(adminUpdatedStartAt),
+      status: "CONFIRMED",
+    }), "admin")).resolves.toMatchObject({ purpose: "testing-admin-update-disabled" });
+
+    const recurrenceDate = futureWeekday(70, 15).slice(0, 10);
+    const recurrence = await products.createRecurrence(parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-admin-recurring-toggle",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-recurring-create-disabled",
+      tagId: null,
+      startDate: recurrenceDate,
+      endDate: recurrenceDate,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+      startTime: "15:00",
+      endTime: "16:00",
+      conflictPolicy: "FAIL_ALL",
+    }), "admin");
+    expect(recurrence).toMatchObject({ createdCount: 1, skippedCount: 0 });
+  });
+
   it("stores optional admin contacts as NULL while public create and update remain strict", async () => {
     await resetProductData();
     const roomId = await insertRoom("testing-room-optional-contact");
