@@ -257,7 +257,7 @@ export function validateReservationPolicy(
   if (context === "PUBLIC" && start.getTime() < now.getTime()) {
     policy("PAST_RESERVATION_TIME", "이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.");
   }
-  if (!settings.reservationEnabled) {
+  if (context === "PUBLIC" && !settings.reservationEnabled) {
     policy("RESERVATION_DISABLED", settings.reservationDisabledMessage || "Reservation is currently disabled.");
   }
 
