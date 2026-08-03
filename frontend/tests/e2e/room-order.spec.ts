@@ -7,6 +7,13 @@ import {
   type E2eRoom,
 } from './helpers';
 
+// dnd-kit removes the pointer sensor's document click blocker after 50ms.
+const POINTER_SENSOR_CLICK_TEARDOWN_MS = 60;
+
+async function waitForPointerSensorClickTeardown(page: Page) {
+  await page.waitForTimeout(POINTER_SENSOR_CLICK_TEARDOWN_MS);
+}
+
 async function displayedOrderIds(page: Page) {
   const items = page.getByTestId('room-order-item');
   await expect.poll(() => items.count()).toBeGreaterThan(0);
@@ -431,14 +438,18 @@ test('room order panel saves a desktop handle drag', async ({ page, request, e2e
   await page.waitForTimeout(100);
   await page.mouse.up();
   await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
   await expect.poll(() => displayedOrderIds(page)).toEqual(expect.arrayContaining([first.id, second.id]));
   const draft = await displayedOrderIds(page);
   expect(draft.indexOf(second.id)).toBeLessThan(draft.indexOf(first.id));
-  const saveResponsePromise = page.waitForResponse((response) => (
-    response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
-  ));
-  await page.getByTestId('room-order-save').click();
-  const saveResponse = await saveResponsePromise;
+  const saveButton = page.getByTestId('room-order-save');
+  await expect(saveButton).toBeEnabled();
+  const [saveResponse] = await Promise.all([
+    page.waitForResponse((response) => (
+      response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+    )),
+    saveButton.click(),
+  ]);
   expect(saveResponse.status(), await saveResponse.text()).toBe(200);
   await expect(page.getByTestId('room-order-panel')).toBeHidden();
 
@@ -560,11 +571,15 @@ test.describe('mobile room order panel', () => {
     });
 
     await expect(overlay).toHaveCount(0);
-    const saveResponsePromise = page.waitForResponse((response) => (
-      response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
-    ));
-    await page.getByTestId('room-order-save').click();
-    const saveResponse = await saveResponsePromise;
+    await waitForPointerSensorClickTeardown(page);
+    const saveButton = page.getByTestId('room-order-save');
+    await expect(saveButton).toBeEnabled();
+    const [saveResponse] = await Promise.all([
+      page.waitForResponse((response) => (
+        response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+      )),
+      saveButton.click(),
+    ]);
     expect(saveResponse.status(), await saveResponse.text()).toBe(200);
     await expect(page.getByTestId('room-order-panel')).toBeHidden();
     const saved = await getRoomOrderByApi(request);
