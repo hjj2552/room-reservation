@@ -549,7 +549,14 @@ test.describe('mobile room order panel', () => {
       touchPoints: [],
     });
 
+    await expect(overlay).toHaveCount(0);
+    const saveResponsePromise = page.waitForResponse((response) => (
+      response.request().method() === 'PUT' && response.url().includes('/api/admin/rooms/order')
+    ));
     await page.getByTestId('room-order-save').click();
+    const saveResponse = await saveResponsePromise;
+    expect(saveResponse.status(), await saveResponse.text()).toBe(200);
+    await expect(page.getByTestId('room-order-panel')).toBeHidden();
     const saved = await getRoomOrderByApi(request);
     expect(saved.items.findIndex((room) => room.id === second.id)).toBeLessThan(
       saved.items.findIndex((room) => room.id === first.id),
