@@ -33,8 +33,8 @@ const emptyForm: RoomFormState = {
 };
 
 const pageSize = 20;
-const RoomOrderPanel = lazy(() => import('../components/RoomOrderPanel').then((module) => ({
-  default: module.RoomOrderPanel,
+const RoomOrderPanelContent = lazy(() => import('../components/RoomOrderPanel').then((module) => ({
+  default: module.RoomOrderPanelContent,
 })));
 
 function numberParam(value: string | null, fallback: number) {
@@ -344,9 +344,19 @@ export function RoomsPage() {
       </section>
 
       {isOrderPanelOpen ? (
-        <Suspense fallback={<LoadingState />}>
-          <RoomOrderPanel onClose={() => setIsOrderPanelOpen(false)} />
-        </Suspense>
+        <SidePanel
+          title="순서 변경"
+          titleId="room-order-title"
+          className="room-order-panel"
+          onClose={() => setIsOrderPanelOpen(false)}
+          testId="room-order-panel"
+          closeTestId="room-order-close"
+          closeButtonLabel="순서 변경 패널 닫기"
+        >
+          <Suspense fallback={<LoadingState />}>
+            <RoomOrderPanelContent onClose={() => setIsOrderPanelOpen(false)} />
+          </Suspense>
+        </SidePanel>
       ) : null}
 
       {isFormPanelOpen ? (

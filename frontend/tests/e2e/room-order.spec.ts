@@ -105,6 +105,115 @@ test('room management paginates 20 at a time, resets search, and corrects an inv
   await expect(page.getByTestId('rooms-table').locator('tbody tr')).toHaveCount(20);
 });
 
+test('room order shell keeps the room page stable while its chunk and data load', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('order-lazy-shell');
+
+  let releaseChunk!: () => void;
+  const chunkRelease = new Promise<void>((resolve) => {
+    releaseChunk = resolve;
+  });
+  let chunkRequests = 0;
+  await page.route('**/admin/components/RoomOrderPanel.tsx*', async (route) => {
+    chunkRequests += 1;
+    await Promise.all([
+      new Promise((resolve) => setTimeout(resolve, 500)),
+      chunkRelease,
+    ]);
+    await route.continue();
+  });
+
+  await page.goto('/admin/rooms');
+  const pageSection = page.locator('.rooms-page');
+  const orderButton = page.getByTestId('room-order-button');
+  const createButton = page.getByTestId('room-create-button');
+  const measureBackground = async () => {
+    const [pageBox, orderButtonBox, createButtonBox] = await Promise.all([
+      pageSection.boundingBox(),
+      orderButton.boundingBox(),
+      createButton.boundingBox(),
+    ]);
+    if (!pageBox || !orderButtonBox || !createButtonBox) {
+      throw new Error('Could not measure the room management background.');
+    }
+    return {
+      pageHeight: pageBox.height,
+      orderButtonX: orderButtonBox.x,
+      orderButtonY: orderButtonBox.y,
+      createButtonX: createButtonBox.x,
+      createButtonY: createButtonBox.y,
+    };
+  };
+  const expectStableBackground = (
+    actual: Awaited<ReturnType<typeof measureBackground>>,
+    expected: Awaited<ReturnType<typeof measureBackground>>,
+  ) => {
+    for (const key of Object.keys(expected) as Array<keyof typeof expected>) {
+      expect(Math.abs(actual[key] - expected[key]), `${key} should stay stable`).toBeLessThanOrEqual(1);
+    }
+  };
+  const beforeOpen = await measureBackground();
+
+  await orderButton.click();
+  const panel = page.getByTestId('room-order-panel');
+  const panelBody = panel.locator('.side-panel-body');
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('heading', { name: '순서 변경' })).toBeVisible();
+  await expect(panel.getByTestId('room-order-close')).toBeVisible();
+  await expect(panelBody.getByRole('status')).toHaveText('불러오는 중입니다.');
+  await expect(page.locator('.rooms-page > .state-box')).toHaveCount(0);
+  await expect.poll(() => chunkRequests).toBe(1);
+  await expect(page.locator('body')).toHaveCSS('position', 'fixed');
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  const chunkResponse = page.waitForResponse((response) => (
+    response.url().includes('/admin/components/RoomOrderPanel.tsx') && response.ok()
+  ));
+  await panel.getByTestId('room-order-close').click();
+  await expect(panel).toBeHidden();
+  releaseChunk();
+  await chunkResponse;
+  await page.waitForTimeout(50);
+  await expect(panel).toBeHidden();
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  let releaseOrderRequest!: () => void;
+  const orderRequestRelease = new Promise<void>((resolve) => {
+    releaseOrderRequest = resolve;
+  });
+  let orderRequests = 0;
+  await page.route('**/api/admin/rooms/order', async (route) => {
+    if (route.request().method() === 'GET') {
+      orderRequests += 1;
+      await orderRequestRelease;
+    }
+    await route.continue();
+  });
+
+  await orderButton.click();
+  await expect(panel).toBeVisible();
+  await expect(panelBody.getByRole('status')).toHaveText('불러오는 중입니다.');
+  await expect(page.locator('.rooms-page > .state-box')).toHaveCount(0);
+  await expect.poll(() => orderRequests).toBe(1);
+  expectStableBackground(await measureBackground(), beforeOpen);
+
+  const orderResponse = page.waitForResponse((response) => (
+    response.request().method() === 'GET'
+      && response.url().includes('/api/admin/rooms/order')
+      && response.ok()
+  ));
+  releaseOrderRequest();
+  await orderResponse;
+  await expect(panel.getByTestId('room-order-item').filter({ hasText: room.name })).toBeVisible();
+  await expect(panel.getByTestId('room-order-save')).toBeVisible();
+  await expect(panel.getByTestId('room-order-cancel')).toBeVisible();
+  expectStableBackground(await measureBackground(), beforeOpen);
+});
+
 test('room order panel supports keyboard save, discard, conflict retention, and focus return', async ({
   page,
   request,

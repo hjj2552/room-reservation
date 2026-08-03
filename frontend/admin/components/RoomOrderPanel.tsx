@@ -23,15 +23,14 @@ import { CSS } from '@dnd-kit/utilities';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { errorMessage } from '../../shared/api/http';
 import type { RoomOrderItem } from '../../shared/api/types';
-import { SidePanel } from '../../shared/components/SidePanel';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useRoomOrder, useSaveRoomOrder } from '../../shared/hooks/useRooms';
 
-interface RoomOrderPanelProps {
+interface RoomOrderPanelContentProps {
   onClose: () => void;
 }
 
-export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
+export function RoomOrderPanelContent({ onClose }: RoomOrderPanelContentProps) {
   const roomOrder = useRoomOrder({ refetchOnMount: 'always' });
   const saveRoomOrder = useSaveRoomOrder();
   const [items, setItems] = useState<RoomOrderItem[]>([]);
@@ -159,15 +158,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
   }
 
   return (
-    <SidePanel
-      title="순서 변경"
-      titleId="room-order-title"
-      className="room-order-panel"
-      onClose={onClose}
-      testId="room-order-panel"
-      closeTestId="room-order-close"
-      closeButtonLabel="순서 변경 패널 닫기"
-    >
+    <>
       <div className="sr-only" aria-live="assertive" aria-atomic="true">
         {keyboardStatus}
       </div>
@@ -258,7 +249,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
           {saveRoomOrder.isPending ? '저장 중...' : '저장'}
         </button>
       </div>
-    </SidePanel>
+    </>
   );
 }
 
