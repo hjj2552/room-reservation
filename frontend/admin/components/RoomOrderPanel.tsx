@@ -10,8 +10,9 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type Modifier,
 } from '@dnd-kit/core';
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
   arrayMove,
   SortableContext,
@@ -26,8 +27,6 @@ import { SidePanel } from '../../shared/components/SidePanel';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useRoomOrder, useSaveRoomOrder } from '../../shared/hooks/useRooms';
 
-const verticalDragModifiers = [restrictToVerticalAxis];
-
 interface RoomOrderPanelProps {
   onClose: () => void;
 }
@@ -40,6 +39,32 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
   const [keyboardStatus, setKeyboardStatus] = useState('');
   const initializedRef = useRef(false);
   const dragStartItemsRef = useRef<RoomOrderItem[]>([]);
+  const listRef = useRef<HTMLOListElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const boundedVerticalDragModifiers = useMemo<Modifier[]>(() => [
+    restrictToVerticalAxis,
+    restrictToFirstScrollableAncestor,
+    ({ draggingNodeRect, transform }) => {
+      const list = listRef.current;
+      const actions = actionsRef.current;
+      const scrollBody = list?.closest<HTMLElement>('.side-panel-body');
+      if (!draggingNodeRect || !list || !actions || !scrollBody) return transform;
+
+      const listRect = list.getBoundingClientRect();
+      const scrollBodyRect = scrollBody.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      const visibleTop = Math.max(listRect.top, scrollBodyRect.top);
+      const visibleBottom = Math.min(listRect.bottom, actionsRect.top, scrollBodyRect.bottom);
+      const minimumY = visibleTop - draggingNodeRect.top;
+      const maximumY = visibleBottom - draggingNodeRect.bottom;
+      if (minimumY > maximumY) return transform;
+
+      return {
+        ...transform,
+        y: Math.min(maximumY, Math.max(minimumY, transform.y)),
+      };
+    },
+  ], []);
   const sensors = useSensors(
     useSensor(MouseSensor),
     useSensor(TouchSensor, {
@@ -152,7 +177,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          modifiers={verticalDragModifiers}
+          modifiers={boundedVerticalDragModifiers}
           autoScroll
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
@@ -173,7 +198,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
           }}
         >
           <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-            <ol className="room-order-list" data-testid="room-order-list">
+            <ol ref={listRef} className="room-order-list" data-testid="room-order-list">
               {items.map((item) => (
                 <SortableRoomOrderItem
                   key={item.id}
@@ -187,7 +212,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
               ))}
             </ol>
           </SortableContext>
-          <DragOverlay modifiers={verticalDragModifiers}>
+          <DragOverlay modifiers={boundedVerticalDragModifiers}>
             {activeItem ? (
               <RoomOrderItemContent
                 item={activeItem}
@@ -213,7 +238,7 @@ export function RoomOrderPanel({ onClose }: RoomOrderPanelProps) {
         </div>
       ) : null}
 
-      <div className="side-panel-actions room-order-actions">
+      <div ref={actionsRef} className="side-panel-actions room-order-actions">
         <button
           type="button"
           className="secondary-button"

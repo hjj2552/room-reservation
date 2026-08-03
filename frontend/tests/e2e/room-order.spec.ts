@@ -379,10 +379,129 @@ test('room order panel locks scrolling without shifting or accumulating backgrou
   });
 });
 
+test('room order drag stays inside the visible list while desktop auto-scroll reaches its limits', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  test.setTimeout(120_000);
+  await loginByApi(request);
+  for (let index = 0; index < 12; index += 1) {
+    await e2eData.createTestRoom(`order-bounds-${index}`);
+  }
+
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto('/admin/rooms');
+  await page.getByTestId('room-order-button').click();
+
+  const panelBody = page.locator('.room-order-panel .side-panel-body');
+  const list = page.getByTestId('room-order-list');
+  const actions = page.locator('.room-order-actions');
+  const items = page.getByTestId('room-order-item');
+  const overlay = page.locator('.room-order-item-content.is-overlay');
+  await expect(items).toHaveCount(12);
+
+  await panelBody.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  const firstHandleBox = await items.first().getByTestId('room-order-handle').boundingBox();
+  const initialBodyBox = await panelBody.boundingBox();
+  const initialListBox = await list.boundingBox();
+  if (!firstHandleBox || !initialBodyBox || !initialListBox) {
+    throw new Error('Could not measure the upper room order boundary.');
+  }
+  const firstPoint = {
+    x: firstHandleBox.x + firstHandleBox.width / 2,
+    y: firstHandleBox.y + firstHandleBox.height / 2,
+  };
+  await page.mouse.move(firstPoint.x, firstPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(firstPoint.x, firstPoint.y - 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(firstPoint.x + 120, initialBodyBox.y - initialBodyBox.height, { steps: 4 });
+  const upperBoundaryBox = await overlay.boundingBox();
+  if (!upperBoundaryBox) throw new Error('Could not measure the upper-bounded drag overlay.');
+  expect(upperBoundaryBox.y).toBeGreaterThanOrEqual(Math.max(initialBodyBox.y, initialListBox.y) - 1);
+  await page.mouse.move(firstPoint.x + 120, initialBodyBox.y - initialBodyBox.height * 2, { steps: 2 });
+  const upperLimitBox = await overlay.boundingBox();
+  if (!upperLimitBox) throw new Error('Could not remeasure the upper-bounded drag overlay.');
+  expect(Math.abs(upperLimitBox.y - upperBoundaryBox.y)).toBeLessThanOrEqual(1);
+  expect(await panelBody.evaluate((element) => element.scrollTop)).toBe(0);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
+
+  const beforeAutoScroll = await displayedOrderIds(page);
+  const middleHandleBox = await items.nth(1).getByTestId('room-order-handle').boundingBox();
+  const bodyBox = await panelBody.boundingBox();
+  const actionsBox = await actions.boundingBox();
+  if (!middleHandleBox || !bodyBox || !actionsBox) {
+    throw new Error('Could not measure the room order auto-scroll boundary.');
+  }
+  const middlePoint = {
+    x: middleHandleBox.x + middleHandleBox.width / 2,
+    y: middleHandleBox.y + middleHandleBox.height / 2,
+  };
+  await page.mouse.move(middlePoint.x, middlePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(middlePoint.x, middlePoint.y + 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(middlePoint.x + 120, bodyBox.y + bodyBox.height - 4, { steps: 6 });
+  await expect.poll(() => panelBody.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => displayedOrderIds(page)).not.toEqual(beforeAutoScroll);
+  const scrollingOverlayBox = await overlay.boundingBox();
+  if (!scrollingOverlayBox) throw new Error('Could not measure the auto-scrolling drag overlay.');
+  expect(scrollingOverlayBox.y + scrollingOverlayBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await waitForPointerSensorClickTeardown(page);
+  expect(await displayedOrderIds(page)).not.toEqual(beforeAutoScroll);
+
+  await panelBody.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const maximumScrollTop = await panelBody.evaluate((element) => element.scrollHeight - element.clientHeight);
+  await expect.poll(() => panelBody.evaluate((element) => element.scrollTop)).toBe(maximumScrollTop);
+  await items.last().scrollIntoViewIfNeeded();
+  const lastHandleBox = await items.last().getByTestId('room-order-handle').boundingBox();
+  const finalBodyBox = await panelBody.boundingBox();
+  const finalListBox = await list.boundingBox();
+  const finalActionsBox = await actions.boundingBox();
+  if (!lastHandleBox || !finalBodyBox || !finalListBox || !finalActionsBox) {
+    throw new Error('Could not measure the lower room order boundary.');
+  }
+  const lastPoint = {
+    x: lastHandleBox.x + lastHandleBox.width / 2,
+    y: lastHandleBox.y + lastHandleBox.height / 2,
+  };
+  await page.mouse.move(lastPoint.x, lastPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(lastPoint.x, lastPoint.y + 6);
+  await expect(overlay).toBeVisible();
+  await page.mouse.move(lastPoint.x + 120, finalBodyBox.y + finalBodyBox.height * 2, { steps: 4 });
+  const lowerBoundaryBox = await overlay.boundingBox();
+  if (!lowerBoundaryBox) throw new Error('Could not measure the lower-bounded drag overlay.');
+  const lowerBoundary = Math.min(
+    finalBodyBox.y + finalBodyBox.height,
+    finalListBox.y + finalListBox.height,
+    finalActionsBox.y,
+  );
+  expect(lowerBoundaryBox.y + lowerBoundaryBox.height).toBeLessThanOrEqual(lowerBoundary + 1);
+  await page.waitForTimeout(150);
+  expect(await panelBody.evaluate((element) => element.scrollTop)).toBe(maximumScrollTop);
+  await page.mouse.move(lastPoint.x + 120, finalBodyBox.y + finalBodyBox.height * 3, { steps: 2 });
+  const lowerLimitBox = await overlay.boundingBox();
+  if (!lowerLimitBox) throw new Error('Could not remeasure the lower-bounded drag overlay.');
+  expect(Math.abs(lowerLimitBox.y - lowerBoundaryBox.y)).toBeLessThanOrEqual(1);
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+});
+
 test('room order panel saves a desktop handle drag', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const first = await e2eData.createTestRoom('order-mouse-a');
   const second = await e2eData.createTestRoom('order-mouse-b', { enabled: false });
+  await e2eData.createTestRoom('order-mouse-c');
   await page.goto('/admin/rooms');
   await page.getByTestId('room-order-button').click();
 
@@ -524,7 +643,8 @@ test.describe('mobile room order panel', () => {
 
     const scrollBeforeAutoScroll = await panelBody.evaluate((element) => element.scrollTop);
     const panelBodyBox = await panelBody.boundingBox();
-    if (!panelBodyBox) throw new Error('Could not measure the mobile room order panel body.');
+    const actionsBox = await page.locator('.room-order-actions').boundingBox();
+    if (!panelBodyBox || !actionsBox) throw new Error('Could not measure the mobile room order panel body.');
     await session.send('Input.dispatchTouchEvent', {
       type: 'touchMove',
       touchPoints: [{
@@ -536,6 +656,7 @@ test.describe('mobile room order panel', () => {
     if (!diagonalOverlayBox) throw new Error('Could not measure the diagonal mobile room order drag overlay.');
     expect(Math.abs(diagonalOverlayBox.x - overlayBox.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(diagonalOverlayBox.y - overlayBox.y)).toBeGreaterThan(1);
+    expect(diagonalOverlayBox.y + diagonalOverlayBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
     await expect.poll(() => panelBody.evaluate((element) => element.scrollTop))
       .toBeGreaterThan(scrollBeforeAutoScroll);
     await session.send('Input.dispatchTouchEvent', {
