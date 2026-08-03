@@ -5,7 +5,7 @@ export const TIMETABLE_GRID_MINUTES = 30;
 export const INTERACTION_INTERVAL_MINUTES = TIMETABLE_GRID_MINUTES;
 export const RESERVATION_INCREMENT_MINUTES = 5;
 export const noFutureReservationTimeMessage =
-  '학기 종료일까지 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.';
+  '설정된 예약 가능 기간에 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.';
 export const publicPastReservationMessage =
   '이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.';
 

@@ -104,7 +104,7 @@ export function SettingsPage() {
         </label>
         <div className="settings-field-pair full-span" data-testid="settings-semester-pair">
           <label>
-            학기 시작일
+            예약 가능 시작일
             <input
               type="date"
               value={form.semesterStartDate}
@@ -113,7 +113,7 @@ export function SettingsPage() {
             />
           </label>
           <label>
-            학기 종료일
+            예약 가능 종료일
             <input
               type="date"
               value={form.semesterEndDate}
