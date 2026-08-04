@@ -25,6 +25,7 @@ export interface ReservationRequestValues {
   status: ReservationStatus;
   memo: string;
   cancelPassword: string;
+  showApplicantName: boolean;
 }
 
 interface RequestRoom {
@@ -77,6 +78,7 @@ export function initialReservationRequestValues(
     status: variant === 'admin' ? 'CONFIRMED' : 'REQUESTED',
     memo: '',
     cancelPassword: '',
+    showApplicantName: false,
   };
 }
 
@@ -124,6 +126,7 @@ const testIds = {
     start: 'quick-add-start-input',
     end: 'quick-add-end-input',
     memo: 'quick-add-memo-input',
+    showApplicantName: 'quick-add-show-applicant-name-input',
     submit: 'quick-add-save-button',
   },
   public: {
@@ -138,6 +141,7 @@ const testIds = {
     start: 'public-request-start-input',
     end: 'public-request-end-input',
     memo: 'public-request-memo-input',
+    showApplicantName: 'public-show-applicant-name-input',
     submit: 'public-request-submit-button',
   },
 };
@@ -302,16 +306,29 @@ export function ReservationRequestPanel({
           startError={fieldError('startAt')}
           endError={fieldError('endAt')}
         />
-        <label>
-          신청자
-          <input
-            data-testid={ids.applicantName}
-            value={values.applicantName}
-            onChange={(event) => updateField('applicantName', event.target.value)}
-            {...inputErrorProps('applicantName')}
-          />
-          {fieldError('applicantName')}
-        </label>
+        <div className="applicant-name-field">
+          <label>
+            신청자
+            <input
+              data-testid={ids.applicantName}
+              value={values.applicantName}
+              onChange={(event) => updateField('applicantName', event.target.value)}
+              {...inputErrorProps('applicantName')}
+            />
+            {errors.applicantName ? fieldError('applicantName') : null}
+          </label>
+          {isAdmin ? (
+            <label className="applicant-name-visibility-toggle">
+              <input
+                type="checkbox"
+                data-testid={ids.showApplicantName}
+                checked={values.showApplicantName}
+                onChange={(event) => updateField('showApplicantName', event.target.checked)}
+              />
+              신청자 이름 보이기
+            </label>
+          ) : null}
+        </div>
         <label>
           이메일{isAdmin ? ' (선택)' : ''}
           <input

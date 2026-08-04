@@ -12,7 +12,7 @@ import {
   useVerifyPublicReservationForEdit,
 } from '../../shared/hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
-import { maskEmail, maskName, maskPhone } from '../../shared/utils/privacyMasking';
+import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 
 type PasswordAction = 'edit' | 'cancel';
 
@@ -96,7 +96,7 @@ export function PublicReservationDetailPage() {
             room: reservation.room,
             startAt: reservation.startAt,
             endAt: reservation.endAt,
-            applicantName: maskName(reservation.applicantName) || '',
+            applicantName: reservation.applicantName || '',
             applicantEmail: maskEmail(reservation.applicantEmail),
             applicantPhone: maskPhone(reservation.applicantPhone),
             purpose: reservation.purpose,

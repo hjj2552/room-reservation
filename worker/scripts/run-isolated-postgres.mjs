@@ -92,7 +92,7 @@ try {
     "testing-room-middle|2",
     "testing-room-zulu|3",
   ])) {
-    throw new Error(`V1 to V3 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
+    throw new Error(`V1 to V4 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
   }
   const sentinelDisplayOrder = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
@@ -119,7 +119,75 @@ try {
               'chk_recurrences_applicant_email_optional'
             )) = 2`,
   ]).trim();
-  if (upgradedContactSchema !== "t") throw new Error("V1 to V3 contact migration failed");
+  if (upgradedContactSchema !== "t") throw new Error("V1 to V4 contact migration failed");
+  const upgradedVisibilitySchema = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations
+        WHERE name='004_applicant_name_visibility_v4') = 1
+       AND (SELECT count(*) FROM information_schema.columns
+            WHERE table_schema='public'
+              AND table_name IN ('reservations','reservation_recurrences')
+              AND column_name='show_applicant_name'
+              AND is_nullable='NO'
+              AND column_default='false') = 2
+       AND (SELECT count(*) FROM information_schema.columns
+            WHERE table_schema='public'
+              AND table_name='reservation_histories'
+              AND column_name IN (
+                'reservation_show_applicant_name',
+                'before_reservation_show_applicant_name'
+              )) = 2
+       AND (SELECT count(*) FROM pg_constraint
+            WHERE conname='chk_reservations_public_applicant_name_hidden') = 1`,
+  ]).trim();
+  if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V4 visibility migration failed");
+
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v4_upgrade"]);
+  const v4UpgradeUrl = `${baseUrl}/worker_v4_upgrade`;
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate-v3-for-test.ts"], v4UpgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v4_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c",
+    `INSERT INTO rooms(name,capacity,enabled,display_order)
+       VALUES ('testing-room-v4-existing',10,true,1);
+     INSERT INTO reservations(
+       room_id,applicant_name,applicant_email,applicant_phone,purpose,start_at,end_at,
+       status,source,created_by_actor_type,cancel_password_hash
+     ) SELECT id,'testing-v4-existing','testing-v4@example.test','010-0000-0000',
+       'testing-v4-existing',date_trunc('hour',now()) + interval '30 days',
+       date_trunc('hour',now()) + interval '30 days 1 hour',
+       'REQUESTED','PUBLIC_FORM','PUBLIC_USER',crypt('Aa1!',gen_salt('bf',12))
+       FROM rooms WHERE name='testing-room-v4-existing';
+     INSERT INTO reservation_recurrences(
+       room_id,applicant_name,applicant_email,applicant_phone,purpose,start_date,end_date,
+       days_of_week,start_time,end_time,conflict_policy,created_by
+     ) SELECT id,'testing-v4-recurring','testing-v4@example.test','010-0000-0000',
+       'testing-v4-recurring',current_date + 40,current_date + 40,'MON','10:00','11:00',
+       'FAIL_ALL','admin' FROM rooms WHERE name='testing-room-v4-existing'`,
+  ]);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v4UpgradeUrl);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v4UpgradeUrl);
+  const v4UpgradeState = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v4_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations
+        WHERE name='004_applicant_name_visibility_v4') = 1
+       AND NOT EXISTS (SELECT 1 FROM reservations WHERE show_applicant_name)
+       AND NOT EXISTS (SELECT 1 FROM reservation_recurrences WHERE show_applicant_name)`,
+  ]).trim();
+  if (v4UpgradeState !== "t") throw new Error("V4 standalone upgrade did not preserve hidden defaults");
+  const publicConstraintStatus = spawnSync("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v4_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c", "UPDATE reservations SET show_applicant_name=true WHERE source='PUBLIC_FORM'",
+  ], { encoding: "utf8", stdio: "pipe" }).status;
+  if (publicConstraintStatus === 0) throw new Error("V4 public visibility constraint was not enforced");
 
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
@@ -128,6 +196,8 @@ try {
   const primarySchema = dump("worker_primary");
   const replaySchema = dump("worker_replay");
   if (primarySchema !== replaySchema) throw new Error("Replayed baseline schema differs");
+  const v4UpgradeSchema = dump("worker_v4_upgrade");
+  if (primarySchema !== v4UpgradeSchema) throw new Error("V4 standalone upgrade schema differs");
   const schemaSha256 = createHash("sha256").update(primarySchema).digest("hex");
   process.stdout.write(`isolated_postgres=passed schema_sha256=${schemaSha256}\n`);
 } finally {

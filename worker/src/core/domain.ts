@@ -38,6 +38,10 @@ export interface PublicReservationInput extends ReservationInput {
   applicantPhone: string;
 }
 
+export interface AdminReservationInput extends ReservationInput {
+  showApplicantName: boolean;
+}
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -186,11 +190,14 @@ export function parsePublicReservationInput(object: Record<string, unknown>): Pu
   };
 }
 
-export function parseAdminReservationInput(object: Record<string, unknown>): ReservationInput {
+export function parseAdminReservationInput(object: Record<string, unknown>): AdminReservationInput {
   return {
     ...parseReservationFields(object),
     applicantEmail: optionalEmail(object, "applicantEmail"),
     applicantPhone: optionalTrimmedString(object, "applicantPhone", 50),
+    showApplicantName: object.showApplicantName === undefined
+      ? false
+      : requireBoolean(object, "showApplicantName"),
   };
 }
 

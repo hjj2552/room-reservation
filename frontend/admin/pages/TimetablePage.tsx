@@ -244,6 +244,7 @@ export function TimetablePage() {
         applicantName: values.applicantName,
         applicantEmail: optionalContact(values.applicantEmail),
         applicantPhone: optionalContact(values.applicantPhone),
+        showApplicantName: values.showApplicantName,
         purpose: values.purpose,
         startAt: fromServiceDateTimeLocal(values.startAt),
         endAt: fromServiceDateTimeLocal(values.endAt),

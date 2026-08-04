@@ -32,6 +32,7 @@ interface RecurrenceForm {
   startTime: string;
   endTime: string;
   conflictPolicy: ConflictPolicy;
+  showApplicantName: boolean;
 }
 
 const initialForm: RecurrenceForm = {
@@ -47,6 +48,7 @@ const initialForm: RecurrenceForm = {
   startTime: '',
   endTime: '',
   conflictPolicy: 'FAIL_ALL',
+  showApplicantName: false,
 };
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -133,6 +135,7 @@ export function RecurrencesPage() {
       applicantPhone: optionalContact(form.applicantPhone),
       purpose: form.purpose,
       tagId: form.tagId || null,
+      showApplicantName: form.showApplicantName,
     });
   }
 
@@ -192,16 +195,30 @@ export function RecurrencesPage() {
               ))}
             </select>
           </label>
-          <label>
-            신청자 이름
-            <input
-              data-testid="recurrence-applicant-name-input"
-              name="applicantName"
-              value={form.applicantName}
-              onChange={(event) => setForm((prev) => ({ ...prev, applicantName: event.target.value }))}
-              required
-            />
-          </label>
+          <div className="applicant-name-field">
+            <label>
+              신청자 이름
+              <input
+                data-testid="recurrence-applicant-name-input"
+                name="applicantName"
+                value={form.applicantName}
+                onChange={(event) => setForm((prev) => ({ ...prev, applicantName: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="applicant-name-visibility-toggle">
+              <input
+                type="checkbox"
+                data-testid="recurrence-show-applicant-name-input"
+                checked={form.showApplicantName}
+                onChange={(event) => setForm((prev) => ({
+                  ...prev,
+                  showApplicantName: event.target.checked,
+                }))}
+              />
+              신청자 이름 보이기
+            </label>
+          </div>
           <label>
             이메일 (선택)
             <input

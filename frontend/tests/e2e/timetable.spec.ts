@@ -169,8 +169,10 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('12:00');
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue('12:30');
 
-    await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
+    const applicantName = 'testing-admin-visible';
+    await page.getByTestId('quick-add-applicant-name-input').fill(applicantName);
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
+    await page.getByTestId('quick-add-show-applicant-name-input').check();
 
     const createResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/reservations') &&
@@ -183,16 +185,21 @@ test('date view can create a reservation from an empty slot', async ({ page, req
       roomId?: string;
       applicantEmail?: string | null;
       applicantPhone?: string | null;
+      showApplicantName?: boolean;
     };
     expect(createRequestBody.roomId).toBe(room.id);
     expect(createRequestBody.applicantEmail).toBeNull();
     expect(createRequestBody.applicantPhone).toBeNull();
+    expect(createRequestBody.showApplicantName).toBe(true);
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
     createdReservationId = (JSON.parse(createResponseBody) as { id: string }).id;
     e2eData.registerReservation(createdReservationId);
 
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
     await expect(page.getByTestId('reservation-date-timetable')).toContainText(purpose);
+
+    await page.goto(`/timetable?view=date&date=${reservationDay}&roomId=${room.id}`);
+    await expect(page.getByText(applicantName)).toBeVisible();
   } finally {
     if (createdReservationId) {
       await cancelReservationByApi(request, createdReservationId, 'testing-cleanup');

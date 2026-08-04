@@ -3,6 +3,7 @@ import {
   cancelRecurrenceByApi,
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTestIdBelow,
   getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
@@ -26,6 +27,8 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
       addMinutesToTime(settings.openTime, settings.minReservationMinutes),
     );
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
+    await expectTestIdBelow(page, 'recurrence-applicant-name-input', 'recurrence-show-applicant-name-input');
+    await expect(page.getByTestId('recurrence-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
     await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
@@ -36,6 +39,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
+    await page.getByTestId('recurrence-show-applicant-name-input').check();
 
     const previewResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/recurrences/preview') &&
@@ -65,9 +69,11 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     const createRequest = JSON.parse(createResponse.request().postData() || '{}') as {
       applicantEmail?: string | null;
       applicantPhone?: string | null;
+      showApplicantName?: boolean;
     };
     expect(createRequest.applicantEmail).toBeNull();
     expect(createRequest.applicantPhone).toBeNull();
+    expect(createRequest.showApplicantName).toBe(true);
     expect(createResponse.ok(), createBody).toBeTruthy();
     const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
     recurrenceId = created.recurrenceId;
@@ -79,7 +85,11 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
-    await expect(page.locator('.description-list').getByText('- / -')).toBeVisible();
+    await expect(page.getByTestId('recurrence-detail-applicant-name')).toContainText('(공개)');
+    await expect(page.getByTestId('recurrence-detail-applicant-email').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
+    await expect(page.getByTestId('recurrence-detail-applicant-phone').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('recurrence-detail-applicant-phone')).toContainText('(비공개)');
 
     await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>

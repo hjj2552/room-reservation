@@ -60,6 +60,24 @@ describe("typed HTTP product input", () => {
     );
   });
 
+  it("keeps public visibility out of commands and parses admin visibility explicitly", () => {
+    expect(parsePublicReservation(publicBody({ showApplicantName: true }))).toEqual(
+      parsePublicReservation(publicBody()),
+    );
+    expect(parseAdminReservation({ ...publicBody(), status: "CONFIRMED" }).reservation.showApplicantName)
+      .toBe(false);
+    expect(parseAdminReservation({
+      ...publicBody(),
+      status: "CONFIRMED",
+      showApplicantName: true,
+    }).reservation.showApplicantName).toBe(true);
+    expect(() => parseAdminReservation({
+      ...publicBody(),
+      status: "CONFIRMED",
+      showApplicantName: "true",
+    })).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+  });
+
   it.each(["applicantEmail", "applicantPhone"])(
     "keeps public %s required for missing, null, empty, and whitespace values",
     (field) => {
@@ -175,7 +193,13 @@ describe("typed HTTP product input", () => {
       ...recurrence,
       applicantName: "Applicant",
       purpose: "Purpose",
-    })).toMatchObject({ applicantEmail: null, applicantPhone: null });
+    })).toMatchObject({ applicantEmail: null, applicantPhone: null, showApplicantName: false });
+    expect(parseRecurrenceCreate({
+      ...recurrence,
+      applicantName: "Applicant",
+      purpose: "Purpose",
+      showApplicantName: true,
+    })).toMatchObject({ showApplicantName: true });
   });
 
   it("rejects settings seconds before the service policy checks", () => {

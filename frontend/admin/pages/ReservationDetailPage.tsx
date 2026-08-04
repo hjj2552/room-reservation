@@ -60,6 +60,9 @@ export function ReservationDetailPage() {
     applicantEmail: detail.applicantEmail,
     applicantPhone: detail.applicantPhone,
     purpose: <span data-testid="reservation-purpose">{detail.purpose}</span>,
+    publicVisibility: {
+      showApplicantName: detail.showApplicantName,
+    },
   });
   if (detail.series) {
     coreSections.push({
@@ -290,6 +293,12 @@ function updatedHistoryDiffs(history: ReservationHistory): TimelineDiffItem[] {
   appendDiff(items, '신청자 이름', history.beforeReservationApplicantName, history.reservationApplicantName);
   appendDiff(items, '이메일', history.beforeReservationApplicantEmail, history.reservationApplicantEmail);
   appendDiff(items, '전화번호', history.beforeReservationApplicantPhone, history.reservationApplicantPhone);
+  appendDiff(
+    items,
+    '신청자 이름 보이기',
+    visibilityLabel(history.beforeReservationShowApplicantName),
+    visibilityLabel(history.reservationShowApplicantName),
+  );
   appendDiff(items, '예약 목적', history.beforeReservationPurpose, history.reservationPurpose);
   appendDiff(items, '시작 시간', formatOptionalDateTime(history.beforeReservationStartAt), formatOptionalDateTime(history.reservationStartAt));
   appendDiff(items, '종료 시간', formatOptionalDateTime(history.beforeReservationEndAt), formatOptionalDateTime(history.reservationEndAt));
@@ -305,7 +314,13 @@ function hasBeforeSnapshot(history: ReservationHistory) {
       || history.beforeReservationApplicantName
       || history.beforeReservationApplicantEmail
       || history.beforeReservationApplicantPhone
+      || history.beforeReservationShowApplicantName !== null
   );
+}
+
+function visibilityLabel(value: boolean | null | undefined) {
+  if (value === null || value === undefined) return null;
+  return value ? '보이기' : '숨기기';
 }
 
 function appendDiff(items: TimelineDiffItem[], label: string, before: string | null | undefined, after: string | null | undefined) {

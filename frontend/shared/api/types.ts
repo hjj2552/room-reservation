@@ -232,6 +232,7 @@ export interface ReservationListItem {
   applicantName: string;
   applicantEmail: string | null;
   applicantPhone: string | null;
+  showApplicantName: boolean;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -261,6 +262,7 @@ export interface ReservationDetail {
   applicantName: string;
   applicantEmail: string | null;
   applicantPhone: string | null;
+  showApplicantName: boolean;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -293,6 +295,8 @@ export interface ReservationHistory {
   beforeReservationApplicantEmail: string | null;
   reservationApplicantPhone: string | null;
   beforeReservationApplicantPhone: string | null;
+  reservationShowApplicantName: boolean | null;
+  beforeReservationShowApplicantName: boolean | null;
   actorType: string;
   actorId: string;
   createdAt: string;
@@ -314,6 +318,7 @@ export interface ReservationPayload {
   applicantName: string;
   applicantEmail: string | null;
   applicantPhone: string | null;
+  showApplicantName: boolean;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -349,6 +354,7 @@ export interface RecurrenceCreatePayload extends RecurrencePreviewPayload {
   applicantPhone: string | null;
   purpose: string;
   tagId?: string | null;
+  showApplicantName: boolean;
 }
 
 export interface RecurrencePreview {
@@ -398,6 +404,7 @@ export interface RecurrenceListItem {
   startTime: string;
   endTime: string;
   conflictPolicy: ConflictPolicy;
+  showApplicantName: boolean;
   deleted: boolean;
   createdAt: string;
 }
@@ -422,6 +429,7 @@ export interface RecurrenceDetail {
   startTime: string;
   endTime: string;
   conflictPolicy: ConflictPolicy;
+  showApplicantName: boolean;
   deleted: boolean;
   createdAt: string;
   reservations: Array<{

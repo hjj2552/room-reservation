@@ -590,10 +590,11 @@ export class ProductService {
         const inserted = await client.query(
           `INSERT INTO reservations (
             room_id, applicant_name, applicant_email, applicant_phone, purpose,
-            start_at, end_at, status, source, created_by_actor_type, created_by_actor_id
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ADMIN_MANUAL','ADMIN',$9) RETURNING *`,
+            start_at, end_at, status, source, created_by_actor_type, created_by_actor_id,
+            show_applicant_name
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ADMIN_MANUAL','ADMIN',$9,$10) RETURNING *`,
           [input.roomId, input.applicantName, input.applicantEmail, input.applicantPhone,
-            input.purpose, input.startAt, input.endAt, status, adminUsername],
+            input.purpose, input.startAt, input.endAt, status, adminUsername, input.showApplicantName],
         );
         const reservation = inserted.rows[0]!;
         await this.insertHistory(client, reservation, "CREATED_BY_ADMIN", null, memo, "ADMIN", adminUsername);
@@ -621,6 +622,7 @@ export class ProductService {
       applicantName: text(row, "applicant_name"),
       applicantEmail: nullableText(row, "applicant_email"),
       applicantPhone: nullableText(row, "applicant_phone"),
+      showApplicantName: bool(row, "show_applicant_name"),
       purpose: text(row, "purpose"),
       recurrenceId: nullableText(row, "recurrence_id"),
       seriesLabel: nullableText(row, "tag_name"),
@@ -645,6 +647,7 @@ export class ProductService {
       applicantName: list.applicantName,
       applicantEmail: list.applicantEmail,
       applicantPhone: list.applicantPhone,
+      showApplicantName: list.showApplicantName,
       purpose: list.purpose,
       startAt: list.startAt,
       endAt: list.endAt,
@@ -679,6 +682,7 @@ export class ProductService {
     const at = input.indexOf("@");
     if (at <= 0) return this.maskName(input);
     const local = input.slice(0, at);
+    if (local.length === 1) return `*${input.slice(at)}`;
     return `${local.slice(0, Math.min(2, local.length))}${"*".repeat(Math.max(1, local.length - 2))}${input.slice(at)}`;
   }
 
@@ -696,7 +700,7 @@ export class ProductService {
     return {
       id: detail.id,
       room: detail.room,
-      applicantName: this.maskName(detail.applicantName),
+      applicantName: detail.showApplicantName ? detail.applicantName : this.maskName(detail.applicantName),
       applicantEmail: this.maskEmail(detail.applicantEmail),
       applicantPhone: this.maskPhone(detail.applicantPhone),
       purpose: detail.purpose,
@@ -799,15 +803,20 @@ export class ProductService {
     try {
       await this.database.transaction(async (client) => {
         const before = await this.getReservationRow(reservationId, client);
+        const showApplicantName = text(before, "source") === "PUBLIC_FORM"
+          ? false
+          : input.showApplicantName;
         if (activeStatuses.has(status)) await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
         const result = await client.query(
           `UPDATE reservations SET room_id=$2, applicant_name=$3, applicant_email=$4,
             applicant_phone=$5, purpose=$6, start_at=$7, end_at=$8, status=$9,
-            updated_by_actor_type='ADMIN', updated_by_actor_id=$10, updated_at=now(),
+            show_applicant_name=$10,
+            updated_by_actor_type='ADMIN', updated_by_actor_id=$11, updated_at=now(),
             recurrence_exception = recurrence_id IS NOT NULL
            WHERE id=$1 RETURNING *`,
           [reservationId, input.roomId, input.applicantName, input.applicantEmail,
-            input.applicantPhone, input.purpose, input.startAt, input.endAt, status, adminUsername],
+            input.applicantPhone, input.purpose, input.startAt, input.endAt, status,
+            showApplicantName, adminUsername],
         );
         await this.insertHistory(client, result.rows[0]!, "UPDATED", before, memo, "ADMIN", adminUsername);
       });
@@ -917,7 +926,8 @@ export class ProductService {
         const item = this.mapReservationList(row);
         return {
           id: item.id, roomId: item.roomId, roomName: item.roomName,
-          applicantName: this.maskName(item.applicantName), startAt: item.startAt, endAt: item.endAt,
+          applicantName: item.showApplicantName ? item.applicantName : this.maskName(item.applicantName),
+          startAt: item.startAt, endAt: item.endAt,
           status: item.status, purpose: item.purpose, recurrenceId: item.recurrenceId,
           seriesLabel: item.seriesLabel, seriesColor: item.seriesColor,
         };
@@ -981,9 +991,10 @@ export class ProductService {
         reservation_start_at, before_reservation_start_at, reservation_end_at, before_reservation_end_at,
         reservation_applicant_name, before_reservation_applicant_name,
         reservation_applicant_email, before_reservation_applicant_email,
-        reservation_applicant_phone, before_reservation_applicant_phone
+        reservation_applicant_phone, before_reservation_applicant_phone,
+        reservation_show_applicant_name, before_reservation_show_applicant_name
        ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
        )`,
       [
         deleted ? null : value(current, "id"), deleted ? value(current, "id") : null, action,
@@ -995,6 +1006,7 @@ export class ProductService {
         value(current, "applicant_name"), before ? value(before, "applicant_name") : null,
         value(current, "applicant_email"), before ? value(before, "applicant_email") : null,
         value(current, "applicant_phone"), before ? value(before, "applicant_phone") : null,
+        value(current, "show_applicant_name"), before ? value(before, "show_applicant_name") : null,
       ],
     );
   }
@@ -1023,6 +1035,12 @@ export class ProductService {
       beforeReservationApplicantEmail: nullableText(row, "before_reservation_applicant_email"),
       reservationApplicantPhone: nullableText(row, "reservation_applicant_phone"),
       beforeReservationApplicantPhone: nullableText(row, "before_reservation_applicant_phone"),
+      reservationShowApplicantName: value(row, "reservation_show_applicant_name") === null
+        ? null
+        : bool(row, "reservation_show_applicant_name"),
+      beforeReservationShowApplicantName: value(row, "before_reservation_show_applicant_name") === null
+        ? null
+        : bool(row, "before_reservation_show_applicant_name"),
       actorType: text(row, "actor_type"),
       actorId: nullableText(row, "actor_id") || "",
       createdAt: iso(value(row, "created_at")),
@@ -1117,11 +1135,12 @@ export class ProductService {
         const recurrenceResult = await client.query(
           `INSERT INTO reservation_recurrences (
             room_id, applicant_name, applicant_email, applicant_phone, purpose, tag_id,
-            start_date, end_date, days_of_week, start_time, end_time, conflict_policy, created_by
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+            start_date, end_date, days_of_week, start_time, end_time, conflict_policy, created_by,
+            show_applicant_name
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
           [input.roomId, input.applicantName, input.applicantEmail, input.applicantPhone, input.purpose,
             input.tagId, input.startDate, input.endDate, input.daysOfWeek.join(","), input.startTime,
-            input.endTime, input.conflictPolicy, adminUsername],
+            input.endTime, input.conflictPolicy, adminUsername, input.showApplicantName],
         );
         const recurrence = recurrenceResult.rows[0]!;
         const resultItems: Array<{ date: string; status: string; reason: string | null }> = [];
@@ -1140,10 +1159,12 @@ export class ProductService {
             const inserted = await client.query(
               `INSERT INTO reservations (
                 room_id, recurrence_id, applicant_name, applicant_email, applicant_phone, purpose,
-                start_at, end_at, status, source, created_by_actor_type, created_by_actor_id
-               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CONFIRMED','RECURRING_GENERATED','ADMIN',$9) RETURNING *`,
+                start_at, end_at, status, source, created_by_actor_type, created_by_actor_id,
+                show_applicant_name
+               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CONFIRMED','RECURRING_GENERATED','ADMIN',$9,$10) RETURNING *`,
               [input.roomId, value(recurrence, "id"), input.applicantName, input.applicantEmail,
-                input.applicantPhone, input.purpose, item.startAt, item.endAt, adminUsername],
+                input.applicantPhone, input.purpose, item.startAt, item.endAt, adminUsername,
+                input.showApplicantName],
             );
             await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, null, "ADMIN", adminUsername);
             await client.query(`RELEASE SAVEPOINT ${savepoint}`);
@@ -1200,6 +1221,7 @@ export class ProductService {
       startTime: timeText(value(row, "start_time")),
       endTime: timeText(value(row, "end_time")),
       conflictPolicy: text(row, "conflict_policy"),
+      showApplicantName: bool(row, "show_applicant_name"),
       deleted: value(row, "deleted_at") !== null,
       createdAt: iso(value(row, "created_at")),
     };
@@ -1256,6 +1278,7 @@ export class ProductService {
       startTime: list.startTime,
       endTime: list.endTime,
       conflictPolicy: list.conflictPolicy,
+      showApplicantName: list.showApplicantName,
       deleted: list.deleted,
       createdAt: list.createdAt,
       reservations: reservations.rows.map((reservation) => {

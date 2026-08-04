@@ -3,6 +3,7 @@ import type { Locator } from '@playwright/test';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTestIdBelow,
   expectTestIdPairsOnSameRow,
   expectTestIdsInDomOrder,
   getSettingsByApi,
@@ -283,6 +284,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
       'reservation-start-input',
       'reservation-end-input',
       'reservation-applicant-name-input',
+      'reservation-show-applicant-name-input',
       'reservation-email-input',
       'reservation-phone-input',
       'reservation-status-select',
@@ -294,6 +296,8 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
       ['reservation-applicant-name-input', 'reservation-email-input'],
       ['reservation-phone-input', 'reservation-status-select'],
     ]);
+    await expectTestIdBelow(page, 'reservation-applicant-name-input', 'reservation-show-applicant-name-input');
+    await expect(page.getByTestId('reservation-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
     await expect(page.getByTestId('reservation-purpose-input').locator('..')).toHaveClass(/full-span/);
     await expect(page.getByTestId('reservation-status-select')).toBeEditable();
     await expect(page.getByTestId('reservation-memo-input').locator('..')).toHaveClass(/full-span/);
@@ -321,8 +325,10 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
 
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(updatedPurpose);
-    await expect(page.locator('.description-list > div').filter({ hasText: '이메일' }).locator('dd')).toHaveText('-');
-    await expect(page.locator('.description-list > div').filter({ hasText: '전화번호' }).locator('dd')).toHaveText('-');
+    await expect(page.getByTestId('reservation-detail-applicant-email').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
+    await expect(page.getByTestId('reservation-detail-applicant-phone').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('reservation-detail-applicant-phone')).toContainText('(비공개)');
 
     await page.goto(`/admin/reservations?keyword=${encodeURIComponent(updatedPurpose)}`);
     await expect(page.getByTestId('reservations-table')).toContainText(updatedPurpose);
@@ -331,6 +337,19 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
   }
+});
+
+test('public form reservation edit does not offer applicant name visibility', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('public-visibility-edit-room');
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-visibility-edit');
+
+  await page.goto(`/admin/reservations/${reservation.id}`);
+  await expect(page.getByTestId('reservation-detail-applicant-name')).toContainText('(비공개)');
+
+  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+  await expect(page.getByTestId('reservation-save-button')).toBeVisible();
+  await expect(page.getByTestId('reservation-show-applicant-name-input')).toHaveCount(0);
 });
 
 test('reservation duplicate pre-fills fields and handles unavailable operating days', async ({ page, request, e2eData }) => {
@@ -474,6 +493,7 @@ test('admin can request a reservation from the timetable and see it on detail an
       'quick-add-start-input',
       'quick-add-end-input',
       'quick-add-applicant-name-input',
+      'quick-add-show-applicant-name-input',
       'quick-add-email-input',
       'quick-add-phone-input',
       'quick-add-status-select',
@@ -485,11 +505,14 @@ test('admin can request a reservation from the timetable and see it on detail an
       ['quick-add-applicant-name-input', 'quick-add-email-input'],
       ['quick-add-phone-input', 'quick-add-status-select'],
     ]);
+    await expectTestIdBelow(page, 'quick-add-applicant-name-input', 'quick-add-show-applicant-name-input');
+    await expect(page.getByTestId('quick-add-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
     await expect(page.getByTestId('quick-add-status-select')).toBeEditable();
     await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
     await page.getByTestId('quick-add-email-input').fill(`testing-reservation-${Date.now()}@example.test`);
     await page.getByTestId('quick-add-phone-input').fill('010-1111-2222');
+    await page.getByTestId('quick-add-show-applicant-name-input').check();
     await page.getByTestId('quick-add-purpose-input').fill(purpose);
     await page.getByTestId('quick-add-start-input-date').fill(reservationTime.date);
     await page.getByTestId('quick-add-start-input').selectOption(reservationTime.startAt.slice(11, 16));
@@ -508,6 +531,10 @@ test('admin can request a reservation from the timetable and see it on detail an
     await page.getByTestId('quick-add-save-button').click();
     const createResponse = await createResponsePromise;
     const createResponseBody = await createResponse.text();
+    const createPayload = JSON.parse(createResponse.request().postData() || '{}') as {
+      showApplicantName?: boolean;
+    };
+    expect(createPayload.showApplicantName).toBe(true);
     expect(createResponse.ok(), createResponseBody).toBeTruthy();
 
     const created = JSON.parse(createResponseBody) as { id: string };
@@ -521,8 +548,30 @@ test('admin can request a reservation from the timetable and see it on detail an
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
     await expect(page.locator('.reservation-detail-main dt')).toHaveCount(6);
     await expect(page.locator('.reservation-detail-main .status-badge')).toBeVisible();
+    await expect(page.getByTestId('reservation-detail-applicant-name')).toContainText('(공개)');
+    await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
+    await expect(page.getByTestId('reservation-detail-applicant-phone')).toContainText('(비공개)');
     await expect(page.getByRole('heading', { name: '감사 이력' })).toBeVisible();
     await expect(page.locator('.timeline')).toContainText('testing-create-verification');
+
+    await page.getByTestId('reservation-edit-link').click();
+    await expect(page.getByTestId('reservation-show-applicant-name-input')).toBeChecked();
+    await page.getByTestId('reservation-show-applicant-name-input').uncheck();
+    const updateResponsePromise = page.waitForResponse((response) =>
+      response.url().includes(`/api/admin/reservations/${createdReservationId}`) &&
+      response.request().method() === 'PUT',
+    );
+    await page.getByTestId('reservation-save-button').click();
+    const updateResponse = await updateResponsePromise;
+    expect(updateResponse.ok(), await updateResponse.text()).toBeTruthy();
+    await expect(page).toHaveURL(new RegExp(`/admin/reservations/${createdReservationId}$`));
+    await expect(page.getByTestId('reservation-detail-applicant-name')).toContainText('(비공개)');
+    await expect(page.locator('.timeline')).toContainText('신청자 이름 보이기');
+
+    await page.goto(`/timetable?view=date&date=${reservationTime.date}&roomId=${room.id}`);
+    const publicTimetableBlock = page.locator('.reservation-block').filter({ hasText: purpose });
+    await expect(publicTimetableBlock).toBeVisible();
+    await expect(publicTimetableBlock).not.toContainText('testing-admin');
 
     await page.goto(`/admin/reservations?keyword=${encodeURIComponent(purpose)}`);
     await expect(page.getByTestId('reservations-table')).toContainText(purpose);

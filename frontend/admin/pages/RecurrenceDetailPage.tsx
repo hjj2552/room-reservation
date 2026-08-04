@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
+import { PublicVisibilityValue } from '../../shared/components/ReservationDetailView';
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCancelRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
@@ -93,12 +94,34 @@ export function RecurrenceDetailPage() {
               </dd>
             </div>
             <div>
-              <dt>신청자</dt>
-              <dd>{detail.applicantName}</dd>
+              <dt>신청자 이름</dt>
+              <dd>
+                <PublicVisibilityValue
+                  value={detail.applicantName}
+                  isPublic={detail.showApplicantName}
+                  testId="recurrence-detail-applicant-name"
+                />
+              </dd>
             </div>
             <div>
-              <dt>연락처</dt>
-              <dd>{detail.applicantEmail || '-'} / {detail.applicantPhone || '-'}</dd>
+              <dt>이메일</dt>
+              <dd>
+                <PublicVisibilityValue
+                  value={detail.applicantEmail}
+                  isPublic={false}
+                  testId="recurrence-detail-applicant-email"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>전화번호</dt>
+              <dd>
+                <PublicVisibilityValue
+                  value={detail.applicantPhone}
+                  isPublic={false}
+                  testId="recurrence-detail-applicant-phone"
+                />
+              </dd>
             </div>
             <div>
               <dt>등록일</dt>

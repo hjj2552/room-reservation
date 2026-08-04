@@ -335,6 +335,10 @@ textarea[aria-invalid='true']:focus-visible {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.form-grid > label {
+  align-content: start;
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -342,6 +346,37 @@ label {
   color: #363a35;
   font-size: 14px;
   font-weight: 500;
+}
+
+.applicant-name-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.applicant-name-visibility-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 6px;
+  color: var(--muted-ink);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.applicant-name-visibility-toggle input[type="checkbox"],
+.compact-request-form .applicant-name-visibility-toggle input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--action);
 }
 
 input,
@@ -1328,6 +1363,25 @@ button:disabled {
 
 .description-list dd {
   margin: 0;
+}
+
+.public-visibility-value {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.public-visibility-label {
+  color: #687484;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.public-visibility-label.is-public {
+  color: #166534;
 }
 
 .timeline {
