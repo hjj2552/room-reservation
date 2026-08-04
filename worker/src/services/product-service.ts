@@ -682,6 +682,7 @@ export class ProductService {
     const at = input.indexOf("@");
     if (at <= 0) return this.maskName(input);
     const local = input.slice(0, at);
+    if (local.length === 1) return `*${input.slice(at)}`;
     return `${local.slice(0, Math.min(2, local.length))}${"*".repeat(Math.max(1, local.length - 2))}${input.slice(at)}`;
   }
 

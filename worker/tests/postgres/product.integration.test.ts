@@ -486,6 +486,7 @@ describe("public reservation privacy contracts", () => {
     const payload = {
       ...publicPayload(roomId, password, "testing-public-detail-privacy", 10),
       applicantName,
+      applicantEmail: "a@example.test",
     };
 
     const createResponse = await app.request("http://worker.test/api/public/reservations", {
@@ -504,7 +505,9 @@ describe("public reservation privacy contracts", () => {
     expect(detailResponse.status).toBe(200);
     const detailJson = await detailResponse.text();
     expect(detailJson).not.toContain(applicantName);
+    expect(detailJson).not.toContain(payload.applicantEmail);
     expect(detailJson).toContain("S*t");
+    expect(detailJson).toContain("*@example.test");
 
     const rejectedVerification = await app.request(
       `http://worker.test/api/public/reservations/${reservationId}/edit`,
@@ -526,7 +529,10 @@ describe("public reservation privacy contracts", () => {
       },
     );
     expect(verifiedResponse.status).toBe(200);
-    expect(await verifiedResponse.json()).toMatchObject({ applicantName });
+    expect(await verifiedResponse.json()).toMatchObject({
+      applicantName,
+      applicantEmail: payload.applicantEmail,
+    });
   });
 
   it("shows an admin applicant name publicly only when enabled and always masks contacts", async () => {
