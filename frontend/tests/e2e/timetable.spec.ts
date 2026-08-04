@@ -3,6 +3,7 @@ import {
   cancelReservationByApi,
   deleteRoomByApi,
   loginByApi,
+  moveFocusOutsidePanel,
   nextWeekdayReservationLocalInputs,
 } from './helpers';
 
@@ -253,11 +254,19 @@ test('toolbar request opens the shared panel without slot room context', async (
     await page.getByTestId('timetable-quick-add-panel-backdrop').click({ position: { x: 4, y: 4 } });
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeVisible();
     await expect(page.getByTestId('quick-add-purpose-input')).toHaveValue(draftPurpose);
-    await closeButton.click();
+    await moveFocusOutsidePanel(page, 'timetable-quick-add-panel');
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
     await expect(page.locator('html')).not.toHaveCSS('overflow', 'hidden');
     await expect(page.locator('body')).not.toHaveCSS('overflow', 'hidden');
     await expect(page.locator('body')).not.toHaveCSS('position', 'fixed');
+    await expect(newRequestButton).toBeFocused();
+
+    await newRequestButton.click();
+    await page.getByTestId('quick-add-purpose-input').focus();
+    await expect(page.getByTestId('quick-add-purpose-input')).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('timetable-quick-add-panel')).toBeHidden();
     await expect(newRequestButton).toBeFocused();
   } finally {
     await deleteRoomByApi(request, room.id);

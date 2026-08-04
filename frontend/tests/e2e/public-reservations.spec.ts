@@ -6,6 +6,7 @@ import {
   expectTestIdsInDomOrder,
   getSettingsByApi,
   loginByApi,
+  moveFocusOutsidePanel,
   nextWeekdayReservationLocalInputs,
   updateSettingsByApi,
 } from './helpers';
@@ -143,7 +144,8 @@ test('public toolbar request opens the shared panel without slot room context', 
     await page.goto('/timetable');
     await page.getByTestId('public-timetable-view-room').click();
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
-    await page.getByTestId('public-new-request-button').click();
+    const newRequestButton = page.getByTestId('public-new-request-button');
+    await newRequestButton.click();
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expectTestIdsInDomOrder(page, [
@@ -196,7 +198,10 @@ test('public toolbar request opens the shared panel without slot room context', 
     await page.getByTestId('public-quick-request-panel-backdrop').click({ position: { x: 4, y: 4 } });
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expect(page.getByTestId('public-request-purpose-input')).toHaveValue(draftPurpose);
-    await page.getByTestId('public-quick-request-close').click();
+    await moveFocusOutsidePanel(page, 'public-quick-request-panel');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+    await expect(newRequestButton).toBeFocused();
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });

@@ -3,7 +3,7 @@ import {
   useEffect,
   useId,
   useRef,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 
@@ -110,27 +110,31 @@ export function SidePanel({
   const resolvedTitleId = titleId || generatedTitleId;
   const panelRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
   const returnFocusRef = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const releaseScrollLock = acquireDocumentScrollLock();
+    const handleDocumentKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onCloseRef.current();
+    };
+
+    document.addEventListener('keydown', handleDocumentKeyDown);
     closeButtonRef.current?.focus();
 
     return () => {
+      document.removeEventListener('keydown', handleDocumentKeyDown);
       releaseScrollLock();
       if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
     };
   }, []);
 
-  function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
     if (event.key !== 'Tab') return;
     const focusable = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>(
