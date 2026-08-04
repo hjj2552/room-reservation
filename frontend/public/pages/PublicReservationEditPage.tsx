@@ -17,6 +17,7 @@ import {
 import { formatDateTime } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
+import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -123,17 +124,36 @@ export function PublicReservationEditPage() {
     }
     setSubmissionPolicyError('');
     const previousStatus = verifiedReservation.status;
+    const payload = {
+      roomId: values.roomId,
+      applicantName: values.applicantName,
+      applicantEmail: values.applicantEmail,
+      applicantPhone: values.applicantPhone,
+      purpose: values.purpose,
+      startAt: fromServiceDateTimeLocal(values.startAt),
+      endAt: fromServiceDateTimeLocal(values.endAt),
+      cancelPassword: reservationPassword,
+    };
+    if (
+      previousStatus === 'REQUESTED'
+      && !hasReservationValueChanges(
+        {
+          roomId: verifiedReservation.room.id,
+          applicantName: verifiedReservation.applicantName,
+          applicantEmail: verifiedReservation.applicantEmail,
+          applicantPhone: verifiedReservation.applicantPhone,
+          purpose: verifiedReservation.purpose,
+          startAt: verifiedReservation.startAt,
+          endAt: verifiedReservation.endAt,
+        },
+        payload,
+      )
+    ) {
+      navigate(`/reservations/${verifiedReservation.id}`);
+      return;
+    }
     update.mutate(
-      {
-        roomId: values.roomId,
-        applicantName: values.applicantName,
-        applicantEmail: values.applicantEmail,
-        applicantPhone: values.applicantPhone,
-        purpose: values.purpose,
-        startAt: fromServiceDateTimeLocal(values.startAt),
-        endAt: fromServiceDateTimeLocal(values.endAt),
-        cancelPassword: reservationPassword,
-      },
+      payload,
       {
         onSuccess: () => {
           setSuccessMessage(

@@ -66,6 +66,23 @@ function iso(input: unknown): string {
   return new Date(String(input)).toISOString();
 }
 
+function sameReservationValues(
+  row: Row,
+  input: ReservationInput,
+  status: ReservationStatus,
+  showApplicantName: boolean,
+): boolean {
+  return text(row, "room_id") === input.roomId
+    && text(row, "applicant_name") === input.applicantName
+    && nullableText(row, "applicant_email") === input.applicantEmail
+    && nullableText(row, "applicant_phone") === input.applicantPhone
+    && text(row, "purpose") === input.purpose
+    && iso(value(row, "start_at")) === parseInstant(input.startAt).toISOString()
+    && iso(value(row, "end_at")) === parseInstant(input.endAt).toISOString()
+    && text(row, "status") === status
+    && bool(row, "show_applicant_name") === showApplicantName;
+}
+
 function dateText(input: unknown): string {
   if (input instanceof Date) return input.toISOString().slice(0, 10);
   return String(input).slice(0, 10);
@@ -758,6 +775,7 @@ export class ProductService {
         const before = await this.verifyPublicPassword(client, reservationId, password);
         if (text(before, "status") === "CANCELLED") validation("CANCELLED status reservations cannot be edited.");
         await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
+        if (sameReservationValues(before, input, "REQUESTED", false)) return;
         const result = await client.query(
           `UPDATE reservations SET room_id=$2, applicant_name=$3, applicant_email=$4,
             applicant_phone=$5, purpose=$6, start_at=$7, end_at=$8, status='REQUESTED',
@@ -807,6 +825,7 @@ export class ProductService {
           ? false
           : input.showApplicantName;
         if (activeStatuses.has(status)) await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
+        if (sameReservationValues(before, input, status, showApplicantName) && !memo?.trim()) return;
         const result = await client.query(
           `UPDATE reservations SET room_id=$2, applicant_name=$3, applicant_email=$4,
             applicant_phone=$5, purpose=$6, start_at=$7, end_at=$8, status=$9,
@@ -978,11 +997,8 @@ export class ProductService {
     actorId: string | null,
     deleted = false,
   ): Promise<void> {
-    const roomName = nullableText(current, "original_room_name") || nullableText(current, "current_room_name")
-      || nullableText(current, "room_name") || "삭제된 공간";
-    const beforeRoomName = before
-      ? nullableText(before, "original_room_name") || nullableText(before, "current_room_name") || nullableText(before, "room_name") || roomName
-      : null;
+    const roomName = await this.historyRoomName(client, current);
+    const beforeRoomName = before ? await this.historyRoomName(client, before) : null;
     await client.query(
       `INSERT INTO reservation_histories (
         reservation_id, reservation_deleted_id, action, before_status, after_status, memo,
@@ -1009,6 +1025,24 @@ export class ProductService {
         value(current, "show_applicant_name"), before ? value(before, "show_applicant_name") : null,
       ],
     );
+  }
+
+  private async historyRoomName(client: Queryable, reservation: Row): Promise<string> {
+    const preservedName = nullableText(reservation, "original_room_name");
+    if (preservedName) return preservedName;
+
+    const selectedName = nullableText(reservation, "current_room_name")
+      || nullableText(reservation, "room_name");
+    if (selectedName) return selectedName;
+
+    const roomId = nullableText(reservation, "room_id");
+    if (roomId) {
+      const result = await client.query("SELECT name FROM rooms WHERE id=$1", [roomId]);
+      const currentName = result.rows[0] ? nullableText(result.rows[0], "name") : null;
+      if (currentName) return currentName;
+    }
+
+    return "삭제된 공간";
   }
 
   private mapHistory(row: Row) {

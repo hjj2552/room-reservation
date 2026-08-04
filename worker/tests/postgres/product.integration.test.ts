@@ -1072,6 +1072,233 @@ describe("E2E cleanup ownership closure", () => {
 });
 
 describe("direct Worker contracts", () => {
+  it("skips admin no-op updates and preserves accurate room names in audit snapshots", async () => {
+    await resetProductData();
+    const firstRoomId = await insertRoom("testing-room-audit-first");
+    const secondRoomId = await insertRoom("testing-room-audit-second");
+    const startAt = futureWeekday(21, 10);
+    const basePayload = {
+      roomId: firstRoomId,
+      applicantName: "testing-admin-audit",
+      applicantEmail: null,
+      applicantPhone: "010-1234-5678",
+      purpose: "testing-admin-audit-purpose",
+      startAt,
+      endAt: addHour(startAt),
+      status: "CONFIRMED",
+      showApplicantName: true,
+    };
+    const created = await products.createAdminReservation(parseAdminReservation(basePayload), "admin");
+    const beforeNoOp = (await database.query(
+      "SELECT updated_at, updated_by_actor_type, updated_by_actor_id, recurrence_exception FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows[0]!;
+    const historyCount = Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [created.id],
+    )).rows[0]?.count);
+    expect((await database.query(
+      `SELECT action, reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at ASC, id ASC LIMIT 1`,
+      [created.id],
+    )).rows[0]).toEqual({
+      action: "CREATED_BY_ADMIN",
+      reservation_room_name: "testing-room-audit-first",
+      before_reservation_room_name: null,
+    });
+
+    await products.updateAdminReservation(created.id, parseAdminReservation({ ...basePayload, memo: "   " }), "other-admin");
+
+    const afterNoOp = (await database.query(
+      "SELECT updated_at, updated_by_actor_type, updated_by_actor_id, recurrence_exception FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows[0]!;
+    expect(afterNoOp).toEqual(beforeNoOp);
+    expect(Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [created.id],
+    )).rows[0]?.count)).toBe(historyCount);
+
+    await products.updateAdminReservation(created.id, parseAdminReservation({
+      ...basePayload,
+      memo: "testing-admin-memo-only",
+    }), "admin");
+    let latestHistory = (await database.query(
+      `SELECT action, memo, reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [created.id],
+    )).rows[0];
+    expect(latestHistory).toEqual({
+      action: "UPDATED",
+      memo: "testing-admin-memo-only",
+      reservation_room_name: "testing-room-audit-first",
+      before_reservation_room_name: "testing-room-audit-first",
+    });
+
+    await products.updateAdminReservation(created.id, parseAdminReservation({
+      ...basePayload,
+      purpose: "testing-admin-audit-purpose-updated",
+    }), "admin");
+    latestHistory = (await database.query(
+      `SELECT reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [created.id],
+    )).rows[0];
+    expect(latestHistory).toEqual({
+      reservation_room_name: "testing-room-audit-first",
+      before_reservation_room_name: "testing-room-audit-first",
+    });
+
+    await products.updateAdminReservation(created.id, parseAdminReservation({
+      ...basePayload,
+      roomId: secondRoomId,
+      purpose: "testing-admin-audit-purpose-updated",
+    }), "admin");
+    latestHistory = (await database.query(
+      `SELECT reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [created.id],
+    )).rows[0];
+    expect(latestHistory).toEqual({
+      reservation_room_name: "testing-room-audit-second",
+      before_reservation_room_name: "testing-room-audit-first",
+    });
+
+    await products.changeReservationStatus(created.id, "CANCELLED", "testing-admin-cancel", "admin");
+    latestHistory = (await database.query(
+      `SELECT reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [created.id],
+    )).rows[0];
+    expect(latestHistory).toEqual({
+      reservation_room_name: "testing-room-audit-second",
+      before_reservation_room_name: "testing-room-audit-second",
+    });
+
+    const deletedRoomId = await insertRoom("testing-room-audit-deleted");
+    const deletedStartAt = futureWeekday(21, 12);
+    const deletedReservation = await products.createAdminReservation(parseAdminReservation({
+      ...basePayload,
+      roomId: deletedRoomId,
+      startAt: deletedStartAt,
+      endAt: addHour(deletedStartAt),
+      purpose: "testing-admin-deleted-room",
+    }), "admin");
+    await products.deleteRoom(deletedRoomId);
+    await products.changeReservationStatus(deletedReservation.id, "CANCELLED", null, "admin");
+    latestHistory = (await database.query(
+      `SELECT reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [deletedReservation.id],
+    )).rows[0];
+    expect(latestHistory).toEqual({
+      reservation_room_name: "testing-room-audit-deleted",
+      before_reservation_room_name: "testing-room-audit-deleted",
+    });
+  });
+
+  it("keeps recurrence-derived reservations unchanged on an admin no-op save", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurrence-no-op");
+    const date = futureWeekday(35, 10).slice(0, 10);
+    const recurrence = await products.createRecurrence(parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-recurrence-no-op",
+      applicantEmail: null,
+      applicantPhone: "010-0000-0000",
+      purpose: "testing-recurrence-no-op",
+      tagId: null,
+      startDate: date,
+      endDate: date,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "FAIL_ALL",
+      showApplicantName: false,
+    }), "admin");
+    const child = (await database.query(
+      `SELECT id, room_id, applicant_name, applicant_email, applicant_phone, purpose,
+        start_at, end_at, status, show_applicant_name, recurrence_exception, updated_at
+       FROM reservations WHERE recurrence_id=$1`,
+      [recurrence.recurrenceId],
+    )).rows[0]!;
+    const historyCount = Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [child.id],
+    )).rows[0]?.count);
+    expect((await database.query(
+      "SELECT reservation_room_name FROM reservation_histories WHERE reservation_id=$1",
+      [child.id],
+    )).rows[0]).toEqual({ reservation_room_name: "testing-room-recurrence-no-op" });
+
+    await products.updateAdminReservation(String(child.id), parseAdminReservation({
+      roomId: String(child.room_id),
+      applicantName: String(child.applicant_name),
+      applicantEmail: child.applicant_email,
+      applicantPhone: child.applicant_phone,
+      purpose: String(child.purpose),
+      startAt: new Date(String(child.start_at)).toISOString(),
+      endAt: new Date(String(child.end_at)).toISOString(),
+      status: String(child.status),
+      showApplicantName: Boolean(child.show_applicant_name),
+      memo: "",
+    }), "admin");
+
+    const after = (await database.query(
+      "SELECT recurrence_exception, updated_at FROM reservations WHERE id=$1",
+      [child.id],
+    )).rows[0];
+    expect(after).toEqual({ recurrence_exception: child.recurrence_exception, updated_at: child.updated_at });
+    expect(Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [child.id],
+    )).rows[0]?.count)).toBe(historyCount);
+  });
+
+  it("skips true public no-op updates but preserves the CONFIRMED to REQUESTED transition", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-no-op");
+    const password = "NoOp1!";
+    const payload = publicPayload(roomId, password, "testing-public-no-op", 10);
+    const created = await products.createPublicReservation(parsePublicReservation(payload));
+    const beforeNoOp = (await database.query(
+      "SELECT updated_at, updated_by_actor_type, updated_by_actor_id, recurrence_exception FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows[0]!;
+    const historyCount = Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [created.id],
+    )).rows[0]?.count);
+
+    await products.updatePublicReservation(created.id, parsePublicReservation(payload));
+
+    expect((await database.query(
+      "SELECT updated_at, updated_by_actor_type, updated_by_actor_id, recurrence_exception FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows[0]).toEqual(beforeNoOp);
+    expect(Number((await database.query(
+      "SELECT count(*) AS count FROM reservation_histories WHERE reservation_id=$1",
+      [created.id],
+    )).rows[0]?.count)).toBe(historyCount);
+
+    await products.changeReservationStatus(created.id, "APPROVED", "testing-public-approve", "admin");
+    await products.updatePublicReservation(created.id, parsePublicReservation(payload));
+    const afterTransition = await products.getReservationDetail(created.id);
+    expect(afterTransition.status).toBe("REQUESTED");
+    const updatedHistory = (await database.query(
+      `SELECT action, before_status, after_status, reservation_room_name, before_reservation_room_name
+       FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1`,
+      [created.id],
+    )).rows[0];
+    expect(updatedHistory).toEqual({
+      action: "UPDATED",
+      before_status: "CONFIRMED",
+      after_status: "REQUESTED",
+      reservation_room_name: "testing-room-public-no-op",
+      before_reservation_room_name: "testing-room-public-no-op",
+    });
+  });
+
   it("limits the public intake toggle to public create and update flows", async () => {
     await resetProductData();
     const roomId = await insertRoom("testing-room-public-intake-toggle");
@@ -1095,6 +1322,10 @@ describe("direct Worker contracts", () => {
       startAt: publicUpdateStartAt,
       endAt: addHour(publicUpdateStartAt),
     }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
+    await expect(products.updatePublicReservation(
+      existingPublic.id,
+      parsePublicReservation(existingPublicPayload),
+    )).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
 
     const adminStartAt = futureWeekday(21, 13);
     const adminCreated = await products.createAdminReservation(parseAdminReservation({
