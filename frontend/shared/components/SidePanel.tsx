@@ -6,6 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
+import { restoreOverlayTriggerFocus } from './overlayFocus';
 
 interface SidePanelProps {
   title: ReactNode;
@@ -114,6 +115,7 @@ export function SidePanel({
   const returnFocusRef = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
+  const returnFocusWasVisibleRef = useRef(returnFocusRef.current?.matches(':focus-visible') ?? false);
   onCloseRef.current = onClose;
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export function SidePanel({
     return () => {
       document.removeEventListener('keydown', handleDocumentKeyDown);
       releaseScrollLock();
-      if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+      restoreOverlayTriggerFocus(returnFocusRef.current, returnFocusWasVisibleRef.current);
     };
   }, []);
 

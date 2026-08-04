@@ -7,6 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { restoreOverlayTriggerFocus } from './overlayFocus';
 
 interface ModalDialogProps {
   title: ReactNode;
@@ -46,6 +47,7 @@ export function ModalDialog({
   const returnFocusRef = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
+  const returnFocusWasVisibleRef = useRef(returnFocusRef.current?.matches(':focus-visible') ?? false);
 
   useEffect(() => {
     const initialFocus = initialFocusRef?.current
@@ -54,7 +56,7 @@ export function ModalDialog({
     initialFocus?.focus();
 
     return () => {
-      if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+      restoreOverlayTriggerFocus(returnFocusRef.current, returnFocusWasVisibleRef.current);
     };
   }, [initialFocusRef, showCloseButton]);
 
