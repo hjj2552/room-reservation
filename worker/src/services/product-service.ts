@@ -917,7 +917,7 @@ export class ProductService {
         const item = this.mapReservationList(row);
         return {
           id: item.id, roomId: item.roomId, roomName: item.roomName,
-          applicantName: item.applicantName, startAt: item.startAt, endAt: item.endAt,
+          applicantName: this.maskName(item.applicantName), startAt: item.startAt, endAt: item.endAt,
           status: item.status, purpose: item.purpose, recurrenceId: item.recurrenceId,
           seriesLabel: item.seriesLabel, seriesColor: item.seriesColor,
         };
