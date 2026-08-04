@@ -12,6 +12,7 @@ import {
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { statusLabels } from '../../shared/utils/labels';
+import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 import { optionalContact } from '../utils/optionalContact';
 
@@ -80,6 +81,12 @@ export function ReservationFormPage() {
     }
   }, [reservation.data, reset]);
 
+  useEffect(() => {
+    if (!reservation.data) return;
+    if (!rooms.data?.some((room) => room.id === reservation.data?.room.id)) return;
+    setValue('roomId', reservation.data.room.id);
+  }, [reservation.data, rooms.data, setValue]);
+
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {
       roomId: values.roomId,
@@ -91,12 +98,34 @@ export function ReservationFormPage() {
       startAt: fromServiceDateTimeLocal(values.startAt),
       endAt: fromServiceDateTimeLocal(values.endAt),
       status: values.status,
-      memo: values.memo || undefined,
+      memo: values.memo.trim() ? values.memo : undefined,
     };
   }
 
   function onSubmit(values: ReservationFormValues) {
     const payload = toPayload(values);
+    const current = reservation.data;
+    if (
+      current
+      && !payload.memo
+      && !hasReservationValueChanges(
+        {
+          roomId: current.room.id,
+          applicantName: current.applicantName,
+          applicantEmail: current.applicantEmail,
+          applicantPhone: current.applicantPhone,
+          purpose: current.purpose,
+          startAt: current.startAt,
+          endAt: current.endAt,
+        },
+        payload,
+      )
+      && current.status === payload.status
+      && current.showApplicantName === payload.showApplicantName
+    ) {
+      navigate(-1);
+      return;
+    }
     update.mutate(payload, {
       onSuccess: (updated) => navigate(`/admin/reservations/${updated.id}`),
     });

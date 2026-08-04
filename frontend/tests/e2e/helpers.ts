@@ -48,6 +48,17 @@ export async function expectTestIdsInDomOrder(page: Page, testIds: string[]) {
   expect(actualOrder).toEqual(testIds);
 }
 
+export async function moveFocusOutsidePanel(page: Page, panelTestId: string) {
+  const focusIsOutsidePanel = await page.getByTestId(panelTestId).evaluate((panel) => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    return document.activeElement !== null && !panel.contains(document.activeElement);
+  });
+
+  expect(focusIsOutsidePanel, `focus should be outside ${panelTestId}`).toBe(true);
+}
+
 export async function expectTestIdPairsOnSameRow(page: Page, testIdPairs: Array<[string, string]>) {
   const nativeControlPixelTolerance = 1;
   for (const [firstTestId, secondTestId] of testIdPairs) {

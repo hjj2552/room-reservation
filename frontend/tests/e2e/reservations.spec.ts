@@ -329,10 +329,57 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
     await expect(page.getByTestId('reservation-detail-applicant-phone').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('reservation-detail-applicant-phone')).toContainText('(비공개)');
+    const updatedHistory = page.locator('.timeline > li').filter({ hasText: 'testing-reservation-edit-smoke' });
+    await expect(updatedHistory).toBeVisible();
+    await expect(updatedHistory).not.toContainText('삭제된 공간');
+    await expect(updatedHistory.locator('.timeline-diff-row', { hasText: '공간' })).toHaveCount(0);
 
     await page.goto(`/admin/reservations?keyword=${encodeURIComponent(updatedPurpose)}`);
     await expect(page.getByTestId('reservations-table')).toContainText(updatedPurpose);
     await expect(page.getByTestId('reservations-table')).toContainText(room.name);
+  } finally {
+    await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
+    await deleteRoomByApi(request, room.id);
+  }
+});
+
+test('reservation edit: no-op save closes without an update while a memo-only save persists', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('reservation-no-op-room');
+  const reservation = await e2eData.createTestReservation(room.id, 'reservation-no-op');
+  let updateRequests = 0;
+  page.on('request', (requestEvent) => {
+    if (
+      requestEvent.method() === 'PUT'
+      && requestEvent.url().includes(`/api/admin/reservations/${reservation.id}`)
+    ) updateRequests += 1;
+  });
+
+  try {
+    await page.goto(`/admin/reservations/${reservation.id}`);
+    await page.getByTestId('reservation-edit-link').click();
+    await expect(page.getByTestId('reservation-save-button')).toBeVisible();
+    await page.getByTestId('reservation-memo-input').fill('   ');
+    await page.getByTestId('reservation-save-button').click();
+
+    await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
+    expect(updateRequests).toBe(0);
+    await expect(page.getByRole('status')).toHaveCount(0);
+
+    await page.getByTestId('reservation-edit-link').click();
+    await page.getByTestId('reservation-memo-input').fill('testing-reservation-memo-only');
+    const updateResponsePromise = page.waitForResponse((response) =>
+      response.url().includes(`/api/admin/reservations/${reservation.id}`)
+      && response.request().method() === 'PUT',
+    );
+    await page.getByTestId('reservation-save-button').click();
+    await updateResponsePromise;
+
+    await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
+    expect(updateRequests).toBe(1);
+    const memoHistory = page.locator('.timeline > li').filter({ hasText: 'testing-reservation-memo-only' });
+    await expect(memoHistory).toBeVisible();
+    await expect(memoHistory).not.toContainText('삭제된 공간');
   } finally {
     await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);

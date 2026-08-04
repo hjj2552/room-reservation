@@ -15,6 +15,7 @@ import {
   toServiceStartOfDayOffset,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
+import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import {
   includeExistingTime,
   operatingTimeOptions,
@@ -168,6 +169,28 @@ test('checks public past input against the Seoul service-local instant', () => {
   const now = new Date('2026-07-14T00:00:00Z');
   expect(isPastServiceReservationTime('2026-07-14T08:55', now)).toBe(true);
   expect(isPastServiceReservationTime('2026-07-14T09:00', now)).toBe(false);
+});
+
+test('compares reservation edits by their semantic persisted values', () => {
+  const current = {
+    roomId: '11111111-1111-4111-8111-111111111111',
+    applicantName: 'testing-applicant',
+    applicantEmail: null,
+    applicantPhone: '010-1234-5678',
+    purpose: 'testing-purpose',
+    startAt: '2026-07-14T00:00:00.000Z',
+    endAt: '2026-07-14T01:00:00.000Z',
+  };
+
+  expect(hasReservationValueChanges(current, {
+    ...current,
+    startAt: '2026-07-14T09:00:00+09:00',
+    endAt: '2026-07-14T10:00:00+09:00',
+  })).toBe(false);
+  expect(hasReservationValueChanges(current, {
+    ...current,
+    purpose: 'testing-purpose-updated',
+  })).toBe(true);
 });
 
 function expectSelection(

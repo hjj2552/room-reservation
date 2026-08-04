@@ -3,6 +3,7 @@ import {
   deleteRoomByApi,
   getSettingsByApi,
   loginByApi,
+  moveFocusOutsidePanel,
   updateSettingsByApi,
 } from './helpers';
 
@@ -37,7 +38,7 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
   }
 });
 
-test('rooms layout uses the page width and registration runs in the shared side panel', async ({ page, request, e2eData }) => {
+test('rooms layout uses the page width and registration panel closes on Escape outside focus', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   await e2eData.createTestRoom('rooms-drawer-layout');
   const createdRoomName = e2eData.name('room-drawer-create');
@@ -70,6 +71,14 @@ test('rooms layout uses the page width and registration runs in the shared side 
   await expect(createButton).toBeFocused();
 
   await createButton.click();
+  await moveFocusOutsidePanel(page, 'room-form-panel');
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('room-form-panel')).toBeHidden();
+  await expect(createButton).toBeFocused();
+
+  await createButton.click();
+  await page.getByTestId('room-name-input').focus();
+  await expect(page.getByTestId('room-name-input')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('room-form-panel')).toBeHidden();
   await expect(createButton).toBeFocused();

@@ -6,6 +6,7 @@ import {
   expectTestIdsInDomOrder,
   getSettingsByApi,
   loginByApi,
+  moveFocusOutsidePanel,
   nextWeekdayReservationLocalInputs,
   updateSettingsByApi,
 } from './helpers';
@@ -143,7 +144,8 @@ test('public toolbar request opens the shared panel without slot room context', 
     await page.goto('/timetable');
     await page.getByTestId('public-timetable-view-room').click();
     await page.getByTestId('public-timetable-room-select').selectOption(room.id);
-    await page.getByTestId('public-new-request-button').click();
+    const newRequestButton = page.getByTestId('public-new-request-button');
+    await newRequestButton.click();
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expectTestIdsInDomOrder(page, [
@@ -196,7 +198,10 @@ test('public toolbar request opens the shared panel without slot room context', 
     await page.getByTestId('public-quick-request-panel-backdrop').click({ position: { x: 4, y: 4 } });
     await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
     await expect(page.getByTestId('public-request-purpose-input')).toHaveValue(draftPurpose);
-    await page.getByTestId('public-quick-request-close').click();
+    await moveFocusOutsidePanel(page, 'public-quick-request-panel');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+    await expect(newRequestButton).toBeFocused();
   } finally {
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
@@ -397,6 +402,29 @@ test('public edit re-requires contacts after an administrator clears them', asyn
   await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));
 });
 
+test('public edit closes a true no-op save without sending an update request', async ({ page, e2eData }) => {
+  const room = await e2eData.createTestRoom('public-edit-no-op-room');
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-edit-no-op');
+  let updateRequests = 0;
+  page.on('request', (requestEvent) => {
+    if (
+      requestEvent.method() === 'PUT'
+      && requestEvent.url().includes(`/api/public/reservations/${reservation.id}`)
+    ) updateRequests += 1;
+  });
+
+  await page.goto(`/reservations/${reservation.id}`);
+  await page.getByTestId('public-reservation-edit-link').click();
+  await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
+  await page.getByTestId('public-edit-verify-button').click();
+  await expect(page.getByTestId('public-edit-save-button')).toBeVisible();
+  await page.getByTestId('public-edit-save-button').click();
+
+  await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+  expect(updateRequests).toBe(0);
+  await expect(page.getByRole('status')).toHaveCount(0);
+});
+
 test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -458,6 +486,15 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
     await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
 
+    const statusTransitionResponse = page.waitForResponse((response) =>
+      response.url().includes(`/api/public/reservations/${reservation.id}`)
+      && response.request().method() === 'PUT',
+    );
+    await page.getByTestId('public-edit-save-button').click();
+    await statusTransitionResponse;
+    await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');
+    await expect(page.getByTestId('public-edit-status-input')).toHaveValue('승인 대기');
+
     await page.getByTestId('public-edit-purpose-input').fill(editedPurpose);
     await page.getByTestId('public-edit-applicant-name-input').fill(editedName);
     await page.getByTestId('public-edit-email-input').fill(editedEmail);
@@ -467,7 +504,7 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-end-input').selectOption(editTime.endAt.slice(11, 16));
     await page.getByTestId('public-edit-save-button').click();
 
-    await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');
+    await expect(page.getByRole('status')).toContainText('승인 대기 상태를 유지합니다');
     await page.getByRole('button', { name: '취소', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
     await expect(page.locator('.status-badge')).toContainText('승인 대기');
