@@ -92,6 +92,7 @@ async function expectSlotFocusContract(
 
   await slot.click();
   await expect(page.getByTestId(panelTestId)).toBeVisible();
+  await expect(page.getByTestId(closeTestId)).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId(panelTestId)).toBeHidden();
   await expect(slot).toBeFocused();
@@ -102,12 +103,14 @@ async function expectSlotFocusContract(
     return {
       backgroundColor: markerStyle.backgroundColor,
       boxShadow: markerStyle.boxShadow,
+      outlineColor: style.outlineColor,
       outlineStyle: style.outlineStyle,
       outlineWidth: Number.parseFloat(style.outlineWidth),
     };
   });
   expect(focusStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)');
   expect(focusStyle.boxShadow).toBe('none');
+  expect(focusStyle.outlineColor).toBe('rgba(0, 0, 0, 0)');
   expect(focusStyle.outlineStyle).toBe('solid');
   expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(2);
   expect(await scrollRegion.evaluate((element) => ({
@@ -119,12 +122,31 @@ async function expectSlotFocusContract(
 
   await page.keyboard.press('Tab');
   await expect(slot).not.toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(slot).toBeFocused();
+  await expect(slot).toHaveCSS('outline-color', 'rgb(40, 94, 168)');
 
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId(panelTestId)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId(panelTestId)).toBeHidden();
+  await expect(slot).toBeFocused();
+  await expect(slot).toHaveCSS('outline-color', 'rgb(40, 94, 168)');
+
+  await page.keyboard.press('Tab');
+  await expect(slot).not.toBeFocused();
   await slot.click();
   await expect(page.getByTestId(panelTestId)).toBeVisible();
   await page.getByTestId(closeTestId).click();
   await expect(page.getByTestId(panelTestId)).toBeHidden();
   await expect(slot).toBeFocused();
+  const hasVisibleOutline = await slot.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return element.matches(':focus-visible')
+      && style.outlineStyle !== 'none'
+      && style.outlineColor !== 'rgba(0, 0, 0, 0)';
+  });
+  expect(hasVisibleOutline).toBe(false);
 }
 
 test('timetable slot focus remains distinct after public and admin panels close', async ({
@@ -178,6 +200,39 @@ test('timetable slot focus remains distinct after public and admin panels close'
     const latestSettings = await getSettingsByApi(request);
     await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
   }
+});
+
+test('room information modal preserves the trigger focus visibility state', async ({ page, e2eData }) => {
+  const room = await e2eData.createTestRoom('modal-focus', {
+    description: 'testing-room-information',
+  });
+  const reservationDate = nextWeekdayReservationLocalInputs({ daysAhead: 42 }).date;
+
+  await page.goto(`/timetable?view=date&date=${reservationDate}`);
+  const trigger = page.getByRole('button', { name: `${room.name} 공간 정보 보기` });
+  const dialog = page.getByRole('dialog', { name: '공간 정보' });
+
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('button', { name: '공간 정보 닫기' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('outline-color', 'rgba(0, 0, 0, 0)');
+  await expect(trigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+  await page.keyboard.press('Tab');
+  await expect(trigger).not.toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('outline-color', 'rgb(40, 94, 168)');
+
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('outline-color', 'rgb(40, 94, 168)');
 });
 
 test('reservation edit toggle has a contained mobile touch target', async ({ page, request, e2eData }) => {

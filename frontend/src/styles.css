@@ -68,6 +68,12 @@ tr[tabindex]:focus-visible {
   outline: 3px solid var(--focus);
 }
 
+button[data-overlay-return-focus='silent']:focus-visible,
+a[data-overlay-return-focus='silent']:focus-visible,
+[tabindex][data-overlay-return-focus='silent']:focus-visible {
+  outline-color: transparent;
+}
+
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
@@ -782,6 +788,10 @@ button:disabled {
 
 .timetable-room-info-trigger:focus-visible {
   background: #ffffff;
+}
+
+.timetable-room-info-trigger[data-overlay-return-focus='silent']:focus-visible {
+  background: transparent;
 }
 
 .timetable-day-header {
