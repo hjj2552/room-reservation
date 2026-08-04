@@ -392,6 +392,107 @@ describe("public password and atomic reservations", () => {
   });
 });
 
+describe("public reservation privacy contracts", () => {
+  it("masks every public timetable applicant name while preserving admin names", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-name-privacy");
+    const names = [
+      { value: "\uAE40", masked: "*" },
+      { value: "\uC774\uC218", masked: "\uC774*" },
+      { value: "\uD64D\uAE38\uB3D9", masked: "\uD64D*\uB3D9" },
+      { value: "Alice", masked: "A*e" },
+      { value: "\u{20BB7}\u91CE\u5BB6", masked: "\u{20BB7}*\u5BB6" },
+    ];
+    for (const [index, name] of names.entries()) {
+      await insertReservation({
+        roomId,
+        applicantName: name.value,
+        purpose: `testing-public-name-privacy-${index}`,
+        hour: 10 + index,
+      });
+    }
+    const { app, cookie } = await authenticatedApp();
+    const weekStart = futureWeekday(55, 10).slice(0, 10);
+
+    const publicResponse = await app.request(
+      `http://worker.test/api/public/rooms/${roomId}/weekly-reservations?weekStart=${weekStart}`,
+    );
+    expect(publicResponse.status).toBe(200);
+    const publicBody = await publicResponse.json() as {
+      reservations: Array<{ purpose: string; applicantName: string }>;
+    };
+    const publicJson = JSON.stringify(publicBody);
+    for (const [index, name] of names.entries()) {
+      expect(publicJson).not.toContain(name.value);
+      expect(publicBody.reservations.find(
+        (reservation) => reservation.purpose === `testing-public-name-privacy-${index}`,
+      )?.applicantName).toBe(name.masked);
+    }
+
+    const adminResponse = await app.request(
+      `http://worker.test/api/admin/reservations?roomId=${roomId}&size=100`,
+      { headers: { cookie } },
+    );
+    expect(adminResponse.status).toBe(200);
+    const adminBody = await adminResponse.json() as { items: Array<{ applicantName: string }> };
+    expect(adminBody.items.map((item) => item.applicantName)).toEqual(
+      expect.arrayContaining(names.map((name) => name.value)),
+    );
+  });
+
+  it("exposes an original public applicant name only after password verification", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-detail-privacy");
+    const { app, writeHeaders } = await authenticatedApp();
+    const applicantName = "Sensitive Applicant";
+    const password = "Privacy1!";
+    const payload = {
+      ...publicPayload(roomId, password, "testing-public-detail-privacy", 10),
+      applicantName,
+    };
+
+    const createResponse = await app.request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(payload),
+    });
+    expect(createResponse.status).toBe(201);
+    const createdJson = await createResponse.text();
+    expect(createdJson).not.toContain(applicantName);
+    const reservationId = (JSON.parse(createdJson) as { id: string }).id;
+
+    const detailResponse = await app.request(
+      `http://worker.test/api/public/reservations/${reservationId}`,
+    );
+    expect(detailResponse.status).toBe(200);
+    const detailJson = await detailResponse.text();
+    expect(detailJson).not.toContain(applicantName);
+    expect(detailJson).toContain("S*t");
+
+    const rejectedVerification = await app.request(
+      `http://worker.test/api/public/reservations/${reservationId}/edit`,
+      {
+        method: "POST",
+        headers: writeHeaders,
+        body: JSON.stringify({ cancelPassword: "Wrong1!" }),
+      },
+    );
+    expect(rejectedVerification.status).toBe(403);
+    expect(await rejectedVerification.text()).not.toContain(applicantName);
+
+    const verifiedResponse = await app.request(
+      `http://worker.test/api/public/reservations/${reservationId}/edit`,
+      {
+        method: "POST",
+        headers: writeHeaders,
+        body: JSON.stringify({ cancelPassword: password }),
+      },
+    );
+    expect(verifiedResponse.status).toBe(200);
+    expect(await verifiedResponse.json()).toMatchObject({ applicantName });
+  });
+});
+
 describe("HTTP session, CSRF, admin contracts and cleanup", () => {
   it("supports the existing cookie/header flow and guarded product routes", async () => {
     const app = createHttpApp(parseRuntimeConfig({ APP_ENV: "uat", E2E_CLEANUP_ENABLED: "true" }), {
