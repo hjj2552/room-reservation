@@ -82,8 +82,11 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
-    await expect(page.getByText('신청자 이름 보이기')).toBeVisible();
-    await expect(page.locator('.description-list').getByText('- / -')).toBeVisible();
+    await expect(page.getByTestId('recurrence-detail-applicant-name')).toContainText('(공개)');
+    await expect(page.getByTestId('recurrence-detail-applicant-email').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
+    await expect(page.getByTestId('recurrence-detail-applicant-phone').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('recurrence-detail-applicant-phone')).toContainText('(비공개)');
 
     await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');
     const cancelResponsePromise = page.waitForResponse((response) =>

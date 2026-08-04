@@ -60,6 +60,9 @@ export function ReservationDetailPage() {
     applicantEmail: detail.applicantEmail,
     applicantPhone: detail.applicantPhone,
     purpose: <span data-testid="reservation-purpose">{detail.purpose}</span>,
+    publicVisibility: {
+      showApplicantName: detail.showApplicantName,
+    },
   });
   if (detail.series) {
     coreSections.push({

@@ -1330,6 +1330,25 @@ button:disabled {
   margin: 0;
 }
 
+.public-visibility-value {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.public-visibility-label {
+  color: #687484;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.public-visibility-label.is-public {
+  color: #166534;
+}
+
 .timeline {
   display: grid;
   gap: 12px;

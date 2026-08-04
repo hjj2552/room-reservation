@@ -22,6 +22,25 @@ export function emptyValue(value?: ReactNode) {
   return value === undefined || value === null || value === '' ? '-' : value;
 }
 
+export function PublicVisibilityValue({
+  value,
+  isPublic,
+  testId,
+}: {
+  value?: ReactNode;
+  isPublic: boolean;
+  testId?: string;
+}) {
+  return (
+    <span className="public-visibility-value" data-testid={testId}>
+      <span>{emptyValue(value)}</span>
+      <span className={`public-visibility-label ${isPublic ? 'is-public' : ''}`}>
+        ({isPublic ? '공개' : '비공개'})
+      </span>
+    </span>
+  );
+}
+
 export function reservationCoreSections(detail: {
   room: { name: string; location?: string | null };
   startAt: string;
@@ -30,8 +49,32 @@ export function reservationCoreSections(detail: {
   applicantEmail?: string | null;
   applicantPhone?: string | null;
   purpose: ReactNode;
+  publicVisibility?: {
+    showApplicantName: boolean;
+  };
 }): DetailSection[] {
   const roomLabel = detail.room.location ? `${detail.room.name} (${detail.room.location})` : detail.room.name;
+  const applicantName = detail.publicVisibility ? (
+    <PublicVisibilityValue
+      value={detail.applicantName}
+      isPublic={detail.publicVisibility.showApplicantName}
+      testId="reservation-detail-applicant-name"
+    />
+  ) : detail.applicantName;
+  const applicantEmail = detail.publicVisibility ? (
+    <PublicVisibilityValue
+      value={detail.applicantEmail}
+      isPublic={false}
+      testId="reservation-detail-applicant-email"
+    />
+  ) : detail.applicantEmail;
+  const applicantPhone = detail.publicVisibility ? (
+    <PublicVisibilityValue
+      value={detail.applicantPhone}
+      isPublic={false}
+      testId="reservation-detail-applicant-phone"
+    />
+  ) : detail.applicantPhone;
 
   return [
     {
@@ -40,9 +83,9 @@ export function reservationCoreSections(detail: {
         { label: '신청 목적', value: detail.purpose },
         { label: '공간', value: roomLabel },
         { label: '날짜/시간', value: `${formatDateTime(detail.startAt)} - ${formatDateTime(detail.endAt)}` },
-        { label: '신청자 이름', value: detail.applicantName },
-        { label: '이메일', value: detail.applicantEmail },
-        { label: '전화번호', value: detail.applicantPhone },
+        { label: '신청자 이름', value: applicantName },
+        { label: '이메일', value: applicantEmail },
+        { label: '전화번호', value: applicantPhone },
       ],
     },
   ];
