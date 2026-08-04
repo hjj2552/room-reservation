@@ -90,6 +90,7 @@ test('readiness shows the loading message only after 300ms', async ({ page }) =>
   await expect(page.getByRole('status')).toHaveAttribute('aria-busy', 'true');
 
   await releaseRequest?.();
+  await page.clock.resume();
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
 });
 
@@ -469,6 +470,41 @@ test('root shows public and admin entry choices', async ({ page }) => {
 
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
+});
+
+test('public routes defer admin page modules until an admin route is opened', async ({ page }) => {
+  const adminPageRequests: string[] = [];
+  page.on('request', (request) => {
+    const pathname = new URL(request.url()).pathname;
+    if (pathname.includes('/admin/pages/')) {
+      adminPageRequests.push(pathname);
+    }
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('entry-public-link')).toBeVisible();
+  expect(adminPageRequests).toEqual([]);
+
+  await page.goto('/timetable');
+  await expect(page.getByTestId('public-new-request-button')).toBeVisible();
+  expect(adminPageRequests).toEqual([]);
+
+  await page.goto('/admin/login');
+  await expect(page.getByRole('heading', { name: '공간 예약 운영 로그인' })).toBeVisible();
+  expect(adminPageRequests.some((pathname) => pathname.endsWith('/admin/pages/LoginPage.tsx'))).toBe(true);
+});
+
+test('a failed route module renders an error state inside the public layout', async ({ page }) => {
+  await page.route('**/public/pages/EntryChoicePage.tsx*', (route) => route.fulfill({
+    status: 503,
+    contentType: 'text/javascript',
+    body: 'Route module unavailable',
+  }));
+
+  await page.goto('/');
+
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.public-contact-footer')).toBeVisible();
 });
 
 test('entry choices keep 16px between their content and horizontal boundaries', async ({ page }) => {
