@@ -10,6 +10,7 @@ const EXPECTED_SCHEMA = "public";
 const MIGRATIONS_TABLE = "worker_migrations";
 const V2_MIGRATION = "002_room_display_order_v2";
 const V3_MIGRATION = "003_admin_optional_contact_v3";
+const V4_MIGRATION = "004_applicant_name_visibility_v4";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -502,6 +503,78 @@ export async function verifyProductionV3Schema(
   }
 }
 
+export async function verifyProductionV4Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV3Schema(client, config);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V4_MIGRATION],
+    );
+    if (migration.rows[0]?.count !== 1) {
+      throw new ProductionMigrationError("schema", "Required V4 migration record is invalid.");
+    }
+
+    const schema = await client.query(
+      `SELECT
+         count(*) FILTER (
+           WHERE table_name IN ('reservations', 'reservation_recurrences')
+             AND column_name='show_applicant_name'
+             AND is_nullable='NO'
+             AND column_default='false'
+         )::integer AS visibility_columns,
+         count(*) FILTER (
+           WHERE table_name='reservation_histories'
+             AND column_name IN (
+               'reservation_show_applicant_name',
+               'before_reservation_show_applicant_name'
+             )
+         )::integer AS history_columns,
+         EXISTS (
+           SELECT 1 FROM pg_constraint
+           WHERE conname='chk_reservations_public_applicant_name_hidden'
+             AND conrelid='public.reservations'::regclass
+         ) AS public_constraint_exists
+       FROM information_schema.columns
+       WHERE table_schema='public'`,
+    );
+    const schemaState = schema.rows[0];
+    if (
+      !schemaState
+      || schemaState.visibility_columns !== 2
+      || schemaState.history_columns !== 2
+      || schemaState.public_constraint_exists !== true
+    ) {
+      throw new ProductionMigrationError("schema", "Production V4 visibility schema objects are incomplete.");
+    }
+
+    const values = await client.query(
+      `SELECT
+         (SELECT count(*) FROM public.reservations
+          WHERE show_applicant_name IS NULL)::integer AS null_reservation_count,
+         (SELECT count(*) FROM public.reservation_recurrences
+          WHERE show_applicant_name IS NULL)::integer AS null_recurrence_count,
+         (SELECT count(*) FROM public.reservations
+          WHERE source='PUBLIC_FORM' AND show_applicant_name=true)::integer AS exposed_public_count`,
+    );
+    if (
+      values.rows[0]?.null_reservation_count !== 0
+      || values.rows[0]?.null_recurrence_count !== 0
+      || values.rows[0]?.exposed_public_count !== 0
+    ) {
+      throw new ProductionMigrationError("schema", "Production V4 visibility values are invalid.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V4 schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -509,6 +582,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV3Schema(client, config);
+    await verifyProductionV4Schema(client, config);
   });
 }

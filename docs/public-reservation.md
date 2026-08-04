@@ -17,6 +17,26 @@ The public reservation timetable and Quick Add flow are available at `/timetable
 - Admin approval, rejection, forced registration, recurrence registration, audit history, and admin memo fields are not exposed in the public UI.
 - Reservation state labels are `REQUESTED` = 승인 대기, `CONFIRMED` = 승인, and `CANCELLED` = 취소. `APPROVED` is not a reservation state; it is an audit history action for 승인 처리.
 
+## Applicant Name Visibility
+
+The public timetable and the public-safe reservation detail use a per-reservation policy to decide whether the applicant name is masked or shown as entered.
+
+- The administrator-facing control is labeled `신청자 이름 보이기`.
+- The control affects only the applicant name. Applicant email and phone remain masked on public screens regardless of this setting.
+- The default value is off. Existing reservations also transition to off and remain masked unless an eligible administrator reservation is explicitly changed.
+- `ADMIN_MANUAL` reservations may enable or disable the setting during administrator creation and editing.
+- A recurring reservation stores the setting and passes it to each generated `RECURRING_GENERATED` reservation.
+- An administrator may override the inherited value while editing an individual generated reservation.
+- `PUBLIC_FORM` reservations always keep the setting off. Public create and update requests do not accept the setting, and administrator editing cannot enable it for a `PUBLIC_FORM` reservation.
+
+`PUBLIC_FORM` reservations cannot be made public by an administrator because the public applicant did not consent to having their unmasked name exposed. Official events or group schedules that require a visible organizer must be created through an administrator single reservation or recurring reservation flow.
+
+When the setting is off, the Worker masks the applicant name in the public timetable API and the public-safe detail API. When the setting is on for an eligible administrator reservation, those APIs may return the applicant name as entered. The Worker response is the privacy boundary; frontend-only masking is not sufficient.
+
+Password-verified public editing may continue to show the applicant their own original information, but it does not expose or change the visibility setting. Authenticated administrator screens and APIs continue to use unmasked applicant information.
+
+Changing this setting is a privacy-relevant administrator action, so its previous and new values must remain reviewable in audit history.
+
 ## Public Edit Policy
 
 - Public users can edit their own 승인 대기 상태(`REQUESTED`) reservations after password verification. Saving keeps the state as `REQUESTED`.

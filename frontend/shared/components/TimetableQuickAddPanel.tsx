@@ -25,6 +25,7 @@ export interface ReservationRequestValues {
   status: ReservationStatus;
   memo: string;
   cancelPassword: string;
+  showApplicantName: boolean;
 }
 
 interface RequestRoom {
@@ -77,6 +78,7 @@ export function initialReservationRequestValues(
     status: variant === 'admin' ? 'CONFIRMED' : 'REQUESTED',
     memo: '',
     cancelPassword: '',
+    showApplicantName: false,
   };
 }
 
@@ -124,6 +126,7 @@ const testIds = {
     start: 'quick-add-start-input',
     end: 'quick-add-end-input',
     memo: 'quick-add-memo-input',
+    showApplicantName: 'quick-add-show-applicant-name-input',
     submit: 'quick-add-save-button',
   },
   public: {
@@ -138,6 +141,7 @@ const testIds = {
     start: 'public-request-start-input',
     end: 'public-request-end-input',
     memo: 'public-request-memo-input',
+    showApplicantName: 'public-show-applicant-name-input',
     submit: 'public-request-submit-button',
   },
 };
@@ -392,6 +396,20 @@ export function ReservationRequestPanel({
             {fieldError('cancelPassword')}
           </label>
         )}
+        {isAdmin ? (
+          <fieldset className="full-span checkbox-group">
+            <legend>공개 표시</legend>
+            <label>
+              <input
+                type="checkbox"
+                data-testid={ids.showApplicantName}
+                checked={values.showApplicantName}
+                onChange={(event) => updateField('showApplicantName', event.target.checked)}
+              />
+              신청자 이름 보이기
+            </label>
+          </fieldset>
+        ) : null}
         <div
           className="inline-error quick-add-submit-error full-span"
           role={submitError ? 'alert' : undefined}

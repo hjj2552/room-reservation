@@ -32,6 +32,7 @@ interface RecurrenceForm {
   startTime: string;
   endTime: string;
   conflictPolicy: ConflictPolicy;
+  showApplicantName: boolean;
 }
 
 const initialForm: RecurrenceForm = {
@@ -47,6 +48,7 @@ const initialForm: RecurrenceForm = {
   startTime: '',
   endTime: '',
   conflictPolicy: 'FAIL_ALL',
+  showApplicantName: false,
 };
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -133,6 +135,7 @@ export function RecurrencesPage() {
       applicantPhone: optionalContact(form.applicantPhone),
       purpose: form.purpose,
       tagId: form.tagId || null,
+      showApplicantName: form.showApplicantName,
     });
   }
 
@@ -231,6 +234,21 @@ export function RecurrencesPage() {
               required
             />
           </label>
+          <fieldset className="full-span checkbox-group">
+            <legend>공개 표시</legend>
+            <label>
+              <input
+                type="checkbox"
+                data-testid="recurrence-show-applicant-name-input"
+                checked={form.showApplicantName}
+                onChange={(event) => setForm((prev) => ({
+                  ...prev,
+                  showApplicantName: event.target.checked,
+                }))}
+              />
+              신청자 이름 보이기
+            </label>
+          </fieldset>
           <label>
             시작일
             <input

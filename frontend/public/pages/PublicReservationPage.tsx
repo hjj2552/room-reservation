@@ -22,7 +22,6 @@ import {
   usePublicWeeklyReservations,
 } from '../../shared/hooks/usePublicReservation';
 import { statusLabels } from '../../shared/utils/labels';
-import { maskName } from '../../shared/utils/privacyMasking';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -83,7 +82,7 @@ function toTimetableReservation(reservation: PublicReservationBlock): TimetableR
     id: reservation.id,
     roomId: reservation.roomId,
     roomName: reservation.roomName,
-    applicantName: maskName(reservation.applicantName) || '-',
+    applicantName: reservation.applicantName || '-',
     purpose: reservation.purpose,
     startAt: reservation.startAt,
     endAt: reservation.endAt,

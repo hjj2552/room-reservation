@@ -6,6 +6,7 @@ import {
   productionMigrationConfigFromEnv,
   verifyProductionV2Schema,
   verifyProductionV3Schema,
+  verifyProductionV4Schema,
   type ProductionMigrationConfig,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
@@ -143,6 +144,8 @@ describe("production migration schema verification", () => {
     orders?: Record<string, unknown>;
     contactSchema?: Record<string, unknown>;
     contactValues?: Record<string, unknown>;
+    visibilitySchema?: Record<string, unknown>;
+    visibilityValues?: Record<string, unknown>;
   } = {}): SqlClient {
     return clientForRows([
       [{ database_name: "production_db", role_name: "migration_role", schema_name: "public" }],
@@ -151,6 +154,7 @@ describe("production migration schema verification", () => {
         { name: "001_worker_baseline_v1" },
         { name: "002_room_display_order_v2" },
         { name: "003_admin_optional_contact_v3" },
+        { name: "004_applicant_name_visibility_v4" },
       ],
       [{ count: 1 }],
       [{
@@ -184,6 +188,19 @@ describe("production migration schema verification", () => {
         invalid_recurrence_count: 0,
         ...overrides.contactValues,
       }],
+      [{ count: 1 }],
+      [{
+        visibility_columns: 2,
+        history_columns: 2,
+        public_constraint_exists: true,
+        ...overrides.visibilitySchema,
+      }],
+      [{
+        null_reservation_count: 0,
+        null_recurrence_count: 0,
+        exposed_public_count: 0,
+        ...overrides.visibilityValues,
+      }],
     ]);
   }
 
@@ -193,6 +210,19 @@ describe("production migration schema verification", () => {
 
   it("accepts nullable contact columns and V3 constraints", async () => {
     await expect(verifyProductionV3Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+  });
+
+  it("accepts V4 applicant visibility columns, defaults and public constraint", async () => {
+    await expect(verifyProductionV4Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+  });
+
+  it("rejects incomplete V4 visibility schema and exposed public reservations", async () => {
+    await expect(verifyProductionV4Schema(validSchemaClient({
+      visibilitySchema: { history_columns: 1 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV4Schema(validSchemaClient({
+      visibilityValues: { exposed_public_count: 1 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("rejects incomplete V3 contact schema and invalid values", async () => {

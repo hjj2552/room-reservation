@@ -1,7 +1,7 @@
 import type {
+  AdminReservationInput,
   ConflictPolicy,
   PublicReservationInput,
-  ReservationInput,
   ReservationSource,
   ReservationStatus,
 } from "../core/domain";
@@ -65,7 +65,7 @@ export interface PublicReservationCommand {
 }
 
 export interface AdminReservationCommand {
-  reservation: ReservationInput;
+  reservation: AdminReservationInput;
   status: ReservationStatus;
   memo: string | null;
 }
@@ -122,6 +122,7 @@ export interface RecurrenceCreateCommand extends RecurrencePreviewCommand {
   applicantEmail: string | null;
   purpose: string;
   tagId: string | null;
+  showApplicantName: boolean;
 }
 
 export interface RecurrenceListQuery extends PageQuery {

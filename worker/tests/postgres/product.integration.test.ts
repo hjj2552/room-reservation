@@ -37,6 +37,13 @@ function addHour(value: string) {
   return `${new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 19)}+09:00`;
 }
 
+function weekStartFor(value: string) {
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  const day = date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1));
+  return date.toISOString().slice(0, 10);
+}
+
 function publicPayload(roomId: string, password: string, purpose: string, hour = 10) {
   const startAt = futureWeekday(21, hour);
   return {
@@ -139,6 +146,36 @@ describe("Worker migrations", () => {
     expect((await database.query(
       "SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_reservations_applicant_email'",
     )).rows).toHaveLength(1);
+  });
+
+  it("applies the V4 applicant name visibility defaults and public reservation constraint", async () => {
+    const columns = await database.query(
+      `SELECT table_name, is_nullable, column_default
+       FROM information_schema.columns
+       WHERE table_schema='public'
+         AND table_name IN ('reservations','reservation_recurrences')
+         AND column_name='show_applicant_name'
+       ORDER BY table_name`,
+    );
+    expect(columns.rows).toEqual([
+      { table_name: "reservation_recurrences", is_nullable: "NO", column_default: "false" },
+      { table_name: "reservations", is_nullable: "NO", column_default: "false" },
+    ]);
+    expect((await database.query(
+      `SELECT 1 FROM pg_constraint
+       WHERE conname='chk_reservations_public_applicant_name_hidden'`,
+    )).rows).toHaveLength(1);
+
+    const roomId = await insertRoom("testing-room-v4-public-constraint");
+    const startAt = futureWeekday(28, 10);
+    await expect(database.query(
+      `INSERT INTO reservations(
+         room_id,applicant_name,applicant_email,applicant_phone,purpose,start_at,end_at,
+         status,source,created_by_actor_type,show_applicant_name
+       ) VALUES($1,'testing-v4-public','testing-v4@example.test','010-0000-0000',
+         'testing-v4-public',$2,$3,'REQUESTED','PUBLIC_FORM','PUBLIC_USER',true)`,
+      [roomId, startAt, addHour(startAt)],
+    )).rejects.toMatchObject({ code: "23514" });
   });
 });
 
@@ -490,6 +527,205 @@ describe("public reservation privacy contracts", () => {
     );
     expect(verifiedResponse.status).toBe(200);
     expect(await verifiedResponse.json()).toMatchObject({ applicantName });
+  });
+
+  it("shows an admin applicant name publicly only when enabled and always masks contacts", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-applicant-visibility");
+    const { app, cookie, writeHeaders } = await authenticatedApp();
+    const startAt = futureWeekday(55, 15);
+    const applicantName = "Visible Applicant";
+    const payload = {
+      roomId,
+      applicantName,
+      applicantEmail: "visible-applicant@example.test",
+      applicantPhone: "010-9876-5432",
+      purpose: "testing-admin-visible-applicant",
+      startAt,
+      endAt: addHour(startAt),
+      status: "CONFIRMED",
+      showApplicantName: true,
+    };
+    const createdResponse = await app.request("http://worker.test/api/admin/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(payload),
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json() as { id: string; showApplicantName: boolean };
+    expect(created.showApplicantName).toBe(true);
+
+    const weeklyResponse = await app.request(
+      `http://worker.test/api/public/rooms/${roomId}/weekly-reservations?weekStart=${weekStartFor(startAt)}`,
+    );
+    expect(weeklyResponse.status).toBe(200);
+    const weeklyJson = await weeklyResponse.text();
+    expect(weeklyJson).toContain(applicantName);
+    expect(weeklyJson).not.toContain(payload.applicantEmail);
+    expect(weeklyJson).not.toContain(payload.applicantPhone);
+
+    const publicDetailResponse = await app.request(
+      `http://worker.test/api/public/reservations/${created.id}`,
+    );
+    expect(publicDetailResponse.status).toBe(200);
+    const publicDetail = await publicDetailResponse.json() as {
+      applicantName: string;
+      applicantEmail: string;
+      applicantPhone: string;
+    };
+    expect(publicDetail).toMatchObject({
+      applicantName,
+      applicantEmail: "vi***************@example.test",
+      applicantPhone: "0109******2",
+    });
+
+    const adminList = await app.request(
+      `http://worker.test/api/admin/reservations?roomId=${roomId}`,
+      { headers: { cookie } },
+    );
+    expect(await adminList.json()).toMatchObject({
+      items: [expect.objectContaining({ applicantName, showApplicantName: true })],
+    });
+
+    const hiddenResponse = await app.request(
+      `http://worker.test/api/admin/reservations/${created.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({ ...payload, showApplicantName: false }),
+      },
+    );
+    expect(hiddenResponse.status).toBe(200);
+    expect(await hiddenResponse.json()).toMatchObject({ applicantName, showApplicantName: false });
+
+    const hiddenDetail = await app.request(
+      `http://worker.test/api/public/reservations/${created.id}`,
+    );
+    expect(await hiddenDetail.json()).toMatchObject({ applicantName: "V*t" });
+
+    const histories = await app.request(
+      `http://worker.test/api/admin/reservations/${created.id}/histories`,
+      { headers: { cookie } },
+    );
+    expect(await histories.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "UPDATED",
+        beforeReservationShowApplicantName: true,
+        reservationShowApplicantName: false,
+      }),
+    ]));
+  });
+
+  it("keeps public form reservations hidden even when clients or admins request visibility", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-visibility-guard");
+    const { app, writeHeaders } = await authenticatedApp();
+    const applicantName = "Never Public";
+    const payload = {
+      ...publicPayload(roomId, "Guard1!", "testing-public-visibility-guard", 10),
+      applicantName,
+      showApplicantName: true,
+    };
+    const createdResponse = await app.request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(payload),
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json() as { id: string };
+    expect((await database.query(
+      "SELECT show_applicant_name FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows).toEqual([{ show_applicant_name: false }]);
+
+    const publicUpdate = await app.request(
+      `http://worker.test/api/public/reservations/${created.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify(payload),
+      },
+    );
+    expect(publicUpdate.status).toBe(200);
+    expect((await database.query(
+      "SELECT show_applicant_name FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows).toEqual([{ show_applicant_name: false }]);
+
+    const adminUpdate = await app.request(
+      `http://worker.test/api/admin/reservations/${created.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({ ...payload, status: "REQUESTED", showApplicantName: true }),
+      },
+    );
+    expect(adminUpdate.status).toBe(200);
+    expect(await adminUpdate.json()).toMatchObject({ showApplicantName: false });
+    const safeDetail = await app.request(`http://worker.test/api/public/reservations/${created.id}`);
+    const safeJson = await safeDetail.text();
+    expect(safeJson).not.toContain(applicantName);
+    expect(safeJson).toContain("N*c");
+  });
+
+  it("inherits recurrence visibility and allows an independent generated reservation override", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurring-visibility");
+    const firstDate = futureWeekday(70, 10).slice(0, 10);
+    const secondDate = new Date(`${firstDate}T00:00:00Z`);
+    do {
+      secondDate.setUTCDate(secondDate.getUTCDate() + 1);
+    } while (secondDate.getUTCDay() === 0 || secondDate.getUTCDay() === 6);
+    const recurrencePayload = {
+      roomId,
+      applicantName: "Recurring Visible",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-recurring-visible-applicant",
+      tagId: null,
+      startDate: firstDate,
+      endDate: secondDate.toISOString().slice(0, 10),
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "FAIL_ALL",
+      showApplicantName: true,
+    };
+    const result = await products.createRecurrence(parseRecurrenceCreate(recurrencePayload), "admin");
+    expect(result.createdCount).toBe(2);
+    const rows = await database.query(
+      `SELECT id, start_at, show_applicant_name
+       FROM reservations WHERE recurrence_id=$1 ORDER BY start_at`,
+      [result.recurrenceId],
+    );
+    expect(rows.rows).toHaveLength(2);
+    expect(rows.rows.every((row) => row.show_applicant_name === true)).toBe(true);
+    expect((await database.query(
+      "SELECT show_applicant_name FROM reservation_recurrences WHERE id=$1",
+      [result.recurrenceId],
+    )).rows).toEqual([{ show_applicant_name: true }]);
+
+    const edited = rows.rows[0]!;
+    await products.updateAdminReservation(String(edited.id), parseAdminReservation({
+      roomId,
+      applicantName: recurrencePayload.applicantName,
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: recurrencePayload.purpose,
+      startAt: new Date(String(edited.start_at)).toISOString(),
+      endAt: new Date(new Date(String(edited.start_at)).getTime() + 60 * 60_000).toISOString(),
+      status: "CONFIRMED",
+      showApplicantName: false,
+    }), "admin");
+    const after = await database.query(
+      `SELECT show_applicant_name FROM reservations WHERE recurrence_id=$1 ORDER BY start_at`,
+      [result.recurrenceId],
+    );
+    expect(after.rows.map((row) => row.show_applicant_name)).toEqual([false, true]);
+    expect((await database.query(
+      "SELECT show_applicant_name FROM reservation_recurrences WHERE id=$1",
+      [result.recurrenceId],
+    )).rows).toEqual([{ show_applicant_name: true }]);
   });
 });
 

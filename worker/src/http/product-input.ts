@@ -135,6 +135,9 @@ function recurrence(
     applicantName: requireString(object, "applicantName", { max: 100 }),
     applicantEmail: optionalEmail(object, "applicantEmail"),
     purpose: requireString(object, "purpose", { max: 500 }),
+    showApplicantName: object.showApplicantName === undefined
+      ? false
+      : requireBoolean(object, "showApplicantName"),
     tagId: object.tagId === undefined || object.tagId === null || object.tagId === ""
       ? null
       : requireUuid(object, "tagId"),

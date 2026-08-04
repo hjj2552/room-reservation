@@ -97,6 +97,10 @@ export function RecurrenceDetailPage() {
               <dd>{detail.applicantName}</dd>
             </div>
             <div>
+              <dt>공개 표시</dt>
+              <dd>{detail.showApplicantName ? '신청자 이름 보이기' : '이름 마스킹'}</dd>
+            </div>
+            <div>
               <dt>연락처</dt>
               <dd>{detail.applicantEmail || '-'} / {detail.applicantPhone || '-'}</dd>
             </div>

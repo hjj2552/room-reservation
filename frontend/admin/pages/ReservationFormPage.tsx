@@ -25,6 +25,7 @@ interface ReservationFormValues {
   endAt: string;
   status: ReservationStatus;
   memo: string;
+  showApplicantName: boolean;
 }
 
 const defaultReservationFormValues: ReservationFormValues = {
@@ -37,6 +38,7 @@ const defaultReservationFormValues: ReservationFormValues = {
   endAt: '',
   status: 'CONFIRMED',
   memo: '',
+  showApplicantName: false,
 };
 
 export function ReservationFormPage() {
@@ -71,6 +73,9 @@ export function ReservationFormPage() {
         endAt: toServiceDateTimeLocal(reservation.data.endAt),
         status: reservation.data.status,
         memo: '',
+        showApplicantName: reservation.data.source === 'PUBLIC_FORM'
+          ? false
+          : reservation.data.showApplicantName,
       });
     }
   }, [reservation.data, reset]);
@@ -81,6 +86,7 @@ export function ReservationFormPage() {
       applicantName: values.applicantName,
       applicantEmail: optionalContact(values.applicantEmail),
       applicantPhone: optionalContact(values.applicantPhone),
+      showApplicantName: reservation.data?.source === 'PUBLIC_FORM' ? false : values.showApplicantName,
       purpose: values.purpose,
       startAt: fromServiceDateTimeLocal(values.startAt),
       endAt: fromServiceDateTimeLocal(values.endAt),
@@ -188,6 +194,19 @@ export function ReservationFormPage() {
             ))}
           </select>
         </label>
+        {reservation.data?.source !== 'PUBLIC_FORM' ? (
+          <fieldset className="full-span checkbox-group">
+            <legend>공개 표시</legend>
+            <label>
+              <input
+                type="checkbox"
+                data-testid="reservation-show-applicant-name-input"
+                {...register('showApplicantName')}
+              />
+              신청자 이름 보이기
+            </label>
+          </fieldset>
+        ) : null}
         <label className="full-span">
           처리 메모
           <textarea

@@ -36,6 +36,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
+    await page.getByTestId('recurrence-show-applicant-name-input').check();
 
     const previewResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/recurrences/preview') &&
@@ -65,9 +66,11 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     const createRequest = JSON.parse(createResponse.request().postData() || '{}') as {
       applicantEmail?: string | null;
       applicantPhone?: string | null;
+      showApplicantName?: boolean;
     };
     expect(createRequest.applicantEmail).toBeNull();
     expect(createRequest.applicantPhone).toBeNull();
+    expect(createRequest.showApplicantName).toBe(true);
     expect(createResponse.ok(), createBody).toBeTruthy();
     const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
     recurrenceId = created.recurrenceId;
@@ -79,6 +82,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
+    await expect(page.getByText('신청자 이름 보이기')).toBeVisible();
     await expect(page.locator('.description-list').getByText('- / -')).toBeVisible();
 
     await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');

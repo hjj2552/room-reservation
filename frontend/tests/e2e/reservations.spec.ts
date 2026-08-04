@@ -333,6 +333,16 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
+test('public form reservation edit does not offer applicant name visibility', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('public-visibility-edit-room');
+  const reservation = await e2eData.createTestPublicReservation(room.id, 'public-visibility-edit');
+
+  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+  await expect(page.getByTestId('reservation-save-button')).toBeVisible();
+  await expect(page.getByTestId('reservation-show-applicant-name-input')).toHaveCount(0);
+});
+
 test('reservation duplicate pre-fills fields and handles unavailable operating days', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const settings = await getSettingsByApi(request);
