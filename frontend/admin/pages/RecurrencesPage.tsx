@@ -195,16 +195,30 @@ export function RecurrencesPage() {
               ))}
             </select>
           </label>
-          <label>
-            신청자 이름
-            <input
-              data-testid="recurrence-applicant-name-input"
-              name="applicantName"
-              value={form.applicantName}
-              onChange={(event) => setForm((prev) => ({ ...prev, applicantName: event.target.value }))}
-              required
-            />
-          </label>
+          <div className="applicant-name-field">
+            <label>
+              신청자 이름
+              <input
+                data-testid="recurrence-applicant-name-input"
+                name="applicantName"
+                value={form.applicantName}
+                onChange={(event) => setForm((prev) => ({ ...prev, applicantName: event.target.value }))}
+                required
+              />
+            </label>
+            <label className="applicant-name-visibility-toggle">
+              <input
+                type="checkbox"
+                data-testid="recurrence-show-applicant-name-input"
+                checked={form.showApplicantName}
+                onChange={(event) => setForm((prev) => ({
+                  ...prev,
+                  showApplicantName: event.target.checked,
+                }))}
+              />
+              신청자 이름 보이기
+            </label>
+          </div>
           <label>
             이메일 (선택)
             <input
@@ -234,21 +248,6 @@ export function RecurrencesPage() {
               required
             />
           </label>
-          <fieldset className="full-span checkbox-group">
-            <legend>공개 표시</legend>
-            <label>
-              <input
-                type="checkbox"
-                data-testid="recurrence-show-applicant-name-input"
-                checked={form.showApplicantName}
-                onChange={(event) => setForm((prev) => ({
-                  ...prev,
-                  showApplicantName: event.target.checked,
-                }))}
-              />
-              신청자 이름 보이기
-            </label>
-          </fieldset>
           <label>
             시작일
             <input

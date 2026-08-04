@@ -328,6 +328,22 @@ document scrolling when all content fits in one viewport.
 - Place related date/time fields together and make their relationship visible.
 - Search and filter controls should be compact enough to preserve data space.
 - Error text appears next to the affected field and remains after focus moves.
+- A single checkbox that changes how one field is used or disclosed belongs
+  directly below that field's input. Do not place it in a separate bordered
+  fieldset, card, or generically titled section.
+- Keep a field-specific checkbox visually attached to its input, while leaving
+  enough space for the input's focus outline. Preserve the form's normal,
+  larger gap between that checkbox and the next unrelated field.
+- Do not reserve an empty error-message row between an input and its dependent
+  checkbox. When an error exists, show it next to the affected input without
+  obscuring the checkbox or keyboard focus treatment.
+- Apply this pattern consistently to applicant name, email, and phone controls
+  if product policy introduces a field-specific visibility or masking option.
+  This layout rule does not itself make currently private contact fields
+  configurable.
+- Use a `fieldset` and `legend` for a real group of multiple related choices,
+  such as recurrence weekdays, rather than for a single field-specific
+  checkbox.
 
 ### Status
 

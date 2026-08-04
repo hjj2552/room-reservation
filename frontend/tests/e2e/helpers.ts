@@ -69,6 +69,24 @@ export async function expectTestIdPairsOnSameRow(page: Page, testIdPairs: Array<
   }
 }
 
+export async function expectTestIdBelow(page: Page, upperTestId: string, lowerTestId: string) {
+  const [upperBox, lowerBox] = await Promise.all([
+    page.getByTestId(upperTestId).boundingBox(),
+    page.getByTestId(lowerTestId).boundingBox(),
+  ]);
+  if (!upperBox || !lowerBox) {
+    throw new Error(`Could not measure ${upperTestId} and ${lowerTestId}`);
+  }
+  expect(
+    lowerBox.y,
+    `${lowerTestId} should be below ${upperTestId}`,
+  ).toBeGreaterThanOrEqual(upperBox.y + upperBox.height);
+  expect(
+    lowerBox.y - (upperBox.y + upperBox.height),
+    `${lowerTestId} should stay visually attached to ${upperTestId}`,
+  ).toBeLessThanOrEqual(12);
+}
+
 export interface E2eSettings {
   organizationName: string;
   publicNotice: string | null;

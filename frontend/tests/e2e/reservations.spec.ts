@@ -3,6 +3,7 @@ import type { Locator } from '@playwright/test';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTestIdBelow,
   expectTestIdPairsOnSameRow,
   expectTestIdsInDomOrder,
   getSettingsByApi,
@@ -283,6 +284,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
       'reservation-start-input',
       'reservation-end-input',
       'reservation-applicant-name-input',
+      'reservation-show-applicant-name-input',
       'reservation-email-input',
       'reservation-phone-input',
       'reservation-status-select',
@@ -294,6 +296,8 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
       ['reservation-applicant-name-input', 'reservation-email-input'],
       ['reservation-phone-input', 'reservation-status-select'],
     ]);
+    await expectTestIdBelow(page, 'reservation-applicant-name-input', 'reservation-show-applicant-name-input');
+    await expect(page.getByTestId('reservation-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
     await expect(page.getByTestId('reservation-purpose-input').locator('..')).toHaveClass(/full-span/);
     await expect(page.getByTestId('reservation-status-select')).toBeEditable();
     await expect(page.getByTestId('reservation-memo-input').locator('..')).toHaveClass(/full-span/);
@@ -489,6 +493,7 @@ test('admin can request a reservation from the timetable and see it on detail an
       'quick-add-start-input',
       'quick-add-end-input',
       'quick-add-applicant-name-input',
+      'quick-add-show-applicant-name-input',
       'quick-add-email-input',
       'quick-add-phone-input',
       'quick-add-status-select',
@@ -500,6 +505,8 @@ test('admin can request a reservation from the timetable and see it on detail an
       ['quick-add-applicant-name-input', 'quick-add-email-input'],
       ['quick-add-phone-input', 'quick-add-status-select'],
     ]);
+    await expectTestIdBelow(page, 'quick-add-applicant-name-input', 'quick-add-show-applicant-name-input');
+    await expect(page.getByTestId('quick-add-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
     await expect(page.getByTestId('quick-add-status-select')).toBeEditable();
     await page.getByTestId('quick-add-room-select').selectOption(room.id);
     await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');

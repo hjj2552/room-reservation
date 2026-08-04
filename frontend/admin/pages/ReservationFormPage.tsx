@@ -158,14 +158,26 @@ export function ReservationFormPage() {
           startError={errors.startAt ? <span className="field-error">{errors.startAt.message}</span> : null}
           endError={errors.endAt ? <span className="field-error">{errors.endAt.message}</span> : null}
         />
-        <label>
-          신청자
-          <input
-            data-testid="reservation-applicant-name-input"
-            {...register('applicantName', { required: '신청자 이름을 입력해 주세요.' })}
-          />
-          {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
-        </label>
+        <div className="applicant-name-field">
+          <label>
+            신청자
+            <input
+              data-testid="reservation-applicant-name-input"
+              {...register('applicantName', { required: '신청자 이름을 입력해 주세요.' })}
+            />
+            {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
+          </label>
+          {reservation.data?.source !== 'PUBLIC_FORM' ? (
+            <label className="applicant-name-visibility-toggle">
+              <input
+                type="checkbox"
+                data-testid="reservation-show-applicant-name-input"
+                {...register('showApplicantName')}
+              />
+              신청자 이름 보이기
+            </label>
+          ) : null}
+        </div>
         <label>
           이메일 (선택)
           <input
@@ -194,19 +206,6 @@ export function ReservationFormPage() {
             ))}
           </select>
         </label>
-        {reservation.data?.source !== 'PUBLIC_FORM' ? (
-          <fieldset className="full-span checkbox-group">
-            <legend>공개 표시</legend>
-            <label>
-              <input
-                type="checkbox"
-                data-testid="reservation-show-applicant-name-input"
-                {...register('showApplicantName')}
-              />
-              신청자 이름 보이기
-            </label>
-          </fieldset>
-        ) : null}
         <label className="full-span">
           처리 메모
           <textarea

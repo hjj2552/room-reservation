@@ -3,6 +3,7 @@ import {
   cancelRecurrenceByApi,
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTestIdBelow,
   getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
@@ -26,6 +27,8 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
       addMinutesToTime(settings.openTime, settings.minReservationMinutes),
     );
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
+    await expectTestIdBelow(page, 'recurrence-applicant-name-input', 'recurrence-show-applicant-name-input');
+    await expect(page.getByTestId('recurrence-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
     await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');

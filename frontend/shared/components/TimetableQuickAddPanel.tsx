@@ -306,16 +306,29 @@ export function ReservationRequestPanel({
           startError={fieldError('startAt')}
           endError={fieldError('endAt')}
         />
-        <label>
-          신청자
-          <input
-            data-testid={ids.applicantName}
-            value={values.applicantName}
-            onChange={(event) => updateField('applicantName', event.target.value)}
-            {...inputErrorProps('applicantName')}
-          />
-          {fieldError('applicantName')}
-        </label>
+        <div className="applicant-name-field">
+          <label>
+            신청자
+            <input
+              data-testid={ids.applicantName}
+              value={values.applicantName}
+              onChange={(event) => updateField('applicantName', event.target.value)}
+              {...inputErrorProps('applicantName')}
+            />
+            {errors.applicantName ? fieldError('applicantName') : null}
+          </label>
+          {isAdmin ? (
+            <label className="applicant-name-visibility-toggle">
+              <input
+                type="checkbox"
+                data-testid={ids.showApplicantName}
+                checked={values.showApplicantName}
+                onChange={(event) => updateField('showApplicantName', event.target.checked)}
+              />
+              신청자 이름 보이기
+            </label>
+          ) : null}
+        </div>
         <label>
           이메일{isAdmin ? ' (선택)' : ''}
           <input
@@ -396,20 +409,6 @@ export function ReservationRequestPanel({
             {fieldError('cancelPassword')}
           </label>
         )}
-        {isAdmin ? (
-          <fieldset className="full-span checkbox-group">
-            <legend>공개 표시</legend>
-            <label>
-              <input
-                type="checkbox"
-                data-testid={ids.showApplicantName}
-                checked={values.showApplicantName}
-                onChange={(event) => updateField('showApplicantName', event.target.checked)}
-              />
-              신청자 이름 보이기
-            </label>
-          </fieldset>
-        ) : null}
         <div
           className="inline-error quick-add-submit-error full-span"
           role={submitError ? 'alert' : undefined}
