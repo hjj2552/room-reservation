@@ -170,7 +170,7 @@ test('settings keep related fields paired on desktop and stacked in order on mob
   }
 });
 
-test('reservation list filters are reflected in URL query and survive reload', async ({ page, request }) => {
+test('reservation list applies all draft filters on submit and survives reload', async ({ page, request }) => {
   await loginByApi(request);
   await page.goto('/admin/reservations');
 
@@ -183,10 +183,11 @@ test('reservation list filters are reflected in URL query and survive reload', a
   expect(download.suggestedFilename()).toBe('reservations.csv');
 
   await page.getByTestId('reservation-status-filter').selectOption('CONFIRMED');
-  await expect(page).toHaveURL(/status=CONFIRMED/);
   await page.getByTestId('reservation-keyword-filter').fill('testing-');
-  await expect(page).toHaveURL(/keyword=testing-/);
   await page.getByTestId('reservation-from-date-filter').fill('2026-05-01');
+  await expect(page).not.toHaveURL(/status=CONFIRMED/);
+  await expect(page).not.toHaveURL(/keyword=testing-/);
+  await expect(page).not.toHaveURL(/fromDate=2026-05-01/);
   await page.getByTestId('reservation-search-button').click();
 
   await expect(page).toHaveURL(/status=CONFIRMED/);
