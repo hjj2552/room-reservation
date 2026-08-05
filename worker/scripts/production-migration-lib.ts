@@ -11,6 +11,7 @@ const MIGRATIONS_TABLE = "worker_migrations";
 const V2_MIGRATION = "002_room_display_order_v2";
 const V3_MIGRATION = "003_admin_optional_contact_v3";
 const V4_MIGRATION = "004_applicant_name_visibility_v4";
+const V5_MIGRATION = "005_recurrence_hard_delete_v5";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -227,14 +228,22 @@ function verifyMigrationPrefix(applied: string[], local: string[], requireAll: b
 export async function inspectProductionMigrationState(
   client: SqlClient,
   config: ProductionMigrationConfig,
-  options: { requireAll?: boolean } = {},
+  options: { requireAll?: boolean; requireThrough?: string } = {},
 ): Promise<string[]> {
   await verifyIdentity(client, config);
   const [applied, local] = await Promise.all([
     appliedMigrationNames(client),
     localMigrationNames(),
   ]);
-  verifyMigrationPrefix(applied, local, options.requireAll === true);
+  if (options.requireThrough) {
+    const requiredIndex = local.indexOf(options.requireThrough);
+    if (requiredIndex < 0) {
+      throw new ProductionMigrationError("ledger", "Required local migration definition is missing.");
+    }
+    verifyMigrationPrefix(applied, local.slice(0, requiredIndex + 1), true);
+  } else {
+    verifyMigrationPrefix(applied, local, options.requireAll === true);
+  }
   return local;
 }
 
@@ -318,8 +327,9 @@ export async function applyProductionMigration(
 export async function verifyProductionV2Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  requireThrough = V2_MIGRATION,
 ): Promise<void> {
-  const local = await inspectProductionMigrationState(client, config, { requireAll: true });
+  const local = await inspectProductionMigrationState(client, config, { requireThrough });
   if (!local.includes(V2_MIGRATION)) {
     throw new ProductionMigrationError("schema", "Required V2 migration definition is missing.");
   }
@@ -430,8 +440,9 @@ export async function verifyProductionV2Schema(
 export async function verifyProductionV3Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  requireThrough = V3_MIGRATION,
 ): Promise<void> {
-  await verifyProductionV2Schema(client, config);
+  await verifyProductionV2Schema(client, config, requireThrough);
 
   try {
     const migration = await client.query(
@@ -503,23 +514,12 @@ export async function verifyProductionV3Schema(
   }
 }
 
-export async function verifyProductionV4Schema(
+async function verifyProductionVisibilitySchema(
   client: SqlClient,
-  config: ProductionMigrationConfig,
+  requireLegacyRecurrenceDeletionObjects: boolean,
+  schemaVersion: "V4" | "V5",
 ): Promise<void> {
-  await verifyProductionV3Schema(client, config);
-
   try {
-    const migration = await client.query(
-      `SELECT count(*)::integer AS count
-       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
-       WHERE name=$1`,
-      [V4_MIGRATION],
-    );
-    if (migration.rows[0]?.count !== 1) {
-      throw new ProductionMigrationError("schema", "Required V4 migration record is invalid.");
-    }
-
     const schema = await client.query(
       `SELECT
          count(*) FILTER (
@@ -560,10 +560,17 @@ export async function verifyProductionV4Schema(
       || schemaState.visibility_columns !== 2
       || schemaState.history_columns !== 2
       || schemaState.public_constraint_exists !== true
-      || schemaState.recurrence_deleted_at_columns !== 1
-      || schemaState.recurrence_deleted_at_index_exists !== true
+      || (requireLegacyRecurrenceDeletionObjects
+        && (schemaState.recurrence_deleted_at_columns !== 1
+          || schemaState.recurrence_deleted_at_index_exists !== true))
+      || (!requireLegacyRecurrenceDeletionObjects
+        && (schemaState.recurrence_deleted_at_columns !== 0
+          || schemaState.recurrence_deleted_at_index_exists !== false))
     ) {
-      throw new ProductionMigrationError("schema", "Production V4 visibility schema objects are incomplete.");
+      throw new ProductionMigrationError(
+        "schema",
+        `Production ${schemaVersion} visibility schema objects are incomplete.`,
+      );
     }
 
     const values = await client.query(
@@ -580,11 +587,56 @@ export async function verifyProductionV4Schema(
       || values.rows[0]?.null_recurrence_count !== 0
       || values.rows[0]?.exposed_public_count !== 0
     ) {
-      throw new ProductionMigrationError("schema", "Production V4 visibility values are invalid.");
+      throw new ProductionMigrationError("schema", `Production ${schemaVersion} visibility values are invalid.`);
     }
   } catch (error) {
     if (error instanceof ProductionMigrationError) throw error;
-    throw new ProductionMigrationError("schema", "Production V4 schema could not be verified.");
+    throw new ProductionMigrationError("schema", `Production ${schemaVersion} schema could not be verified.`);
+  }
+}
+
+export async function verifyProductionV4Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV3Schema(client, config, V4_MIGRATION);
+
+  const migration = await client.query(
+    `SELECT count(*)::integer AS count
+     FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+     WHERE name=$1`,
+    [V4_MIGRATION],
+  );
+  if (migration.rows[0]?.count !== 1) {
+    throw new ProductionMigrationError("schema", "Required V4 migration record is invalid.");
+  }
+
+  await verifyProductionVisibilitySchema(client, true, "V4");
+}
+
+export async function verifyProductionV5Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV3Schema(client, config, V5_MIGRATION);
+
+  try {
+    const migrations = await client.query(
+      `SELECT name, count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name = ANY($1::text[])
+       GROUP BY name`,
+      [[V4_MIGRATION, V5_MIGRATION]],
+    );
+    const migrationCounts = new Map(migrations.rows.map((row) => [row.name, row.count]));
+    if (migrationCounts.get(V4_MIGRATION) !== 1 || migrationCounts.get(V5_MIGRATION) !== 1) {
+      throw new ProductionMigrationError("schema", "Required V4/V5 migration records are invalid.");
+    }
+
+    await verifyProductionVisibilitySchema(client, false, "V5");
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V5 schema could not be verified.");
   }
 }
 
@@ -595,6 +647,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV4Schema(client, config);
+    await verifyProductionV5Schema(client, config);
   });
 }

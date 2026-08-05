@@ -94,7 +94,7 @@ describe("Worker migrations", () => {
     expect(sentinel.rows).toEqual([{ name: "삭제된 공간" }]);
   });
 
-  it("keeps the V4 recurrence compatibility column and index with no pending migration", async () => {
+  it("removes the legacy recurrence deletion column and index at V5", async () => {
     const schema = await database.query(
       `SELECT
          EXISTS (
@@ -112,8 +112,8 @@ describe("Worker migrations", () => {
          ) AS deleted_at_index_exists`,
     );
     expect(schema.rows[0]).toEqual({
-      deleted_at_exists: true,
-      deleted_at_index_exists: true,
+      deleted_at_exists: false,
+      deleted_at_index_exists: false,
     });
     const ledger = await database.query("SELECT name FROM worker_migrations ORDER BY run_on ASC, id ASC");
     expect(ledger.rows.map((row) => row.name)).toEqual([
@@ -121,6 +121,7 @@ describe("Worker migrations", () => {
       "002_room_display_order_v2",
       "003_admin_optional_contact_v3",
       "004_applicant_name_visibility_v4",
+      "005_recurrence_hard_delete_v5",
     ]);
   });
 
@@ -1007,62 +1008,6 @@ describe("room display order HTTP contract", () => {
 });
 
 describe("recurrence search contract", () => {
-  it("uses statusless recurrence behavior for legacy soft-cancelled rows on the V4 schema", async () => {
-    await resetProductData();
-    const roomId = await insertRoom("testing-room-v4-recurrence-compatibility");
-    const activeId = await insertRecurrence({ roomId, purpose: "testing-v4-active-recurrence" });
-    const legacyDeletedId = await insertRecurrence({ roomId, purpose: "testing-v4-legacy-deleted-recurrence" });
-    const legacyChildId = await insertReservation({
-      roomId,
-      recurrenceId: legacyDeletedId,
-      purpose: "testing-v4-legacy-child",
-      source: "RECURRING_GENERATED",
-    });
-    await database.query("UPDATE reservation_recurrences SET deleted_at=now() WHERE id=$1", [legacyDeletedId]);
-
-    const listed = await products.listRecurrences(parseRecurrenceList(
-      new URL("http://worker.test/api/admin/recurrences?page=0&size=20").searchParams,
-    ));
-    expect(listed.items.map((item) => item.id)).toEqual(expect.arrayContaining([activeId, legacyDeletedId]));
-    await expect(products.getRecurrence(legacyDeletedId)).resolves.toMatchObject({
-      id: legacyDeletedId,
-      reservations: [expect.objectContaining({ id: legacyChildId })],
-    });
-    expect((await database.query(
-      "SELECT deleted_at IS NOT NULL AS legacy_marker_preserved FROM reservation_recurrences WHERE id=$1",
-      [legacyDeletedId],
-    )).rows[0]).toEqual({ legacy_marker_preserved: true });
-
-    const newRoomId = await insertRoom("testing-room-v4-new-recurrence");
-    const date = futureWeekday(70, 15).slice(0, 10);
-    const created = await products.createRecurrence(parseRecurrenceCreate({
-      roomId: newRoomId,
-      applicantName: "testing-v4-new-recurrence",
-      applicantEmail: null,
-      applicantPhone: null,
-      purpose: "testing-v4-new-recurrence",
-      tagId: null,
-      startDate: date,
-      endDate: date,
-      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
-      startTime: "15:00",
-      endTime: "16:00",
-      conflictPolicy: "FAIL_ALL",
-      showApplicantName: false,
-    }), "admin");
-    expect((await database.query(
-      "SELECT deleted_at FROM reservation_recurrences WHERE id=$1",
-      [created.recurrenceId],
-    )).rows[0]).toEqual({ deleted_at: null });
-
-    await products.deleteRecurrence(legacyDeletedId, "testing-v4-compatibility-delete", "admin");
-    expect((await database.query(
-      "SELECT 1 FROM reservation_recurrences WHERE id=$1",
-      [legacyDeletedId],
-    )).rows).toHaveLength(0);
-    expect((await database.query("SELECT 1 FROM reservations WHERE id=$1", [legacyChildId])).rows).toHaveLength(0);
-  });
-
   it("searches purpose, applicant name, room name and tag name, but not email", async () => {
     await resetProductData();
     const purposeRoom = await insertRoom("ordinary-purpose-room");
