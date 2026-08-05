@@ -162,9 +162,10 @@ export function RecurrencesPage() {
   );
   const recurrences = useRecurrences(filters);
   const currentPreviewFingerprint = recurrencePreviewFingerprint(form);
-  const previewIsValid = successfulPreview?.fingerprint === currentPreviewFingerprint;
+  const previewFingerprintMatches = successfulPreview?.fingerprint === currentPreviewFingerprint;
+  const previewIsValid = previewFingerprintMatches && !preview.isPending && !preview.isError;
   const validPreview = previewIsValid ? successfulPreview.data : null;
-  const previewIsStale = successfulPreview !== null && !previewIsValid;
+  const previewIsStale = successfulPreview !== null && !previewFingerprintMatches;
 
   function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

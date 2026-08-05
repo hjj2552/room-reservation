@@ -350,6 +350,46 @@ test('recurrence preview validity follows only the preview condition values', as
     () => page.getByTestId('recurrence-conflict-policy-select').selectOption('SKIP_CONFLICTS'),
     () => page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL'),
   );
+
+  let releaseRepeatedPreview!: () => void;
+  let markRepeatedPreviewStarted!: () => void;
+  const repeatedPreviewGate = new Promise<void>((resolve) => { releaseRepeatedPreview = resolve; });
+  const repeatedPreviewStarted = new Promise<void>((resolve) => { markRepeatedPreviewStarted = resolve; });
+  await page.route('**/api/admin/recurrences/preview', async (route) => {
+    markRepeatedPreviewStarted();
+    await repeatedPreviewGate;
+    await route.continue();
+  }, { times: 1 });
+
+  const repeatedPreviewResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/admin/recurrences/preview',
+  );
+  await page.getByTestId('recurrence-preview-button').click();
+  await repeatedPreviewStarted;
+  await expect(createButton).toBeDisabled();
+  await expect(summary).toBeHidden();
+  await expect(staleMessage).toBeHidden();
+  releaseRepeatedPreview();
+  expect((await repeatedPreviewResponse).ok()).toBe(true);
+  await expect(createButton).toBeEnabled();
+  await expect(summary).toBeVisible();
+
+  await page.route('**/api/admin/recurrences/preview', async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'testing-preview-failure' }),
+    });
+  }, { times: 1 });
+  const failedPreviewResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/admin/recurrences/preview',
+  );
+  await page.getByTestId('recurrence-preview-button').click();
+  expect((await failedPreviewResponse).status()).toBe(503);
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(createButton).toBeDisabled();
+  await expect(summary).toBeHidden();
+  await expect(staleMessage).toBeHidden();
 });
 
 test('a late preview response cannot validate changed recurrence conditions', async ({ page, request, e2eData }) => {
