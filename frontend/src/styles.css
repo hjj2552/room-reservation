@@ -287,6 +287,35 @@ textarea[aria-invalid='true']:focus-visible {
   margin-top: 14px;
 }
 
+.recurrence-detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.recurrence-delete-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.recurrence-delete-summary > div {
+  display: grid;
+  gap: var(--space-1);
+  border-top: 1px solid var(--rule);
+  padding-top: var(--space-2);
+}
+
+.recurrence-delete-summary dt {
+  color: var(--muted-ink);
+  font-size: 13px;
+}
+
+.recurrence-delete-summary dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .view-mode-bar {
   display: inline-flex;
   width: fit-content;
@@ -2260,6 +2289,10 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
+  .recurrence-delete-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   input,
   select,
   textarea {

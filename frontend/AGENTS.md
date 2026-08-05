@@ -15,7 +15,7 @@ These rules apply to `frontend`, especially Playwright E2E work.
   - `e2eData.registerReservation(id)`, `e2eData.registerRecurrence(id)`, and `e2eData.registerTag(id)` for ids created through the UI.
 - Do not bypass the fixture with local one-off factories unless adding the missing capability to the shared fixture in the same change.
 - UI-created data must still use `testing-` applicant names, emails, purposes, and memos where the form allows it.
-- The fixture performs best-effort id cleanup after each test; reservations and tags are hard-deleted by id, recurrences are cancelled by id, and E2E audit histories are left for the guarded prefix cleanup. The E2E runner performs guarded prefix cleanup before and after the suite.
+- The fixture performs best-effort id cleanup after each test; reservations, recurrences, and tags are hard-deleted by id, and E2E audit histories are left for the guarded prefix cleanup. The E2E runner performs guarded prefix cleanup before and after the suite.
 
 ## Manual Cleanup Commands
 

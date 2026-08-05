@@ -391,8 +391,8 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
     await dependencies.products.listRecurrences(parseRecurrenceList(queryParams(context))),
   ));
   app.get("/api/admin/recurrences/:recurrenceId", async (context) => context.json(await dependencies.products.getRecurrence(uuidParam(context, "recurrenceId"))));
-  app.post("/api/admin/recurrences/:recurrenceId/cancel", async (context) => {
-    await dependencies.products.cancelRecurrence(
+  app.delete("/api/admin/recurrences/:recurrenceId", async (context) => {
+    await dependencies.products.deleteRecurrence(
       uuidParam(context, "recurrenceId"),
       parseMemo(await jsonBody(context)),
       context.get("adminUsername")!,

@@ -25,7 +25,46 @@ function runProject(args, databaseUrl) {
   process.stdout.write(result.stdout ?? "");
   process.stderr.write(result.stderr ?? "");
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`node ${args.join(" ")} failed with ${result.status}`);
+  if (result.status !== 0) {
+    const error = new Error(`node ${args.join(" ")} failed with ${result.status}`);
+    error.commandOutput = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+    throw error;
+  }
+}
+
+function waitForPostgres() {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const probe = spawnSync(
+      "docker",
+      ["exec", containerName, "pg_isready", "-U", "worker_test"],
+      { encoding: "utf8" },
+    );
+    if (probe.status === 0) return;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+  }
+  throw new Error("Disposable PostgreSQL did not become ready");
+}
+
+function isTransientPostgresConnectionError(error) {
+  const output = `${error.message}\n${error.commandOutput ?? ""}`;
+  return /Connection terminated unexpectedly|ECONNRESET|ECONNREFUSED|the database system is starting up|57P01/i.test(output);
+}
+
+function runMigration(script, databaseUrl) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    waitForPostgres();
+    try {
+      runProject(["node_modules/tsx/dist/cli.mjs", script], databaseUrl);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3 || !isTransientPostgresConnectionError(error)) throw error;
+      process.stderr.write(`PostgreSQL migration connection failed (${attempt}/3); retrying.\n`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 1_000);
+    }
+  }
+  throw lastError;
 }
 
 try {
@@ -38,30 +77,24 @@ try {
     "postgres:17-alpine",
   ]);
 
-  let ready = false;
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const probe = spawnSync("docker", ["exec", containerName, "pg_isready", "-U", "worker_test"], { encoding: "utf8" });
-    if (probe.status === 0) { ready = true; break; }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
-  }
-  if (!ready) throw new Error("Disposable PostgreSQL did not become ready");
+  waitForPostgres();
 
   const portOutput = run("docker", ["port", containerName, "5432/tcp"]);
   const port = /:(\d+)\s*$/.exec(portOutput)?.[1];
   if (!port) throw new Error(`Could not determine PostgreSQL port: ${portOutput}`);
   const baseUrl = `postgresql://worker_test:worker_test_password@127.0.0.1:${port}`;
   const primaryUrl = `${baseUrl}/worker_primary`;
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], primaryUrl);
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], primaryUrl);
+  runMigration("scripts/migrate.ts", primaryUrl);
+  runMigration("scripts/migrate.ts", primaryUrl);
   runProject(["node_modules/vitest/vitest.mjs", "run", "--config", "vitest.postgres.config.ts"], primaryUrl);
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_replay"]);
   const replayUrl = `${baseUrl}/worker_replay`;
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], replayUrl);
+  runMigration("scripts/migrate.ts", replayUrl);
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_upgrade"]);
   const upgradeUrl = `${baseUrl}/worker_upgrade`;
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate-v1-for-test.ts"], upgradeUrl);
+  runMigration("scripts/migrate-v1-for-test.ts", upgradeUrl);
   run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
     "-v", "ON_ERROR_STOP=1",
@@ -69,8 +102,8 @@ try {
     `INSERT INTO rooms(name,capacity,enabled)
      VALUES ('testing-room-zulu',10,true),('testing-room-alpha',10,true),('testing-room-middle',10,true)`,
   ]);
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], upgradeUrl);
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], upgradeUrl);
+  runMigration("scripts/migrate.ts", upgradeUrl);
+  runMigration("scripts/migrate.ts", upgradeUrl);
   runProject([
     "node_modules/vitest/vitest.mjs",
     "run",
@@ -141,13 +174,24 @@ try {
                 'before_reservation_show_applicant_name'
               )) = 2
        AND (SELECT count(*) FROM pg_constraint
-            WHERE conname='chk_reservations_public_applicant_name_hidden') = 1`,
+            WHERE conname='chk_reservations_public_applicant_name_hidden') = 1
+       AND (SELECT count(*) FROM information_schema.columns
+            WHERE table_schema='public'
+              AND table_name='reservation_recurrences'
+              AND column_name='deleted_at'
+              AND is_nullable='YES') = 1
+       AND EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname='public'
+           AND tablename='reservation_recurrences'
+           AND indexname='idx_recurrences_deleted_at'
+       )`,
   ]).trim();
   if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V4 visibility migration failed");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v4_upgrade"]);
   const v4UpgradeUrl = `${baseUrl}/worker_v4_upgrade`;
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate-v3-for-test.ts"], v4UpgradeUrl);
+  runMigration("scripts/migrate-v3-for-test.ts", v4UpgradeUrl);
   run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v4_upgrade",
     "-v", "ON_ERROR_STOP=1",
@@ -169,8 +213,8 @@ try {
        'testing-v4-recurring',current_date + 40,current_date + 40,'MON','10:00','11:00',
        'FAIL_ALL','admin' FROM rooms WHERE name='testing-room-v4-existing'`,
   ]);
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v4UpgradeUrl);
-  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v4UpgradeUrl);
+  runMigration("scripts/migrate.ts", v4UpgradeUrl);
+  runMigration("scripts/migrate.ts", v4UpgradeUrl);
   const v4UpgradeState = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v4_upgrade",
     "--tuples-only", "--no-align",

@@ -28,7 +28,6 @@ export function listRecurrences(filters: RecurrenceFilters = {}) {
   return apiRequest<PagedResponse<RecurrenceListItem>>(
     `/api/admin/recurrences${buildQuery({
       ...filters,
-      includeDeleted: filters.includeDeleted ?? false,
       size: filters.size ?? 20,
       page: filters.page ?? 0,
     })}`,
@@ -39,9 +38,9 @@ export function getRecurrence(recurrenceId: string) {
   return apiRequest<RecurrenceDetail>(`/api/admin/recurrences/${recurrenceId}`);
 }
 
-export function cancelRecurrence(recurrenceId: string, memo?: string) {
-  return apiRequest<void>(`/api/admin/recurrences/${recurrenceId}/cancel`, {
-    method: 'POST',
+export function deleteRecurrence(recurrenceId: string, memo?: string) {
+  return apiRequest<void>(`/api/admin/recurrences/${recurrenceId}`, {
+    method: 'DELETE',
     body: memo ? { memo } : undefined,
   });
 }

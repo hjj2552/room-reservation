@@ -1,7 +1,6 @@
 export type ReservationStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
 export type ReservationSource = 'PUBLIC_FORM' | 'ADMIN_GRID' | 'ADMIN_MANUAL' | 'RECURRING_GENERATED';
 export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS';
-export type RecurrenceStatus = 'ACTIVE' | 'CANCELLED';
 export type ApiErrorCode =
   | 'ADMIN_UNAUTHORIZED'
   | 'DATA_INTEGRITY_VIOLATION'
@@ -338,12 +337,10 @@ export interface RecurrencePreviewPayload {
 }
 
 export interface RecurrenceFilters {
-  status?: RecurrenceStatus | '';
   roomId?: string;
   fromDate?: string;
   toDate?: string;
   keyword?: string;
-  includeDeleted?: boolean;
   page?: number;
   size?: number;
 }
@@ -405,7 +402,6 @@ export interface RecurrenceListItem {
   endTime: string;
   conflictPolicy: ConflictPolicy;
   showApplicantName: boolean;
-  deleted: boolean;
   createdAt: string;
 }
 
@@ -430,7 +426,6 @@ export interface RecurrenceDetail {
   endTime: string;
   conflictPolicy: ConflictPolicy;
   showApplicantName: boolean;
-  deleted: boolean;
   createdAt: string;
   reservations: Array<{
     id: string;

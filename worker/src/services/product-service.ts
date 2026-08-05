@@ -490,8 +490,16 @@ export class ProductService {
       const sentinelId = sentinel.rows[0]?.id;
       if (!sentinelId) throw new Error("Deleted room sentinel is missing.");
       const originalName = text(room, "name");
-      await client.query("UPDATE reservations SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
+      await client.query(
+        "SELECT id FROM reservation_recurrences WHERE room_id=$1 ORDER BY id ASC FOR UPDATE",
+        [roomId],
+      );
+      await client.query(
+        "SELECT id FROM reservations WHERE room_id=$1 ORDER BY id ASC FOR UPDATE",
+        [roomId],
+      );
       await client.query("UPDATE reservation_recurrences SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
+      await client.query("UPDATE reservations SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
       await client.query("DELETE FROM rooms WHERE id=$1", [roomId]);
       await this.incrementRoomOrderVersion(client);
     });
@@ -875,15 +883,30 @@ export class ProductService {
 
   async deleteReservation(reservationId: string, memo: string | null, adminUsername: string): Promise<void> {
     await this.database.transaction(async (client) => {
-      const before = await this.getReservationRow(reservationId, client);
-      await client.query(
-        `UPDATE reservation_histories SET reservation_deleted_id=$1, reservation_id=NULL
-         WHERE reservation_id=$1`,
+      const locked = await client.query(
+        `${this.reservationSelect} WHERE r.id=$1 FOR UPDATE OF r`,
         [reservationId],
       );
-      await this.insertHistory(client, before, "DELETED", before, memo, "ADMIN", adminUsername, true);
-      await client.query("DELETE FROM reservations WHERE id=$1", [reservationId]);
+      const before = locked.rows[0];
+      if (!before) notFound("Reservation");
+      await this.hardDeleteReservation(client, before, memo, adminUsername);
     });
+  }
+
+  private async hardDeleteReservation(
+    client: Queryable,
+    before: Row,
+    memo: string | null,
+    adminUsername: string,
+  ): Promise<void> {
+    const reservationId = text(before, "id");
+    await client.query(
+      `UPDATE reservation_histories SET reservation_deleted_id=$1, reservation_id=NULL
+       WHERE reservation_id=$1`,
+      [reservationId],
+    );
+    await this.insertHistory(client, before, "DELETED", before, memo, "ADMIN", adminUsername, true);
+    await client.query("DELETE FROM reservations WHERE id=$1", [reservationId]);
   }
 
   private reservationFilter(query: ReservationFilterQuery): { where: string; values: unknown[] } {
@@ -1257,7 +1280,6 @@ export class ProductService {
       endTime: timeText(value(row, "end_time")),
       conflictPolicy: text(row, "conflict_policy"),
       showApplicantName: bool(row, "show_applicant_name"),
-      deleted: value(row, "deleted_at") !== null,
       createdAt: iso(value(row, "created_at")),
     };
   }
@@ -1267,9 +1289,6 @@ export class ProductService {
     const conditions: string[] = [];
     const values: unknown[] = [];
     const add = (condition: string, input: unknown) => { values.push(input); conditions.push(condition.replace("?", `$${values.length}`)); };
-    if (!query.includeDeleted) conditions.push("rr.deleted_at IS NULL");
-    if (query.status === "ACTIVE") conditions.push("rr.deleted_at IS NULL");
-    if (query.status === "CANCELLED") conditions.push("rr.deleted_at IS NOT NULL");
     if (query.roomId) add("rr.room_id=?::uuid", query.roomId);
     if (query.fromDate) add("rr.end_date>=?::date", query.fromDate);
     if (query.toDate) add("rr.start_date<=?::date", query.toDate);
@@ -1314,7 +1333,6 @@ export class ProductService {
       endTime: list.endTime,
       conflictPolicy: list.conflictPolicy,
       showApplicantName: list.showApplicantName,
-      deleted: list.deleted,
       createdAt: list.createdAt,
       reservations: reservations.rows.map((reservation) => {
         const item = this.mapReservationList(reservation);
@@ -1326,21 +1344,21 @@ export class ProductService {
     };
   }
 
-  async cancelRecurrence(recurrenceId: string, memo: string | null, adminUsername: string): Promise<void> {
+  async deleteRecurrence(recurrenceId: string, memo: string | null, adminUsername: string): Promise<void> {
     await this.database.transaction(async (client) => {
-      const recurrence = await client.query("UPDATE reservation_recurrences SET deleted_at=now(),updated_at=now(),updated_by=$2 WHERE id=$1 RETURNING id", [recurrenceId, adminUsername]);
+      const recurrence = await client.query(
+        "SELECT id FROM reservation_recurrences WHERE id=$1 FOR UPDATE",
+        [recurrenceId],
+      );
       if (!recurrence.rows[0]) notFound("Recurrence");
       const reservations = await client.query(
-        `${this.reservationSelect} WHERE r.recurrence_id=$1 AND r.status IN ('REQUESTED','CONFIRMED') FOR UPDATE OF r`,
+        `${this.reservationSelect} WHERE r.recurrence_id=$1 ORDER BY r.id FOR UPDATE OF r`,
         [recurrenceId],
       );
       for (const before of reservations.rows) {
-        const updated = await client.query(
-          "UPDATE reservations SET status='CANCELLED',updated_by_actor_type='ADMIN',updated_by_actor_id=$2,updated_at=now() WHERE id=$1 RETURNING *",
-          [value(before, "id"), adminUsername],
-        );
-        await this.insertHistory(client, updated.rows[0]!, "RECURRENCE_CANCELLED", before, memo, "ADMIN", adminUsername);
+        await this.hardDeleteReservation(client, before, memo, adminUsername);
       }
+      await client.query("DELETE FROM reservation_recurrences WHERE id=$1", [recurrenceId]);
     });
   }
 

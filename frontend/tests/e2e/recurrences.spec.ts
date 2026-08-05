@@ -1,23 +1,24 @@
 import { expect, test } from './fixtures';
 import type { Page } from '@playwright/test';
 import {
-  cancelRecurrenceByApi,
   cancelReservationByApi,
+  deleteRecurrenceByApi,
   deleteRoomByApi,
   expectTestIdBelow,
   getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
+  updateReservationPurposeByApi,
 } from './helpers';
 
-test('recurrence smoke: list, preview, create, detail, and cancel', async ({ page, request, e2eData }) => {
+test('recurrence smoke: list, preview, create, detail, and hard delete', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('recurrence-room');
   const purpose = e2eData.name('recurring-smoke');
   const recurrenceTime = nextWeekdayRecurrenceInputs({ weeks: 1 });
   const settings = await getSettingsByApi(request);
   let recurrenceId: string | undefined;
-  let cancelled = false;
+  let deleted = false;
 
   try {
     await page.goto('/admin/recurrences');
@@ -102,6 +103,10 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     }, { times: 1 });
     await page.goto('/admin/recurrences');
     let row = page.getByRole('row').filter({ hasText: purpose });
+    const recurrenceTable = page.getByTestId('recurrences-table');
+    await expect(page.getByTestId('recurrence-status-filter')).toHaveCount(0);
+    await expect(recurrenceTable.getByRole('columnheader', { name: '상태' })).toHaveCount(0);
+    await expect(row.locator('.plain-badge')).toHaveCount(0);
     await expect(row).toContainText('화, 수, 목');
     await page.reload();
     row = page.getByRole('row').filter({ hasText: purpose });
@@ -122,28 +127,85 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
     await expect(page.getByTestId('recurrence-detail-applicant-phone').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('recurrence-detail-applicant-phone')).toContainText('(비공개)');
+    await expect(page.getByTestId('recurrence-detail-status')).toHaveCount(0);
 
-    await page.getByTestId('recurrence-detail-cancel-memo-input').fill('testing-recurrence-cancel');
-    const cancelResponsePromise = page.waitForResponse((response) =>
-      response.url().includes(`/api/admin/recurrences/${recurrenceId}/cancel`) &&
-      response.request().method() === 'POST',
+    const detailResponse = await request.get(`/api/admin/recurrences/${recurrenceId}`);
+    expect(detailResponse.ok()).toBe(true);
+    const recurrenceDetail = await detailResponse.json() as {
+      reservations: Array<{ id: string; purpose: string; status: 'REQUESTED' | 'CONFIRMED' | 'CANCELLED' }>;
+    };
+    expect(recurrenceDetail.reservations.length).toBeGreaterThanOrEqual(2);
+    const [modifiedReservation, cancelledReservation] = recurrenceDetail.reservations;
+    const modifiedPurpose = `${purpose}-modified`;
+    await updateReservationPurposeByApi(request, modifiedReservation.id, modifiedPurpose);
+    await cancelReservationByApi(request, cancelledReservation.id, 'testing-recurrence-child-cancel');
+
+    await page.reload();
+    await expect(page.getByTestId('recurrence-reservations-table')).toContainText(modifiedPurpose);
+    await expect(page.getByTestId('recurrence-reservations-table')).toContainText('개별 수정됨');
+    await expect(page.getByTestId('recurrence-reservations-table')).toContainText('취소');
+    await expect(page.getByTestId('recurrence-delete-button')).toBeVisible();
+    await page.getByTestId('recurrence-delete-button').click();
+
+    const deleteModal = page.getByTestId('recurrence-delete-modal');
+    await expect(deleteModal).toContainText(
+      `연결된 개별 예약 ${recurrenceDetail.reservations.length}건도 모두 영구 삭제되며 되돌릴 수 없습니다.`,
     );
-    await page.getByTestId('recurrence-detail-cancel-button').click();
-    const cancelResponse = await cancelResponsePromise;
-    expect(cancelResponse.ok(), `Cancel recurrence failed with status ${cancelResponse.status()}`).toBeTruthy();
-    cancelled = true;
+    await expect(page.getByTestId('recurrence-delete-summary')).toContainText(`전체${recurrenceDetail.reservations.length}건`);
+    await expect(page.getByTestId('recurrence-delete-summary')).toContainText(`승인${recurrenceDetail.reservations.length - 1}건`);
+    await expect(page.getByTestId('recurrence-delete-summary')).toContainText('취소1건');
+    await expect(deleteModal).toContainText('개별 수정된 예약 1건과 이미 취소된 예약 1건도 삭제 대상입니다.');
+    await page.getByTestId('recurrence-delete-memo-input').fill('testing-recurrence-hard-delete');
 
-    await expect(page.getByTestId('recurrence-detail-status')).toContainText('취소');
-    await expect(page.getByTestId('recurrence-detail-cancel-button')).toBeDisabled();
+    await page.route(`**/api/admin/recurrences/${recurrenceId}`, async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        json: { code: 'SERVICE_UNAVAILABLE', message: 'testing transient recurrence delete failure' },
+      });
+    }, { times: 1 });
+    const failedDeleteResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === `/api/admin/recurrences/${recurrenceId}`
+      && response.request().method() === 'DELETE',
+    );
+    await page.getByTestId('recurrence-delete-confirm-button').click();
+    expect((await failedDeleteResponsePromise).status()).toBe(503);
+    await expect(deleteModal).toBeVisible();
+    await expect(deleteModal.getByRole('alert')).toBeVisible();
+    await expect(page.getByTestId('recurrence-delete-memo-input')).toHaveValue('testing-recurrence-hard-delete');
+    await expect(page.getByTestId('recurrence-delete-confirm-button')).toBeEnabled();
+    expect((await request.get(`/api/admin/recurrences/${recurrenceId}`)).status()).toBe(200);
+    for (const reservation of recurrenceDetail.reservations) {
+      expect((await request.get(`/api/admin/reservations/${reservation.id}`)).status()).toBe(200);
+    }
 
-    await page.goto('/admin/recurrences');
-    await expect(page.getByTestId('recurrence-status-filter')).toHaveValue('ALL');
+    const deleteResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === `/api/admin/recurrences/${recurrenceId}`
+      && response.request().method() === 'DELETE',
+    );
+    await page.getByTestId('recurrence-delete-confirm-button').click();
+    const deleteResponse = await deleteResponsePromise;
+    expect(deleteResponse.status()).toBe(204);
+    deleted = true;
+
+    await expect(page).toHaveURL(/\/admin\/recurrences$/);
     row = page.getByRole('row').filter({ hasText: purpose });
-    await expect(row).toBeVisible();
-    await expect(row).toContainText('취소');
+    await expect(row).toHaveCount(0);
+    expect((await request.get(`/api/admin/recurrences/${recurrenceId}`)).status()).toBe(404);
+    for (const reservation of recurrenceDetail.reservations) {
+      expect((await request.get(`/api/admin/reservations/${reservation.id}`)).status()).toBe(404);
+      const historyResponse = await request.get(
+        `/api/admin/audit/reservation-histories?reservationId=${reservation.id}&action=DELETED&page=0&size=20`,
+      );
+      expect(historyResponse.ok()).toBe(true);
+      const histories = await historyResponse.json() as { items: Array<{ action: string; memo: string | null }> };
+      expect(histories.items).toEqual(expect.arrayContaining([
+        expect.objectContaining({ action: 'DELETED', memo: 'testing-recurrence-hard-delete' }),
+      ]));
+    }
   } finally {
-    if (recurrenceId && !cancelled) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
+    if (recurrenceId && !deleted) {
+      await deleteRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
     await deleteRoomByApi(request, room.id);
   }
@@ -219,7 +281,7 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
   } finally {
     if (recurrenceId) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
+      await deleteRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
     await cancelReservationByApi(request, blocker.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
@@ -283,7 +345,7 @@ test('recurrence create can select a configured tag', async ({ page, request, e2
     await expect(row).toContainText(tag.name);
   } finally {
     if (recurrenceId) {
-      await cancelRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
+      await deleteRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
     }
   }
 });

@@ -9,7 +9,6 @@ import type {
   RecurrenceFilters,
   RecurrencePreview,
   RecurrencePreviewPayload,
-  RecurrenceStatus,
 } from '../../shared/api/types';
 import { Pagination } from '../../shared/components/Pagination';
 import { TimeRangeSelect } from '../../shared/components/ReservationTimeRangeInput';
@@ -139,8 +138,6 @@ export function RecurrencesPage() {
     defaultTimesAppliedRef.current = true;
   }, [settings.data]);
 
-  const statusParam = searchParams.get('status');
-  const status = statusParam === null || statusParam === 'ALL' ? '' : (statusParam as RecurrenceStatus);
   const roomId = searchParams.get('roomId') || '';
   const fromDate = searchParams.get('fromDate') || '';
   const toDate = searchParams.get('toDate') || '';
@@ -149,16 +146,14 @@ export function RecurrencesPage() {
 
   const filters = useMemo<RecurrenceFilters>(
     () => ({
-      status,
       roomId,
       fromDate,
       toDate,
       keyword,
-      includeDeleted: status !== 'ACTIVE',
       page,
       size: pageSize,
     }),
-    [status, roomId, fromDate, toDate, keyword, page],
+    [roomId, fromDate, toDate, keyword, page],
   );
   const recurrences = useRecurrences(filters);
   const currentPreviewFingerprint = recurrencePreviewFingerprint(form);
@@ -472,18 +467,6 @@ export function RecurrencesPage() {
         </div>
         <form className="filter-bar" onSubmit={handleListFilterSubmit}>
           <label>
-            상태
-            <select
-              data-testid="recurrence-status-filter"
-              value={status || 'ALL'}
-              onChange={(event) => setParam('status', event.target.value)}
-            >
-              <option value="ACTIVE">운영 중</option>
-              <option value="CANCELLED">취소됨</option>
-              <option value="ALL">전체</option>
-            </select>
-          </label>
-          <label>
             공간
             <select
               data-testid="recurrence-list-room-filter"
@@ -541,7 +524,6 @@ export function RecurrencesPage() {
                 <caption className="sr-only">반복 예약 목록</caption>
                 <thead>
                   <tr>
-                    <th scope="col">상태</th>
                     <th scope="col">공간</th>
                     <th scope="col">기간</th>
                     <th scope="col">요일/시간</th>
@@ -561,11 +543,6 @@ export function RecurrencesPage() {
                         if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
                       }}
                     >
-                      <td>
-                        <span className={`plain-badge ${item.deleted ? 'muted-badge' : 'good'}`}>
-                          {item.deleted ? '취소됨' : '운영 중'}
-                        </span>
-                      </td>
                       <td>
                         <Link
                           className="text-link"

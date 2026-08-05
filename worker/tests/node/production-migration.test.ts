@@ -193,6 +193,8 @@ describe("production migration schema verification", () => {
         visibility_columns: 2,
         history_columns: 2,
         public_constraint_exists: true,
+        recurrence_deleted_at_columns: 1,
+        recurrence_deleted_at_index_exists: true,
         ...overrides.visibilitySchema,
       }],
       [{
@@ -214,6 +216,15 @@ describe("production migration schema verification", () => {
 
   it("accepts V4 applicant visibility columns, defaults and public constraint", async () => {
     await expect(verifyProductionV4Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+  });
+
+  it("requires the legacy recurrence deletion column and index in the V4 deployment schema", async () => {
+    await expect(verifyProductionV4Schema(validSchemaClient({
+      visibilitySchema: { recurrence_deleted_at_columns: 0 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV4Schema(validSchemaClient({
+      visibilitySchema: { recurrence_deleted_at_index_exists: false },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("rejects incomplete V4 visibility schema and exposed public reservations", async () => {

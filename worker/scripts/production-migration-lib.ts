@@ -539,7 +539,18 @@ export async function verifyProductionV4Schema(
            SELECT 1 FROM pg_constraint
            WHERE conname='chk_reservations_public_applicant_name_hidden'
              AND conrelid='public.reservations'::regclass
-         ) AS public_constraint_exists
+         ) AS public_constraint_exists,
+         count(*) FILTER (
+           WHERE table_name='reservation_recurrences'
+             AND column_name='deleted_at'
+             AND is_nullable='YES'
+         )::integer AS recurrence_deleted_at_columns,
+         EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname='public'
+             AND tablename='reservation_recurrences'
+             AND indexname='idx_recurrences_deleted_at'
+         ) AS recurrence_deleted_at_index_exists
        FROM information_schema.columns
        WHERE table_schema='public'`,
     );
@@ -549,6 +560,8 @@ export async function verifyProductionV4Schema(
       || schemaState.visibility_columns !== 2
       || schemaState.history_columns !== 2
       || schemaState.public_constraint_exists !== true
+      || schemaState.recurrence_deleted_at_columns !== 1
+      || schemaState.recurrence_deleted_at_index_exists !== true
     ) {
       throw new ProductionMigrationError("schema", "Production V4 visibility schema objects are incomplete.");
     }
