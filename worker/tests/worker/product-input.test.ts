@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeDays } from "../../src/core/domain";
 import {
   parseAdminReservation,
   parseAvailability,
@@ -28,6 +29,22 @@ function publicBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("typed HTTP product input", () => {
+  it("normalizes weekdays without mutating input and sorts them Monday through Sunday", () => {
+    const mixedDays = ["THU", "TUE", "WED"];
+    const duplicateDays = ["THU", "TUE", "THU", "WED"];
+    const normalizedNames = ["thursday", "tuesday", "Wednesday"];
+
+    expect(normalizeDays(mixedDays)).toEqual(["TUE", "WED", "THU"]);
+    expect(normalizeDays(duplicateDays)).toEqual(["TUE", "WED", "THU"]);
+    expect(normalizeDays(normalizedNames)).toEqual(["TUE", "WED", "THU"]);
+    expect(mixedDays).toEqual(["THU", "TUE", "WED"]);
+    expect(duplicateDays).toEqual(["THU", "TUE", "THU", "WED"]);
+    expect(normalizedNames).toEqual(["thursday", "tuesday", "Wednesday"]);
+    expect(() => normalizeDays(["THU", "FUNDAY"])).toThrowError(
+      expect.objectContaining({ code: "VALIDATION_ERROR" }),
+    );
+  });
+
   it("builds typed reservation commands before service invocation", () => {
     expect(parsePublicReservation(publicBody())).toEqual({
       reservation: {
