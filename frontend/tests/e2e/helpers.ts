@@ -303,12 +303,48 @@ export async function deleteReservationByApi(request: APIRequestContext, reserva
   expect([204, 404]).toContain(response.status());
 }
 
-export async function cancelRecurrenceByApi(request: APIRequestContext, recurrenceId: string, memo?: string) {
-  const response = await request.post(`/api/admin/recurrences/${recurrenceId}/cancel`, {
+export async function deleteRecurrenceByApi(request: APIRequestContext, recurrenceId: string, memo?: string) {
+  const response = await request.delete(`/api/admin/recurrences/${recurrenceId}`, {
     headers: await csrfHeaders(request),
     data: memo ? { memo } : undefined,
   });
-  expect([204, 404, 409]).toContain(response.status());
+  expect([204, 404]).toContain(response.status());
+}
+
+export async function updateReservationPurposeByApi(
+  request: APIRequestContext,
+  reservationId: string,
+  purpose: string,
+  memo = 'testing-reservation-update',
+) {
+  const detailResponse = await request.get(`/api/admin/reservations/${reservationId}`);
+  await expectApiOk(detailResponse, 'get reservation for update');
+  const detail = await detailResponse.json() as {
+    room: { id: string };
+    applicantName: string;
+    applicantEmail: string | null;
+    applicantPhone: string | null;
+    startAt: string;
+    endAt: string;
+    status: 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
+    showApplicantName: boolean;
+  };
+  const response = await request.put(`/api/admin/reservations/${reservationId}`, {
+    headers: await csrfHeaders(request),
+    data: {
+      roomId: detail.room.id,
+      applicantName: detail.applicantName,
+      applicantEmail: detail.applicantEmail,
+      applicantPhone: detail.applicantPhone,
+      purpose,
+      startAt: detail.startAt,
+      endAt: detail.endAt,
+      status: detail.status,
+      showApplicantName: detail.showApplicantName,
+      memo,
+    },
+  });
+  await expectApiOk(response, 'update reservation purpose');
 }
 
 export async function createRecurrenceByApi(

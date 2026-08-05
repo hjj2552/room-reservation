@@ -11,6 +11,7 @@ const MIGRATIONS_TABLE = "worker_migrations";
 const V2_MIGRATION = "002_room_display_order_v2";
 const V3_MIGRATION = "003_admin_optional_contact_v3";
 const V4_MIGRATION = "004_applicant_name_visibility_v4";
+const V5_MIGRATION = "005_recurrence_hard_delete_v5";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -575,6 +576,50 @@ export async function verifyProductionV4Schema(
   }
 }
 
+export async function verifyProductionV5Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV4Schema(client, config);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V5_MIGRATION],
+    );
+    if (migration.rows[0]?.count !== 1) {
+      throw new ProductionMigrationError("schema", "Required V5 migration record is invalid.");
+    }
+
+    const schema = await client.query(
+      `SELECT
+         NOT EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema='public'
+             AND table_name='reservation_recurrences'
+             AND column_name='deleted_at'
+         ) AS deleted_at_removed,
+         NOT EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname='public'
+             AND tablename='reservation_recurrences'
+             AND indexname='idx_recurrences_deleted_at'
+         ) AS deleted_at_index_removed`,
+    );
+    if (
+      schema.rows[0]?.deleted_at_removed !== true
+      || schema.rows[0]?.deleted_at_index_removed !== true
+    ) {
+      throw new ProductionMigrationError("schema", "Production V5 recurrence schema objects are incomplete.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V5 recurrence schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -582,6 +627,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV4Schema(client, config);
+    await verifyProductionV5Schema(client, config);
   });
 }

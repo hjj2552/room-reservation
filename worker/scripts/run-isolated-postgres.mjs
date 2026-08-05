@@ -189,6 +189,70 @@ try {
   ], { encoding: "utf8", stdio: "pipe" }).status;
   if (publicConstraintStatus === 0) throw new Error("V4 public visibility constraint was not enforced");
 
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v5_upgrade"]);
+  const v5UpgradeUrl = `${baseUrl}/worker_v5_upgrade`;
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate-v4-for-test.ts"], v5UpgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v5_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c",
+    `INSERT INTO rooms(name,capacity,enabled,display_order)
+       VALUES ('testing-room-v5-existing',10,true,1);
+     INSERT INTO reservation_recurrences(
+       room_id,applicant_name,applicant_email,applicant_phone,purpose,start_date,end_date,
+       days_of_week,start_time,end_time,conflict_policy,created_by,deleted_at
+     ) SELECT id,'testing-v5-active','testing-v5-active@example.test','010-0000-0000',
+       'testing-v5-active',current_date + 40,current_date + 40,'MON','10:00','11:00',
+       'FAIL_ALL','admin',NULL FROM rooms WHERE name='testing-room-v5-existing';
+     INSERT INTO reservation_recurrences(
+       room_id,applicant_name,applicant_email,applicant_phone,purpose,start_date,end_date,
+       days_of_week,start_time,end_time,conflict_policy,created_by,deleted_at
+     ) SELECT id,'testing-v5-deleted','testing-v5-deleted@example.test','010-0000-0000',
+       'testing-v5-deleted',current_date + 41,current_date + 41,'TUE','12:00','13:00',
+       'SKIP_CONFLICTS','admin',now() FROM rooms WHERE name='testing-room-v5-existing';
+     INSERT INTO reservations(
+       room_id,recurrence_id,applicant_name,applicant_email,applicant_phone,purpose,start_at,end_at,
+       status,source,created_by_actor_type,recurrence_exception
+     ) SELECT rr.room_id,rr.id,rr.applicant_name,rr.applicant_email,rr.applicant_phone,
+       'testing-v5-active-child',date_trunc('hour',now()) + interval '40 days',
+       date_trunc('hour',now()) + interval '40 days 1 hour','CONFIRMED','RECURRING_GENERATED','ADMIN',false
+       FROM reservation_recurrences rr WHERE rr.purpose='testing-v5-active';
+     INSERT INTO reservations(
+       room_id,recurrence_id,applicant_name,applicant_email,applicant_phone,purpose,start_at,end_at,
+       status,source,created_by_actor_type,recurrence_exception
+     ) SELECT rr.room_id,rr.id,rr.applicant_name,rr.applicant_email,rr.applicant_phone,
+       'testing-v5-deleted-child',date_trunc('hour',now()) + interval '41 days',
+       date_trunc('hour',now()) + interval '41 days 1 hour','CANCELLED','RECURRING_GENERATED','ADMIN',true
+       FROM reservation_recurrences rr WHERE rr.purpose='testing-v5-deleted'`,
+  ]);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v5UpgradeUrl);
+  runProject(["node_modules/tsx/dist/cli.mjs", "scripts/migrate.ts"], v5UpgradeUrl);
+  const v5UpgradeState = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v5_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations WHERE name='005_recurrence_hard_delete_v5') = 1
+       AND (SELECT count(*) FROM reservation_recurrences
+            WHERE purpose IN ('testing-v5-active','testing-v5-deleted')) = 2
+       AND (SELECT count(*) FROM reservations
+            WHERE purpose='testing-v5-active-child' AND status='CONFIRMED'
+              AND recurrence_exception=false) = 1
+       AND (SELECT count(*) FROM reservations
+            WHERE purpose='testing-v5-deleted-child' AND status='CANCELLED'
+              AND recurrence_exception=true) = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema='public' AND table_name='reservation_recurrences' AND column_name='deleted_at'
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname='public' AND tablename='reservation_recurrences'
+           AND indexname='idx_recurrences_deleted_at'
+       )`,
+  ]).trim();
+  if (v5UpgradeState !== "t") throw new Error("V5 recurrence migration did not preserve existing groups and reservations");
+
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
     "-U", "worker_test", database,
@@ -198,6 +262,8 @@ try {
   if (primarySchema !== replaySchema) throw new Error("Replayed baseline schema differs");
   const v4UpgradeSchema = dump("worker_v4_upgrade");
   if (primarySchema !== v4UpgradeSchema) throw new Error("V4 standalone upgrade schema differs");
+  const v5UpgradeSchema = dump("worker_v5_upgrade");
+  if (primarySchema !== v5UpgradeSchema) throw new Error("V5 standalone upgrade schema differs");
   const schemaSha256 = createHash("sha256").update(primarySchema).digest("hex");
   process.stdout.write(`isolated_postgres=passed schema_sha256=${schemaSha256}\n`);
 } finally {

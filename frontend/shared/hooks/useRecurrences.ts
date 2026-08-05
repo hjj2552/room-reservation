@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  cancelRecurrence,
   createRecurrence,
+  deleteRecurrence,
   getRecurrence,
   listRecurrences,
   previewRecurrence,
@@ -46,14 +46,15 @@ export function useCreateRecurrence() {
   });
 }
 
-export function useCancelRecurrence() {
+export function useDeleteRecurrence() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ recurrenceId, memo }: { recurrenceId: string; memo?: string }) =>
-      cancelRecurrence(recurrenceId, memo),
+      deleteRecurrence(recurrenceId, memo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: recurrenceKeys.all });
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['audit'] });
     },
   });
 }

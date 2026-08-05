@@ -44,7 +44,6 @@ import { isValidPublicPassword } from "../core/security";
 
 const reservationStatuses = ["REQUESTED", "CONFIRMED", "CANCELLED"] as const;
 const reservationSources = ["PUBLIC_FORM", "ADMIN_GRID", "ADMIN_MANUAL", "RECURRING_GENERATED"] as const;
-const recurrenceStatuses = ["ACTIVE", "CANCELLED"] as const;
 const conflictPolicies = ["FAIL_ALL", "SKIP_CONFLICTS"] as const;
 const historyActions = [
   "CREATED",
@@ -301,15 +300,11 @@ export function parseRecurrenceCreate(body: unknown): RecurrenceCreateCommand {
 }
 
 export function parseRecurrenceList(params: URLSearchParams): RecurrenceListQuery {
-  const status = parseEnumParameter(params.get("status")?.toUpperCase(), "status", recurrenceStatuses);
   const roomId = params.get("roomId") || undefined;
   const fromDate = params.get("fromDate") || undefined;
   const toDate = params.get("toDate") || undefined;
   return {
     ...pageQuery(params),
-    status,
-    includeDeleted: parseBooleanParameter(params.get("includeDeleted"), "includeDeleted", false)
-      || status === "CANCELLED",
     roomId: roomId ? parseUuid(roomId, "roomId") : undefined,
     fromDate: fromDate ? parseDate(fromDate, "fromDate") : undefined,
     toDate: toDate ? parseDate(toDate, "toDate") : undefined,

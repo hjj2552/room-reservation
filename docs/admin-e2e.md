@@ -54,6 +54,7 @@ runner는 종료 시 자신이 만든 exact container와 process만 정리합니
 - 모든 생성 데이터는 `frontend/tests/e2e/fixtures.ts`의 공유 factory를 우선 사용합니다.
 - room은 `testing-room-*`, reservation은 `testing-reservation-*`, recurrence 및 신청자 식별자는 `testing-*` 규칙을 사용합니다.
 - 생성된 id는 fixture registry에 등록하고 teardown에서 id 기반 정리를 먼저 시도합니다.
+- 반복 예약 id 정리는 그룹 DELETE API를 사용하며, 연결된 개별 예약도 같은 transaction에서 정리됩니다.
 - interrupted run의 fallback cleanup도 `testing-` 소유권을 증명할 수 있는 row와 연결 row만 대상으로 합니다.
 - production에는 cleanup route가 등록되지 않습니다.
 - non-prod에서도 `E2E_CLEANUP_ENABLED=true`가 명시돼야 cleanup route가 등록됩니다.

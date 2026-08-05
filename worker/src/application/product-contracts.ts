@@ -126,8 +126,6 @@ export interface RecurrenceCreateCommand extends RecurrencePreviewCommand {
 }
 
 export interface RecurrenceListQuery extends PageQuery {
-  status?: "ACTIVE" | "CANCELLED" | undefined;
-  includeDeleted: boolean;
   roomId?: string | undefined;
   fromDate?: string | undefined;
   toDate?: string | undefined;
