@@ -157,6 +157,28 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await expect(deleteModal).toContainText('개별 수정된 예약 1건과 이미 취소된 예약 1건도 삭제 대상입니다.');
     await page.getByTestId('recurrence-delete-memo-input').fill('testing-recurrence-hard-delete');
 
+    await page.route(`**/api/admin/recurrences/${recurrenceId}`, async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        json: { code: 'SERVICE_UNAVAILABLE', message: 'testing transient recurrence delete failure' },
+      });
+    }, { times: 1 });
+    const failedDeleteResponsePromise = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === `/api/admin/recurrences/${recurrenceId}`
+      && response.request().method() === 'DELETE',
+    );
+    await page.getByTestId('recurrence-delete-confirm-button').click();
+    expect((await failedDeleteResponsePromise).status()).toBe(503);
+    await expect(deleteModal).toBeVisible();
+    await expect(deleteModal.getByRole('alert')).toBeVisible();
+    await expect(page.getByTestId('recurrence-delete-memo-input')).toHaveValue('testing-recurrence-hard-delete');
+    await expect(page.getByTestId('recurrence-delete-confirm-button')).toBeEnabled();
+    expect((await request.get(`/api/admin/recurrences/${recurrenceId}`)).status()).toBe(200);
+    for (const reservation of recurrenceDetail.reservations) {
+      expect((await request.get(`/api/admin/reservations/${reservation.id}`)).status()).toBe(200);
+    }
+
     const deleteResponsePromise = page.waitForResponse((response) =>
       new URL(response.url()).pathname === `/api/admin/recurrences/${recurrenceId}`
       && response.request().method() === 'DELETE',

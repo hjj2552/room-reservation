@@ -94,6 +94,36 @@ describe("Worker migrations", () => {
     expect(sentinel.rows).toEqual([{ name: "삭제된 공간" }]);
   });
 
+  it("keeps the V4 recurrence compatibility column and index with no pending migration", async () => {
+    const schema = await database.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema='public'
+             AND table_name='reservation_recurrences'
+             AND column_name='deleted_at'
+             AND is_nullable='YES'
+         ) AS deleted_at_exists,
+         EXISTS (
+           SELECT 1 FROM pg_indexes
+           WHERE schemaname='public'
+             AND tablename='reservation_recurrences'
+             AND indexname='idx_recurrences_deleted_at'
+         ) AS deleted_at_index_exists`,
+    );
+    expect(schema.rows[0]).toEqual({
+      deleted_at_exists: true,
+      deleted_at_index_exists: true,
+    });
+    const ledger = await database.query("SELECT name FROM worker_migrations ORDER BY run_on ASC, id ASC");
+    expect(ledger.rows.map((row) => row.name)).toEqual([
+      "001_worker_baseline_v1",
+      "002_room_display_order_v2",
+      "003_admin_optional_contact_v3",
+      "004_applicant_name_visibility_v4",
+    ]);
+  });
+
   it("rolls transactions back", async () => {
     await expect(database.transaction(async (client) => {
       await client.query("INSERT INTO tags(name,color) VALUES('testing-rollback','#112233')");
@@ -977,6 +1007,62 @@ describe("room display order HTTP contract", () => {
 });
 
 describe("recurrence search contract", () => {
+  it("uses statusless recurrence behavior for legacy soft-cancelled rows on the V4 schema", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-v4-recurrence-compatibility");
+    const activeId = await insertRecurrence({ roomId, purpose: "testing-v4-active-recurrence" });
+    const legacyDeletedId = await insertRecurrence({ roomId, purpose: "testing-v4-legacy-deleted-recurrence" });
+    const legacyChildId = await insertReservation({
+      roomId,
+      recurrenceId: legacyDeletedId,
+      purpose: "testing-v4-legacy-child",
+      source: "RECURRING_GENERATED",
+    });
+    await database.query("UPDATE reservation_recurrences SET deleted_at=now() WHERE id=$1", [legacyDeletedId]);
+
+    const listed = await products.listRecurrences(parseRecurrenceList(
+      new URL("http://worker.test/api/admin/recurrences?page=0&size=20").searchParams,
+    ));
+    expect(listed.items.map((item) => item.id)).toEqual(expect.arrayContaining([activeId, legacyDeletedId]));
+    await expect(products.getRecurrence(legacyDeletedId)).resolves.toMatchObject({
+      id: legacyDeletedId,
+      reservations: [expect.objectContaining({ id: legacyChildId })],
+    });
+    expect((await database.query(
+      "SELECT deleted_at IS NOT NULL AS legacy_marker_preserved FROM reservation_recurrences WHERE id=$1",
+      [legacyDeletedId],
+    )).rows[0]).toEqual({ legacy_marker_preserved: true });
+
+    const newRoomId = await insertRoom("testing-room-v4-new-recurrence");
+    const date = futureWeekday(70, 15).slice(0, 10);
+    const created = await products.createRecurrence(parseRecurrenceCreate({
+      roomId: newRoomId,
+      applicantName: "testing-v4-new-recurrence",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-v4-new-recurrence",
+      tagId: null,
+      startDate: date,
+      endDate: date,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+      startTime: "15:00",
+      endTime: "16:00",
+      conflictPolicy: "FAIL_ALL",
+      showApplicantName: false,
+    }), "admin");
+    expect((await database.query(
+      "SELECT deleted_at FROM reservation_recurrences WHERE id=$1",
+      [created.recurrenceId],
+    )).rows[0]).toEqual({ deleted_at: null });
+
+    await products.deleteRecurrence(legacyDeletedId, "testing-v4-compatibility-delete", "admin");
+    expect((await database.query(
+      "SELECT 1 FROM reservation_recurrences WHERE id=$1",
+      [legacyDeletedId],
+    )).rows).toHaveLength(0);
+    expect((await database.query("SELECT 1 FROM reservations WHERE id=$1", [legacyChildId])).rows).toHaveLength(0);
+  });
+
   it("searches purpose, applicant name, room name and tag name, but not email", async () => {
     await resetProductData();
     const purposeRoom = await insertRoom("ordinary-purpose-room");
@@ -1138,6 +1224,109 @@ describe("recurrence hard-delete contract", () => {
       [[first, second]],
     )).rows).toHaveLength(2);
   });
+
+  it("completes concurrent room and recurrence hard deletes without a lock-order deadlock", async () => {
+    await resetProductData();
+    const roomName = "testing-room-concurrent-recurrence-delete";
+    const roomId = await insertRoom(roomName);
+    const recurrenceId = await insertRecurrence({
+      roomId,
+      purpose: "testing-concurrent-recurrence-delete",
+    });
+    const recurringReservationId = await insertReservation({
+      roomId,
+      recurrenceId,
+      purpose: "testing-concurrent-recurring-reservation",
+      source: "RECURRING_GENERATED",
+    });
+    const ordinaryReservationId = await insertReservation({
+      roomId,
+      purpose: "testing-concurrent-ordinary-reservation",
+      hour: 12,
+    });
+    for (const [reservationId, action] of [
+      [recurringReservationId, "RECURRENCE_GENERATED"],
+      [ordinaryReservationId, "CREATED_BY_ADMIN"],
+    ]) {
+      await database.query(
+        `INSERT INTO reservation_histories(
+         reservation_id,action,actor_type,reservation_room_id,reservation_purpose,reservation_room_name
+         ) SELECT id,$2,'ADMIN',room_id,purpose,$3
+           FROM reservations WHERE id=$1`,
+        [reservationId, action, roomName],
+      );
+    }
+    await database.query(`CREATE FUNCTION pause_testing_room_reservation_move() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF OLD.room_id = '${roomId}'::uuid AND NEW.room_id IS DISTINCT FROM OLD.room_id THEN
+          PERFORM pg_sleep(0.5);
+        END IF;
+        RETURN NEW;
+      END $$`);
+    await database.query(
+      `CREATE TRIGGER trg_pause_testing_room_reservation_move
+       AFTER UPDATE OF room_id ON reservations
+       FOR EACH ROW EXECUTE FUNCTION pause_testing_room_reservation_move()`,
+    );
+
+    let results: PromiseSettledResult<void>[] = [];
+    try {
+      const roomDelete = products.deleteRoom(roomId);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      results = await Promise.allSettled([
+        roomDelete,
+        products.deleteRecurrence(recurrenceId, "testing-concurrent-delete", "admin"),
+      ]);
+    } finally {
+      await database.query("DROP TRIGGER IF EXISTS trg_pause_testing_room_reservation_move ON reservations");
+      await database.query("DROP FUNCTION IF EXISTS pause_testing_room_reservation_move()");
+    }
+
+    expect(results).toEqual([
+      { status: "fulfilled", value: undefined },
+      { status: "fulfilled", value: undefined },
+    ]);
+    expect((await database.query("SELECT 1 FROM rooms WHERE id=$1", [roomId])).rows).toHaveLength(0);
+    expect((await database.query("SELECT 1 FROM reservation_recurrences WHERE id=$1", [recurrenceId])).rows).toHaveLength(0);
+    expect((await database.query("SELECT 1 FROM reservations WHERE id=$1", [recurringReservationId])).rows).toHaveLength(0);
+
+    const ordinaryReservation = (await database.query(
+      `SELECT r.original_room_name,rm.system_reserved
+       FROM reservations r JOIN rooms rm ON rm.id=r.room_id
+       WHERE r.id=$1`,
+      [ordinaryReservationId],
+    )).rows[0];
+    expect(ordinaryReservation).toEqual({ original_room_name: roomName, system_reserved: true });
+    const deletedHistories = await database.query(
+      `SELECT action,memo,reservation_room_name,reservation_id
+       FROM reservation_histories WHERE reservation_deleted_id=$1
+       ORDER BY created_at ASC,id ASC`,
+      [recurringReservationId],
+    );
+    expect(deletedHistories.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "RECURRENCE_GENERATED",
+        reservation_room_name: roomName,
+        reservation_id: null,
+      }),
+      expect.objectContaining({
+        action: "DELETED",
+        memo: "testing-concurrent-delete",
+        reservation_room_name: roomName,
+        reservation_id: null,
+      }),
+    ]));
+    expect((await database.query(
+      `SELECT 1 FROM reservation_histories
+       WHERE reservation_id=$1 AND reservation_room_name=$2`,
+      [ordinaryReservationId, roomName],
+    )).rows).toHaveLength(1);
+    expect((await database.query(
+      `SELECT 1 FROM reservations r
+       LEFT JOIN reservation_recurrences rr ON rr.id=r.recurrence_id
+       WHERE r.recurrence_id IS NOT NULL AND rr.id IS NULL`,
+    )).rows).toHaveLength(0);
+  }, 15_000);
 });
 
 describe("E2E cleanup ownership closure", () => {

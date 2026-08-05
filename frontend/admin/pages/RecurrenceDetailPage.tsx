@@ -32,6 +32,11 @@ export function RecurrenceDetailPage() {
     );
   }
 
+  function openDeleteModal() {
+    deleteRecurrence.reset();
+    setShowDeleteModal(true);
+  }
+
   if (recurrence.isLoading) return <LoadingState />;
   if (recurrence.isError) return <ErrorState error={recurrence.error} />;
   if (!recurrence.data) return null;
@@ -194,15 +199,12 @@ export function RecurrenceDetailPage() {
           type="button"
           className="danger-button"
           disabled={deleteRecurrence.isPending}
-          onClick={() => setShowDeleteModal(true)}
+          onClick={openDeleteModal}
           data-testid="recurrence-delete-button"
         >
           <Trash2 size={16} aria-hidden="true" />
           반복 예약 영구 삭제
         </button>
-        {deleteRecurrence.isError ? (
-          <div className="inline-error" role="alert">{errorMessage(deleteRecurrence.error)}</div>
-        ) : null}
       </div>
 
       {showDeleteModal ? (
@@ -238,6 +240,9 @@ export function RecurrenceDetailPage() {
               placeholder="삭제 사유를 남깁니다."
             />
           </label>
+          {deleteRecurrence.isError ? (
+            <div className="inline-error" role="alert">{errorMessage(deleteRecurrence.error)}</div>
+          ) : null}
           <div className="modal-actions">
             <button
               type="button"

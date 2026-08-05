@@ -490,8 +490,16 @@ export class ProductService {
       const sentinelId = sentinel.rows[0]?.id;
       if (!sentinelId) throw new Error("Deleted room sentinel is missing.");
       const originalName = text(room, "name");
-      await client.query("UPDATE reservations SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
+      await client.query(
+        "SELECT id FROM reservation_recurrences WHERE room_id=$1 ORDER BY id ASC FOR UPDATE",
+        [roomId],
+      );
+      await client.query(
+        "SELECT id FROM reservations WHERE room_id=$1 ORDER BY id ASC FOR UPDATE",
+        [roomId],
+      );
       await client.query("UPDATE reservation_recurrences SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
+      await client.query("UPDATE reservations SET room_id=$2, original_room_name=$3 WHERE room_id=$1", [roomId, sentinelId, originalName]);
       await client.query("DELETE FROM rooms WHERE id=$1", [roomId]);
       await this.incrementRoomOrderVersion(client);
     });

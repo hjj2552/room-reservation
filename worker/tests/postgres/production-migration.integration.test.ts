@@ -2,7 +2,7 @@ import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   productionMigrationConfigFromEnv,
-  verifyProductionV5Schema,
+  verifyProductionV4Schema,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
 
@@ -35,7 +35,7 @@ afterAll(async () => {
 });
 
 describe("production migration schema contract", () => {
-  it("verifies the complete V5 schema and migration ledger", async () => {
-    await expect(verifyProductionV5Schema(client, config)).resolves.toBeUndefined();
+  it("verifies the complete V4 schema and migration ledger", async () => {
+    await expect(verifyProductionV4Schema(client, config)).resolves.toBeUndefined();
   });
 });
