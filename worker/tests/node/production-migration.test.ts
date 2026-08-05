@@ -7,6 +7,7 @@ import {
   verifyProductionV2Schema,
   verifyProductionV3Schema,
   verifyProductionV4Schema,
+  verifyProductionV5Schema,
   type ProductionMigrationConfig,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
@@ -146,8 +147,11 @@ describe("production migration schema verification", () => {
     contactValues?: Record<string, unknown>;
     visibilitySchema?: Record<string, unknown>;
     visibilityValues?: Record<string, unknown>;
+    version?: 2 | 3 | 4 | 5;
+    v5?: boolean;
+    v5Migrations?: Array<Record<string, unknown>>;
   } = {}): SqlClient {
-    return clientForRows([
+    const commonRows: Array<Array<Record<string, unknown>>> = [
       [{ database_name: "production_db", role_name: "migration_role", schema_name: "public" }],
       [{ exists: true }],
       [
@@ -155,7 +159,8 @@ describe("production migration schema verification", () => {
         { name: "002_room_display_order_v2" },
         { name: "003_admin_optional_contact_v3" },
         { name: "004_applicant_name_visibility_v4" },
-      ],
+        { name: "005_recurrence_hard_delete_v5" },
+      ].slice(0, overrides.v5 ? 5 : (overrides.version ?? 4)),
       [{ count: 1 }],
       [{
         state_table_exists: true,
@@ -188,13 +193,14 @@ describe("production migration schema verification", () => {
         invalid_recurrence_count: 0,
         ...overrides.contactValues,
       }],
-      [{ count: 1 }],
+    ];
+    const visibilityRows: Array<Array<Record<string, unknown>>> = [
       [{
         visibility_columns: 2,
         history_columns: 2,
         public_constraint_exists: true,
-        recurrence_deleted_at_columns: 1,
-        recurrence_deleted_at_index_exists: true,
+        recurrence_deleted_at_columns: overrides.v5 ? 0 : 1,
+        recurrence_deleted_at_index_exists: !overrides.v5,
         ...overrides.visibilitySchema,
       }],
       [{
@@ -203,19 +209,49 @@ describe("production migration schema verification", () => {
         exposed_public_count: 0,
         ...overrides.visibilityValues,
       }],
-    ]);
+    ];
+    if (overrides.v5) {
+      return clientForRows([
+        ...commonRows,
+        overrides.v5Migrations ?? [
+          { name: "004_applicant_name_visibility_v4", count: 1 },
+          { name: "005_recurrence_hard_delete_v5", count: 1 },
+        ],
+        ...visibilityRows,
+      ]);
+    }
+    return clientForRows([...commonRows, [{ count: 1 }], ...visibilityRows]);
   }
 
   it("accepts a complete V2 ledger and contiguous room order", async () => {
-    await expect(verifyProductionV2Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+    await expect(verifyProductionV2Schema(validSchemaClient({ version: 2 }), config)).resolves.toBeUndefined();
   });
 
   it("accepts nullable contact columns and V3 constraints", async () => {
-    await expect(verifyProductionV3Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+    await expect(verifyProductionV3Schema(validSchemaClient({ version: 3 }), config)).resolves.toBeUndefined();
   });
 
   it("accepts V4 applicant visibility columns, defaults and public constraint", async () => {
     await expect(verifyProductionV4Schema(validSchemaClient(), config)).resolves.toBeUndefined();
+  });
+
+  it("accepts V5 after removing the legacy recurrence deletion column and index", async () => {
+    await expect(verifyProductionV5Schema(validSchemaClient({ v5: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("requires exactly one V5 ledger record and complete recurrence schema removal", async () => {
+    await expect(verifyProductionV5Schema(validSchemaClient({
+      v5: true,
+      v5Migrations: [{ name: "004_applicant_name_visibility_v4", count: 1 }],
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV5Schema(validSchemaClient({
+      v5: true,
+      visibilitySchema: { recurrence_deleted_at_columns: 1 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV5Schema(validSchemaClient({
+      v5: true,
+      visibilitySchema: { recurrence_deleted_at_index_exists: true },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("requires the legacy recurrence deletion column and index in the V4 deployment schema", async () => {
@@ -238,24 +274,30 @@ describe("production migration schema verification", () => {
 
   it("rejects incomplete V3 contact schema and invalid values", async () => {
     await expect(verifyProductionV3Schema(validSchemaClient({
+      version: 3,
       contactSchema: { nullable_email_columns: 1 },
     }), config)).rejects.toMatchObject({ stage: "schema" });
     await expect(verifyProductionV3Schema(validSchemaClient({
+      version: 3,
       contactValues: { invalid_reservation_count: 1 },
     }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("fails when the V2 schema contract is incomplete", async () => {
     await expect(verifyProductionV2Schema(validSchemaClient({
+      version: 2,
       objects: { active_order_index_exists: false },
     }), config)).rejects.toMatchObject({ stage: "schema" });
     await expect(verifyProductionV2Schema(validSchemaClient({
+      version: 2,
       state: { row_count: 2 },
     }), config)).rejects.toMatchObject({ stage: "schema" });
     await expect(verifyProductionV2Schema(validSchemaClient({
+      version: 2,
       orders: { distinct_active_count: 2 },
     }), config)).rejects.toMatchObject({ stage: "schema" });
     await expect(verifyProductionV2Schema(validSchemaClient({
+      version: 2,
       orders: { maximum_order: "4" },
     }), config)).rejects.toMatchObject({ stage: "schema" });
   });

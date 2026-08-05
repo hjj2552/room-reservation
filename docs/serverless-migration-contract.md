@@ -317,9 +317,9 @@ PostgreSQL microsecond 정밀도의 마지막 시각이 누락되지 않도록 �
 
 세부 동작이 불명확하면 이 계약서에 명시된 매크로 개념을 우선하고, 나머지는 기준 버전의 테스트와 코드를 따른다.
 
-반복 예약 hard-delete 기능을 배포하는 단계의 production schema 기준은 V4다. 이 배포에서는 기존 Worker의 rollback 가능성을 보장하기 위해 `reservation_recurrences.deleted_at` 열과 `idx_recurrences_deleted_at` 인덱스를 그대로 유지한다. 새 Worker는 두 객체를 조회하거나 갱신하지 않으며, `deleted_at` 값이 NULL이 아닌 과거 그룹도 상태 구분 없이 일반 그룹 row로 조회한다.
+반복 예약 hard-delete Worker가 production에서 안정화된 뒤 적용하는 후속 contract schema 기준은 V5다. V5는 새 Worker가 더 이상 조회하거나 갱신하지 않는 `reservation_recurrences.deleted_at` 열과 `idx_recurrences_deleted_at` 인덱스만 제거한다. 기존 그룹, 연결 예약, 예약 상태와 내용, `recurrence_exception`, 감사 이력은 삭제하거나 변경하지 않는다. V4에서 `deleted_at` 값이 NULL이었던 그룹과 값이 있었던 과거 그룹은 모두 상태 구분 없는 동일한 그룹 row로 보존된다.
 
-해당 열과 인덱스의 제거는 hard-delete Worker가 production에서 안정화되고 기존 Worker로 rollback할 필요가 없음을 확인한 뒤 별도의 후속 contract migration으로 수행한다. 후속 migration은 기존 그룹과 연결 예약을 삭제·복원·상태 변경하지 않고 schema 객체만 제거해야 하며, 현재 배포에는 V5 또는 그에 해당하는 pending production migration이 포함되지 않는다.
+V5 down migration은 호환성 롤백을 위한 nullable `deleted_at` 열과 인덱스 구조만 다시 만든다. 열을 제거하면서 소실된 과거 그룹별 `deleted_at` 값은 복원할 수 없으므로, down 이후 모든 기존 row의 해당 값은 NULL이다. 이 구조 롤백은 과거 soft-delete 상태를 복구하는 수단이 아니다.
 
 신규 그룹 삭제는 `DELETE /api/admin/recurrences/{id}`로 수행한다. 그룹 row와 연결된 모든 예약을 잠근 뒤 각 예약에 단건 영구 삭제와 같은 감사 보존 처리를 적용하고, 예약 row와 그룹 row를 하나의 transaction에서 하드 삭제한다. 그룹 자체의 별도 삭제 이력은 생성하지 않는다.
 
