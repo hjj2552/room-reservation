@@ -87,6 +87,8 @@ function toTimetableReservation(reservation: PublicReservationBlock): TimetableR
     startAt: reservation.startAt,
     endAt: reservation.endAt,
     status: reservation.status,
+    seriesLabel: reservation.seriesLabel,
+    seriesColor: reservation.seriesColor,
   };
 }
 

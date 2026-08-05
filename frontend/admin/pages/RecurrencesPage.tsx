@@ -2,7 +2,15 @@ import { RefreshCw, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
-import type { ConflictPolicy, RecurrenceFilters, RecurrenceStatus } from '../../shared/api/types';
+import type {
+  ConflictPolicy,
+  RecurrenceCreatePayload,
+  RecurrenceCreateResult,
+  RecurrenceFilters,
+  RecurrencePreview,
+  RecurrencePreviewPayload,
+  RecurrenceStatus,
+} from '../../shared/api/types';
 import { Pagination } from '../../shared/components/Pagination';
 import { TimeRangeSelect } from '../../shared/components/ReservationTimeRangeInput';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -24,6 +32,7 @@ import {
   WEEKDAY_ORDER,
 } from '../../shared/utils/weekdays';
 import { optionalContact } from '../utils/optionalContact';
+import { recurrencePreviewFingerprint } from '../utils/recurrencePreview';
 
 interface RecurrenceForm {
   roomId: string;
@@ -39,6 +48,16 @@ interface RecurrenceForm {
   endTime: string;
   conflictPolicy: ConflictPolicy;
   showApplicantName: boolean;
+}
+
+interface SuccessfulPreview {
+  fingerprint: string;
+  data: RecurrencePreview;
+}
+
+interface CompletedCreate {
+  purpose: string;
+  result: RecurrenceCreateResult;
 }
 
 const initialForm: RecurrenceForm = {
@@ -64,12 +83,41 @@ function numberParam(value: string | null, fallback: number) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function previewPayload(form: RecurrenceForm): RecurrencePreviewPayload {
+  return {
+    roomId: form.roomId,
+    startDate: form.startDate,
+    endDate: form.endDate,
+    daysOfWeek: canonicalizeWeekdayCodes(form.daysOfWeek),
+    startTime: `${form.startTime}:00`,
+    endTime: `${form.endTime}:00`,
+    applicantPhone: optionalContact(form.applicantPhone),
+    conflictPolicy: form.conflictPolicy,
+  };
+}
+
+function createPayload(form: RecurrenceForm): RecurrenceCreatePayload {
+  return {
+    ...previewPayload(form),
+    applicantName: form.applicantName,
+    applicantEmail: optionalContact(form.applicantEmail),
+    applicantPhone: optionalContact(form.applicantPhone),
+    purpose: form.purpose,
+    tagId: form.tagId || null,
+    showApplicantName: form.showApplicantName,
+  };
+}
+
 export function RecurrencesPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
+  const [successfulPreview, setSuccessfulPreview] = useState<SuccessfulPreview | null>(null);
+  const [completedCreate, setCompletedCreate] = useState<CompletedCreate | null>(null);
   const defaultTimesAppliedRef = useRef(false);
+  const previewRequestIdRef = useRef(0);
+  const createInFlightRef = useRef(false);
   const rooms = useRoomOptions();
   const settings = useSettings();
   const tags = useTags({ size: 1000 });
@@ -113,34 +161,45 @@ export function RecurrencesPage() {
     [status, roomId, fromDate, toDate, keyword, page],
   );
   const recurrences = useRecurrences(filters);
-
-  function basePayload() {
-    return {
-      roomId: form.roomId,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      daysOfWeek: canonicalizeWeekdayCodes(form.daysOfWeek),
-      startTime: `${form.startTime}:00`,
-      endTime: `${form.endTime}:00`,
-      applicantPhone: optionalContact(form.applicantPhone),
-      conflictPolicy: form.conflictPolicy,
-    };
-  }
+  const currentPreviewFingerprint = recurrencePreviewFingerprint(form);
+  const previewFingerprintMatches = successfulPreview?.fingerprint === currentPreviewFingerprint;
+  const previewIsValid = previewFingerprintMatches && !preview.isPending && !preview.isError;
+  const validPreview = previewIsValid ? successfulPreview.data : null;
+  const previewIsStale = successfulPreview !== null && !previewFingerprintMatches;
 
   function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    preview.mutate(basePayload());
+    if (preview.isPending) return;
+    const payload = previewPayload(form);
+    const fingerprint = recurrencePreviewFingerprint(payload);
+    const requestId = previewRequestIdRef.current + 1;
+    previewRequestIdRef.current = requestId;
+    preview.mutate(payload, {
+      onSuccess: (data) => {
+        if (previewRequestIdRef.current === requestId) {
+          setSuccessfulPreview({ fingerprint, data });
+        }
+      },
+    });
   }
 
   function handleCreate() {
-    create.mutate({
-      ...basePayload(),
-      applicantName: form.applicantName,
-      applicantEmail: optionalContact(form.applicantEmail),
-      applicantPhone: optionalContact(form.applicantPhone),
-      purpose: form.purpose,
-      tagId: form.tagId || null,
-      showApplicantName: form.showApplicantName,
+    if (
+      !validPreview?.createAllowed
+      || successfulPreview?.fingerprint !== currentPreviewFingerprint
+      || create.isPending
+      || createInFlightRef.current
+    ) return;
+
+    const payload = createPayload(form);
+    if (recurrencePreviewFingerprint(payload) !== successfulPreview.fingerprint) return;
+
+    createInFlightRef.current = true;
+    create.mutate(payload, {
+      onSuccess: (result) => setCompletedCreate({ purpose: payload.purpose, result }),
+      onSettled: () => {
+        createInFlightRef.current = false;
+      },
     });
   }
 
@@ -328,9 +387,9 @@ export function RecurrencesPage() {
           </label>
           {preview.isError ? <div className="inline-error full-span" role="alert">{errorMessage(preview.error)}</div> : null}
           {create.isError ? <div className="inline-error full-span" role="alert">{errorMessage(create.error)}</div> : null}
-          {create.data ? (
+          {completedCreate ? (
             <div className="success-box full-span" role="status">
-              등록 완료: 등록 {create.data.createdCount}건, 건너뜀 {create.data.skippedCount}건, 실패 {create.data.failedCount}건
+              ‘{completedCreate.purpose}’ 등록 완료: 등록 {completedCreate.result.createdCount}건, 건너뜀 {completedCreate.result.skippedCount}건, 실패 {completedCreate.result.failedCount}건
             </div>
           ) : null}
           <div className="button-row full-span">
@@ -347,7 +406,7 @@ export function RecurrencesPage() {
               type="button"
               className="primary-button"
               data-testid="recurrence-create-button"
-              disabled={!preview.data?.createAllowed || create.isPending}
+              disabled={!validPreview?.createAllowed || create.isPending}
               onClick={handleCreate}
             >
               {create.isPending ? '등록 중...' : '반복 예약 등록'}
@@ -357,16 +416,26 @@ export function RecurrencesPage() {
 
         <section className="panel" aria-labelledby="preview-title">
           <h2 id="preview-title">미리보기 결과</h2>
-          {!preview.data && !preview.isPending ? (
+          {!successfulPreview && !preview.isPending ? (
             <EmptyState message="입력 후 미리보기를 실행하세요." />
           ) : null}
-          {preview.data ? (
+          {previewIsStale ? (
+            <div
+              className="state-box"
+              role="status"
+              aria-live="polite"
+              data-testid="recurrence-preview-stale"
+            >
+              반복 조건이 변경되었습니다. 다시 미리보기를 실행해 주세요.
+            </div>
+          ) : null}
+          {validPreview ? (
             <>
               <div className="summary-cards" data-testid="recurrence-preview-summary">
-                <div><strong>{preview.data.totalCandidates}</strong><span>전체 후보</span></div>
-                <div><strong>{preview.data.availableCount}</strong><span>가능</span></div>
-                <div><strong>{preview.data.conflictCount}</strong><span>충돌</span></div>
-                <div><strong>{preview.data.createAllowed ? '가능' : '불가능'}</strong><span>생성 여부</span></div>
+                <div><strong>{validPreview.totalCandidates}</strong><span>전체 후보</span></div>
+                <div><strong>{validPreview.availableCount}</strong><span>가능</span></div>
+                <div><strong>{validPreview.conflictCount}</strong><span>충돌</span></div>
+                <div><strong>{validPreview.createAllowed ? '가능' : '불가능'}</strong><span>생성 여부</span></div>
               </div>
               <div className="table-wrap compact">
                 <table className="data-table" data-testid="recurrence-preview-table">
@@ -379,7 +448,7 @@ export function RecurrencesPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.data.items.map((item) => (
+                    {validPreview.items.map((item) => (
                       <tr key={`${item.date}-${item.startAt}`}>
                         <td>{formatDate(item.date)}</td>
                         <td>{formatDateTime(item.startAt)} ~ {formatDateTime(item.endAt)}</td>

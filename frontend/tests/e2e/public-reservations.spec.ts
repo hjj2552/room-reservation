@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test';
 import { expect, test } from './fixtures';
 import {
   approveReservationByApi,
@@ -7,6 +8,7 @@ import {
   getSettingsByApi,
   loginByApi,
   moveFocusOutsidePanel,
+  nextWeekdayRecurrenceInputs,
   nextWeekdayReservationLocalInputs,
   updateSettingsByApi,
 } from './helpers';
@@ -230,6 +232,62 @@ test('public date timetable preserves its URL context after browser back from de
   await expect(page.getByText(reservation.purpose || '')).toBeVisible();
 });
 
+test('public timetables reuse recurrence tag colors without exposing private applicant data', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('public-recurrence-tag-room');
+  const tag = await e2eData.createTestTag('public-recurrence-tag', { color: '#b5453f' });
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42, startHour: 10, endHour: 11 });
+  const recurrence = await e2eData.createTestRecurringReservation(room.id, 'public-recurrence-tag', {
+    startDate: recurrenceTime.startDate,
+    endDate: recurrenceTime.endDate,
+    dayOfWeek: recurrenceTime.dayOfWeek,
+    startTime: recurrenceTime.startTime,
+    endTime: recurrenceTime.endTime,
+    tagId: tag.id,
+  });
+  expect(recurrence.createdCount).toBe(1);
+  const untagged = await e2eData.createTestReservation(room.id, 'public-untagged', {
+    startAt: `${recurrenceTime.startDate}T12:00:00+09:00`,
+    endAt: `${recurrenceTime.startDate}T13:00:00+09:00`,
+  });
+  const weekStart = mondayOf(recurrenceTime.startDate);
+
+  await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
+  const publicDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
+  const publicUntaggedBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: untagged.purpose });
+  await expect(publicDateBlock).toBeVisible();
+  await expect(publicDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+  await expect(publicDateBlock).toHaveCSS('border-color', 'rgb(181, 69, 63)');
+  await expect(publicDateBlock).toHaveCSS('background-color', 'rgba(181, 69, 63, 0.12)');
+  await expect(publicDateBlock).not.toContainText('testing-recurring-admin');
+  await expect(publicDateBlock).not.toContainText(recurrence.recurrenceId);
+  await expect(publicUntaggedBlock.locator('.reservation-block-series')).toHaveCount(0);
+  expect(await inlineTimetableColors(publicUntaggedBlock)).toEqual({
+    borderColor: '',
+    backgroundColor: '',
+  });
+  const publicDateColors = await computedTimetableColors(publicDateBlock);
+
+  await page.getByTestId('public-timetable-view-room').click();
+  await page.getByTestId('public-timetable-room-select').selectOption(room.id);
+  await page.getByTestId('public-timetable-week-input').fill(weekStart);
+  const publicRoomBlock = page.getByTestId('reservation-room-timetable-block').filter({ hasText: tag.name });
+  await expect(publicRoomBlock).toBeVisible();
+  await expect(publicRoomBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+  expect(await computedTimetableColors(publicRoomBlock)).toEqual(publicDateColors);
+  await expect(publicRoomBlock).not.toContainText('testing-recurring-admin');
+
+  await page.goto(`/admin/timetable?view=date&date=${recurrenceTime.startDate}&roomId=${room.id}`);
+  const adminDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
+  await expect(adminDateBlock).toBeVisible();
+  await expect(adminDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+  expect(await computedTimetableColors(adminDateBlock)).toEqual(publicDateColors);
+});
+
 test('public timetable supports slot-based request, masked detail page, and password cancellation', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
@@ -352,6 +410,23 @@ function mondayOf(dateString: string) {
   const diff = day === 0 ? -6 : 1 - day;
   date.setUTCDate(date.getUTCDate() + diff);
   return date.toISOString().slice(0, 10);
+}
+
+async function computedTimetableColors(block: Locator) {
+  return block.evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    return {
+      borderColor: styles.borderColor,
+      backgroundColor: styles.backgroundColor,
+    };
+  });
+}
+
+async function inlineTimetableColors(block: Locator) {
+  return block.evaluate((element) => ({
+    borderColor: (element as HTMLElement).style.borderColor,
+    backgroundColor: (element as HTMLElement).style.backgroundColor,
+  }));
 }
 
 test('public edit re-requires contacts after an administrator clears them', async ({ page, request, e2eData }) => {
