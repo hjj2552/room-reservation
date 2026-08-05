@@ -32,6 +32,7 @@ import {
 } from '../../shared/utils/weekdays';
 import { optionalContact } from '../utils/optionalContact';
 import { recurrencePreviewFingerprint } from '../utils/recurrencePreview';
+import { useImeSafeSubmit } from '../hooks/useImeSafeSubmit';
 
 interface RecurrenceForm {
   roomId: string;
@@ -59,6 +60,13 @@ interface CompletedCreate {
   result: RecurrenceCreateResult;
 }
 
+interface RecurrenceFilterDraft {
+  roomId: string;
+  fromDate: string;
+  toDate: string;
+  keyword: string;
+}
+
 const initialForm: RecurrenceForm = {
   roomId: '',
   applicantName: '',
@@ -80,6 +88,22 @@ const pageSize = 20;
 function numberParam(value: string | null, fallback: number) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function filterDraftFromParams(searchParams: URLSearchParams): RecurrenceFilterDraft {
+  return {
+    roomId: searchParams.get('roomId') || '',
+    fromDate: searchParams.get('fromDate') || '',
+    toDate: searchParams.get('toDate') || '',
+    keyword: searchParams.get('keyword') || '',
+  };
+}
+
+function sameFilterDraft(first: RecurrenceFilterDraft, second: RecurrenceFilterDraft) {
+  return first.roomId === second.roomId
+    && first.fromDate === second.fromDate
+    && first.toDate === second.toDate
+    && first.keyword === second.keyword;
 }
 
 function previewPayload(form: RecurrenceForm): RecurrencePreviewPayload {
@@ -122,10 +146,21 @@ export function RecurrencesPage() {
   const tags = useTags({ size: 1000 });
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
+  const appliedFilters = useMemo(() => filterDraftFromParams(searchParams), [searchParams]);
+  const previousAppliedFiltersRef = useRef(appliedFilters);
+  const [draftFilters, setDraftFilters] = useState(appliedFilters);
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
+
+  useEffect(() => {
+    const previousAppliedFilters = previousAppliedFiltersRef.current;
+    previousAppliedFiltersRef.current = appliedFilters;
+    if (!sameFilterDraft(previousAppliedFilters, appliedFilters)) {
+      setDraftFilters(appliedFilters);
+    }
+  }, [appliedFilters]);
 
   useEffect(() => {
     if (!settings.data || defaultTimesAppliedRef.current) return;
@@ -138,10 +173,7 @@ export function RecurrencesPage() {
     defaultTimesAppliedRef.current = true;
   }, [settings.data]);
 
-  const roomId = searchParams.get('roomId') || '';
-  const fromDate = searchParams.get('fromDate') || '';
-  const toDate = searchParams.get('toDate') || '';
-  const keyword = searchParams.get('keyword') || '';
+  const { roomId, fromDate, toDate, keyword } = appliedFilters;
   const page = numberParam(searchParams.get('page'), 0);
 
   const filters = useMemo<RecurrenceFilters>(
@@ -155,7 +187,7 @@ export function RecurrencesPage() {
     }),
     [roomId, fromDate, toDate, keyword, page],
   );
-  const recurrences = useRecurrences(filters);
+  const recurrences = useRecurrences(filters, { keepPreviousData: true });
   const currentPreviewFingerprint = recurrencePreviewFingerprint(form);
   const previewFingerprintMatches = successfulPreview?.fingerprint === currentPreviewFingerprint;
   const previewIsValid = previewFingerprintMatches && !preview.isPending && !preview.isError;
@@ -212,18 +244,25 @@ export function RecurrencesPage() {
     setSearchParams(new URLSearchParams(next));
   }
 
-  function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
+  function setPage(nextPage: number) {
     updateSearchParams((next) => {
-      if (value) next.set(name, value);
-      else next.delete(name);
-      if (options.resetPage !== false) next.set('page', '0');
+      next.set('page', String(nextPage));
     });
   }
 
-  function handleListFilterSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setParam('page', '0', { resetPage: false });
+  function applyListFilters() {
+    const normalizedDraft = { ...draftFilters, keyword: draftFilters.keyword.trim() };
+    setDraftFilters(normalizedDraft);
+    updateSearchParams((next) => {
+      for (const [name, value] of Object.entries(normalizedDraft)) {
+        if (value) next.set(name, value);
+        else next.delete(name);
+      }
+      next.set('page', '0');
+    });
   }
+
+  const listFilterSubmission = useImeSafeSubmit(applyListFilters);
 
   return (
     <section className="page-section" aria-labelledby="recurrences-title">
@@ -465,13 +504,13 @@ export function RecurrencesPage() {
         <div className="panel-header">
           <h2 id="recurrence-list-title">반복 예약 목록</h2>
         </div>
-        <form className="filter-bar" onSubmit={handleListFilterSubmit}>
+        <form className="filter-bar" onSubmit={listFilterSubmission.handleSubmit}>
           <label>
             공간
             <select
               data-testid="recurrence-list-room-filter"
-              value={roomId}
-              onChange={(event) => setParam('roomId', event.target.value)}
+              value={draftFilters.roomId}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, roomId: event.target.value }))}
             >
               <option value="">전체</option>
               {rooms.data?.map((room) => (
@@ -486,8 +525,8 @@ export function RecurrencesPage() {
             <input
               data-testid="recurrence-list-from-date-filter"
               type="date"
-              value={fromDate}
-              onChange={(event) => setParam('fromDate', event.target.value)}
+              value={draftFilters.fromDate}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
             />
           </label>
           <label>
@@ -495,8 +534,8 @@ export function RecurrencesPage() {
             <input
               data-testid="recurrence-list-to-date-filter"
               type="date"
-              value={toDate}
-              onChange={(event) => setParam('toDate', event.target.value)}
+              value={draftFilters.toDate}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
             />
           </label>
           <label>
@@ -505,8 +544,9 @@ export function RecurrencesPage() {
               data-testid="recurrence-list-keyword-filter"
               type="search"
               placeholder="태그, 신청자, 목적"
-              value={keyword}
-              onChange={(event) => setParam('keyword', event.target.value)}
+              value={draftFilters.keyword}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
+              {...listFilterSubmission.searchInputProps}
             />
           </label>
           <button type="submit" className="secondary-button" data-testid="recurrence-list-search-button">
@@ -514,76 +554,78 @@ export function RecurrencesPage() {
             조회
           </button>
         </form>
-        {recurrences.isLoading ? <LoadingState /> : null}
-        {recurrences.isError ? <ErrorState error={recurrences.error} /> : null}
-        {recurrences.data?.items.length === 0 ? <EmptyState message="조건에 맞는 반복 예약이 없습니다." /> : null}
-        {recurrences.data?.items.length ? (
-          <>
-            <div className="table-wrap">
-              <table className="data-table" data-testid="recurrences-table">
-                <caption className="sr-only">반복 예약 목록</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">공간</th>
-                    <th scope="col">기간</th>
-                    <th scope="col">요일/시간</th>
-                    <th scope="col">목적</th>
-                    <th scope="col">등록 정책</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recurrences.data.items.map((item) => (
-                    <tr
-                      key={item.id}
-                      tabIndex={0}
-                      className="clickable-row"
-                      onClick={() => navigate(`/admin/recurrences/${item.id}`)}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
-                      }}
-                    >
-                      <td>
-                        <Link
-                          className="text-link"
-                          to={`/admin/recurrences/${item.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {item.roomName}
-                        </Link>
-                      </td>
-                      <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
-                      <td>
-                        {formatDayCodes(item.daysOfWeek)}
-                        <br />
-                        <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
-                      </td>
-                      <td className="purpose-cell">
-                        {item.tagName ? (
-                          <span
-                            className="series-chip"
-                            style={item.tagColor ? { borderColor: item.tagColor, color: item.tagColor } : undefined}
-                          >
-                            {item.tagName}
-                          </span>
-                        ) : null}
-                        {item.purpose}
-                      </td>
-                      <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
+        <div data-testid="recurrence-list-results" aria-busy={recurrences.isFetching}>
+          {recurrences.isLoading ? <LoadingState /> : null}
+          {recurrences.isError ? <ErrorState error={recurrences.error} /> : null}
+          {recurrences.data?.items.length === 0 ? <EmptyState message="조건에 맞는 반복 예약이 없습니다." /> : null}
+          {recurrences.data?.items.length ? (
+            <>
+              <div className="table-wrap">
+                <table className="data-table" data-testid="recurrences-table">
+                  <caption className="sr-only">반복 예약 목록</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">공간</th>
+                      <th scope="col">기간</th>
+                      <th scope="col">요일/시간</th>
+                      <th scope="col">목적</th>
+                      <th scope="col">등록 정책</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pagination
-              page={recurrences.data.page}
-              totalPages={recurrences.data.totalPages}
-              totalItems={recurrences.data.totalItems}
-              size={recurrences.data.size}
-              onPageChange={(nextPage) => setParam('page', String(nextPage), { resetPage: false })}
-            />
-          </>
-        ) : null}
+                  </thead>
+                  <tbody>
+                    {recurrences.data.items.map((item) => (
+                      <tr
+                        key={item.id}
+                        tabIndex={0}
+                        className="clickable-row"
+                        onClick={() => navigate(`/admin/recurrences/${item.id}`)}
+                        onKeyDown={(event) => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
+                        }}
+                      >
+                        <td>
+                          <Link
+                            className="text-link"
+                            to={`/admin/recurrences/${item.id}`}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {item.roomName}
+                          </Link>
+                        </td>
+                        <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
+                        <td>
+                          {formatDayCodes(item.daysOfWeek)}
+                          <br />
+                          <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
+                        </td>
+                        <td className="purpose-cell">
+                          {item.tagName ? (
+                            <span
+                              className="series-chip"
+                              style={item.tagColor ? { borderColor: item.tagColor, color: item.tagColor } : undefined}
+                            >
+                              {item.tagName}
+                            </span>
+                          ) : null}
+                          {item.purpose}
+                        </td>
+                        <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={recurrences.data.page}
+                totalPages={recurrences.data.totalPages}
+                totalItems={recurrences.data.totalItems}
+                size={recurrences.data.size}
+                onPageChange={setPage}
+              />
+            </>
+          ) : null}
+        </div>
       </section>
     </section>
   );

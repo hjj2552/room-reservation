@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/http';
 import {
   approveReservation,
@@ -19,11 +19,15 @@ export const reservationKeys = {
   histories: (id: string) => ['reservations', 'histories', id] as const,
 };
 
-export function useReservations(filters: ReservationFilters, options: { enabled?: boolean } = {}) {
+export function useReservations(
+  filters: ReservationFilters,
+  options: { enabled?: boolean; keepPreviousData?: boolean } = {},
+) {
   return useQuery({
     queryKey: reservationKeys.list(filters),
     queryFn: () => listReservations(filters),
     enabled: options.enabled ?? true,
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
   });
 }
 

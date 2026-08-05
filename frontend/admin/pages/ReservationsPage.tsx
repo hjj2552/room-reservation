@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { exportReservationsCsv } from '../../shared/api/reservations';
@@ -13,8 +13,35 @@ import {
   toServiceEndOfDayOffset,
   toServiceStartOfDayOffset,
 } from '../../shared/utils/reservationTime';
+import { useImeSafeSubmit } from '../hooks/useImeSafeSubmit';
 
 const pageSize = 20;
+
+interface ReservationFilterDraft {
+  status: '' | ReservationStatus;
+  roomId: string;
+  fromDate: string;
+  toDate: string;
+  keyword: string;
+}
+
+function filterDraftFromParams(searchParams: URLSearchParams): ReservationFilterDraft {
+  return {
+    status: (searchParams.get('status') || '') as '' | ReservationStatus,
+    roomId: searchParams.get('roomId') || '',
+    fromDate: searchParams.get('fromDate') || '',
+    toDate: searchParams.get('toDate') || '',
+    keyword: searchParams.get('keyword') || '',
+  };
+}
+
+function sameFilterDraft(first: ReservationFilterDraft, second: ReservationFilterDraft) {
+  return first.status === second.status
+    && first.roomId === second.roomId
+    && first.fromDate === second.fromDate
+    && first.toDate === second.toDate
+    && first.keyword === second.keyword;
+}
 
 function numberParam(value: string | null, fallback: number) {
   const parsed = Number(value);
@@ -27,15 +54,23 @@ export function ReservationsPage() {
   const [csvError, setCsvError] = useState('');
   const rooms = useRoomOptions();
 
+  const appliedFilters = useMemo(() => filterDraftFromParams(searchParams), [searchParams]);
+  const previousAppliedFiltersRef = useRef(appliedFilters);
+  const [draftFilters, setDraftFilters] = useState(appliedFilters);
+
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
 
-  const status = (searchParams.get('status') || '') as '' | ReservationStatus;
-  const roomId = searchParams.get('roomId') || '';
-  const fromDate = searchParams.get('fromDate') || '';
-  const toDate = searchParams.get('toDate') || '';
-  const keyword = searchParams.get('keyword') || '';
+  useEffect(() => {
+    const previousAppliedFilters = previousAppliedFiltersRef.current;
+    previousAppliedFiltersRef.current = appliedFilters;
+    if (!sameFilterDraft(previousAppliedFilters, appliedFilters)) {
+      setDraftFilters(appliedFilters);
+    }
+  }, [appliedFilters]);
+
+  const { status, roomId, fromDate, toDate, keyword } = appliedFilters;
   const page = numberParam(searchParams.get('page'), 0);
 
   const filters = useMemo<ReservationFilters>(
@@ -50,7 +85,7 @@ export function ReservationsPage() {
     }),
     [status, roomId, keyword, fromDate, toDate, page],
   );
-  const reservations = useReservations(filters);
+  const reservations = useReservations(filters, { keepPreviousData: true });
 
   function updateSearchParams(updater: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(searchParamsRef.current);
@@ -59,18 +94,25 @@ export function ReservationsPage() {
     setSearchParams(new URLSearchParams(next));
   }
 
-  function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
+  function setPage(nextPage: number) {
     updateSearchParams((next) => {
-      if (value) next.set(name, value);
-      else next.delete(name);
-      if (options.resetPage !== false) next.set('page', '0');
+      next.set('page', String(nextPage));
     });
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setParam('page', '0', { resetPage: false });
+  function applyFilters() {
+    const normalizedDraft = { ...draftFilters, keyword: draftFilters.keyword.trim() };
+    setDraftFilters(normalizedDraft);
+    updateSearchParams((next) => {
+      for (const [name, value] of Object.entries(normalizedDraft)) {
+        if (value) next.set(name, value);
+        else next.delete(name);
+      }
+      next.set('page', '0');
+    });
   }
+
+  const filterSubmission = useImeSafeSubmit(applyFilters);
 
   async function handleCsvDownload() {
     setCsvError('');
@@ -95,13 +137,16 @@ export function ReservationsPage() {
         </div>
       </div>
 
-      <form className="filter-bar" onSubmit={handleSubmit}>
+      <form className="filter-bar" onSubmit={filterSubmission.handleSubmit}>
         <label>
           상태
           <select
             data-testid="reservation-status-filter"
-            value={status}
-            onChange={(event) => setParam('status', event.target.value)}
+            value={draftFilters.status}
+            onChange={(event) => setDraftFilters((current) => ({
+              ...current,
+              status: event.target.value as '' | ReservationStatus,
+            }))}
           >
             <option value="">전체</option>
             {Object.entries(statusLabels).map(([value, label]) => (
@@ -115,8 +160,8 @@ export function ReservationsPage() {
           공간
           <select
             data-testid="reservation-room-filter"
-            value={roomId}
-            onChange={(event) => setParam('roomId', event.target.value)}
+            value={draftFilters.roomId}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, roomId: event.target.value }))}
           >
             <option value="">전체</option>
             {rooms.data?.map((room) => (
@@ -131,13 +176,18 @@ export function ReservationsPage() {
           <input
             data-testid="reservation-from-date-filter"
             type="date"
-            value={fromDate}
-            onChange={(event) => setParam('fromDate', event.target.value)}
+            value={draftFilters.fromDate}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
           />
         </label>
         <label>
           종료일
-          <input type="date" value={toDate} onChange={(event) => setParam('toDate', event.target.value)} />
+          <input
+            data-testid="reservation-to-date-filter"
+            type="date"
+            value={draftFilters.toDate}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
+          />
         </label>
         <label>
           검색어
@@ -145,8 +195,9 @@ export function ReservationsPage() {
             data-testid="reservation-keyword-filter"
             type="search"
             placeholder="신청자, 목적"
-            value={keyword}
-            onChange={(event) => setParam('keyword', event.target.value)}
+            value={draftFilters.keyword}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
+            {...filterSubmission.searchInputProps}
           />
         </label>
         <button type="submit" className="secondary-button" data-testid="reservation-search-button">
@@ -159,23 +210,25 @@ export function ReservationsPage() {
           {csvError}
         </div>
       ) : null}
-      {reservations.isLoading ? <LoadingState /> : null}
-      {reservations.isError ? <ErrorState error={reservations.error} /> : null}
-      {reservations.data && reservations.data.items.length === 0 ? (
-        <EmptyState message="조건에 맞는 예약이 없습니다." />
-      ) : null}
-      {reservations.data && reservations.data.items.length > 0 ? (
-        <>
-          <ReservationTable reservations={reservations.data.items} />
-          <Pagination
-            page={reservations.data.page}
-            totalPages={reservations.data.totalPages}
-            totalItems={reservations.data.totalItems}
-            size={reservations.data.size}
-            onPageChange={(nextPage) => setParam('page', String(nextPage), { resetPage: false })}
-          />
-        </>
-      ) : null}
+      <div data-testid="reservation-list-results" aria-busy={reservations.isFetching}>
+        {reservations.isLoading ? <LoadingState /> : null}
+        {reservations.isError ? <ErrorState error={reservations.error} /> : null}
+        {reservations.data && reservations.data.items.length === 0 ? (
+          <EmptyState message="조건에 맞는 예약이 없습니다." />
+        ) : null}
+        {reservations.data && reservations.data.items.length > 0 ? (
+          <>
+            <ReservationTable reservations={reservations.data.items} />
+            <Pagination
+              page={reservations.data.page}
+              totalPages={reservations.data.totalPages}
+              totalItems={reservations.data.totalItems}
+              size={reservations.data.size}
+              onPageChange={setPage}
+            />
+          </>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -2163,6 +2163,10 @@ button:disabled {
 }
 
 @media (min-width: 981px) {
+  :root {
+    scrollbar-gutter: stable;
+  }
+
   .form-grid input:not([type="checkbox"]):not([type="radio"]),
   .form-grid select,
   .filter-bar input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),

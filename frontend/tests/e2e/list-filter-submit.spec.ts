@@ -1,0 +1,329 @@
+import type { Locator, Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { loginByApi } from './helpers';
+
+interface ListScenario {
+  name: string;
+  route: string;
+  apiPath: string;
+  resultsTestId: string;
+  tableTestId: string;
+  roomFilterTestId: string;
+  fromDateFilterTestId: string;
+  toDateFilterTestId: string;
+  keywordFilterTestId: string;
+  searchButtonTestId: string;
+  statusFilterTestId?: string;
+}
+
+const scenarios: ListScenario[] = [
+  {
+    name: 'reservation list',
+    route: '/admin/reservations',
+    apiPath: '/api/admin/reservations',
+    resultsTestId: 'reservation-list-results',
+    tableTestId: 'reservations-table',
+    roomFilterTestId: 'reservation-room-filter',
+    fromDateFilterTestId: 'reservation-from-date-filter',
+    toDateFilterTestId: 'reservation-to-date-filter',
+    keywordFilterTestId: 'reservation-keyword-filter',
+    searchButtonTestId: 'reservation-search-button',
+    statusFilterTestId: 'reservation-status-filter',
+  },
+  {
+    name: 'recurrence list',
+    route: '/admin/recurrences',
+    apiPath: '/api/admin/recurrences',
+    resultsTestId: 'recurrence-list-results',
+    tableTestId: 'recurrences-table',
+    roomFilterTestId: 'recurrence-list-room-filter',
+    fromDateFilterTestId: 'recurrence-list-from-date-filter',
+    toDateFilterTestId: 'recurrence-list-to-date-filter',
+    keywordFilterTestId: 'recurrence-list-keyword-filter',
+    searchButtonTestId: 'recurrence-list-search-button',
+  },
+];
+
+for (const scenario of scenarios) {
+  test(`${scenario.name} applies drafts explicitly and keeps prior results stable`, async ({ page, request, e2eData }) => {
+    await loginByApi(request);
+    const room = await e2eData.createTestRoom(`${scenario.name.replaceAll(' ', '-')}-filters`);
+    let listRequestCount = 0;
+    let releaseEmptyResponse: (() => void) | undefined;
+    let markEmptyRequestStarted: (() => void) | undefined;
+    const emptyResponseGate = new Promise<void>((resolve) => { releaseEmptyResponse = resolve; });
+    const emptyRequestStarted = new Promise<void>((resolve) => { markEmptyRequestStarted = resolve; });
+
+    await page.route(`**${scenario.apiPath}?**`, async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.continue();
+        return;
+      }
+      listRequestCount += 1;
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('keyword') === 'testing-no-results') {
+        markEmptyRequestStarted?.();
+        await emptyResponseGate;
+        await route.fulfill({ json: pagedResponse(scenario, room.id, room.name, 0, true) });
+        return;
+      }
+      const pageNumber = Number(url.searchParams.get('page') || '0');
+      await route.fulfill({ json: pagedResponse(scenario, room.id, room.name, pageNumber) });
+    });
+
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto(`${scenario.route}?keyword=testing-applied&page=0`);
+    const results = page.getByTestId(scenario.resultsTestId);
+    const table = page.getByTestId(scenario.tableTestId);
+    const form = page.locator(`${scenario.route === '/admin/recurrences' ? '.recurrence-list-panel ' : ''}.filter-bar`);
+    await expect(table).toBeVisible();
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    expect(listRequestCount).toBe(1);
+    const rootMetricsBefore = await rootScrollMetrics(page);
+
+    await page.getByTestId(scenario.roomFilterTestId).selectOption(room.id);
+    await page.getByTestId(scenario.fromDateFilterTestId).fill('2026-09-01');
+    await page.getByTestId(scenario.toDateFilterTestId).fill('2026-09-30');
+    await page.getByTestId(scenario.keywordFilterTestId).fill('testing-draft');
+    if (scenario.statusFilterTestId) {
+      await page.getByTestId(scenario.statusFilterTestId).selectOption('CONFIRMED');
+    }
+
+    await page.waitForTimeout(100);
+    expect(listRequestCount).toBe(1);
+    expect(new URL(page.url()).searchParams.get('keyword')).toBe('testing-applied');
+    expect(new URL(page.url()).searchParams.get('roomId')).toBeNull();
+
+    if (scenario.route === '/admin/reservations') {
+      let csvRequestUrl = '';
+      await page.route('**/api/admin/exports/reservations.csv**', async (route) => {
+        csvRequestUrl = route.request().url();
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/csv;charset=UTF-8',
+          headers: { 'Content-Disposition': 'attachment; filename="reservations.csv"' },
+          body: 'id\n',
+        });
+      }, { times: 1 });
+      const downloadPromise = page.waitForEvent('download');
+      await page.locator('.page-header').getByRole('button', { name: 'CSV 내보내기' }).click();
+      await downloadPromise;
+      const csvParams = new URL(csvRequestUrl).searchParams;
+      expect(csvParams.get('keyword')).toBe('testing-applied');
+      expect(csvParams.get('roomId')).toBeNull();
+    }
+
+    const submittedRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname === scenario.apiPath && url.searchParams.get('keyword') === 'testing-draft';
+    });
+    await page.getByTestId(scenario.searchButtonTestId).click();
+    const submittedUrl = new URL((await submittedRequest).url());
+    expect(submittedUrl.searchParams.get('roomId')).toBe(room.id);
+    expect(submittedUrl.searchParams.get('page')).toBe('0');
+    expect(submittedUrl.searchParams.get('from') || submittedUrl.searchParams.get('fromDate')).toContain('2026-09-01');
+    expect(submittedUrl.searchParams.get('to') || submittedUrl.searchParams.get('toDate')).toContain('2026-09-30');
+    if (scenario.statusFilterTestId) expect(submittedUrl.searchParams.get('status')).toBe('CONFIRMED');
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    expect(listRequestCount).toBe(2);
+
+    await page.getByTestId(scenario.keywordFilterTestId).fill('testing-forward');
+    await page.getByTestId(scenario.keywordFilterTestId).press('Enter');
+    await expect(page).toHaveURL(/keyword=testing-forward/);
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    expect(listRequestCount).toBe(3);
+
+    await page.goBack();
+    await expect(page.getByTestId(scenario.keywordFilterTestId)).toHaveValue('testing-draft');
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    await page.goForward();
+    await expect(page.getByTestId(scenario.keywordFilterTestId)).toHaveValue('testing-forward');
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+
+    await page.getByTestId(scenario.keywordFilterTestId).fill('testing-unapplied');
+    await page.getByRole('button', { name: '다음', exact: true }).click();
+    await expect(page).toHaveURL(/page=1/);
+    await expect(page.getByTestId(scenario.keywordFilterTestId)).toHaveValue('testing-unapplied');
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+
+    const geometryBefore = await resultTransitionGeometry(page, form);
+    await page.getByTestId(scenario.keywordFilterTestId).fill('testing-no-results');
+    await page.getByTestId(scenario.searchButtonTestId).click();
+    await emptyRequestStarted;
+    await expect(results).toHaveAttribute('aria-busy', 'true');
+    await expect(table).toBeVisible();
+    await expect(results.locator('.pagination')).toBeVisible();
+    await expect(results.getByText('불러오는 중입니다.')).toHaveCount(0);
+    const geometryWhilePending = await resultTransitionGeometry(page, form);
+    const pendingMaxDelta = expectGeometryStable(geometryBefore, geometryWhilePending);
+
+    releaseEmptyResponse?.();
+    await expect(results).toHaveAttribute('aria-busy', 'false');
+    await expect(table).toBeHidden();
+    await expect(results.getByText(scenario.route === '/admin/reservations'
+      ? '조건에 맞는 예약이 없습니다.'
+      : '조건에 맞는 반복 예약이 없습니다.')).toBeVisible();
+    const geometryAfter = await resultTransitionGeometry(page, form);
+    const settledMaxDelta = expectGeometryStable(geometryBefore, geometryAfter);
+    const rootMetricsAfter = await rootScrollMetrics(page);
+    if (scenario.route === '/admin/reservations') {
+      expect(rootMetricsBefore.hasVerticalOverflow).toBe(true);
+      expect(rootMetricsAfter.hasVerticalOverflow).toBe(false);
+    }
+    console.info(
+      `${scenario.name} geometry: pending ${pendingMaxDelta}px, settled ${settledMaxDelta}px, `
+      + `scrollbar ${rootMetricsBefore.scrollbarWidth}px, `
+      + `overflow ${rootMetricsBefore.hasVerticalOverflow}->${rootMetricsAfter.hasVerticalOverflow}`,
+    );
+    await expect(page.locator('html')).toHaveCSS('scrollbar-gutter', /stable/);
+  });
+
+  test(`${scenario.name} ignores IME candidate Enter and submits completed Korean once`, async ({ page, request }) => {
+    await loginByApi(request);
+    let listRequestCount = 0;
+    await page.route(`**${scenario.apiPath}?**`, async (route) => {
+      if (route.request().method() === 'GET') listRequestCount += 1;
+      await route.fulfill({ json: { items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 } });
+    });
+
+    await page.goto(scenario.route);
+    await expect(page.getByTestId(scenario.resultsTestId)).toHaveAttribute('aria-busy', 'false');
+    expect(listRequestCount).toBe(1);
+    const keywordInput = page.getByTestId(scenario.keywordFilterTestId);
+    await dispatchKoreanCompositionEnter(keywordInput, '대학원');
+
+    await page.waitForTimeout(100);
+    await expect(keywordInput).toHaveValue('대학원');
+    expect(listRequestCount).toBe(1);
+    expect(new URL(page.url()).searchParams.get('keyword')).toBeNull();
+
+    const completedRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname === scenario.apiPath && url.searchParams.get('keyword') === '대학원';
+    });
+    await keywordInput.press('Enter');
+    await completedRequest;
+    await expect(page).toHaveURL(/keyword=%EB%8C%80%ED%95%99%EC%9B%90/);
+    await expect(page.getByTestId(scenario.resultsTestId)).toHaveAttribute('aria-busy', 'false');
+    expect(listRequestCount).toBe(2);
+  });
+}
+
+function pagedResponse(
+  scenario: ListScenario,
+  roomId: string,
+  roomName: string,
+  page: number,
+  empty = false,
+) {
+  if (empty) return { items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 };
+  const itemCount = page === 0 ? 20 : 5;
+  const items = Array.from({ length: itemCount }, (_, index) => (
+    scenario.route === '/admin/reservations'
+      ? reservationItem(`${page}-${index}`, roomId, roomName)
+      : recurrenceItem(`${page}-${index}`, roomId, roomName)
+  ));
+  return { items, page, size: 20, totalItems: 25, totalPages: 2 };
+}
+
+function reservationItem(id: string, roomId: string, roomName: string) {
+  return {
+    id: `testing-reservation-list-${id}`,
+    roomId,
+    roomName,
+    applicantName: '테스트 신청자',
+    applicantEmail: null,
+    applicantPhone: null,
+    showApplicantName: false,
+    purpose: `testing-reservation-list-${id}`,
+    startAt: '2026-09-08T09:00:00+09:00',
+    endAt: '2026-09-08T10:00:00+09:00',
+    status: 'CONFIRMED',
+    source: 'ADMIN',
+    recurrenceId: null,
+    seriesLabel: null,
+    seriesColor: null,
+    recurrenceException: false,
+    createdAt: '2026-09-01T00:00:00Z',
+  };
+}
+
+function recurrenceItem(id: string, roomId: string, roomName: string) {
+  return {
+    id: `testing-recurrence-list-${id}`,
+    roomId,
+    roomName,
+    purpose: `testing-recurring-list-${id}`,
+    tagId: null,
+    tagName: null,
+    tagColor: null,
+    startDate: '2026-09-01',
+    endDate: '2026-09-30',
+    daysOfWeek: 'TUE,THU',
+    startTime: '09:00:00',
+    endTime: '10:00:00',
+    conflictPolicy: 'FAIL_ALL',
+    showApplicantName: false,
+    createdAt: '2026-09-01T00:00:00Z',
+  };
+}
+
+async function dispatchKoreanCompositionEnter(input: Locator, value: string) {
+  await input.evaluate((element, nextValue) => {
+    const inputElement = element as HTMLInputElement;
+    inputElement.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    valueSetter?.call(inputElement, nextValue);
+    inputElement.dispatchEvent(new InputEvent('input', {
+      bubbles: true,
+      data: nextValue,
+      inputType: 'insertCompositionText',
+      isComposing: true,
+    }));
+    inputElement.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+      isComposing: true,
+    }));
+    inputElement.form?.requestSubmit();
+    inputElement.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: nextValue }));
+  }, value);
+}
+
+async function resultTransitionGeometry(page: Page, form: Locator) {
+  const [header, filter, searchButton] = await Promise.all([
+    page.locator('.page-header').first().boundingBox(),
+    form.boundingBox(),
+    form.getByRole('button', { name: '조회', exact: true }).boundingBox(),
+  ]);
+  if (!header || !filter || !searchButton) throw new Error('Could not measure list result transition geometry.');
+  return {
+    headerX: header.x,
+    headerRight: header.x + header.width,
+    filterX: filter.x,
+    filterRight: filter.x + filter.width,
+    searchButtonX: searchButton.x,
+  };
+}
+
+function expectGeometryStable(
+  before: Awaited<ReturnType<typeof resultTransitionGeometry>>,
+  after: Awaited<ReturnType<typeof resultTransitionGeometry>>,
+) {
+  let maxDelta = 0;
+  for (const key of Object.keys(before) as Array<keyof typeof before>) {
+    const delta = Math.abs(before[key] - after[key]);
+    maxDelta = Math.max(maxDelta, delta);
+    expect(delta, `${key} should remain stable`).toBeLessThanOrEqual(1);
+  }
+  return maxDelta;
+}
+
+async function rootScrollMetrics(page: Page) {
+  return page.evaluate(() => ({
+    hasVerticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
+    scrollbarWidth: window.innerWidth - document.documentElement.clientWidth,
+  }));
+}

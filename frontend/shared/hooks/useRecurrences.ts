@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createRecurrence,
   deleteRecurrence,
@@ -14,10 +14,14 @@ export const recurrenceKeys = {
   detail: (id: string) => ['recurrences', 'detail', id] as const,
 };
 
-export function useRecurrences(filters: RecurrenceFilters = {}) {
+export function useRecurrences(
+  filters: RecurrenceFilters = {},
+  options: { keepPreviousData?: boolean } = {},
+) {
   return useQuery({
     queryKey: recurrenceKeys.list(filters),
     queryFn: () => listRecurrences(filters),
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
   });
 }
 
