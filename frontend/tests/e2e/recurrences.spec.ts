@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import type { Page } from '@playwright/test';
 import {
   cancelRecurrenceByApi,
   cancelReservationByApi,
@@ -287,6 +288,220 @@ test('recurrence create can select a configured tag', async ({ page, request, e2
   }
 });
 
+test('recurrence preview validity follows only the preview condition values', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const firstRoom = await e2eData.createTestRoom('recurrence-preview-first');
+  const secondRoom = await e2eData.createTestRoom('recurrence-preview-second');
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 49, weeks: 1 });
+  const purpose = e2eData.name('recurring-preview-validity');
+
+  await page.goto('/admin/recurrences');
+  await fillRecurrenceDraft(page, firstRoom.id, purpose, recurrenceTime);
+  await runRecurrencePreview(page);
+
+  const createButton = page.getByTestId('recurrence-create-button');
+  const summary = page.getByTestId('recurrence-preview-summary');
+  const staleMessage = page.getByTestId('recurrence-preview-stale');
+  await expect(createButton).toBeEnabled();
+  await expect(summary).toBeVisible();
+
+  await page.getByTestId('recurrence-room-select').focus();
+  await page.keyboard.press('Tab');
+  await expect(createButton).toBeEnabled();
+  await expect(staleMessage).toBeHidden();
+
+  async function expectStaleUntilRestored(change: () => Promise<void>, restore: () => Promise<void>) {
+    await change();
+    await expect(createButton).toBeDisabled();
+    await expect(staleMessage).toHaveText('반복 조건이 변경되었습니다. 다시 미리보기를 실행해 주세요.');
+    await expect(summary).toBeHidden();
+    await restore();
+    await expect(createButton).toBeEnabled();
+    await expect(staleMessage).toBeHidden();
+    await expect(summary).toBeVisible();
+  }
+
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-room-select').selectOption(secondRoom.id),
+    () => page.getByTestId('recurrence-room-select').selectOption(firstRoom.id),
+  );
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-start-date-input').fill(shiftDate(recurrenceTime.startDate, 1)),
+    () => page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate),
+  );
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-end-date-input').fill(shiftDate(recurrenceTime.endDate, 1)),
+    () => page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate),
+  );
+  const additionalDay = recurrenceTime.dayOfWeek === 'MON' ? 'TUE' : 'MON';
+  await expectStaleUntilRestored(
+    () => page.getByTestId(`recurrence-day-${additionalDay}`).check(),
+    () => page.getByTestId(`recurrence-day-${additionalDay}`).uncheck(),
+  );
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-start-time-input').selectOption(addMinutesToTime(recurrenceTime.startTime, 5)),
+    () => page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime),
+  );
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-end-time-input').selectOption(addMinutesToTime(recurrenceTime.endTime, 5)),
+    () => page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime),
+  );
+  await expectStaleUntilRestored(
+    () => page.getByTestId('recurrence-conflict-policy-select').selectOption('SKIP_CONFLICTS'),
+    () => page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL'),
+  );
+});
+
+test('a late preview response cannot validate changed recurrence conditions', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const firstRoom = await e2eData.createTestRoom('recurrence-late-preview-first');
+  const secondRoom = await e2eData.createTestRoom('recurrence-late-preview-second');
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 56, weeks: 1 });
+  const purpose = e2eData.name('recurring-late-preview');
+  let releasePreview!: () => void;
+  let markPreviewStarted!: () => void;
+  const previewGate = new Promise<void>((resolve) => { releasePreview = resolve; });
+  const previewStarted = new Promise<void>((resolve) => { markPreviewStarted = resolve; });
+
+  await page.route('**/api/admin/recurrences/preview', async (route) => {
+    markPreviewStarted();
+    await previewGate;
+    await route.continue();
+  }, { times: 1 });
+
+  await page.goto('/admin/recurrences');
+  await fillRecurrenceDraft(page, firstRoom.id, purpose, recurrenceTime);
+  const firstResponsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/admin/recurrences/preview',
+  );
+  await page.getByTestId('recurrence-preview-button').click();
+  await previewStarted;
+  await page.getByTestId('recurrence-room-select').selectOption(secondRoom.id);
+  releasePreview();
+  expect((await firstResponsePromise).ok()).toBe(true);
+
+  await expect(page.getByTestId('recurrence-create-button')).toBeDisabled();
+  await expect(page.getByTestId('recurrence-preview-summary')).toBeHidden();
+  await expect(page.getByTestId('recurrence-preview-stale')).toBeVisible();
+
+  await runRecurrencePreview(page);
+  await expect(page.getByTestId('recurrence-preview-stale')).toBeHidden();
+  await expect(page.getByTestId('recurrence-preview-summary')).toBeVisible();
+  await expect(page.getByTestId('recurrence-create-button')).toBeEnabled();
+});
+
+test('a pending recurrence create keeps its payload snapshot and the next draft intact', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const firstRoom = await e2eData.createTestRoom('recurrence-create-snapshot-first');
+  const secondRoom = await e2eData.createTestRoom('recurrence-create-snapshot-second');
+  const tag = await e2eData.createTestTag('recurrence-create-snapshot', { color: '#245b47' });
+  const firstTime = nextWeekdayRecurrenceInputs({ daysAhead: 63, weeks: 1 });
+  const secondTime = nextWeekdayRecurrenceInputs({ daysAhead: 77, weeks: 1, startHour: 15, endHour: 16 });
+  const firstPurpose = e2eData.name('recurring-snapshot-first');
+  const submittedPurpose = `${firstPurpose}-submitted`;
+  const secondPurpose = e2eData.name('recurring-snapshot-second');
+
+  await page.goto('/admin/recurrences');
+  await fillRecurrenceDraft(page, firstRoom.id, firstPurpose, firstTime);
+  await runRecurrencePreview(page);
+
+  await page.getByTestId('recurrence-applicant-name-input').fill('testing-snapshot-applicant');
+  await page.getByTestId('recurrence-email-input').fill('testing-snapshot@example.test');
+  await page.getByTestId('recurrence-phone-input').fill('010-5555-6666');
+  await page.getByTestId('recurrence-purpose-input').fill(submittedPurpose);
+  await page.getByTestId('recurrence-tag-select').selectOption(tag.id);
+  await page.getByTestId('recurrence-show-applicant-name-input').check();
+  await expect(page.getByTestId('recurrence-create-button')).toBeEnabled();
+  await expect(page.getByTestId('recurrence-preview-stale')).toBeHidden();
+
+  let releaseCreate!: () => void;
+  let markCreateStarted!: () => void;
+  let createRequestCount = 0;
+  let submittedBody: Record<string, unknown> | undefined;
+  const createGate = new Promise<void>((resolve) => { releaseCreate = resolve; });
+  const createStarted = new Promise<void>((resolve) => { markCreateStarted = resolve; });
+  await page.route('**/api/admin/recurrences', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === '/api/admin/recurrences' && route.request().method() === 'POST') {
+      createRequestCount += 1;
+      submittedBody = JSON.parse(route.request().postData() || '{}') as Record<string, unknown>;
+      markCreateStarted();
+      await createGate;
+    }
+    await route.continue();
+  });
+
+  const createResponsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/admin/recurrences'
+      && response.request().method() === 'POST',
+  );
+  const createButton = page.getByTestId('recurrence-create-button');
+  await createButton.click();
+  await createStarted;
+  await expect(createButton).toBeDisabled();
+  await createButton.evaluate((button: HTMLButtonElement) => button.click());
+  expect(createRequestCount).toBe(1);
+
+  await page.getByTestId('recurrence-room-select').selectOption(secondRoom.id);
+  await page.getByTestId('recurrence-applicant-name-input').fill('testing-next-draft-applicant');
+  await page.getByTestId('recurrence-email-input').fill('testing-next-draft@example.test');
+  await page.getByTestId('recurrence-phone-input').fill('010-7777-8888');
+  await page.getByTestId('recurrence-purpose-input').fill(secondPurpose);
+  await page.getByTestId('recurrence-start-date-input').fill(secondTime.startDate);
+  await page.getByTestId('recurrence-end-date-input').fill(secondTime.endDate);
+  await page.getByTestId('recurrence-start-time-input').selectOption(secondTime.startTime);
+  await page.getByTestId('recurrence-end-time-input').selectOption(secondTime.endTime);
+  await page.getByTestId('recurrence-tag-select').selectOption('');
+  await page.getByTestId('recurrence-show-applicant-name-input').uncheck();
+  if (secondTime.dayOfWeek !== firstTime.dayOfWeek) {
+    await page.getByTestId(`recurrence-day-${firstTime.dayOfWeek}`).uncheck();
+    await page.getByTestId(`recurrence-day-${secondTime.dayOfWeek}`).check();
+  }
+
+  await runRecurrencePreview(page);
+  await expect(page.getByTestId('recurrence-preview-summary')).toBeVisible();
+  await expect(page.getByTestId('recurrence-preview-stale')).toBeHidden();
+  await expect(createButton).toBeDisabled();
+
+  releaseCreate();
+  const createResponse = await createResponsePromise;
+  const createBody = await createResponse.text();
+  expect(createResponse.ok(), createBody).toBe(true);
+  const created = JSON.parse(createBody) as {
+    recurrenceId: string;
+    createdCount: number;
+    skippedCount: number;
+    failedCount: number;
+  };
+  e2eData.registerRecurrence(created.recurrenceId);
+
+  expect(createRequestCount).toBe(1);
+  expect(submittedBody).toMatchObject({
+    roomId: firstRoom.id,
+    startDate: firstTime.startDate,
+    endDate: firstTime.endDate,
+    daysOfWeek: [firstTime.dayOfWeek],
+    startTime: `${firstTime.startTime}:00`,
+    endTime: `${firstTime.endTime}:00`,
+    applicantName: 'testing-snapshot-applicant',
+    applicantEmail: 'testing-snapshot@example.test',
+    applicantPhone: '010-5555-6666',
+    purpose: submittedPurpose,
+    tagId: tag.id,
+    showApplicantName: true,
+  });
+
+  await expect(page.getByTestId('recurrence-room-select')).toHaveValue(secondRoom.id);
+  await expect(page.getByTestId('recurrence-purpose-input')).toHaveValue(secondPurpose);
+  await expect(page.getByTestId('recurrence-start-date-input')).toHaveValue(secondTime.startDate);
+  await expect(page.getByTestId('recurrence-end-date-input')).toHaveValue(secondTime.endDate);
+  await expect(page.getByTestId('recurrence-preview-summary')).toBeVisible();
+  await expect(createButton).toBeEnabled();
+  await expect(page.locator('.success-box')).toHaveText(
+    `‘${submittedPurpose}’ 등록 완료: 등록 ${created.createdCount}건, 건너뜀 ${created.skippedCount}건, 실패 ${created.failedCount}건`,
+  );
+});
+
 function dayLabel(day: string) {
   const labels: Record<string, string> = {
     MON: '월',
@@ -304,4 +519,39 @@ function addMinutesToTime(value: string, minutesToAdd: number) {
   const [hour, minute] = value.slice(0, 5).split(':').map(Number);
   const total = hour * 60 + minute + minutesToAdd;
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function shiftDate(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+async function fillRecurrenceDraft(
+  page: Page,
+  roomId: string,
+  purpose: string,
+  recurrenceTime: ReturnType<typeof nextWeekdayRecurrenceInputs>,
+) {
+  await page.getByTestId('recurrence-room-select').selectOption(roomId);
+  await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
+  await page.getByTestId('recurrence-purpose-input').fill(purpose);
+  await page.getByTestId('recurrence-start-date-input').fill(recurrenceTime.startDate);
+  await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
+  await page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime);
+  await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
+  await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
+  await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
+}
+
+async function runRecurrencePreview(page: Page) {
+  const responsePromise = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === '/api/admin/recurrences/preview'
+      && response.request().method() === 'POST',
+  );
+  await page.getByTestId('recurrence-preview-button').click();
+  const response = await responsePromise;
+  const body = await response.text();
+  expect(response.ok(), body).toBe(true);
+  return JSON.parse(body) as Record<string, unknown>;
 }
