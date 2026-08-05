@@ -239,3 +239,57 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
     });
   }
 });
+
+test('settings canonicalize weekday selection and mixed API order before saving', async ({ page, request }) => {
+  await loginByApi(request);
+  const originalSettings = await getSettingsByApi(request);
+  let mixedResponseServed = false;
+
+  await page.route('**/api/admin/settings', async (route) => {
+    if (route.request().method() === 'GET' && !mixedResponseServed) {
+      mixedResponseServed = true;
+      await route.fulfill({
+        json: {
+          ...originalSettings,
+          availableDaysOfWeek: ['THU', 'TUE', 'WED'],
+        },
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  try {
+    await page.goto('/admin/settings');
+    await expect(page.getByTestId('settings-form')).toBeVisible();
+    for (const day of ['TUE', 'WED', 'THU']) {
+      await expect(page.getByTestId(`settings-day-${day}`)).toBeChecked();
+      await page.getByTestId(`settings-day-${day}`).uncheck();
+    }
+
+    await page.getByTestId('settings-day-THU').check();
+    await page.getByTestId('settings-day-TUE').check();
+    await page.getByTestId('settings-day-WED').check();
+    const saveRequestPromise = page.waitForRequest((request) =>
+      new URL(request.url()).pathname === '/api/admin/settings' && request.method() === 'PUT',
+    );
+    await page.getByTestId('settings-save-button').click();
+    const saveRequest = await saveRequestPromise;
+    const payload = JSON.parse(saveRequest.postData() || '{}') as { availableDaysOfWeek?: string[] };
+    expect(payload.availableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
+    await expect(page.getByRole('status')).toBeVisible();
+
+    const savedSettings = await getSettingsByApi(request);
+    expect(savedSettings.availableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
+    await page.reload();
+    for (const day of ['TUE', 'WED', 'THU']) {
+      await expect(page.getByTestId(`settings-day-${day}`)).toBeChecked();
+    }
+  } finally {
+    const latestSettings = await getSettingsByApi(request);
+    await updateSettingsByApi(request, {
+      ...originalSettings,
+      version: latestSettings.version,
+    });
+  }
+});

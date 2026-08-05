@@ -17,6 +17,12 @@ import { useTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
+import {
+  canonicalizeWeekdayCodes,
+  formatDayCodes,
+  toggleWeekday,
+  WEEKDAY_ORDER,
+} from '../../shared/utils/weekdays';
 import { optionalContact } from '../utils/optionalContact';
 
 interface RecurrenceForm {
@@ -51,7 +57,6 @@ const initialForm: RecurrenceForm = {
   showApplicantName: false,
 };
 
-const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 const pageSize = 20;
 
 function numberParam(value: string | null, fallback: number) {
@@ -114,7 +119,7 @@ export function RecurrencesPage() {
       roomId: form.roomId,
       startDate: form.startDate,
       endDate: form.endDate,
-      daysOfWeek: form.daysOfWeek,
+      daysOfWeek: canonicalizeWeekdayCodes(form.daysOfWeek),
       startTime: `${form.startTime}:00`,
       endTime: `${form.endTime}:00`,
       applicantPhone: optionalContact(form.applicantPhone),
@@ -142,9 +147,7 @@ export function RecurrencesPage() {
   function toggleDay(day: string) {
     setForm((prev) => ({
       ...prev,
-      daysOfWeek: prev.daysOfWeek.includes(day)
-        ? prev.daysOfWeek.filter((item) => item !== day)
-        : [...prev.daysOfWeek, day],
+      daysOfWeek: toggleWeekday(prev.daysOfWeek, day),
     }));
   }
 
@@ -298,7 +301,7 @@ export function RecurrencesPage() {
           </label>
           <fieldset className="full-span checkbox-group">
             <legend>반복 요일</legend>
-            {days.map((day) => (
+            {WEEKDAY_ORDER.map((day) => (
               <label key={day}>
                 <input
                   data-testid={`recurrence-day-${day}`}
@@ -538,11 +541,4 @@ export function RecurrencesPage() {
       </section>
     </section>
   );
-}
-
-function formatDayCodes(daysOfWeek: string) {
-  return daysOfWeek
-    .split(',')
-    .map((day) => dayLabels[day.trim()] || day.trim())
-    .join(', ');
 }

@@ -46,7 +46,12 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 const instantPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
-const days = new Set(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]);
+export const WEEKDAY_ORDER = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
+
+const days = new Set<string>(WEEKDAY_ORDER);
+const weekdayOrderIndex = new Map<string, number>(
+  WEEKDAY_ORDER.map((day, index) => [day, index]),
+);
 
 export function requireObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) validation("Please check the request fields.");
@@ -299,12 +304,15 @@ export function validateReservationPolicy(
 
 export function normalizeDays(value: unknown): string[] {
   if (!Array.isArray(value) || value.length === 0) validation("must not be empty", "daysOfWeek");
-  return [...new Set(value.map((item) => {
+  const normalizedDays = [...new Set(value.map((item) => {
     if (typeof item !== "string") validation("Invalid day of week", "daysOfWeek");
     const normalized = item.trim().toUpperCase().slice(0, 3);
     if (!days.has(normalized)) validation(`Invalid day of week: ${item}`, "daysOfWeek");
     return normalized;
   }))];
+  return normalizedDays.sort(
+    (left, right) => weekdayOrderIndex.get(left)! - weekdayOrderIndex.get(right)!,
+  );
 }
 
 export function serviceOffsetDateTime(date: string, time: string): string {

@@ -6,8 +6,9 @@ import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCancelRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
-import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
+import { conflictPolicyLabels } from '../../shared/utils/labels';
 import { timetableReservationUrl } from '../../shared/utils/timetable';
+import { formatDayCodes } from '../../shared/utils/weekdays';
 
 export function RecurrenceDetailPage() {
   const { recurrenceId = '' } = useParams();
@@ -212,11 +213,4 @@ export function RecurrenceDetailPage() {
       </section>
     </section>
   );
-}
-
-function formatDayCodes(daysOfWeek: string) {
-  return daysOfWeek
-    .split(',')
-    .map((day) => dayLabels[day.trim()] || day.trim())
-    .join(', ');
 }

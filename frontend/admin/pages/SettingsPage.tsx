@@ -5,8 +5,7 @@ import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useSettings, useUpdateSettings } from '../../shared/hooks/useSettings';
 import { dayLabels } from '../../shared/utils/labels';
 import { operatingTimeOptions } from '../../shared/utils/timeOptions';
-
-const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+import { canonicalizeWeekdayCodes, toggleWeekday, WEEKDAY_ORDER } from '../../shared/utils/weekdays';
 
 export function SettingsPage() {
   const settings = useSettings();
@@ -17,6 +16,7 @@ export function SettingsPage() {
     if (settings.data) {
       setForm({
         ...settings.data,
+        availableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.availableDaysOfWeek),
         slotMinutes: 5,
         openTime: settings.data.openTime.slice(0, 5),
         closeTime: settings.data.closeTime.slice(0, 5),
@@ -33,9 +33,7 @@ export function SettingsPage() {
       if (!prev) return prev;
       return {
         ...prev,
-        availableDaysOfWeek: prev.availableDaysOfWeek.includes(day)
-          ? prev.availableDaysOfWeek.filter((item) => item !== day)
-          : [...prev.availableDaysOfWeek, day],
+        availableDaysOfWeek: toggleWeekday(prev.availableDaysOfWeek, day),
       };
     });
   }
@@ -45,6 +43,7 @@ export function SettingsPage() {
     if (!form) return;
     updateSettings.mutate({
       ...form,
+      availableDaysOfWeek: canonicalizeWeekdayCodes(form.availableDaysOfWeek),
       slotMinutes: 5,
       publicNotice: form.publicNotice || null,
       reservationDisabledMessage: form.reservationDisabledMessage || null,
@@ -181,9 +180,10 @@ export function SettingsPage() {
         </p>
         <fieldset className="full-span checkbox-group">
           <legend>예약 가능 요일</legend>
-          {days.map((day) => (
+          {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input
+                data-testid={`settings-day-${day}`}
                 type="checkbox"
                 checked={form.availableDaysOfWeek.includes(day)}
                 onChange={() => toggleDay(day)}

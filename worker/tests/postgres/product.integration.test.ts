@@ -1575,6 +1575,91 @@ describe("direct Worker contracts", () => {
     await expect(Promise.resolve().then(() => tagQuery("http://worker.test/api/admin/tags?page=abc"))).rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
   });
 
+  it("stores and returns recurrence and settings weekdays in canonical order", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-weekday-order");
+    const start = new Date();
+    start.setUTCDate(start.getUTCDate() + 35);
+    while (start.getUTCDay() !== 2) start.setUTCDate(start.getUTCDate() + 1);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 2);
+    const startDate = start.toISOString().slice(0, 10);
+    const endDate = end.toISOString().slice(0, 10);
+
+    const settingsBefore = await products.getSettings();
+    const updatedSettings = await products.updateSettings(parseUpdateSettings({
+      ...settingsBefore,
+      availableDaysOfWeek: ["THU", "TUE", "WED"],
+    }), "admin");
+    expect(updatedSettings.availableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
+    expect((await database.query(
+      "SELECT available_days_of_week FROM operation_settings WHERE id=1",
+    )).rows).toEqual([{ available_days_of_week: "TUE,WED,THU" }]);
+
+    const recurrence = await products.createRecurrence(parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-recurring-weekday-order",
+      applicantEmail: "testing-recurring-weekday-order@example.test",
+      applicantPhone: null,
+      purpose: "testing-recurring-weekday-order",
+      tagId: null,
+      startDate,
+      endDate,
+      daysOfWeek: ["THU", "TUE", "WED"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "FAIL_ALL",
+      showApplicantName: false,
+    }), "admin");
+    expect(recurrence.createdCount).toBe(3);
+    expect((await database.query(
+      "SELECT days_of_week FROM reservation_recurrences WHERE id=$1",
+      [recurrence.recurrenceId],
+    )).rows).toEqual([{ days_of_week: "TUE,WED,THU" }]);
+    expect((await database.query(
+      "SELECT start_at::date::text AS date FROM reservations WHERE recurrence_id=$1 ORDER BY start_at",
+      [recurrence.recurrenceId],
+    )).rows.map((row) => row.date)).toEqual([startDate, new Date(start.getTime() + 86_400_000).toISOString().slice(0, 10), endDate]);
+
+    await database.query(
+      "UPDATE reservation_recurrences SET days_of_week='THU,TUE,WED' WHERE id=$1",
+      [recurrence.recurrenceId],
+    );
+    const list = await products.listRecurrences(parseRecurrenceList(
+      new URLSearchParams("keyword=testing-recurring-weekday-order"),
+    ));
+    expect(list.items[0]?.daysOfWeek).toBe("TUE,WED,THU");
+    expect((await products.getRecurrence(recurrence.recurrenceId)).daysOfWeek).toBe("TUE,WED,THU");
+
+    await database.query(
+      "UPDATE operation_settings SET available_days_of_week='THU,TUE,WED' WHERE id=1",
+    );
+    const { app, cookie } = await authenticatedApp();
+    const publicSettingsResponse = await app.request("http://worker.test/api/public/settings");
+    const adminSettingsResponse = await app.request("http://worker.test/api/admin/settings", {
+      headers: { cookie },
+    });
+    expect(publicSettingsResponse.status).toBe(200);
+    expect(adminSettingsResponse.status).toBe(200);
+    expect((await publicSettingsResponse.json() as { availableDaysOfWeek: string[] }).availableDaysOfWeek)
+      .toEqual(["TUE", "WED", "THU"]);
+    expect((await adminSettingsResponse.json() as { availableDaysOfWeek: string[] }).availableDaysOfWeek)
+      .toEqual(["TUE", "WED", "THU"]);
+
+    expect(await products.checkAvailability({
+      roomId,
+      startAt: `${startDate}T12:00:00+09:00`,
+      endAt: `${startDate}T13:00:00+09:00`,
+    })).toMatchObject({ available: true, reason: null });
+    const unavailableDate = new Date(start);
+    unavailableDate.setUTCDate(unavailableDate.getUTCDate() - 1);
+    expect(await products.checkAvailability({
+      roomId,
+      startAt: `${unavailableDate.toISOString().slice(0, 10)}T12:00:00+09:00`,
+      endAt: `${unavailableDate.toISOString().slice(0, 10)}T13:00:00+09:00`,
+    })).toMatchObject({ available: false, reason: "OUTSIDE_OPERATING_DAYS" });
+  });
+
   it("keeps settings updates atomic, detects version conflicts and rejects time precision", async () => {
     await resetProductData();
     const before = await products.getSettings();

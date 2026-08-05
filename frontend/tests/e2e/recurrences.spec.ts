@@ -13,7 +13,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
   await loginByApi(request);
   const room = await e2eData.createTestRoom('recurrence-room');
   const purpose = e2eData.name('recurring-smoke');
-  const recurrenceTime = nextWeekdayRecurrenceInputs();
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ weeks: 1 });
   const settings = await getSettingsByApi(request);
   let recurrenceId: string | undefined;
   let cancelled = false;
@@ -37,7 +37,9 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     await page.getByTestId('recurrence-end-date-input').fill(recurrenceTime.endDate);
     await page.getByTestId('recurrence-start-time-input').selectOption(recurrenceTime.startTime);
     await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
-    await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
+    await page.getByTestId('recurrence-day-THU').check();
+    await page.getByTestId('recurrence-day-TUE').check();
+    await page.getByTestId('recurrence-day-WED').check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
     await page.getByTestId('recurrence-show-applicant-name-input').check();
 
@@ -50,8 +52,10 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
     const previewBody = await previewResponse.text();
     const previewRequest = JSON.parse(previewResponse.request().postData() || '{}') as {
       applicantPhone?: string | null;
+      daysOfWeek?: string[];
     };
     expect(previewRequest.applicantPhone).toBeNull();
+    expect(previewRequest.daysOfWeek).toEqual(['TUE', 'WED', 'THU']);
     expect(previewResponse.ok(), previewBody).toBeTruthy();
     const preview = JSON.parse(previewBody) as { availableCount: number; totalCandidates: number };
     expect(preview.totalCandidates, previewBody).toBeGreaterThan(0);
@@ -70,21 +74,48 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
       applicantEmail?: string | null;
       applicantPhone?: string | null;
       showApplicantName?: boolean;
+      daysOfWeek?: string[];
     };
     expect(createRequest.applicantEmail).toBeNull();
     expect(createRequest.applicantPhone).toBeNull();
     expect(createRequest.showApplicantName).toBe(true);
+    expect(createRequest.daysOfWeek).toEqual(['TUE', 'WED', 'THU']);
     expect(createResponse.ok(), createBody).toBeTruthy();
     const created = JSON.parse(createBody) as { recurrenceId: string; createdCount: number };
     recurrenceId = created.recurrenceId;
     e2eData.registerRecurrence(recurrenceId);
     expect(created.createdCount, createBody).toBeGreaterThan(0);
 
+    await page.route('**/api/admin/recurrences?**', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json() as { items: Array<{ id: string; daysOfWeek: string }> };
+      await route.fulfill({
+        response,
+        json: {
+          ...body,
+          items: body.items.map((item) => item.id === recurrenceId
+            ? { ...item, daysOfWeek: 'THU,TUE,WED' }
+            : item),
+        },
+      });
+    }, { times: 1 });
+    await page.goto('/admin/recurrences');
+    let row = page.getByRole('row').filter({ hasText: purpose });
+    await expect(row).toContainText('화, 수, 목');
+    await page.reload();
+    row = page.getByRole('row').filter({ hasText: purpose });
+    await expect(row).toContainText('화, 수, 목');
+
+    await page.route(`**/api/admin/recurrences/${recurrenceId}`, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json() as { daysOfWeek: string };
+      await route.fulfill({ response, json: { ...body, daysOfWeek: 'THU,TUE,WED' } });
+    }, { times: 1 });
     await page.goto(`/admin/recurrences/${recurrenceId}`);
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
-    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
+    await expect(page.getByTestId('recurrence-detail-schedule')).toContainText('화, 수, 목');
     await expect(page.getByTestId('recurrence-detail-applicant-name')).toContainText('(공개)');
     await expect(page.getByTestId('recurrence-detail-applicant-email').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
@@ -106,7 +137,7 @@ test('recurrence smoke: list, preview, create, detail, and cancel', async ({ pag
 
     await page.goto('/admin/recurrences');
     await expect(page.getByTestId('recurrence-status-filter')).toHaveValue('ALL');
-    const row = page.getByRole('row').filter({ hasText: purpose });
+    row = page.getByRole('row').filter({ hasText: purpose });
     await expect(row).toBeVisible();
     await expect(row).toContainText('취소');
   } finally {
