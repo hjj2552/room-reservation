@@ -17,14 +17,15 @@ cd ..
 
 기본 주소는 `http://localhost:5173`이며 `/api` 요청은 `http://127.0.0.1:8080`의 로컬 Worker로 프록시됩니다. 다른 로컬 API를 사용하려면 `VITE_API_PROXY_TARGET`을 지정합니다.
 
-## 빌드와 proxy test
+## Production build
 
 ```powershell
 cd frontend
 npm.cmd ci
-npm.cmd run test:functions
 npm.cmd run build
 ```
+
+Production에서는 이 `dist`를 Worker Static Assets로 배포합니다. 로컬 Vite `/api` proxy는 개발 편의를 위해서만 유지합니다.
 
 ## Playwright E2E
 

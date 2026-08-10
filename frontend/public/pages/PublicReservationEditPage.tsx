@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -89,17 +89,16 @@ export function PublicReservationEditPage() {
   });
   const startAt = watch('startAt');
   const endAt = watch('endAt');
+  const editFormReady = Boolean(
+    verifiedReservation
+    && rooms.data?.some((room) => room.id === verifiedReservation.room.id),
+  );
 
-  useEffect(() => {
-    if (!verifiedReservation) return;
-    reset(valuesFromReservation(verifiedReservation));
-  }, [reset, verifiedReservation]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!verifiedReservation) return;
     if (!rooms.data?.some((room) => room.id === verifiedReservation.room.id)) return;
-    setValue('roomId', verifiedReservation.room.id);
-  }, [rooms.data, setValue, verifiedReservation]);
+    reset(valuesFromReservation(verifiedReservation));
+  }, [reset, rooms.data, verifiedReservation]);
 
   useEffect(() => {
     if (!routeState?.verifiedReservation) return;
@@ -223,7 +222,7 @@ export function PublicReservationEditPage() {
         onSubmit={verifyReservationPassword}
       />
 
-      {verifiedReservation ? (
+      {verifiedReservation && editFormReady ? (
         <form className="panel form-grid" onSubmit={handleSubmit(onSubmit)} aria-label="예약 수정 입력">
           <label className="full-span">
             신청 목적

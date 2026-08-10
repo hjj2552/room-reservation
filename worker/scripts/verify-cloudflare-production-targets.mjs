@@ -23,15 +23,9 @@ async function requireExistingTarget(url, targetLabel) {
 }
 
 const accountPath = encodeURIComponent(values.accountId);
-await Promise.all([
-  requireExistingTarget(
-    `https://api.cloudflare.com/client/v4/accounts/${accountPath}/workers/scripts/${encodeURIComponent(values.workerName)}`,
-    "Worker",
-  ),
-  requireExistingTarget(
-    `https://api.cloudflare.com/client/v4/accounts/${accountPath}/pages/projects/${encodeURIComponent(values.pagesProjectName)}`,
-    "Pages project",
-  ),
-]);
+await requireExistingTarget(
+  `https://api.cloudflare.com/client/v4/accounts/${accountPath}/workers/scripts/${encodeURIComponent(values.workerName)}`,
+  "Worker",
+);
 
-process.stdout.write("Configured production Cloudflare targets verified.\n");
+process.stdout.write("Configured production Cloudflare Worker target verified.\n");

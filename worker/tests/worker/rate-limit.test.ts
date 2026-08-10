@@ -5,7 +5,7 @@ import { createOpaqueToken, isValidOpaqueToken } from "../../src/core/security";
 import { createHttpApp } from "../../src/http/app";
 import { CloudflareRateLimiter } from "../../src/infra/cloudflare-rate-limit";
 import type { Database } from "../../src/infra/database";
-import { TrustedProxyClientIpProvider } from "../../src/infra/trusted-proxy-client-ip";
+import { CloudflareClientIpProvider } from "../../src/infra/cloudflare-client-ip";
 import { ProductService } from "../../src/services/product-service";
 import { SessionService, type SessionRecord } from "../../src/services/session-service";
 import {
@@ -24,6 +24,7 @@ function testApp(options: {
   adminSession?: boolean;
   productCalls?: { reads: number; writes: number };
   sessionCalls?: { finds: number };
+  resolveClientIp?: (request: Request) => string | null;
 } = {}) {
   const productCalls = options.productCalls ?? { reads: 0, writes: 0 };
   const sessionCalls = options.sessionCalls ?? { finds: 0 };
@@ -54,7 +55,7 @@ function testApp(options: {
     products,
     sessions,
     rateLimiter: options.limiter ?? new DeterministicRateLimiter(),
-    resolveClientIp: headerClientIpResolver,
+    resolveClientIp: options.resolveClientIp ?? headerClientIpResolver,
     adminUsername: "admin",
     adminPassword: "secret",
   });
@@ -321,7 +322,7 @@ describe("public API rate-limit contract", () => {
   });
 });
 
-describe("Cloudflare rate-limit and trusted-IP adapters", () => {
+describe("Cloudflare rate-limit and direct client-IP adapters", () => {
   it("selects exactly the ingress, read, or write binding", async () => {
     const ingress = { limit: vi.fn(async () => ({ success: true })) };
     const read = { limit: vi.fn(async () => ({ success: true })) };
@@ -339,21 +340,52 @@ describe("Cloudflare rate-limit and trusted-IP adapters", () => {
     expect(write.limit).toHaveBeenCalledWith({ key: "write-actor" });
   });
 
-  it("accepts only a valid Pages-owned internal IP header", () => {
-    const provider = new TrustedProxyClientIpProvider();
+  it("accepts only Cloudflare edge client IP and ignores spoofable forwarding headers", () => {
+    const provider = new CloudflareClientIpProvider();
     expect(provider.getClientIp(new Request("https://worker.test", {
       headers: {
         "X-Room-Reservation-Client-IP": "203.0.113.42",
         "CF-Connecting-IP": "198.51.100.1",
         "X-Forwarded-For": "198.51.100.2",
       },
-    }))).toBe("203.0.113.42");
+    }))).toBe("198.51.100.1");
     expect(provider.getClientIp(new Request("https://worker.test", {
-      headers: { "X-Room-Reservation-Client-IP": "not-an-ip" },
+      headers: {
+        "X-Room-Reservation-Client-IP": "203.0.113.42",
+        "X-Forwarded-For": "198.51.100.2",
+      },
     }))).toBeNull();
     expect(provider.getClientIp(new Request("https://worker.test", {
-      headers: { "CF-Connecting-IP": "203.0.113.42" },
+      headers: { "CF-Connecting-IP": "not-an-ip" },
     }))).toBeNull();
+    expect(provider.getClientIp(new Request("https://worker.test", {
+      headers: { "CF-Connecting-IP": "2001:db8::1" },
+    }))).toBe("2001:db8::1");
+  });
+
+  it("keeps the limiter actor key on CF-Connecting-IP when browser headers are forged", async () => {
+    const provider = new CloudflareClientIpProvider();
+    const check = vi.fn(async (_request: Parameters<RateLimiter["check"]>[0]) => ({ allowed: true }));
+    const { app } = testApp({
+      limiter: { check },
+      resolveClientIp: (request) => provider.getClientIp(request),
+    });
+    for (const forgedIp of ["192.0.2.10", "192.0.2.11"]) {
+      const response = await app.request("/api/public/settings", {
+        headers: {
+          "CF-Connecting-IP": "198.51.100.8",
+          "X-Forwarded-For": forgedIp,
+          "X-Room-Reservation-Client-IP": forgedIp,
+        },
+      });
+      expect(response.status).toBe(200);
+    }
+    expect(check.mock.calls.map(([request]) => request.actorKey)).toEqual([
+      "198.51.100.8",
+      "198.51.100.8",
+      "198.51.100.8",
+      "198.51.100.8",
+    ]);
   });
 });
 

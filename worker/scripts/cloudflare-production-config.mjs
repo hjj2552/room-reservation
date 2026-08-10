@@ -9,14 +9,30 @@ function requireAccountId(value) {
   return normalized;
 }
 
-export function pagesProjectNameFromEnv(env = process.env) {
-  const value = env.CLOUDFLARE_PAGES_PROJECT_NAME;
+export function productionOriginFromEnv(env = process.env) {
+  const value = env.CLOUDFLARE_PRODUCTION_ORIGIN;
   const normalized = value?.trim();
-  if (!normalized) throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME is required");
-  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalized)) {
-    throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME must be a valid Pages project name");
+  if (!normalized) throw new Error("CLOUDFLARE_PRODUCTION_ORIGIN is required");
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error("CLOUDFLARE_PRODUCTION_ORIGIN must be a valid HTTPS Worker origin");
   }
-  return normalized;
+  if (
+    parsed.protocol !== "https:"
+    || parsed.username
+    || parsed.password
+    || parsed.port
+    || parsed.pathname !== "/"
+    || parsed.search
+    || parsed.hash
+    || !parsed.hostname.endsWith(".workers.dev")
+    || parsed.hostname.split(".").length < 4
+  ) {
+    throw new Error("CLOUDFLARE_PRODUCTION_ORIGIN must be a valid HTTPS Worker origin");
+  }
+  return parsed.origin;
 }
 
 function requireApiToken(value) {
@@ -26,10 +42,15 @@ function requireApiToken(value) {
 }
 
 export function productionCloudflareValuesFromEnv(env = process.env) {
+  const deployment = deploymentValuesFromEnv(env);
+  const productionOrigin = productionOriginFromEnv(env);
+  if (new URL(productionOrigin).hostname.split(".", 1)[0] !== deployment.workerName) {
+    throw new Error("CLOUDFLARE_PRODUCTION_ORIGIN must match CLOUDFLARE_WORKER_NAME");
+  }
   return {
     accountId: requireAccountId(env.CLOUDFLARE_ACCOUNT_ID),
-    pagesProjectName: pagesProjectNameFromEnv(env),
+    productionOrigin,
     apiToken: requireApiToken(env.CLOUDFLARE_API_TOKEN),
-    ...deploymentValuesFromEnv(env),
+    ...deployment,
   };
 }

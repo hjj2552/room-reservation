@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -61,31 +61,29 @@ export function ReservationFormPage() {
   });
   const startAt = watch('startAt');
   const endAt = watch('endAt');
+  const formReady = Boolean(
+    reservation.data
+    && rooms.data?.some((room) => room.id === reservation.data.room.id),
+  );
 
-  useEffect(() => {
-    if (reservation.data) {
-      reset({
-        roomId: reservation.data.room.id,
-        applicantName: reservation.data.applicantName,
-        applicantEmail: reservation.data.applicantEmail || '',
-        applicantPhone: reservation.data.applicantPhone || '',
-        purpose: reservation.data.purpose,
-        startAt: toServiceDateTimeLocal(reservation.data.startAt),
-        endAt: toServiceDateTimeLocal(reservation.data.endAt),
-        status: reservation.data.status,
-        memo: '',
-        showApplicantName: reservation.data.source === 'PUBLIC_FORM'
-          ? false
-          : reservation.data.showApplicantName,
-      });
-    }
-  }, [reservation.data, reset]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!reservation.data) return;
     if (!rooms.data?.some((room) => room.id === reservation.data?.room.id)) return;
-    setValue('roomId', reservation.data.room.id);
-  }, [reservation.data, rooms.data, setValue]);
+    reset({
+      roomId: reservation.data.room.id,
+      applicantName: reservation.data.applicantName,
+      applicantEmail: reservation.data.applicantEmail || '',
+      applicantPhone: reservation.data.applicantPhone || '',
+      purpose: reservation.data.purpose,
+      startAt: toServiceDateTimeLocal(reservation.data.startAt),
+      endAt: toServiceDateTimeLocal(reservation.data.endAt),
+      status: reservation.data.status,
+      memo: '',
+      showApplicantName: reservation.data.source === 'PUBLIC_FORM'
+        ? false
+        : reservation.data.showApplicantName,
+    });
+  }, [reservation.data, reset, rooms.data]);
 
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {
@@ -131,9 +129,11 @@ export function ReservationFormPage() {
     });
   }
 
-  if (reservation.isLoading || settings.isLoading) return <LoadingState />;
+  if (reservation.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
   if (reservation.isError) return <ErrorState error={reservation.error} />;
   if (settings.isError) return <ErrorState error={settings.error} />;
+  if (rooms.isError) return <ErrorState error={rooms.error} />;
+  if (!formReady) return <LoadingState />;
 
   const mutationError = update.error;
   const isPending = update.isPending;

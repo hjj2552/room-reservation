@@ -112,13 +112,20 @@ test('room order shell keeps the room page stable while its chunk and data load'
 }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('order-lazy-shell');
+  const productionAssets = process.env.E2E_PRODUCTION_ASSETS === 'true';
+  const roomOrderChunkPattern = productionAssets
+    ? '**/assets/RoomOrderPanel-*.js'
+    : '**/admin/components/RoomOrderPanel.tsx*';
+  const isRoomOrderChunk = (pathname: string) => productionAssets
+    ? /\/assets\/RoomOrderPanel-[^/]+\.js$/.test(pathname)
+    : pathname.endsWith('/admin/components/RoomOrderPanel.tsx');
 
   let releaseChunk!: () => void;
   const chunkRelease = new Promise<void>((resolve) => {
     releaseChunk = resolve;
   });
   let chunkRequests = 0;
-  await page.route('**/admin/components/RoomOrderPanel.tsx*', async (route) => {
+  await page.route(roomOrderChunkPattern, async (route) => {
     chunkRequests += 1;
     await Promise.all([
       new Promise((resolve) => setTimeout(resolve, 500)),
@@ -131,6 +138,7 @@ test('room order shell keeps the room page stable while its chunk and data load'
   const pageSection = page.locator('.rooms-page');
   const orderButton = page.getByTestId('room-order-button');
   const createButton = page.getByTestId('room-create-button');
+  await expect(page.getByTestId('rooms-table').getByText(room.name)).toBeVisible();
   const measureBackground = async () => {
     const [pageBox, orderButtonBox, createButtonBox] = await Promise.all([
       pageSection.boundingBox(),
@@ -171,7 +179,7 @@ test('room order shell keeps the room page stable while its chunk and data load'
   expectStableBackground(await measureBackground(), beforeOpen);
 
   const chunkResponse = page.waitForResponse((response) => (
-    response.url().includes('/admin/components/RoomOrderPanel.tsx') && response.ok()
+    isRoomOrderChunk(new URL(response.url()).pathname) && response.ok()
   ));
   await panel.getByTestId('room-order-close').click();
   await expect(panel).toBeHidden();
@@ -824,7 +832,7 @@ test('global room order reaches public and admin timetables, forms, and filters 
   request,
   e2eData,
 }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(process.env.E2E_REMOTE === 'true' ? 600_000 : 240_000);
   await loginByApi(request);
   const rooms: E2eRoom[] = [];
   for (let index = 0; index < 101; index += 1) {

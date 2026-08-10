@@ -2,7 +2,7 @@ import { createHttpApp } from "./http/app";
 import { parseRuntimeConfig } from "./core/config";
 import { NeonDatabase } from "./infra/neon-database";
 import { CloudflareRateLimiter } from "./infra/cloudflare-rate-limit";
-import { TrustedProxyClientIpProvider } from "./infra/trusted-proxy-client-ip";
+import { CloudflareClientIpProvider } from "./infra/cloudflare-client-ip";
 import { ProductService } from "./services/product-service";
 import { SessionService } from "./services/session-service";
 
@@ -24,7 +24,7 @@ export default {
     if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD) throw new Error("ADMIN_USERNAME and ADMIN_PASSWORD are required");
     const database = new NeonDatabase(env.DATABASE_URL);
     const now = () => new Date();
-    const clientIpProvider = new TrustedProxyClientIpProvider();
+    const clientIpProvider = new CloudflareClientIpProvider();
     const app = createHttpApp(config, {
       products: new ProductService(database, now),
       sessions: new SessionService(database, now),

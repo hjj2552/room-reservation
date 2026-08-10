@@ -1,5 +1,7 @@
 # Worker Go-Live 전 rate limit과 Pages 신뢰 경계 검증
 
+> 이 문서는 Pages Service Binding을 사용하던 시점의 역사적 검증 기록이다. 현재 배포 경계는 Workers Static Assets와 direct `CF-Connecting-IP` 방식으로 대체되었으며 제품 rate-limit 수치와 세션 조회 전 보호 순서는 유지된다.
+
 > **역사적 검증 기록:** 이 문서는 production 전환 전 수행한 보안 gate의 시점별 결과입니다. 문서 안의 “전환 전”, “production 미변경” 표현은 당시 상태를 뜻합니다. 현재 production 구조와 배포 절차는 [배포 체크리스트](deployment-checklist.md)를 참조하세요.
 
 검증일: 2026-07-23, 세션 DB 앞단 보강 2026-07-24

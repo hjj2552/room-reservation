@@ -1,6 +1,4 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupE2eData } from './cleanup-e2e-data.mjs';
@@ -12,8 +10,6 @@ const frontendUrl = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const cleanupRequired = process.env.E2E_CLEANUP_REQUIRED !== 'false';
 
 let frontendProcess = null;
-let frontendOutFd = null;
-let frontendErrFd = null;
 
 async function main() {
   try {
@@ -56,25 +52,26 @@ async function main() {
 }
 
 async function startFrontend() {
-  const logDir = path.join(frontendRoot, 'test-results', 'frontend');
-  await mkdir(logDir, { recursive: true });
-
-  frontendOutFd = openSync(path.join(logDir, 'frontend.out.log'), 'a');
-  frontendErrFd = openSync(path.join(logDir, 'frontend.err.log'), 'a');
   const frontendPort = new URL(frontendUrl).port;
-  const command = process.platform === 'win32' ? 'cmd.exe' : 'npm';
-  const args = process.platform === 'win32'
-    ? ['/d', '/s', '/c', 'npm.cmd', 'run', 'dev', '--', '--host', '127.0.0.1', '--port', frontendPort]
-    : ['run', 'dev', '--', '--host', '127.0.0.1', '--port', frontendPort];
-  const processRef = spawn(command, args, {
+  const viteCli = path.join(frontendRoot, 'node_modules', 'vite', 'bin', 'vite.js');
+  const processRef = spawn(process.execPath, [
+    viteCli,
+    '--config',
+    'vite.config.mjs',
+    '--configLoader',
+    'native',
+    '--host',
+    '127.0.0.1',
+    '--port',
+    frontendPort,
+  ], {
     cwd: frontendRoot,
-    stdio: ['ignore', frontendOutFd, frontendErrFd],
+    stdio: 'inherit',
     windowsHide: true,
-    detached: true,
+    detached: process.platform !== 'win32',
   });
 
   await waitForProcessUrl(processRef, frontendUrl, 'frontend');
-  processRef.unref();
   return processRef;
 }
 
@@ -149,28 +146,19 @@ function assertNoE2eDataLeft(summary) {
 }
 
 function stopFrontend() {
-  if (!frontendProcess || frontendProcess.exitCode !== null) {
+  if (!frontendProcess) {
     return;
   }
 
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/PID', String(frontendProcess.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    killProcessGroup(frontendProcess);
-  }
-
-  closeFrontendLogs();
-  frontendProcess = null;
-}
-
-function closeFrontendLogs() {
-  for (const fd of [frontendOutFd, frontendErrFd]) {
-    if (fd !== null) {
-      closeSync(fd);
+  if (frontendProcess.exitCode === null) {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(frontendProcess.pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      killProcessGroup(frontendProcess);
     }
   }
-  frontendOutFd = null;
-  frontendErrFd = null;
+
+  frontendProcess = null;
 }
 
 function killProcessGroup(processRef) {

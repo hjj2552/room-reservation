@@ -29,8 +29,7 @@ runner는 종료 시 자신이 만든 exact container와 process만 정리합니
 `.github/workflows/ci.yml`의 `worker-frontend-e2e` job은 다음을 수행합니다.
 
 - Worker와 Frontend clean dependency install
-- Pages same-origin API proxy test
-- Frontend production build
+- Frontend production build와 combined Static Assets Worker dry-run
 - Playwright Chromium 설치
 - disposable Worker PostgreSQL 기반 전체 E2E
 
@@ -77,12 +76,14 @@ $env:E2E_CLEANUP_ENABLED='true'
 
 ## Remote UAT
 
-Remote UAT는 disposable Neon/Worker와 Pages preview만 사용합니다. production 형태의 Pages URL은 runner가 거부합니다.
+Remote UAT는 disposable Neon과 별도 UAT Worker만 사용합니다. production Worker origin은 runner가 거부합니다.
 
 ```powershell
 cd worker
 $env:P4_UAT_CONFIRM_DISPOSABLE='true'
-$env:P4_UAT_PAGES_URL='https://<preview-deployment>.pages.dev/'
+$env:CLOUDFLARE_WORKER_NAME='<disposable-uat-worker-name>'
+$env:CLOUDFLARE_UAT_ORIGIN='https://<disposable-uat-worker-name>.<workers-dev-subdomain>.workers.dev/'
+npm.cmd run test:uat-static-assets
 npm.cmd run test:uat-e2e
 ```
 

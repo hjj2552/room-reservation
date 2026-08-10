@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   includeExistingTime,
   reservationEndTimeOptions,
@@ -154,7 +154,7 @@ export function ReservationTimeRangeInput({
   const startTime = timePart(startAt);
   const endTime = timePart(endAt);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (externalDate) setSelectedDate(externalDate);
   }, [externalDate]);
 

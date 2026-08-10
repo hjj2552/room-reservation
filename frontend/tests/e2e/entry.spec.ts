@@ -473,10 +473,17 @@ test('root shows public and admin entry choices', async ({ page }) => {
 });
 
 test('public routes defer admin page modules until an admin route is opened', async ({ page }) => {
+  const productionAssets = process.env.E2E_PRODUCTION_ASSETS === 'true';
+  const isAdminPageModule = (pathname: string) => productionAssets
+    ? /\/assets\/(?:LoginPage|ReservationsPage|ReservationDetailPage|ReservationFormPage|RecurrencesPage|RecurrenceDetailPage|RoomsPage|SettingsPage|TagSettingsPage|AuditPage)-[^/]+\.js$/.test(pathname)
+    : pathname.includes('/admin/pages/');
+  const isLoginPageModule = (pathname: string) => productionAssets
+    ? /\/assets\/LoginPage-[^/]+\.js$/.test(pathname)
+    : pathname.endsWith('/admin/pages/LoginPage.tsx');
   const adminPageRequests: string[] = [];
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (pathname.includes('/admin/pages/')) {
+    if (isAdminPageModule(pathname)) {
       adminPageRequests.push(pathname);
     }
   });
@@ -491,11 +498,14 @@ test('public routes defer admin page modules until an admin route is opened', as
 
   await page.goto('/admin/login');
   await expect(page.getByRole('heading', { name: '공간 예약 운영 로그인' })).toBeVisible();
-  expect(adminPageRequests.some((pathname) => pathname.endsWith('/admin/pages/LoginPage.tsx'))).toBe(true);
+  expect(adminPageRequests.some(isLoginPageModule)).toBe(true);
 });
 
 test('a failed route module renders an error state inside the public layout', async ({ page }) => {
-  await page.route('**/public/pages/EntryChoicePage.tsx*', (route) => route.fulfill({
+  const entryModulePattern = process.env.E2E_PRODUCTION_ASSETS === 'true'
+    ? '**/assets/EntryChoicePage-*.js'
+    : '**/public/pages/EntryChoicePage.tsx*';
+  await page.route(entryModulePattern, (route) => route.fulfill({
     status: 503,
     contentType: 'text/javascript',
     body: 'Route module unavailable',
