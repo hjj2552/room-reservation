@@ -38,3 +38,9 @@ Copy-Item .env.example .env
 Worker는 `http://127.0.0.1:8080`, 프런트엔드는 `http://localhost:5173`에서 실행됩니다. 로컬 데이터는 Docker PostgreSQL의 `room_reservation_worker` database에 저장됩니다.
 
 관리자 계정은 `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 사용합니다. `admin` / `admin1234`는 test/E2E profile의 일회성 기본값일 뿐 local 또는 운영 계정이 아닙니다. 자세한 실행, 테스트, E2E 절차는 [docs/dev-setup.md](docs/dev-setup.md)를 참고하세요.
+
+## 라이선스
+
+별도로 명시된 제3자 자산을 제외한 이 저장소의 소스 코드와 문서는 [MIT License](LICENSE)에 따라 제공됩니다.
+
+번들된 Wanted Sans 글꼴에는 별도의 [SIL Open Font License 1.1](frontend/src/assets/fonts/wanted-sans/OFL.txt)이 적용됩니다.
