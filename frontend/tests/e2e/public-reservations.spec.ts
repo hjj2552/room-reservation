@@ -504,6 +504,33 @@ test('public edit closes a true no-op save without sending an update request', a
   await expect(page.getByRole('status')).toHaveCount(0);
 });
 
+test('public edit replaces an inactive current room without getting stuck loading', async ({ page, request, e2eData }) => {
+  const inactiveRoom = await e2eData.createTestRoom('public-edit-inactive-current');
+  const replacementRoom = await e2eData.createTestRoom('public-edit-active-replacement');
+  const reservation = await e2eData.createTestPublicReservation(inactiveRoom.id, 'public-edit-inactive-room');
+  await loginByApi(request);
+  await e2eData.setTestRoomEnabled(inactiveRoom.id, false);
+
+  await page.goto(`/reservations/${reservation.id}/edit`);
+  await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
+  await page.getByTestId('public-edit-verify-button').click();
+
+  const roomSelect = page.getByTestId('public-edit-room-select');
+  await expect(roomSelect).toBeVisible();
+  await expect(roomSelect).toHaveValue(inactiveRoom.id);
+  await expect(roomSelect.locator(`option[value="${inactiveRoom.id}"]`)).toHaveAttribute('disabled', '');
+  await expect(page.getByText('현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.')).toBeVisible();
+  await expect(page.getByTestId('public-edit-save-button')).toBeDisabled();
+
+  await roomSelect.selectOption(replacementRoom.id);
+  await expect(page.getByTestId('public-edit-save-button')).toBeEnabled();
+  await page.getByTestId('public-edit-save-button').click();
+
+  await expect(roomSelect).toHaveValue(replacementRoom.id);
+  await expect(page.getByText('현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.')).toHaveCount(0);
+  await expect(page.locator('.success-box')).toContainText('승인 대기');
+});
+
 test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {

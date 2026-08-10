@@ -174,6 +174,19 @@ export async function deleteRoomByApi(request: APIRequestContext, roomId: string
   expect([204, 404, 409]).toContain(response.status());
 }
 
+export async function updateRoomEnabledByApi(
+  request: APIRequestContext,
+  roomId: string,
+  enabled: boolean,
+) {
+  const response = await request.patch(`/api/admin/rooms/${roomId}/enabled`, {
+    headers: await csrfHeaders(request),
+    data: { enabled },
+  });
+  await expectApiOk(response, 'update room enabled state');
+  return response.json() as Promise<E2eRoom>;
+}
+
 export async function getRoomOrderByApi(request: APIRequestContext) {
   const response = await request.get('/api/admin/rooms/order');
   await expectApiOk(response, 'get room order');

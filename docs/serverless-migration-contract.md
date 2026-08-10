@@ -202,7 +202,7 @@ P3 결과에 따라 1차 마이그레이션에서는 기존 Cloudflare Pages Fun
 - Pages Function proxy 제거 가능성
 - 프런트·백엔드 단일 진입점의 장단점
 
-SPA deep link는 `single-page-application` fallback을 사용하고, selective `run_worker_first`는 `/api`와 `/api/*`에만 적용한다. HTML, JavaScript, CSS와 font asset 요청은 Worker code를 실행하지 않는 asset-first 경로로 둔다. Pages Function proxy, `API_BACKEND`, `API_PROXY_TRANSPORT`와 production `BACKEND_ORIGIN`은 통합 배포 경로에서 제거한다. 기존 Pages 프로젝트는 전환 검증 후 별도 승인 전까지 fallback으로 유지한다.
+SPA deep link는 `single-page-application` fallback을 사용하고, selective `run_worker_first`는 `/api`와 `/api/*`에만 적용한다. HTML, JavaScript, CSS와 font asset 요청은 Worker code를 실행하지 않는 asset-first 경로로 둔다. Pages Function proxy, `API_BACKEND`, `API_PROXY_TRANSPORT`와 production `BACKEND_ORIGIN`은 통합 배포 경로에서 제거한다. 기존 Pages 프로젝트는 전환 검증 후 별도 승인 전까지 이전 프런트와 rollback 진입점으로 보존하지만, 같은 production Worker를 호출하므로 새 Worker 배포 이후의 독립적인 API fallback으로 간주하지 않는다. 실제 rollback은 전환 전 확인한 안정 Worker version을 복원한 뒤 기존 Pages 경로를 smoke하는 절차로 수행한다.
 
 ## 7. 시간 정책
 
