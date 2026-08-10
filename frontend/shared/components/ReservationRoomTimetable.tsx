@@ -190,8 +190,6 @@ export function ReservationRoomTimetable({
                     style={{
                       top: position.top,
                       height: position.height,
-                      borderColor: reservation.seriesColor || undefined,
-                      backgroundColor: reservation.seriesColor ? hexToTint(reservation.seriesColor) : undefined,
                     }}
                     onClick={() =>
                       onReservationClick ? onReservationClick(reservation) : navigate(`/admin/reservations/${reservation.id}`)
@@ -199,25 +197,33 @@ export function ReservationRoomTimetable({
                     aria-label={`${room.name} ${day.label} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabelOverride?.[reservation.status] || statusLabels[reservation.status]}`}
                     data-testid="reservation-room-timetable-block"
                   >
-                    <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
-                    {reservation.seriesLabel ? (
-                      <span
-                        className="reservation-block-series"
-                        style={reservation.seriesColor ? {
-                          borderColor: reservation.seriesColor,
-                        } : undefined}
-                      >
-                        {reservation.seriesLabel}
+                    <span
+                      className="reservation-block-card"
+                      style={{
+                        borderColor: reservation.seriesColor || undefined,
+                        backgroundColor: reservation.seriesColor ? hexToTint(reservation.seriesColor) : undefined,
+                      }}
+                    >
+                      <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
+                      {reservation.seriesLabel ? (
+                        <span
+                          className="reservation-block-series"
+                          style={reservation.seriesColor ? {
+                            borderColor: reservation.seriesColor,
+                          } : undefined}
+                        >
+                          {reservation.seriesLabel}
+                        </span>
+                      ) : null}
+                      <span className="reservation-block-meta">
+                        <span>
+                          {position.startLabel}-{position.endLabel}
+                        </span>
+                        <span>{reservation.applicantName}</span>
                       </span>
-                    ) : null}
-                    <span className="reservation-block-meta">
-                      <span>
-                        {position.startLabel}-{position.endLabel}
+                      <span className="reservation-block-footer">
+                        <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                       </span>
-                      <span>{reservation.applicantName}</span>
-                    </span>
-                    <span className="reservation-block-footer">
-                      <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                     </span>
                   </button>
                 );

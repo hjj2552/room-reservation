@@ -917,9 +917,23 @@ button:disabled {
 
 .reservation-block {
   position: absolute;
-  right: 5px;
-  left: 5px;
+  right: 0;
+  left: 0;
   z-index: 1;
+  display: block;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #17202a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.reservation-block-card {
+  position: absolute;
+  inset: 0 5px;
   display: grid;
   align-content: start;
   gap: 2px;
@@ -930,29 +944,28 @@ button:disabled {
   padding: 5px 7px;
   background: #f8fbfd;
   color: #17202a;
-  cursor: pointer;
-  text-align: left;
+  pointer-events: none;
 }
 
-.reservation-block:hover {
+.reservation-block:hover .reservation-block-card {
   filter: brightness(0.98);
 }
 
-.reservation-block-highlighted {
+.reservation-block-highlighted .reservation-block-card {
   box-shadow: 0 0 0 3px rgba(40, 94, 168, 0.28);
 }
 
-.reservation-block-requested {
+.reservation-block-requested .reservation-block-card {
   border-left-color: #d48a00;
   background: #fff9ea;
 }
 
-.reservation-block-confirmed {
+.reservation-block-confirmed .reservation-block-card {
   border-left-color: #2a8f68;
   background: #eefaf4;
 }
 
-.reservation-block-cancelled {
+.reservation-block-cancelled .reservation-block-card {
   border-left-color: #c24a40;
   background: #fff3f2;
   color: #5d6876;
@@ -1036,6 +1049,10 @@ button:disabled {
 }
 
 .reservation-block-compact {
+  padding: 0;
+}
+
+.reservation-block-compact .reservation-block-card {
   align-content: center;
   gap: 1px;
   padding: 3px 6px;
