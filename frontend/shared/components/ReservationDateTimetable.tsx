@@ -104,7 +104,7 @@ export function clippedBlockPosition(reservation: TimetableReservation, openMinu
 
   return {
     top: (visibleStart - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
-    height: Math.max((visibleEnd - visibleStart) * TIMETABLE_MINUTE_HEIGHT, 34),
+    height: (visibleEnd - visibleStart) * TIMETABLE_MINUTE_HEIGHT,
     visible: visibleEnd > visibleStart,
     startLabel: formatClock(startMinutes),
     endLabel: formatClock(endMinutes),
@@ -248,8 +248,6 @@ export function ReservationDateTimetable({
                     style={{
                       top: position.top,
                       height: position.height,
-                      borderColor: reservation.seriesColor || undefined,
-                      backgroundColor: reservation.seriesColor ? hexToTint(reservation.seriesColor) : undefined,
                     }}
                     onClick={() =>
                       onReservationClick ? onReservationClick(reservation) : navigate(`/admin/reservations/${reservation.id}`)
@@ -257,25 +255,33 @@ export function ReservationDateTimetable({
                     aria-label={`${room.name} ${position.startLabel}-${position.endLabel} ${reservation.purpose} ${statusLabelOverride?.[reservation.status] || statusLabels[reservation.status]}`}
                     data-testid="reservation-timetable-block"
                   >
-                    <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
-                    {reservation.seriesLabel ? (
-                      <span
-                        className="reservation-block-series"
-                        style={reservation.seriesColor ? {
-                          borderColor: reservation.seriesColor,
-                        } : undefined}
-                      >
-                        {reservation.seriesLabel}
+                    <span
+                      className="reservation-block-card"
+                      style={{
+                        borderColor: reservation.seriesColor || undefined,
+                        backgroundColor: reservation.seriesColor ? hexToTint(reservation.seriesColor) : undefined,
+                      }}
+                    >
+                      <span className="reservation-block-title">{reservation.purpose || reservation.applicantName}</span>
+                      {reservation.seriesLabel ? (
+                        <span
+                          className="reservation-block-series"
+                          style={reservation.seriesColor ? {
+                            borderColor: reservation.seriesColor,
+                          } : undefined}
+                        >
+                          {reservation.seriesLabel}
+                        </span>
+                      ) : null}
+                      <span className="reservation-block-meta">
+                        <span>
+                          {position.startLabel}-{position.endLabel}
+                        </span>
+                        <span>{reservation.applicantName}</span>
                       </span>
-                    ) : null}
-                    <span className="reservation-block-meta">
-                      <span>
-                        {position.startLabel}-{position.endLabel}
+                      <span className="reservation-block-footer">
+                        <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                       </span>
-                      <span>{reservation.applicantName}</span>
-                    </span>
-                    <span className="reservation-block-footer">
-                      <StatusBadge status={reservation.status} label={statusLabelOverride?.[reservation.status]} />
                     </span>
                   </button>
                 );
