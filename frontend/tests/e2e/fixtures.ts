@@ -10,6 +10,7 @@ import {
   deleteReservationByApi,
   deleteTagByApi,
   uniqueE2eName,
+  updateRoomEnabledByApi,
   type E2ePublicReservation,
   type E2eRecurrence,
   type E2eReservation,
@@ -35,6 +36,7 @@ interface E2eDataFactory {
       enabled?: boolean;
     },
   ): Promise<E2eRoom>;
+  setTestRoomEnabled(roomId: string, enabled: boolean): Promise<E2eRoom>;
   createTestTag(label: string, options?: { color?: string }): Promise<E2eTag>;
   createTestReservation(
     roomId: string,
@@ -100,6 +102,7 @@ export const test = base.extend<E2eFixtures>({
         e2eRegistry.rooms.push(room.id);
         return room;
       },
+      setTestRoomEnabled: (roomId, enabled) => updateRoomEnabledByApi(request, roomId, enabled),
       createTestTag: async (label, options) => {
         const tag = await createTagByApi(request, uniqueE2eName(`tag-${label}`), options?.color);
         e2eRegistry.tags.push(tag.id);

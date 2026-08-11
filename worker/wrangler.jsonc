@@ -4,12 +4,17 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-07-20",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "<static-assets-directory>",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  },
   "workers_dev": false,
   "preview_urls": false,
   "env": {
     "uat": {
       "name": "<worker-name>",
-      "workers_dev": false,
+      "workers_dev": true,
       "preview_urls": false,
       "vars": {
         "APP_ENV": "uat",
@@ -35,7 +40,7 @@
     },
     "production": {
       "name": "<worker-name>",
-      "workers_dev": false,
+      "workers_dev": true,
       "preview_urls": false,
       "vars": {
         "APP_ENV": "prod",

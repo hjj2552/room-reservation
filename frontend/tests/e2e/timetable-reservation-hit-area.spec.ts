@@ -26,7 +26,7 @@ test('reservation hit areas cover horizontal card gaps without covering later ti
   request,
   e2eData,
 }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(process.env.E2E_REMOTE === 'true' ? 240_000 : 120_000);
   const originalSettings = await getSettingsByApi(request);
   await updateSettingsByApi(request, {
     ...originalSettings,

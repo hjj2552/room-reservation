@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -45,7 +45,7 @@ const defaultReservationFormValues: ReservationFormValues = {
 export function ReservationFormPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
-  const rooms = useRoomOptions();
+  const rooms = useRoomOptions({ includeDisabled: true });
   const settings = useSettings();
   const reservation = useReservation(reservationId);
   const update = useUpdateReservation(reservationId);
@@ -61,31 +61,40 @@ export function ReservationFormPage() {
   });
   const startAt = watch('startAt');
   const endAt = watch('endAt');
-
-  useEffect(() => {
-    if (reservation.data) {
-      reset({
-        roomId: reservation.data.room.id,
-        applicantName: reservation.data.applicantName,
-        applicantEmail: reservation.data.applicantEmail || '',
-        applicantPhone: reservation.data.applicantPhone || '',
-        purpose: reservation.data.purpose,
-        startAt: toServiceDateTimeLocal(reservation.data.startAt),
-        endAt: toServiceDateTimeLocal(reservation.data.endAt),
-        status: reservation.data.status,
-        memo: '',
-        showApplicantName: reservation.data.source === 'PUBLIC_FORM'
-          ? false
-          : reservation.data.showApplicantName,
-      });
+  const selectedRoomId = watch('roomId');
+  const roomOptions = useMemo(() => {
+    const options = (rooms.data || []).map((room) => ({
+      id: room.id,
+      name: room.name,
+      enabled: room.enabled,
+    }));
+    const currentRoom = reservation.data?.room;
+    if (currentRoom && !options.some((room) => room.id === currentRoom.id)) {
+      options.unshift({ id: currentRoom.id, name: currentRoom.name, enabled: false });
     }
-  }, [reservation.data, reset]);
+    return options;
+  }, [reservation.data?.room, rooms.data]);
+  const selectedRoomUnavailable = roomOptions.some(
+    (room) => room.id === selectedRoomId && !room.enabled,
+  );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!reservation.data) return;
-    if (!rooms.data?.some((room) => room.id === reservation.data?.room.id)) return;
-    setValue('roomId', reservation.data.room.id);
-  }, [reservation.data, rooms.data, setValue]);
+    reset({
+      roomId: reservation.data.room.id,
+      applicantName: reservation.data.applicantName,
+      applicantEmail: reservation.data.applicantEmail || '',
+      applicantPhone: reservation.data.applicantPhone || '',
+      purpose: reservation.data.purpose,
+      startAt: toServiceDateTimeLocal(reservation.data.startAt),
+      endAt: toServiceDateTimeLocal(reservation.data.endAt),
+      status: reservation.data.status,
+      memo: '',
+      showApplicantName: reservation.data.source === 'PUBLIC_FORM'
+        ? false
+        : reservation.data.showApplicantName,
+    });
+  }, [reservation.data, reset]);
 
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {
@@ -131,9 +140,11 @@ export function ReservationFormPage() {
     });
   }
 
-  if (reservation.isLoading || settings.isLoading) return <LoadingState />;
+  if (reservation.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
   if (reservation.isError) return <ErrorState error={reservation.error} />;
   if (settings.isError) return <ErrorState error={settings.error} />;
+  if (rooms.isError) return <ErrorState error={rooms.error} />;
+  if (!reservation.data || !rooms.data) return <LoadingState />;
 
   const mutationError = update.error;
   const isPending = update.isPending;
@@ -162,12 +173,17 @@ export function ReservationFormPage() {
           예약 공간
           <select data-testid="reservation-room-select" {...register('roomId', { required: '예약 공간을 선택해 주세요.' })}>
             <option value="">선택</option>
-            {rooms.data?.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
+            {roomOptions.map((room) => (
+              <option key={room.id} value={room.id} disabled={!room.enabled}>
+                {room.name}{room.enabled ? '' : ' (예약 대상 제외)'}
               </option>
             ))}
           </select>
+          {selectedRoomUnavailable ? (
+            <span className="field-error" role="status">
+              현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.
+            </span>
+          ) : null}
           {errors.roomId ? <span className="field-error">{errors.roomId.message}</span> : null}
         </label>
         <ReservationTimeRangeInput
@@ -253,7 +269,7 @@ export function ReservationFormPage() {
             type="submit"
             className="primary-button"
             data-testid="reservation-save-button"
-            disabled={isPending}
+            disabled={isPending || selectedRoomUnavailable}
           >
             {isPending ? '저장 중...' : '저장'}
           </button>

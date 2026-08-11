@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -89,17 +89,27 @@ export function PublicReservationEditPage() {
   });
   const startAt = watch('startAt');
   const endAt = watch('endAt');
+  const selectedRoomId = watch('roomId');
+  const roomOptions = useMemo(() => {
+    const options = (rooms.data || []).map((room) => ({
+      id: room.id,
+      name: room.name,
+      enabled: true,
+    }));
+    const currentRoom = verifiedReservation?.room;
+    if (currentRoom && !options.some((room) => room.id === currentRoom.id)) {
+      options.unshift({ id: currentRoom.id, name: currentRoom.name, enabled: false });
+    }
+    return options;
+  }, [rooms.data, verifiedReservation?.room]);
+  const selectedRoomUnavailable = roomOptions.some(
+    (room) => room.id === selectedRoomId && !room.enabled,
+  );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!verifiedReservation) return;
     reset(valuesFromReservation(verifiedReservation));
   }, [reset, verifiedReservation]);
-
-  useEffect(() => {
-    if (!verifiedReservation) return;
-    if (!rooms.data?.some((room) => room.id === verifiedReservation.room.id)) return;
-    setValue('roomId', verifiedReservation.room.id);
-  }, [rooms.data, setValue, verifiedReservation]);
 
   useEffect(() => {
     if (!routeState?.verifiedReservation) return;
@@ -155,21 +165,32 @@ export function PublicReservationEditPage() {
     update.mutate(
       payload,
       {
-        onSuccess: () => {
+        onSuccess: (updated) => {
           setSuccessMessage(
             previousStatus === 'CONFIRMED'
               ? '수정 완료. 다시 승인 대기로 변경되었습니다.'
               : '수정 완료. 승인 대기 상태를 유지합니다.',
           );
-          setVerifiedReservation((current) => current ? { ...current, ...values, status: 'REQUESTED' } : current);
+          setVerifiedReservation((current) => current ? {
+            ...current,
+            room: updated.room,
+            applicantName: values.applicantName,
+            applicantEmail: values.applicantEmail,
+            applicantPhone: values.applicantPhone,
+            purpose: values.purpose,
+            startAt: updated.startAt,
+            endAt: updated.endAt,
+            status: updated.status,
+          } : current);
         },
       },
     );
   }
 
-  if (detail.isLoading || settings.isLoading) return <LoadingState />;
+  if (detail.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
   if (detail.isError) return <ErrorState error={detail.error} />;
   if (settings.isError) return <ErrorState error={settings.error} />;
+  if (rooms.isError) return <ErrorState error={rooms.error} />;
   if (!detail.data) return null;
 
   const reservation = detail.data;
@@ -237,12 +258,17 @@ export function PublicReservationEditPage() {
             예약 공간
             <select data-testid="public-edit-room-select" {...register('roomId', { required: '예약 공간을 선택해 주세요.' })}>
               <option value="">선택</option>
-              {rooms.data?.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.name}
+              {roomOptions.map((room) => (
+                <option key={room.id} value={room.id} disabled={!room.enabled}>
+                  {room.name}{room.enabled ? '' : ' (예약 대상 제외)'}
                 </option>
               ))}
             </select>
+            {selectedRoomUnavailable ? (
+              <span className="field-error" role="status">
+                현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.
+              </span>
+            ) : null}
             {errors.roomId ? <span className="field-error">{errors.roomId.message}</span> : null}
           </label>
           <ReservationTimeRangeInput
@@ -302,7 +328,12 @@ export function PublicReservationEditPage() {
             <button type="button" className="ghost-button" onClick={() => navigate(reservationDetailPath)}>
               취소
             </button>
-            <button type="submit" className="primary-button" disabled={update.isPending} data-testid="public-edit-save-button">
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={update.isPending || selectedRoomUnavailable}
+              data-testid="public-edit-save-button"
+            >
               {update.isPending ? '저장 중...' : '수정 저장'}
             </button>
           </div>

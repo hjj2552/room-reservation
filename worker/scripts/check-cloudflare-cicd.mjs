@@ -9,7 +9,7 @@ const requiredFragments = [
   "if: github.event_name == 'push' && github.ref == 'refs/heads/main'",
   "- worker-frontend-e2e",
   "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
-  "CLOUDFLARE_PAGES_PROJECT_NAME: ${{ secrets.CLOUDFLARE_PAGES_PROJECT_NAME }}",
+  "CLOUDFLARE_PRODUCTION_ORIGIN: ${{ secrets.CLOUDFLARE_PRODUCTION_ORIGIN }}",
   "CLOUDFLARE_WORKER_NAME: ${{ secrets.CLOUDFLARE_PRODUCTION_WORKER_NAME }}",
   "CLOUDFLARE_INGRESS_RATE_LIMIT_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_PRODUCTION_INGRESS_RATE_LIMIT_NAMESPACE_ID }}",
   "CLOUDFLARE_READ_RATE_LIMIT_NAMESPACE_ID: ${{ secrets.CLOUDFLARE_PRODUCTION_READ_RATE_LIMIT_NAMESPACE_ID }}",
@@ -22,8 +22,9 @@ const requiredFragments = [
   "run: npm run migrate:production:preflight",
   "run: npm run migrate:production:apply",
   "run: npm run migrate:production:verify",
+  "run: npm run build",
+  "run: npm run artifact:manifest",
   "run: npm run deploy:production",
-  "run: npm run deploy:pages:production",
   "run: npm run deploy:smoke:production",
 ];
 for (const fragment of requiredFragments) assert.equal(workflow.includes(fragment), true, fragment);
@@ -48,11 +49,12 @@ assert.equal(
     < workflow.indexOf("run: npm run deploy:production"),
   true,
 );
-assert.equal(workflow.indexOf("run: npm run deploy:production") < workflow.indexOf("run: npm run deploy:pages:production"), true);
 assert.equal(
-  workflow.indexOf("run: npm run deploy:pages:production")
+  workflow.indexOf("run: npm run deploy:production")
     < workflow.indexOf("run: npm run deploy:smoke:production"),
   true,
 );
+assert.equal(workflow.includes("deploy:pages:production"), false);
+assert.equal(workflow.includes("test:functions"), false);
 
 process.stdout.write("Cloudflare production CI/CD workflow contract verified.\n");

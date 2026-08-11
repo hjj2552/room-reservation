@@ -13,7 +13,7 @@ Windows와 PowerShell을 기준으로 문서화한 이유는 현재 이 저장�
 ```text
 room-reservation/
   worker/                 # Cloudflare Worker/Hono API
-  frontend/               # React/Vite SPA와 Pages API proxy
+  frontend/               # React/Vite SPA와 Worker Static Assets source
   docs/
   docker-compose.yml      # 로컬 Worker PostgreSQL
   start-worker.bat
@@ -69,12 +69,11 @@ npm.cmd run test:isolated-postgres
 npm.cmd run build
 ```
 
-프런트엔드 Pages proxy test와 production build:
+프런트엔드 production build:
 
 ```powershell
 cd <repo>\frontend
 npm.cmd ci
-npm.cmd run test:functions
 npm.cmd run build
 ```
 
@@ -91,8 +90,8 @@ E2E가 만든 데이터는 `testing-` 표식을 사용하며 suite 전후 id 기
 
 `.github/workflows/ci.yml`은 다음 두 검증 job을 배포 전에 요구합니다.
 
-- `worker-validation`: Worker 검사, unit/contract test, 격리 PostgreSQL test, dry-run build와 dependency audit
-- `worker-frontend-e2e`: Pages proxy test, 프런트엔드 build와 Worker 기반 전체 Playwright E2E
+- `worker-validation`: Worker 검사, unit/contract test, 격리 PostgreSQL test와 dependency audit
+- `worker-frontend-e2e`: 프런트엔드 build, combined Static Assets Worker dry-run과 Worker 기반 전체 Playwright E2E
 
 `main` push의 production 배포는 두 검증 중 Worker E2E 경로가 성공한 뒤에만 실행됩니다.
 

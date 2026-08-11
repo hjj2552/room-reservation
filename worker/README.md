@@ -1,6 +1,6 @@
 # Room Reservation Worker
 
-현재 production API를 제공하는 Cloudflare Worker 구현이다.
+현재 React Static Assets와 `/api/*` production API를 한 version으로 제공하는 Cloudflare Worker 구현이다.
 
 프로젝트 전체 문서의 현재 기준과 역사적 검증 기록 구분은 [`docs/README.md`](../docs/README.md)를 따른다.
 
@@ -12,7 +12,7 @@
 - `src/http`: Hono route, session cookie, CSRF, 오류 응답
 - `src/index.ts`: Worker composition root
 - `migrations/001_worker_baseline_v1.ts`: 빈 PostgreSQL용 Worker baseline V1
-- `scripts`: migration, 격리 PostgreSQL/E2E, artifact provenance 도구
+- `scripts`: migration, 격리 PostgreSQL/E2E, Static Assets 배포와 artifact provenance 도구
 
 Hono는 HTTP 경계에서만 사용한다. 일반 query는 Neon HTTP를 사용하고, 중간 결과에 따라 다음 statement가 달라지는 transaction은 요청 범위 WebSocket `Client`로 `BEGIN`/`COMMIT`/`ROLLBACK` 후 항상 연결을 닫는다.
 
@@ -68,9 +68,12 @@ $env:P4_UAT_ROLE='<expected-disposable-branch-role>'
 npm.cmd run uat:prepare
 ```
 
-Worker 배포 이름과 Cloudflare Rate Limiting namespace ID는 저장소에 넣지 않는다. 대상 환경에 맞는 값을 현재 shell에만 주입한 뒤 환경별 wrapper를 사용한다. 값이 없거나 양의 정수 형식이 아니거나 namespace가 중복되면 Wrangler 실행 전에 실패한다.
+먼저 `frontend`에서 표준 Vite production build를 생성한다. Worker 배포 이름과 Cloudflare Rate Limiting namespace ID는 저장소에 넣지 않는다. 대상 환경에 맞는 값을 현재 shell에만 주입한 뒤 환경별 wrapper를 사용한다. 값이 없거나 양의 정수 형식이 아니거나 namespace가 중복되면 Wrangler 실행 전에 실패한다.
 
 ```powershell
+cd ..\frontend
+npm.cmd run build
+cd ..\worker
 $env:CLOUDFLARE_WORKER_NAME='<worker-name>'
 $env:CLOUDFLARE_INGRESS_RATE_LIMIT_NAMESPACE_ID='<ingress-rate-limit-namespace-id>'
 $env:CLOUDFLARE_READ_RATE_LIMIT_NAMESPACE_ID='<read-rate-limit-namespace-id>'
@@ -78,7 +81,7 @@ $env:CLOUDFLARE_WRITE_RATE_LIMIT_NAMESPACE_ID='<write-rate-limit-namespace-id>'
 npm.cmd run deploy:uat
 ```
 
-UAT Worker는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음으로 배포하고 공개 URL을 만들지 않는다. Pages는 기존 프로젝트의 새 preview deployment만 만들고 `API_BACKEND` Service Binding을 exact UAT Worker에 연결한다. `API_PROXY_TRANSPORT=service-binding`을 명시하며 `BACKEND_ORIGIN` fallback을 사용하지 않는다. 배포 전 project-level preview 설정을 snapshot하고 테스트 후 정확히 복원한 뒤 production과 preview 설정을 모두 재확인한다. production Pages 변수·deployment·domain은 변경하지 않는다.
+UAT Worker는 `workers_dev=true`, `preview_urls=false`, route/custom domain 없음으로 배포한다. `frontend/dist`, Worker code와 bindings는 한 version으로 배포된다. SPA fallback을 사용하며 `/api`와 `/api/*`만 Worker code를 먼저 실행한다. HTML, JavaScript, CSS와 font는 asset-first 경로다. Production Worker와 기존 Pages는 UAT 중 변경하지 않는다.
 
 UAT Worker에는 환경변수로 전달한 다음 세 namespace만 연결된다.
 
@@ -88,16 +91,17 @@ UAT Worker에는 환경변수로 전달한 다음 세 namespace만 연결된다.
 
 production namespace 값은 별도 운영 환경변수로만 관리하며 UAT에서 호출하지 않는다. INGRESS는 인증 여부와 무관하게 세션 DB 조회 전에 적용하고, 인증 관리자는 그 뒤의 READ/WRITE만 우회한다. `ROOM-SESSION`은 43자 padding 없는 base64url 형식일 때만 DB 조회 후보로 인정한다. 실제 Cloudflare 제한은 위치별 eventually consistent이므로 원격 검증은 정확한 601/121/25번째가 아니라 burst에서 429가 발생하고 60초 후 복구되는지를 확인한다. exact 경계와 내부 호출 0회는 deterministic unit test가 담당한다.
 
-전체 원격 E2E는 preview URL과 이중 확인 flag를 모두 요구한다.
+전체 원격 E2E는 exact disposable Worker origin과 이중 확인 flag를 모두 요구한다.
 
 ```powershell
 $env:P4_UAT_CONFIRM_DISPOSABLE='true'
-$env:CLOUDFLARE_PAGES_PROJECT_NAME='<pages-project-name>'
-$env:P4_UAT_PAGES_URL='https://<deployment>.<pages-project-name>.pages.dev/'
+$env:CLOUDFLARE_WORKER_NAME='<disposable-uat-worker-name>'
+$env:CLOUDFLARE_UAT_ORIGIN='https://<disposable-uat-worker-name>.<workers-dev-subdomain>.workers.dev/'
+npm.cmd run test:uat-static-assets
 npm.cmd run test:uat-e2e
 ```
 
-script는 production 형태의 `<project>.pages.dev` URL을 거부한다. 테스트는 Pages preview → `API_BACKEND` Service Binding → UAT Worker 경로만 사용하며 공개 Worker URL을 사용하지 않는다. 테스트 종료 후 cleanup preview가 0건이어야 하며, 배포 정리는 exact Worker/Pages deployment와 disposable Neon 대상만 수행한다.
+script는 입력 origin의 첫 label이 exact UAT Worker 이름과 일치하는 HTTPS `workers.dev` URL만 허용한다. 테스트 종료 후 cleanup preview가 0건이어야 하며, 배포 정리는 exact disposable Worker와 Neon 대상만 수행한다.
 
 ## Artifact와 baseline 동일성
 
@@ -107,4 +111,4 @@ script는 production 형태의 `<project>.pages.dev` URL을 거부한다. 테스
 npm.cmd run artifact:manifest
 ```
 
-receipt의 `gitCommit`, Worker bundle SHA-256, baseline migration SHA-256, 결합 candidate SHA-256을 배포 기록에 함께 보관한다. receipt는 build 결과이므로 Git에 커밋하지 않는다. production 변경 후보는 배포 직전 같은 commit에서 다시 생성하고, UAT에서 검증한 receipt와 일치할 때만 배포한다.
+receipt의 `gitCommit`, Worker bundle과 Static Assets의 SHA-256·파일 수·크기, baseline migration SHA-256, 결합 candidate SHA-256을 배포 기록에 함께 보관한다. receipt는 build 결과이므로 Git에 커밋하지 않는다. production 변경 후보는 배포 직전 같은 commit에서 다시 생성하고, UAT에서 검증한 receipt와 일치할 때만 배포한다.

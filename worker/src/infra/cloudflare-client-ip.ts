@@ -1,4 +1,4 @@
-export const TRUSTED_CLIENT_IP_HEADER = "X-Room-Reservation-Client-IP";
+export const CLOUDFLARE_CLIENT_IP_HEADER = "CF-Connecting-IP";
 
 function isIpv4(value: string): boolean {
   const parts = value.split(".");
@@ -19,9 +19,9 @@ function isIpv6(value: string): boolean {
   }
 }
 
-export class TrustedProxyClientIpProvider {
+export class CloudflareClientIpProvider {
   getClientIp(request: Request): string | null {
-    const value = request.headers.get(TRUSTED_CLIENT_IP_HEADER)?.trim();
+    const value = request.headers.get(CLOUDFLARE_CLIENT_IP_HEADER)?.trim();
     if (!value || (!isIpv4(value) && !isIpv6(value))) return null;
     return value;
   }

@@ -344,6 +344,30 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   }
 });
 
+test('reservation edit replaces an inactive current room without getting stuck loading', async ({ page, request, e2eData }) => {
+  await loginByApi(request);
+  const inactiveRoom = await e2eData.createTestRoom('reservation-edit-inactive-current');
+  const replacementRoom = await e2eData.createTestRoom('reservation-edit-active-replacement');
+  const reservation = await e2eData.createTestReservation(inactiveRoom.id, 'reservation-edit-inactive-room');
+  await e2eData.setTestRoomEnabled(inactiveRoom.id, false);
+
+  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+
+  const roomSelect = page.getByTestId('reservation-room-select');
+  await expect(roomSelect).toBeVisible();
+  await expect(roomSelect).toHaveValue(inactiveRoom.id);
+  await expect(roomSelect.locator(`option[value="${inactiveRoom.id}"]`)).toHaveAttribute('disabled', '');
+  await expect(page.getByText('현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.')).toBeVisible();
+  await expect(page.getByTestId('reservation-save-button')).toBeDisabled();
+
+  await roomSelect.selectOption(replacementRoom.id);
+  await expect(page.getByTestId('reservation-save-button')).toBeEnabled();
+  await page.getByTestId('reservation-save-button').click();
+
+  await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
+  await expect(page.locator('.reservation-detail-main')).toContainText(replacementRoom.name);
+});
+
 test('reservation edit: no-op save closes without an update while a memo-only save persists', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('reservation-no-op-room');

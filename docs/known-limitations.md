@@ -164,7 +164,7 @@ Worker 통합 테스트는 다음 영역을 다룹니다.
 
 ## 저장소 밖에서 관리해야 하는 운영 정보
 
-배포 구조는 Cloudflare Pages → private Worker Service Binding → Neon PostgreSQL로 확정되어 있습니다. 다음 값과 절차는 보안·조직별 차이 때문에 저장소 문서에 실제 내용을 기록하지 않고 별도 운영 인수 문서에서 관리해야 합니다.
+배포 구조는 public Cloudflare Worker의 Static Assets와 `/api/*` → Neon PostgreSQL로 확정되어 있습니다. 다음 값과 절차는 보안·조직별 차이 때문에 저장소 문서에 실제 내용을 기록하지 않고 별도 운영 인수 문서에서 관리해야 합니다.
 
 - 운영 서버 URL과 접속 경로
 - 운영 관리자 계정 발급/회수 절차

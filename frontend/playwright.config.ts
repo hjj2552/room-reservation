@@ -1,11 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const remoteE2e = process.env.E2E_REMOTE === 'true';
+
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30_000,
+  timeout: remoteE2e ? 60_000 : 30_000,
   workers: 1,
   expect: {
-    timeout: 8_000,
+    timeout: remoteE2e ? 15_000 : 8_000,
   },
   fullyParallel: false,
   reporter: [['list'], ['html', { open: 'never' }]],

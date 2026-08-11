@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 
 export const WRANGLER_PLACEHOLDERS = Object.freeze({
   workerName: "<worker-name>",
+  staticAssetsDirectory: "<static-assets-directory>",
   ingressNamespaceId: "<ingress-rate-limit-namespace-id>",
   readNamespaceId: "<read-rate-limit-namespace-id>",
   writeNamespaceId: "<write-rate-limit-namespace-id>",
@@ -58,11 +59,18 @@ export function deploymentValuesFromEnv(env = process.env) {
   return values;
 }
 
-export function materializeWranglerConfig(template, environment, values, mainPath) {
+export function materializeWranglerConfig(template, environment, values, mainPath, staticAssetsDirectory) {
   if (environment !== "uat" && environment !== "production") {
     throw new Error("Worker environment must be uat or production");
   }
   const config = structuredClone(template);
+  if (config.assets?.directory !== WRANGLER_PLACEHOLDERS.staticAssetsDirectory) {
+    throw new Error("Wrangler assets.directory is not the expected placeholder");
+  }
+  if (!staticAssetsDirectory?.trim()) {
+    throw new Error("Static assets directory is required");
+  }
+  config.assets.directory = staticAssetsDirectory;
   const selected = config.env?.[environment];
   if (!selected) throw new Error(`Wrangler template is missing env.${environment}`);
   if (selected.name !== WRANGLER_PLACEHOLDERS.workerName) {

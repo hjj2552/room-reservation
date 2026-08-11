@@ -188,9 +188,9 @@ Hono를 사용하더라도 라우팅과 HTTP 변환 계층에 한정한다. 제�
 
 P3 결과에 따라 1차 마이그레이션에서는 기존 Cloudflare Pages Function `/api` reverse proxy를 유지한다. production Pages domain에 direct Worker route를 추가하지 않는다. 프런트의 same-origin `/api` 호출 계약은 변경하지 않는다.
 
-### 안정화 이후
+### 안정화 이후 통합 결정
 
-Worker 백엔드가 안정화되면 프런트엔드도 Workers Static Assets 등으로 통합하는 방안을 별도로 검토한다.
+위 1차 마이그레이션 구조는 당시 P3/P4의 단계적 전환 계약이다. 안정화 후속 작업에서 Workers Static Assets 통합을 승인·채택한다. `frontend`와 `worker` 소스는 분리한 채 표준 Vite `frontend/dist`, `/api/*` Worker code와 bindings를 하나의 Worker version으로 원자적으로 배포한다. 브라우저의 상대 `/api` 계약은 유지한다.
 
 검토 기준은 다음과 같다.
 
@@ -202,7 +202,7 @@ Worker 백엔드가 안정화되면 프런트엔드도 Workers Static Assets 등
 - Pages Function proxy 제거 가능성
 - 프런트·백엔드 단일 진입점의 장단점
 
-기존 경험상 Worker 통합을 우선적인 후속 방향으로 고려하지만 1차 백엔드 마이그레이션 범위에는 포함하지 않는다.
+SPA deep link는 `single-page-application` fallback을 사용하고, selective `run_worker_first`는 `/api`와 `/api/*`에만 적용한다. HTML, JavaScript, CSS와 font asset 요청은 Worker code를 실행하지 않는 asset-first 경로로 둔다. Pages Function proxy, `API_BACKEND`, `API_PROXY_TRANSPORT`와 production `BACKEND_ORIGIN`은 통합 배포 경로에서 제거한다. 기존 Pages 프로젝트는 전환 검증 후 별도 승인 전까지 이전 프런트와 rollback 진입점으로 보존하지만, 같은 production Worker를 호출하므로 새 Worker 배포 이후의 독립적인 API fallback으로 간주하지 않는다. 실제 rollback은 전환 전 확인한 안정 Worker version을 복원한 뒤 기존 Pages 경로를 smoke하는 절차로 수행한다.
 
 ## 7. 시간 정책
 
@@ -505,7 +505,7 @@ Cloudflare binding은 정확한 token 수나 해제 시점을 제공하지 않�
 
 `INGRESS` 600/60초는 위조 세션 cookie를 포함한 과도한 요청이 세션 DB 조회에 도달하지 못하게 하는 높은 인프라 안전 상한이며 제품별 제한이 아니다. 세션 발급·관리자 로그인·예약 비밀번호·경로별 limiter, Neon rate-limit table, Durable Objects, KV, isolate-local memory와 WAF 규칙은 추가하지 않는다.
 
-브라우저는 기존처럼 Pages same-origin `/api`를 호출한다. production Pages Function은 공개 `BACKEND_ORIGIN`이 아니라 `API_BACKEND` Service Binding으로 backend Worker를 호출한다. Pages Function은 사용자가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 제거하고 Pages ingress의 `CF-Connecting-IP`만 `X-Room-Reservation-Client-IP`로 덮어쓴다. backend Worker는 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음으로 두고 이 Service Binding에서만 도달 가능하게 한다. 따라서 별도 HMAC 또는 proxy secret은 추가하지 않는다.
+후속 Static Assets 통합에서는 public Worker가 same-origin 화면과 `/api`를 함께 제공한다. HTTP/infrastructure adapter는 Cloudflare edge가 제공한 `CF-Connecting-IP`만 신뢰하고 사용자가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 무시한다. Worker core/application에는 Cloudflare header를 노출하지 않는다. Worker는 `workers_dev=true`, `preview_urls=false`, route/custom domain 없음으로 두며 별도 proxy secret은 추가하지 않는다.
 
 Worker core/application은 `RateLimiter`와 `ClientIpProvider` 포트만 알고 Cloudflare binding과 내부 header는 어댑터에 격리한다. 처리 순서는 신뢰 IP 확인, INGRESS limiter, 정상 형식의 session cookie만 session 조회, 관리자 판정, 비관리자 READ/WRITE limiter, 기존 CSRF, body/password/Neon 처리다. production에서 신뢰 IP가 없거나 어떤 binding 호출이라도 실패하면 세션 조회·제품 Neon query·bcrypt 전에 `RATE_LIMIT_UNAVAILABLE` 서버 의존성 오류로 fail closed한다. 로그에는 환경과 정책·경로·method만 남기며 IP, session token, session hash, password와 CSRF token 원문을 남기지 않는다.
 
@@ -773,9 +773,9 @@ Worker 백엔드 교체와 실제 Go-Live는 서로 다른 단계로 구분한�
 공개 예약 접수를 활성화하기 전에는 추가로 다음을 확인한다.
 
 - 14절의 공개 API rate limit과 429 응답 계약 구현·검증 완료
-- Pages `API_BACKEND` Service Binding에서 backend Worker로 전달되는 클라이언트 IP의 인증된 신뢰 경계 확인
-- 클라이언트가 주입한 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 모두 제거하고 Pages ingress 값으로 덮어씀
-- production Worker의 `workers_dev=false`, `preview_urls=false`, route/custom domain 없음 확인
+- public Worker가 Cloudflare edge의 `CF-Connecting-IP`만 client IP로 신뢰하는 경계 확인
+- 클라이언트가 주입한 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`가 limiter key를 바꾸지 못함을 확인
+- production Worker의 `workers_dev=true`, `preview_urls=false`, route/custom domain 없음 확인
 - UAT와 production INGRESS/READ/WRITE namespace 여섯 개가 모두 분리됐는지 확인
 - 위조 session cookie가 세션 조회 전에 INGRESS guard를 통과해야 하고 형식 오류 cookie는 DB 조회 후보가 아닌지 확인
 
@@ -883,6 +883,8 @@ P3 결과로 다음을 확정한다.
 - 1차 마이그레이션에서 기존 Pages Function `/api` proxy 유지
 - 공개 예약 비밀번호는 printable ASCII 4~64자와 `pgcrypto` bcrypt cost 12 사용
 - rate limit은 P4 완료 조건에서 제외하고 실제 Go-Live 전 필수 보안 gate로 이전
+
+위 목록의 Pages Function 항목은 1차 마이그레이션 당시 결정이다. 안정화 후속 배포에서는 6절의 Workers Static Assets 통합 결정으로 대체한다.
 
 제품 정책과 외부 API 동작은 원칙적으로 P3 기술 선택을 이유로 변경하지 않는다. 단, 14절의 공개 예약 비밀번호 정책은 기존 bcrypt 72-byte 잠재 문제를 해결하기 위해 사용자가 명시적으로 승인한 예외다.
 
@@ -996,7 +998,7 @@ P3에서 기술적으로 현행 계약을 유지할 수 없는 항목이 발견�
 
 실제 Go-Live는 2026년 9월에 별도 최종 확인 후 공개 예약 접수를 활성화하는 시점이다.
 
-INGRESS 600과 기존 READ 120/WRITE 24 수치, 429, `RATE_LIMIT_EXCEEDED`, `Retry-After`, Service Binding 기반 클라이언트 IP 판정, 세션 조회 전 보호 순서와 isolate-local memory 비의존 여부는 P4 핵심 재작성과 분리된 실제 Go-Live 전 필수 완료 조건이다. 구현과 UAT가 끝나더라도 별도 전환 작업에서 production binding·Pages 설정과 최종 smoke를 확인하기 전에는 공개 예약 접수를 활성화하지 않는다.
+INGRESS 600과 기존 READ 120/WRITE 24 수치, 429, `RATE_LIMIT_EXCEEDED`, `Retry-After`, direct `CF-Connecting-IP` 판정, 세션 조회 전 보호 순서와 isolate-local memory 비의존 여부는 실제 Go-Live 전 필수 완료 조건이다. 구현과 UAT가 끝나더라도 별도 전환 작업에서 combined production Worker와 최종 same-origin smoke를 확인하기 전에는 공개 예약 접수를 활성화하지 않는다.
 
 ## 23. 변경 통제
 

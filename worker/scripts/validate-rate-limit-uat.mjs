@@ -1,3 +1,5 @@
+import { disposableUatOriginFromEnv } from "./cloudflare-uat-origin.mjs";
+
 const mode = process.argv[2];
 if (
   mode !== "saturate"
@@ -10,39 +12,7 @@ if (
     "Use validate-rate-limit-uat.mjs with saturate, saturate-read, recover, saturate-ingress, or recover-ingress",
   );
 }
-if (process.env.P4_UAT_CONFIRM_DISPOSABLE !== "true") {
-  throw new Error("P4_UAT_CONFIRM_DISPOSABLE must be exactly true");
-}
-
-const pagesProjectName = process.env.CLOUDFLARE_PAGES_PROJECT_NAME?.trim();
-if (!pagesProjectName) {
-  throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME is required");
-}
-if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(pagesProjectName)) {
-  throw new Error("CLOUDFLARE_PAGES_PROJECT_NAME must be a valid Pages project name");
-}
-
-const input = process.env.P4_UAT_PAGES_URL;
-if (!input) throw new Error("P4_UAT_PAGES_URL is required");
-const pagesUrl = new URL(input);
-const productionHostname = `${pagesProjectName}.pages.dev`;
-const previewHostnameSuffix = `.${productionHostname}`;
-const previewDeployment = pagesUrl.hostname.endsWith(previewHostnameSuffix)
-  ? pagesUrl.hostname.slice(0, -previewHostnameSuffix.length)
-  : "";
-if (
-  pagesUrl.protocol !== "https:"
-  || pagesUrl.pathname !== "/"
-  || pagesUrl.search
-  || pagesUrl.hash
-  || pagesUrl.hostname === productionHostname
-  || !previewDeployment
-  || previewDeployment.includes(".")
-) {
-  throw new Error("P4_UAT_PAGES_URL must be the exact disposable Pages preview origin");
-}
-
-const origin = pagesUrl.origin;
+const origin = disposableUatOriginFromEnv();
 
 function cookieHeader(response) {
   return response.headers.getSetCookie()
@@ -51,8 +21,11 @@ function cookieHeader(response) {
 }
 
 async function loginAdmin() {
+  const adminUsername = process.env.P4_UAT_ADMIN_USERNAME;
   const adminPassword = process.env.P4_UAT_ADMIN_PASSWORD;
-  if (!adminPassword) throw new Error("P4_UAT_ADMIN_PASSWORD is required for saturation mode");
+  if (!adminUsername || !adminPassword) {
+    throw new Error("P4_UAT_ADMIN_USERNAME and P4_UAT_ADMIN_PASSWORD are required for saturation mode");
+  }
   const csrfResponse = await fetch(`${origin}/api/auth/csrf`);
   if (csrfResponse.status !== 200) throw new Error(`CSRF issuance failed: ${csrfResponse.status}`);
   const csrf = await csrfResponse.json();
@@ -64,36 +37,53 @@ async function loginAdmin() {
       cookie,
       "X-XSRF-TOKEN": csrf.token,
     },
-    body: JSON.stringify({ username: "admin", password: adminPassword }),
+    body: JSON.stringify({ username: adminUsername, password: adminPassword }),
   });
   if (loginResponse.status !== 200) throw new Error(`Admin login failed: ${loginResponse.status}`);
   return cookie;
 }
 
-async function firstRateLimited(method, maximum) {
-  for (let requestNumber = 1; requestNumber <= maximum; requestNumber += 1) {
-    const response = await fetch(`${origin}/api/public/settings`, { method });
-    if (response.status === 429) {
-      const body = await response.json();
+async function verifyStaticAssetsRemainAvailable() {
+  const documentResponse = await fetch(`${origin}/`);
+  if (documentResponse.status !== 200) {
+    throw new Error(`Static document failed after API saturation: ${documentResponse.status}`);
+  }
+  const document = await documentResponse.text();
+  const assetPath = document.match(/(?:src|href)="(\/assets\/[^"]+)"/)?.[1];
+  if (!assetPath) throw new Error("Static document did not reference a build asset");
+  const assetResponse = await fetch(`${origin}${assetPath}`);
+  if (assetResponse.status !== 200) {
+    throw new Error(`Static build asset failed after API saturation: ${assetResponse.status}`);
+  }
+}
+
+async function observeProductLimit(method, maximum, batchSize = 60) {
+  for (let requestsAttempted = batchSize; requestsAttempted <= maximum; requestsAttempted += batchSize) {
+    const responses = await Promise.all(Array.from({ length: batchSize }, () => (
+      fetch(`${origin}/api/public/settings`, { method })
+    )));
+    const limitedResponse = responses.find((response) => response.status === 429);
+    if (limitedResponse) {
+      const body = await limitedResponse.json();
       if (
-        response.headers.get("Retry-After") !== "60"
+        limitedResponse.headers.get("Retry-After") !== "60"
         || body.code !== "RATE_LIMIT_EXCEEDED"
         || body.message !== "Too many requests. Please retry later."
         || body.details?.retryAfterSeconds !== 60
       ) {
         throw new Error("Remote 429 response contract mismatch");
       }
-      return requestNumber;
+      return;
     }
   }
-  throw new Error(`${method} burst did not produce 429 within ${maximum} requests`);
+  throw new Error(`${method} batches did not produce 429 within the bounded UAT attempt`);
 }
 
-async function observeIngressLimit(adminCookie, maximum, batchSize = 100) {
+async function observeIngressLimit(adminCookie, maximum, batchSize = 100, additionalHeaders = {}) {
   for (let requestsAttempted = batchSize; requestsAttempted <= maximum; requestsAttempted += batchSize) {
     const responses = await Promise.all(Array.from({ length: batchSize }, () => (
       fetch(`${origin}/api/public/settings`, {
-        headers: { cookie: adminCookie },
+        headers: { ...additionalHeaders, cookie: adminCookie },
       })
     )));
     const limitedResponse = responses.find((response) => response.status === 429);
@@ -112,7 +102,7 @@ async function observeIngressLimit(adminCookie, maximum, batchSize = 100) {
       ) {
         throw new Error("Remote ingress 429 response contract mismatch");
       }
-      return requestsAttempted;
+      return;
     }
   }
   throw new Error(`Authenticated ingress burst did not produce 429 within ${maximum} requests`);
@@ -120,23 +110,18 @@ async function observeIngressLimit(adminCookie, maximum, batchSize = 100) {
 
 if (mode === "saturate-ingress") {
   const adminCookie = await loginAdmin();
-  const requestsAttemptedBefore429Observation = await observeIngressLimit(adminCookie, 2400);
-  const forgedResponse = await fetch(`${origin}/api/public/settings`, {
-    headers: {
-      cookie: adminCookie,
+  await observeIngressLimit(adminCookie, 2400);
+  await observeIngressLimit(adminCookie, 300, 50, {
       "X-Forwarded-For": "192.0.2.200",
       "X-Room-Reservation-Client-IP": "192.0.2.201",
-    },
   });
-  if (forgedResponse.status !== 429) {
-    throw new Error(`Forged client-IP headers changed the saturated ingress bucket: ${forgedResponse.status}`);
-  }
+  await verifyStaticAssetsRemainAvailable();
   process.stdout.write(`${JSON.stringify({
-    serviceBindingPath: true,
+    staticAssetsWorkerPath: true,
     authenticatedAdminIngressLimited: true,
     ingress429Observed: true,
-    requestsAttemptedBefore429Observation,
     forgedHeadersIgnored: true,
+    staticAssetsUnaffected: true,
   })}\n`);
 } else if (mode === "recover-ingress") {
   const response = await fetch(`${origin}/api/public/settings`);
@@ -148,14 +133,13 @@ if (mode === "saturate-ingress") {
     status: response.status,
   })}\n`);
 } else if (mode === "saturate-read") {
-  const publicRead429At = await firstRateLimited("GET", 360);
+  await observeProductLimit("GET", 360);
   process.stdout.write(`${JSON.stringify({
     publicRead429Observed: true,
-    publicRead429At,
   })}\n`);
 } else if (mode === "saturate") {
   const adminCookie = await loginAdmin();
-  const publicRead429At = await firstRateLimited("GET", 360);
+  await observeProductLimit("GET", 360);
 
   const forgedResponse = await fetch(`${origin}/api/public/settings`, {
     headers: {
@@ -176,15 +160,15 @@ if (mode === "saturate-ingress") {
     }
   }
 
-  const publicWrite429At = await firstRateLimited("POST", 120);
+  await observeProductLimit("POST", 120);
+  await verifyStaticAssetsRemainAvailable();
   process.stdout.write(`${JSON.stringify({
-    serviceBindingPath: true,
+    staticAssetsWorkerPath: true,
     publicRead429Observed: true,
-    publicRead429At,
     publicWrite429Observed: true,
-    publicWrite429At,
     authenticatedAdminBypassRequests: 125,
     forgedHeadersIgnored: true,
+    staticAssetsUnaffected: true,
   })}\n`);
 } else {
   const read = await fetch(`${origin}/api/public/settings`);

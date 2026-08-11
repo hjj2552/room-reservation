@@ -1,6 +1,6 @@
 # room-reservation
 
-Cloudflare Worker 백엔드와 React 기반 프런트엔드로 구성된 공간 예약 MVP입니다.
+하나의 public Cloudflare Worker가 React Static Assets와 `/api/*` TypeScript API를 제공하고 Neon PostgreSQL에 연결하는 공간 예약 MVP입니다. `frontend`와 `worker` 소스는 분리되어 있으며 배포 시에만 하나의 Worker version으로 결합합니다.
 
 ## 문서
 
