@@ -1715,6 +1715,11 @@ button:disabled {
   text-align: right;
 }
 
+.reservation-list-results > .pagination,
+.reservation-list-results > .result-summary {
+  margin-top: var(--space-3);
+}
+
 .plain-badge {
   display: inline-flex;
   align-items: center;

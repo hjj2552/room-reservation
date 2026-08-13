@@ -209,6 +209,52 @@ for (const scenario of scenarios) {
   });
 }
 
+test('reservation list keeps 12px between its table and result controls', async ({ page, request }) => {
+  await loginByApi(request);
+  let releaseSinglePageResponse: (() => void) | undefined;
+  let markSinglePageRequestStarted: (() => void) | undefined;
+  const singlePageResponseGate = new Promise<void>((resolve) => { releaseSinglePageResponse = resolve; });
+  const singlePageRequestStarted = new Promise<void>((resolve) => { markSinglePageRequestStarted = resolve; });
+
+  await page.route('**/api/admin/reservations?**', async (route) => {
+    const url = new URL(route.request().url());
+    const singlePage = url.searchParams.get('keyword') === 'testing-one-page';
+    if (singlePage) {
+      markSinglePageRequestStarted?.();
+      await singlePageResponseGate;
+    }
+    await route.fulfill({
+      json: {
+        items: [reservationItem(singlePage ? 'one-page' : 'many-pages', 'testing-room-layout', '테스트 공간')],
+        page: 0,
+        size: 20,
+        totalItems: singlePage ? 1 : 21,
+        totalPages: singlePage ? 1 : 2,
+      },
+    });
+  });
+
+  await page.goto('/admin/reservations?keyword=testing-many-pages&page=0');
+  const results = page.getByTestId('reservation-list-results');
+  const tableWrap = results.locator(':scope > .table-wrap');
+  const pagination = results.locator(':scope > .pagination');
+  await expect(pagination).toBeVisible();
+  await expectVerticalGap(tableWrap, pagination, 12);
+
+  await page.getByTestId('reservation-keyword-filter').fill('testing-one-page');
+  await page.getByTestId('reservation-search-button').click();
+  await singlePageRequestStarted;
+  await expect(results).toHaveAttribute('aria-busy', 'true');
+  await expect(tableWrap).toBeVisible();
+  await expect(pagination).toBeVisible();
+
+  releaseSinglePageResponse?.();
+  await expect(results).toHaveAttribute('aria-busy', 'false');
+  const resultSummary = results.locator(':scope > .result-summary');
+  await expect(resultSummary).toBeVisible();
+  await expectVerticalGap(tableWrap, resultSummary, 12);
+});
+
 function pagedResponse(
   scenario: ListScenario,
   roomId: string,
@@ -326,4 +372,13 @@ async function rootScrollMetrics(page: Page) {
     hasVerticalOverflow: document.documentElement.scrollHeight > document.documentElement.clientHeight,
     scrollbarWidth: window.innerWidth - document.documentElement.clientWidth,
   }));
+}
+
+async function expectVerticalGap(first: Locator, second: Locator, expectedGap: number) {
+  const [firstBox, secondBox] = await Promise.all([first.boundingBox(), second.boundingBox()]);
+  if (!firstBox || !secondBox) throw new Error('Could not measure reservation result spacing.');
+  expect(
+    Math.abs(secondBox.y - (firstBox.y + firstBox.height) - expectedGap),
+    `expected ${expectedGap}px vertical gap`,
+  ).toBeLessThanOrEqual(1);
 }
