@@ -391,6 +391,8 @@ export function RecurrencesPage() {
               data-testid="recurrence-tag-select"
               name="tagId"
               value={form.tagId}
+              disabled={tags.isLoading || tags.isError}
+              aria-describedby={tags.isError ? 'recurrence-tag-error' : undefined}
               onChange={(event) => setForm((prev) => ({ ...prev, tagId: event.target.value }))}
             >
               <option value="">없음</option>
@@ -398,6 +400,16 @@ export function RecurrencesPage() {
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </select>
+            {tags.isError ? (
+              <span
+                id="recurrence-tag-error"
+                className="field-error"
+                role="alert"
+                data-testid="recurrence-tag-error"
+              >
+                태그 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+              </span>
+            ) : null}
           </label>
           <fieldset className="full-span checkbox-group">
             <legend>반복 요일</legend>

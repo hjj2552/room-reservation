@@ -408,7 +408,7 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
   }
 });
 
-test('recurrence form selects the 101st tag without changing tag management pagination', async ({ page }) => {
+test('recurrence form loads every tag page and surfaces later page failures', async ({ page }) => {
   const room = {
     id: 'testing-room-all-tags',
     name: 'Testing Room',
@@ -438,6 +438,7 @@ test('recurrence form selects the 101st tag without changing tag management pagi
   const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42 });
   const tags = Array.from({ length: 101 }, (_, index) => tag(index + 1));
   const tagRequests: string[] = [];
+  let failSecondTagPage = false;
 
   await page.route('**/api/public/settings', (route) => route.fulfill({ json: settings }));
   await page.route('**/api/auth/admin/me', (route) => route.fulfill({
@@ -463,6 +464,10 @@ test('recurrence form selects the 101st tag without changing tag management pagi
     tagRequests.push(url.search);
     const pageNumber = Number(url.searchParams.get('page'));
     const size = Number(url.searchParams.get('size'));
+    if (failSecondTagPage && size === 100 && pageNumber === 1) {
+      await route.fulfill({ status: 500, json: { message: 'testing-page-failure' } });
+      return;
+    }
     const items = size === 100
       ? tags.slice(pageNumber * size, (pageNumber + 1) * size)
       : tags.slice(0, size);
@@ -545,6 +550,17 @@ test('recurrence form selects the 101st tag without changing tag management pagi
   await page.goto('/admin/settings/tags');
   await expect(page.getByTestId('tags-table')).toBeVisible();
   expect(tagRequests).toEqual(['?page=0&size=20']);
+
+  await page.reload();
+  failSecondTagPage = true;
+  tagRequests.length = 0;
+  await page.goto('/admin/recurrences');
+  await expect(page.getByTestId('recurrence-tag-select')).toBeDisabled();
+  await expect(page.getByTestId('recurrence-tag-error')).toHaveText(
+    '태그 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
+  );
+  await expect(page.getByTestId('recurrence-tag-select')).toBeDisabled();
+  expect(tagRequests.filter((request) => request === '?page=1&size=100').length).toBeGreaterThan(0);
 });
 
 test('recurrence create can select a configured tag', async ({ page, request, e2eData }) => {
