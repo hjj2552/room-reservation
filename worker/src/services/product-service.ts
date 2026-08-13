@@ -1138,15 +1138,22 @@ export class ProductService {
   }
 
   async previewRecurrence(input: RecurrencePreviewCommand) {
+    const dates = datesInRange(input.startDate, input.endDate);
     if (input.startTime >= input.endTime) {
       validation("Start time must be before end time.");
     }
-    const { room, settings } = await this.roomAndSettings(input.roomId);
-    const candidates = datesInRange(input.startDate, input.endDate)
+    const candidates = dates
       .filter((date) => input.daysOfWeek.includes(weekdayCode(date)))
       .map((date) => ({ date, startAt: serviceOffsetDateTime(date, input.startTime), endAt: serviceOffsetDateTime(date, input.endTime) }));
-    const items = [];
-    for (const candidate of candidates) {
+    const { room, settings } = await this.roomAndSettings(input.roomId);
+    const items = candidates.map((candidate) => ({
+      ...candidate,
+      available: true,
+      reason: null as string | null,
+      message: null as string | null,
+    }));
+    const validCandidates: Array<typeof candidates[number] & { itemIndex: number }> = [];
+    for (const [itemIndex, candidate] of candidates.entries()) {
       const policyInput: ReservationInput = {
         roomId: input.roomId, applicantName: "recurrence-preview", applicantEmail: "preview@example.test",
         applicantPhone: input.applicantPhone, purpose: "recurrence-preview",
@@ -1154,17 +1161,39 @@ export class ProductService {
       };
       try {
         validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, policyInput, "ADMIN", this.now());
-        const overlap = await this.database.query(
-          `SELECT 1 FROM reservations WHERE room_id=$1 AND status IN ('REQUESTED','CONFIRMED')
-           AND start_at < $3::timestamptz AND end_at > $2::timestamptz LIMIT 1`,
-          [input.roomId, candidate.startAt, candidate.endAt],
-        );
-        items.push(overlap.rows[0]
-          ? { ...candidate, available: false, reason: "TIME_SLOT_CONFLICT", message: "Time slot is already reserved." }
-          : { ...candidate, available: true, reason: null, message: null });
+        validCandidates.push({ ...candidate, itemIndex });
       } catch (error) {
-        if (error instanceof AppError) items.push({ ...candidate, available: false, reason: error.code, message: error.message });
+        if (error instanceof AppError) {
+          items[itemIndex] = { ...candidate, available: false, reason: error.code, message: error.message };
+        }
         else throw error;
+      }
+    }
+    if (validCandidates.length > 0) {
+      const conflicts = await this.database.query(
+        `SELECT candidate.candidate_index::int AS candidate_index
+         FROM unnest($2::timestamptz[], $3::timestamptz[])
+           WITH ORDINALITY AS candidate(start_at, end_at, candidate_index)
+         WHERE EXISTS (
+           SELECT 1 FROM reservations reservation
+           WHERE reservation.room_id=$1
+             AND reservation.status IN ('REQUESTED','CONFIRMED')
+             AND reservation.start_at < candidate.end_at
+             AND reservation.end_at > candidate.start_at
+         )
+         ORDER BY candidate.candidate_index`,
+        [input.roomId, validCandidates.map((candidate) => candidate.startAt), validCandidates.map((candidate) => candidate.endAt)],
+      );
+      for (const row of conflicts.rows) {
+        const itemIndex = validCandidates[number(row, "candidate_index") - 1]?.itemIndex;
+        if (itemIndex !== undefined) {
+          items[itemIndex] = {
+            ...candidates[itemIndex]!,
+            available: false,
+            reason: "TIME_SLOT_CONFLICT",
+            message: "Time slot is already reserved.",
+          };
+        }
       }
     }
     const availableCount = items.filter((item) => item.available).length;

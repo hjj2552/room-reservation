@@ -138,6 +138,12 @@ export function RecurrencesPage() {
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const [successfulPreview, setSuccessfulPreview] = useState<SuccessfulPreview | null>(null);
   const [completedCreate, setCompletedCreate] = useState<CompletedCreate | null>(null);
+  const endDateMax = useMemo(() => {
+    const startDate = new Date(`${form.startDate}T00:00:00Z`);
+    if (Number.isNaN(startDate.getTime()) || startDate.toISOString().slice(0, 10) !== form.startDate) return undefined;
+    startDate.setUTCDate(startDate.getUTCDate() + 365);
+    return startDate.toISOString().slice(0, 10);
+  }, [form.startDate]);
   const defaultTimesAppliedRef = useRef(false);
   const previewRequestIdRef = useRef(0);
   const createInFlightRef = useRef(false);
@@ -362,6 +368,7 @@ export function RecurrencesPage() {
               name="endDate"
               type="date"
               value={form.endDate}
+              max={endDateMax}
               onChange={(event) => setForm((prev) => ({ ...prev, endDate: event.target.value }))}
               required
             />

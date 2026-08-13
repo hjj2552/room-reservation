@@ -1959,6 +1959,55 @@ describe("direct Worker contracts", () => {
     expect((await database.query("SELECT 1 FROM reservations WHERE purpose=$1", [body.purpose])).rows).toHaveLength(0);
     expect((await database.query("SELECT 1 FROM reservation_histories WHERE reservation_purpose=$1", [body.purpose])).rows).toHaveLength(0);
   });
+
+  it("batches recurrence conflicts while preserving cancelled and half-open boundaries", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurrence-batch");
+    const firstDate = new Date();
+    firstDate.setUTCDate(firstDate.getUTCDate() + 35);
+    while (firstDate.getUTCDay() !== 1) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
+    const dates = Array.from({ length: 4 }, (_, index) => {
+      const date = new Date(firstDate);
+      date.setUTCDate(date.getUTCDate() + index);
+      return date.toISOString().slice(0, 10);
+    });
+    await database.query(
+      `INSERT INTO reservations(
+         room_id,applicant_name,applicant_email,purpose,start_at,end_at,status,source,created_by_actor_type
+       ) VALUES
+         ($1,'testing-requested','testing-requested@example.test','testing-requested',$2,$3,'REQUESTED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-confirmed','testing-confirmed@example.test','testing-confirmed',$4,$5,'CONFIRMED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-cancelled','testing-cancelled@example.test','testing-cancelled',$6,$7,'CANCELLED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-touching','testing-touching@example.test','testing-touching',$8,$9,'CONFIRMED','ADMIN_MANUAL','ADMIN')`,
+      [
+        roomId,
+        `${dates[0]}T10:00:00+09:00`, `${dates[0]}T11:00:00+09:00`,
+        `${dates[1]}T10:30:00+09:00`, `${dates[1]}T11:30:00+09:00`,
+        `${dates[2]}T10:00:00+09:00`, `${dates[2]}T11:00:00+09:00`,
+        `${dates[3]}T09:00:00+09:00`, `${dates[3]}T10:00:00+09:00`,
+      ],
+    );
+
+    const preview = await products.previewRecurrence({
+      roomId,
+      applicantPhone: null,
+      startDate: dates[0]!,
+      endDate: dates[3]!,
+      daysOfWeek: ["MON", "TUE", "WED", "THU"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "SKIP_CONFLICTS",
+    });
+
+    expect(preview.items.map(({ date }) => date)).toEqual(dates);
+    expect(preview.items.map(({ reason }) => reason)).toEqual([
+      "TIME_SLOT_CONFLICT",
+      "TIME_SLOT_CONFLICT",
+      null,
+      null,
+    ]);
+    expect(preview).toMatchObject({ totalCandidates: 4, availableCount: 2, conflictCount: 2, createAllowed: true });
+  });
 });
 
 describe("input boundaries, cookies and bounded session cleanup", () => {
@@ -1966,6 +2015,25 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     await resetProductData();
     const roomId = await insertRoom("ordinary-validation-room");
     const { app, cookie, writeHeaders } = await authenticatedApp();
+    const excessiveRecurrence = await app.request("http://worker.test/api/admin/recurrences/preview", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        roomId,
+        applicantPhone: null,
+        startDate: "2024-02-29",
+        endDate: "2025-03-01",
+        daysOfWeek: ["MON"],
+        startTime: "09:00",
+        endTime: "10:00",
+        conflictPolicy: "FAIL_ALL",
+      }),
+    });
+    expect(excessiveRecurrence.status).toBe(400);
+    expect(await excessiveRecurrence.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      fieldErrors: [{ field: "endDate" }],
+    });
     const requests = [
       app.request("http://worker.test/api/public/rooms/not-a-uuid"),
       app.request(`http://worker.test/api/public/rooms/${roomId}/weekly-reservations?weekStart=2026-02-30`),

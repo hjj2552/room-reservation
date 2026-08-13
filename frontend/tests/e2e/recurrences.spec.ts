@@ -11,6 +11,22 @@ import {
   updateReservationPurposeByApi,
 } from './helpers';
 
+test('recurrence end date uses an inclusive 366-day native limit without rewriting the value', async ({ page, request }) => {
+  await loginByApi(request);
+  await page.goto('/admin/recurrences');
+  const startDate = page.getByTestId('recurrence-start-date-input');
+  const endDate = page.getByTestId('recurrence-end-date-input');
+
+  await startDate.fill('2024-02-29');
+  await expect(endDate).toHaveAttribute('max', '2025-02-28');
+  await endDate.fill('2025-02-28');
+
+  await startDate.fill('2024-01-01');
+  await expect(endDate).toHaveAttribute('max', '2024-12-31');
+  await expect(endDate).toHaveValue('2025-02-28');
+  expect(await endDate.evaluate((input: HTMLInputElement) => input.validity.rangeOverflow)).toBe(true);
+});
+
 test('recurrence smoke: list, preview, create, detail, and hard delete', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('recurrence-room');
