@@ -111,6 +111,18 @@ for (const scenario of scenarios) {
       const csvParams = new URL(csvRequestUrl).searchParams;
       expect(csvParams.get('keyword')).toBe('testing-applied');
       expect(csvParams.get('roomId')).toBeNull();
+
+      await page.route('**/api/admin/exports/reservations.csv**', async (route) => {
+        await route.fulfill({
+          status: 422,
+          json: {
+            code: 'CSV_EXPORT_TOO_LARGE',
+            message: 'Too many reservations to export. Narrow the filters and try again.',
+          },
+        });
+      }, { times: 1 });
+      await page.locator('.page-header button.secondary-button').click();
+      await expect(page.getByRole('alert')).toContainText('검색 조건을 좁힌 뒤 다시 시도해 주세요.');
     }
 
     const submittedRequest = page.waitForRequest((request) => {

@@ -58,6 +58,49 @@ function publicPayload(roomId: string, password: string, purpose: string, hour =
   };
 }
 
+async function waitForPublicMutationWaiters(expected: number) {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const result = await database.query(
+      `SELECT count(*)::int AS count
+       FROM pg_stat_activity
+       WHERE datname=current_database() AND pid <> pg_backend_pid()
+         AND state='active' AND wait_event_type='Lock'
+         AND query LIKE '%cancel_password_hash = crypt%'
+         AND query LIKE '%FOR UPDATE OF r%'`,
+    );
+    if (Number(result.rows[0]?.count) >= expected) return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error(`Timed out waiting for ${expected} public reservation mutation lock waiter(s).`);
+}
+
+async function runQueuedPublicMutations(
+  reservationId: string,
+  first: () => Promise<unknown>,
+  second: () => Promise<unknown>,
+) {
+  const blocker = await database.pool.connect();
+  const pending: Promise<unknown>[] = [];
+  let transactionOpen = false;
+  try {
+    await blocker.query("BEGIN");
+    transactionOpen = true;
+    await blocker.query("SELECT id FROM reservations WHERE id=$1 FOR UPDATE", [reservationId]);
+    pending.push(first());
+    await waitForPublicMutationWaiters(1);
+    pending.push(second());
+    await waitForPublicMutationWaiters(2);
+    await blocker.query("COMMIT");
+    transactionOpen = false;
+    return await Promise.allSettled(pending);
+  } finally {
+    if (transactionOpen) await blocker.query("ROLLBACK");
+    await Promise.allSettled(pending);
+    blocker.release();
+  }
+}
+
 beforeAll(async () => {
   await database.query("DELETE FROM admin_sessions");
   await database.query("DELETE FROM reservation_histories");
@@ -457,6 +500,185 @@ describe("public password and atomic reservations", () => {
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
     expect(failures).toHaveLength(7);
     expect(failures.every((result) => result.reason instanceof AppError && result.reason.code === "TIME_SLOT_CONFLICT")).toBe(true);
+  });
+});
+
+describe("public reservation mutation serialization", () => {
+  it("keeps cancellation final when cancellation acquires the row lock first", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-cancel-first");
+    const password = "Cancel1!";
+    const original = publicPayload(roomId, password, "testing-public-cancel-first", 10);
+    const created = await products.createPublicReservation(parsePublicReservation(original));
+    const updated = {
+      ...original,
+      applicantName: "testing-public-should-not-update",
+      purpose: "testing-public-should-not-update",
+    };
+
+    const results = await runQueuedPublicMutations(
+      created.id,
+      () => products.cancelPublicReservation(created.id, password),
+      () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
+    );
+
+    expect(results[0]?.status).toBe("fulfilled");
+    expect(results[1]).toMatchObject({
+      status: "rejected",
+      reason: { kind: "VALIDATION", code: "VALIDATION_ERROR" },
+    });
+    const final = (await database.query(
+      `SELECT status,applicant_name,purpose,room_id,start_at,end_at
+       FROM reservations WHERE id=$1`,
+      [created.id],
+    )).rows[0]!;
+    expect(final).toMatchObject({
+      status: "CANCELLED",
+      applicant_name: original.applicantName,
+      purpose: original.purpose,
+      room_id: roomId,
+    });
+    expect(new Date(String(final.start_at)).toISOString()).toBe(new Date(original.startAt).toISOString());
+    expect(new Date(String(final.end_at)).toISOString()).toBe(new Date(original.endAt).toISOString());
+    const histories = await database.query(
+      `SELECT action FROM reservation_histories
+       WHERE reservation_id=$1 AND action IN ('UPDATED','CANCELLED')`,
+      [created.id],
+    );
+    expect(histories.rows).toEqual([{ action: "CANCELLED" }]);
+  });
+
+  it("records update then cancellation snapshots when update acquires the row lock first", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-update-first");
+    const password = "Update1!";
+    const original = publicPayload(roomId, password, "testing-public-update-first", 11);
+    const created = await products.createPublicReservation(parsePublicReservation(original));
+    const updated = {
+      ...original,
+      applicantName: "testing-public-updated-first",
+      purpose: "testing-public-updated-first",
+    };
+
+    const results = await runQueuedPublicMutations(
+      created.id,
+      () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
+      () => products.cancelPublicReservation(created.id, password),
+    );
+
+    expect(results.map((result) => result.status)).toEqual(["fulfilled", "fulfilled"]);
+    expect((await database.query(
+      "SELECT status,applicant_name,purpose FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows[0]).toEqual({
+      status: "CANCELLED",
+      applicant_name: updated.applicantName,
+      purpose: updated.purpose,
+    });
+    const histories = await database.query(
+      `SELECT action,before_status,after_status,before_reservation_purpose,reservation_purpose,
+        before_reservation_applicant_name,reservation_applicant_name
+       FROM reservation_histories
+       WHERE reservation_id=$1 AND action IN ('UPDATED','CANCELLED')
+       ORDER BY created_at ASC,id ASC`,
+      [created.id],
+    );
+    expect(histories.rows).toEqual([
+      {
+        action: "UPDATED",
+        before_status: "REQUESTED",
+        after_status: "REQUESTED",
+        before_reservation_purpose: original.purpose,
+        reservation_purpose: updated.purpose,
+        before_reservation_applicant_name: original.applicantName,
+        reservation_applicant_name: updated.applicantName,
+      },
+      {
+        action: "CANCELLED",
+        before_status: "REQUESTED",
+        after_status: "CANCELLED",
+        before_reservation_purpose: updated.purpose,
+        reservation_purpose: updated.purpose,
+        before_reservation_applicant_name: updated.applicantName,
+        reservation_applicant_name: updated.applicantName,
+      },
+    ]);
+  });
+
+  it("allows only one concurrent cancellation and records one cancellation history", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-double-cancel");
+    const password = "Double1!";
+    const payload = publicPayload(roomId, password, "testing-public-double-cancel", 12);
+    const created = await products.createPublicReservation(parsePublicReservation(payload));
+
+    const results = await runQueuedPublicMutations(
+      created.id,
+      () => products.cancelPublicReservation(created.id, password),
+      () => products.cancelPublicReservation(created.id, password),
+    );
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toEqual([
+      expect.objectContaining({
+        reason: expect.objectContaining({ kind: "VALIDATION", code: "VALIDATION_ERROR" }),
+      }),
+    ]);
+    expect((await database.query(
+      "SELECT status FROM reservations WHERE id=$1",
+      [created.id],
+    )).rows).toEqual([{ status: "CANCELLED" }]);
+    expect((await database.query(
+      `SELECT action FROM reservation_histories
+       WHERE reservation_id=$1 AND action='CANCELLED'`,
+      [created.id],
+    )).rows).toEqual([{ action: "CANCELLED" }]);
+  });
+
+  it("preserves public mutation password, not-found, cancelled, and read-only verification contracts", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-public-mutation-contracts");
+    const password = "Contract1!";
+    const payload = publicPayload(roomId, password, "testing-public-mutation-contracts", 13);
+    const created = await products.createPublicReservation(parsePublicReservation(payload));
+
+    const blocker = await database.pool.connect();
+    await blocker.query("BEGIN");
+    try {
+      await blocker.query("SELECT id FROM reservations WHERE id=$1 FOR UPDATE", [created.id]);
+      await expect(Promise.race([
+        products.verifyPublicReservationForEdit(created.id, password),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("read-only verification waited for a row lock")), 2_000)),
+      ])).resolves.toMatchObject({ id: created.id, editable: true });
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+    }
+
+    await expect(products.updatePublicReservation(
+      created.id,
+      parsePublicReservation({ ...payload, cancelPassword: "Wrong1!" }),
+    )).rejects.toMatchObject({ kind: "CREDENTIAL_MISMATCH", code: "PUBLIC_RESERVATION_PASSWORD_MISMATCH" });
+    await expect(products.cancelPublicReservation(created.id, "Wrong1!"))
+      .rejects.toMatchObject({ kind: "CREDENTIAL_MISMATCH", code: "PUBLIC_CANCEL_PASSWORD_MISMATCH" });
+    const missingId = "00000000-0000-4000-8000-000000000099";
+    await expect(products.updatePublicReservation(
+      missingId,
+      parsePublicReservation(payload),
+    )).rejects.toMatchObject({ kind: "NOT_FOUND", code: "NOT_FOUND" });
+    await expect(products.cancelPublicReservation(missingId, password))
+      .rejects.toMatchObject({ kind: "NOT_FOUND", code: "NOT_FOUND" });
+
+    await expect(products.cancelPublicReservation(created.id, password)).resolves.toMatchObject({ status: "CANCELLED" });
+    await expect(products.updatePublicReservation(created.id, parsePublicReservation(payload)))
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
+    await expect(products.cancelPublicReservation(created.id, password))
+      .rejects.toMatchObject({ kind: "VALIDATION", code: "VALIDATION_ERROR" });
+    expect((await database.query(
+      `SELECT action FROM reservation_histories
+       WHERE reservation_id=$1 AND action IN ('UPDATED','CANCELLED')`,
+      [created.id],
+    )).rows).toEqual([{ action: "CANCELLED" }]);
   });
 });
 
@@ -1789,9 +2011,9 @@ describe("direct Worker contracts", () => {
 
   it("exports the exact BOM CSV contract, all filtered rows, escaping and Seoul timestamps", async () => {
     await resetProductData();
-    const roomId = await insertRoom("ordinary-csv-room");
+    const roomId = await insertRoom("=ordinary-csv-room");
     const firstId = await insertReservation({
-      roomId, purpose: "testing-csv, \"quoted\"\nline", applicantName: "CsvNeedle one", hour: 10,
+      roomId, purpose: "\t=testing-csv, \"quoted\"\nline", applicantName: "  +CsvNeedle one", hour: 10,
       createdAt: "2026-01-02T00:00:00Z",
     });
     const secondId = await insertReservation({
@@ -1809,7 +2031,8 @@ describe("direct Worker contracts", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const csv = new TextDecoder().decode(bytes.slice(3));
     expect(csv.startsWith("reservationId,roomName,applicantName,applicantEmail,applicantPhone,purpose,startAt,endAt,status,source,recurrenceId,createdAt\r\n")).toBe(true);
-    expect(csv).toContain(`"testing-csv, ""quoted""\nline"`);
+    expect(csv).toContain(`'=ordinary-csv-room,'  +CsvNeedle one`);
+    expect(csv).toContain(`"'\t=testing-csv, ""quoted""\nline"`);
     expect(csv).toContain(firstId);
     expect(csv).toContain(secondId);
     expect(csv.indexOf(firstId)).toBeLessThan(csv.indexOf(secondId));
@@ -1959,6 +2182,55 @@ describe("direct Worker contracts", () => {
     expect((await database.query("SELECT 1 FROM reservations WHERE purpose=$1", [body.purpose])).rows).toHaveLength(0);
     expect((await database.query("SELECT 1 FROM reservation_histories WHERE reservation_purpose=$1", [body.purpose])).rows).toHaveLength(0);
   });
+
+  it("batches recurrence conflicts while preserving cancelled and half-open boundaries", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurrence-batch");
+    const firstDate = new Date();
+    firstDate.setUTCDate(firstDate.getUTCDate() + 35);
+    while (firstDate.getUTCDay() !== 1) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
+    const dates = Array.from({ length: 4 }, (_, index) => {
+      const date = new Date(firstDate);
+      date.setUTCDate(date.getUTCDate() + index);
+      return date.toISOString().slice(0, 10);
+    });
+    await database.query(
+      `INSERT INTO reservations(
+         room_id,applicant_name,applicant_email,purpose,start_at,end_at,status,source,created_by_actor_type
+       ) VALUES
+         ($1,'testing-requested','testing-requested@example.test','testing-requested',$2,$3,'REQUESTED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-confirmed','testing-confirmed@example.test','testing-confirmed',$4,$5,'CONFIRMED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-cancelled','testing-cancelled@example.test','testing-cancelled',$6,$7,'CANCELLED','ADMIN_MANUAL','ADMIN'),
+         ($1,'testing-touching','testing-touching@example.test','testing-touching',$8,$9,'CONFIRMED','ADMIN_MANUAL','ADMIN')`,
+      [
+        roomId,
+        `${dates[0]}T10:00:00+09:00`, `${dates[0]}T11:00:00+09:00`,
+        `${dates[1]}T10:30:00+09:00`, `${dates[1]}T11:30:00+09:00`,
+        `${dates[2]}T10:00:00+09:00`, `${dates[2]}T11:00:00+09:00`,
+        `${dates[3]}T09:00:00+09:00`, `${dates[3]}T10:00:00+09:00`,
+      ],
+    );
+
+    const preview = await products.previewRecurrence({
+      roomId,
+      applicantPhone: null,
+      startDate: dates[0]!,
+      endDate: dates[3]!,
+      daysOfWeek: ["MON", "TUE", "WED", "THU"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "SKIP_CONFLICTS",
+    });
+
+    expect(preview.items.map(({ date }) => date)).toEqual(dates);
+    expect(preview.items.map(({ reason }) => reason)).toEqual([
+      "TIME_SLOT_CONFLICT",
+      "TIME_SLOT_CONFLICT",
+      null,
+      null,
+    ]);
+    expect(preview).toMatchObject({ totalCandidates: 4, availableCount: 2, conflictCount: 2, createAllowed: true });
+  });
 });
 
 describe("input boundaries, cookies and bounded session cleanup", () => {
@@ -1966,6 +2238,25 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     await resetProductData();
     const roomId = await insertRoom("ordinary-validation-room");
     const { app, cookie, writeHeaders } = await authenticatedApp();
+    const excessiveRecurrence = await app.request("http://worker.test/api/admin/recurrences/preview", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        roomId,
+        applicantPhone: null,
+        startDate: "2024-02-29",
+        endDate: "2025-03-01",
+        daysOfWeek: ["MON"],
+        startTime: "09:00",
+        endTime: "10:00",
+        conflictPolicy: "FAIL_ALL",
+      }),
+    });
+    expect(excessiveRecurrence.status).toBe(400);
+    expect(await excessiveRecurrence.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      fieldErrors: [{ field: "endDate" }],
+    });
     const requests = [
       app.request("http://worker.test/api/public/rooms/not-a-uuid"),
       app.request(`http://worker.test/api/public/rooms/${roomId}/weekly-reservations?weekStart=2026-02-30`),

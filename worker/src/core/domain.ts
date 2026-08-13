@@ -325,9 +325,12 @@ export function datesInRange(start: string, end: string): string[] {
   if (start > end) {
     validation("Start date must be before or equal to end date.", "startDate");
   }
-  const result: string[] = [];
   const cursor = new Date(`${start}T00:00:00Z`);
   const final = new Date(`${end}T00:00:00Z`);
+  if (final.getTime() - cursor.getTime() > 365 * 24 * 60 * 60 * 1000) {
+    validation("Date range must not exceed 366 days.", "endDate");
+  }
+  const result: string[] = [];
   while (cursor <= final) {
     result.push(cursor.toISOString().slice(0, 10));
     cursor.setUTCDate(cursor.getUTCDate() + 1);

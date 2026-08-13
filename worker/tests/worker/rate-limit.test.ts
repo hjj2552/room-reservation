@@ -251,6 +251,34 @@ describe("public API rate-limit contract", () => {
     expect(productCalls).toEqual({ reads: 0, writes: 0 });
   });
 
+  it.each([
+    ["429", headerClientIpResolver, { check: async () => ({ allowed: false }) }, 429],
+    ["503", () => null, new DeterministicRateLimiter(), 503],
+  ] as const)("returns ingress %s without reading a JSON body", async (_label, resolveClientIp, limiter, status) => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array([123, 125]));
+        controller.close();
+      },
+    }, { highWaterMark: 0 });
+    const { app, productCalls, sessionCalls } = testApp({ limiter, resolveClientIp });
+    const request = new Request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: { ...requestHeaders(), "content-type": "application/json" },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+
+    const response = await app.request(request);
+
+    expect(response.status).toBe(status);
+    expect(pulls).toBe(0);
+    expect(sessionCalls.finds).toBe(0);
+    expect(productCalls).toEqual({ reads: 0, writes: 0 });
+  });
+
   it("rejects ingress before the real session, Neon, ProductService, and password crypt path", async () => {
     const query = vi.fn(async () => ({ rows: [] }));
     const database = {

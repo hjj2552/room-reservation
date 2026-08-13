@@ -11,6 +11,17 @@ export function listTags(filters: TagFilters = {}) {
   );
 }
 
+export async function listAllTags() {
+  const firstPage = await listTags({ page: 0, size: 100 });
+  const tags = [...firstPage.items];
+
+  for (let page = 1; page < firstPage.totalPages; page += 1) {
+    tags.push(...(await listTags({ page, size: 100 })).items);
+  }
+
+  return tags;
+}
+
 export function createTag(payload: TagPayload) {
   return apiRequest<Tag>('/api/admin/tags', {
     method: 'POST',

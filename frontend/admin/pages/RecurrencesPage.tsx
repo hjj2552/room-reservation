@@ -20,7 +20,7 @@ import {
 } from '../../shared/hooks/useRecurrences';
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
-import { useTags } from '../../shared/hooks/useTags';
+import { useAllTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
@@ -138,12 +138,18 @@ export function RecurrencesPage() {
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
   const [successfulPreview, setSuccessfulPreview] = useState<SuccessfulPreview | null>(null);
   const [completedCreate, setCompletedCreate] = useState<CompletedCreate | null>(null);
+  const endDateMax = useMemo(() => {
+    const startDate = new Date(`${form.startDate}T00:00:00Z`);
+    if (Number.isNaN(startDate.getTime()) || startDate.toISOString().slice(0, 10) !== form.startDate) return undefined;
+    startDate.setUTCDate(startDate.getUTCDate() + 365);
+    return startDate.toISOString().slice(0, 10);
+  }, [form.startDate]);
   const defaultTimesAppliedRef = useRef(false);
   const previewRequestIdRef = useRef(0);
   const createInFlightRef = useRef(false);
   const rooms = useRoomOptions();
   const settings = useSettings();
-  const tags = useTags({ size: 1000 });
+  const tags = useAllTags();
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
   const appliedFilters = useMemo(() => filterDraftFromParams(searchParams), [searchParams]);
@@ -362,6 +368,7 @@ export function RecurrencesPage() {
               name="endDate"
               type="date"
               value={form.endDate}
+              max={endDateMax}
               onChange={(event) => setForm((prev) => ({ ...prev, endDate: event.target.value }))}
               required
             />
@@ -384,13 +391,25 @@ export function RecurrencesPage() {
               data-testid="recurrence-tag-select"
               name="tagId"
               value={form.tagId}
+              disabled={tags.isLoading || tags.isError}
+              aria-describedby={tags.isError ? 'recurrence-tag-error' : undefined}
               onChange={(event) => setForm((prev) => ({ ...prev, tagId: event.target.value }))}
             >
               <option value="">없음</option>
-              {tags.data?.items.map((tag) => (
+              {tags.data?.map((tag) => (
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </select>
+            {tags.isError ? (
+              <span
+                id="recurrence-tag-error"
+                className="field-error"
+                role="alert"
+                data-testid="recurrence-tag-error"
+              >
+                태그 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+              </span>
+            ) : null}
           </label>
           <fieldset className="full-span checkbox-group">
             <legend>반복 요일</legend>
