@@ -255,6 +255,87 @@ test('reservation list keeps 12px between its table and result controls', async 
   await expectVerticalGap(tableWrap, resultSummary, 12);
 });
 
+test('shared pagination keeps five-page desktop groups stable', async ({ page, request }) => {
+  await loginByApi(request);
+  await mockReservationPages(page, 43);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/admin/reservations?page=0');
+
+  const controls = page.locator('.pagination-desktop-controls');
+  await expect(controls).toBeVisible();
+  await expectPageNumbers(controls, [1, 2, 3, 4, 5, 43]);
+  await expect(controls.locator('.page-ellipsis')).toHaveCount(1);
+  const initialPositions = await pageNumberPositions(controls, [1, 2, 3, 4, 5]);
+
+  await controls.getByRole('button', { name: '2', exact: true }).click();
+  await expect(page).toHaveURL(/page=1/);
+  await expectCurrentPage(controls, 2);
+  await expectPageNumbers(controls, [1, 2, 3, 4, 5, 43]);
+  expectPageNumberPositionsStable(initialPositions, await pageNumberPositions(controls, [1, 2, 3, 4, 5]));
+
+  await controls.getByRole('button', { name: '3', exact: true }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expectCurrentPage(controls, 3);
+  await expectPageNumbers(controls, [1, 2, 3, 4, 5, 43]);
+  expectPageNumberPositionsStable(initialPositions, await pageNumberPositions(controls, [1, 2, 3, 4, 5]));
+
+  await controls.getByRole('button', { name: '5', exact: true }).click();
+  await controls.getByRole('button', { name: '다음', exact: true }).click();
+  await expectCurrentPage(controls, 6);
+  await expectPageNumbers(controls, [1, 6, 7, 8, 9, 10, 43]);
+  await expect(controls.locator('.page-ellipsis')).toHaveCount(2);
+
+  await page.goto('/admin/reservations?page=35');
+  await expectCurrentPage(controls, 36);
+  await expectPageNumbers(controls, [1, 36, 37, 38, 39, 40, 43]);
+  await expect(controls.locator('.page-ellipsis')).toHaveCount(2);
+
+  await page.goto('/admin/reservations?page=40');
+  await expectCurrentPage(controls, 41);
+  await expectPageNumbers(controls, [1, 41, 42, 43]);
+  await expect(controls.locator('.page-ellipsis')).toHaveCount(1);
+});
+
+test('shared pagination uses a stable two-row mobile layout', async ({ page, request }) => {
+  await loginByApi(request);
+  await mockReservationPages(page, 43);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/admin/reservations?page=0');
+
+  const controls = page.locator('.pagination-mobile-controls');
+  const first = controls.getByRole('button', { name: '첫 페이지' });
+  const previous = controls.getByRole('button', { name: '이전 페이지' });
+  const next = controls.getByRole('button', { name: '다음 페이지' });
+  const last = controls.getByRole('button', { name: '마지막 페이지' });
+  const position = controls.locator('.pagination-position');
+
+  await expect(controls).toBeVisible();
+  await expect(page.locator('.pagination-desktop-controls')).toBeHidden();
+  await expect(first).toBeVisible();
+  await expect(previous).toBeVisible();
+  await expect(first).toBeDisabled();
+  await expect(previous).toBeDisabled();
+  await expect(next).toBeEnabled();
+  await expect(last).toBeEnabled();
+  await expect(position).toHaveText('1/43');
+  await expectMobilePaginationGeometry(controls, [first, previous, next, last], position);
+  await expectNoHorizontalOverflow(page);
+
+  await next.click();
+  await expect(position).toHaveText('2/43');
+  await expect(first).toBeEnabled();
+  await expect(previous).toBeEnabled();
+  await expectMobilePaginationGeometry(controls, [first, previous, next, last], position);
+
+  await last.click();
+  await expect(position).toHaveText('43/43');
+  await expect(next).toBeDisabled();
+  await expect(last).toBeDisabled();
+  await expect(next).toBeVisible();
+  await expect(last).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 function pagedResponse(
   scenario: ListScenario,
   roomId: string,
@@ -381,4 +462,81 @@ async function expectVerticalGap(first: Locator, second: Locator, expectedGap: n
     Math.abs(secondBox.y - (firstBox.y + firstBox.height) - expectedGap),
     `expected ${expectedGap}px vertical gap`,
   ).toBeLessThanOrEqual(1);
+}
+
+async function mockReservationPages(page: Page, totalPages: number) {
+  await page.route('**/api/admin/reservations?**', async (route) => {
+    const requestedPage = Number(new URL(route.request().url()).searchParams.get('page') || '0');
+    await route.fulfill({
+      json: {
+        items: [reservationItem(`pagination-${requestedPage}`, 'testing-room-pagination', '테스트 공간')],
+        page: requestedPage,
+        size: 20,
+        totalItems: totalPages * 20,
+        totalPages,
+      },
+    });
+  });
+}
+
+async function expectPageNumbers(controls: Locator, expected: number[]) {
+  await expect.poll(async () => controls.locator('.page-button').allTextContents())
+    .toEqual(expected.map(String));
+}
+
+async function expectCurrentPage(controls: Locator, pageNumber: number) {
+  await expect(controls.locator('.page-button[aria-current="page"]')).toHaveCount(1);
+  await expect(controls.locator('.page-button[aria-current="page"]')).toHaveText(String(pageNumber));
+  await expect(controls.locator('.page-button[aria-current="page"]')).toHaveCSS('opacity', '1');
+}
+
+async function pageNumberPositions(controls: Locator, pageNumbers: number[]) {
+  return Promise.all(pageNumbers.map(async (pageNumber) => {
+    const box = await controls.getByRole('button', { name: String(pageNumber), exact: true }).boundingBox();
+    if (!box) throw new Error(`Could not measure page ${pageNumber}.`);
+    return box.x;
+  }));
+}
+
+function expectPageNumberPositionsStable(before: number[], after: number[]) {
+  before.forEach((x, index) => {
+    expect(Math.abs(x - after[index]), `page ${index + 1} X position should remain stable`)
+      .toBeLessThanOrEqual(1);
+  });
+}
+
+async function expectMobilePaginationGeometry(
+  controls: Locator,
+  buttons: [Locator, Locator, Locator, Locator],
+  position: Locator,
+) {
+  const [firstBox, previousBox, nextBox, lastBox, positionBox, controlsBox] = await Promise.all([
+    buttons[0].boundingBox(),
+    buttons[1].boundingBox(),
+    buttons[2].boundingBox(),
+    buttons[3].boundingBox(),
+    position.boundingBox(),
+    controls.boundingBox(),
+  ]);
+  if (!firstBox || !previousBox || !nextBox || !lastBox || !positionBox || !controlsBox) {
+    throw new Error('Could not measure mobile pagination geometry.');
+  }
+
+  const boxes = [firstBox, previousBox, nextBox, lastBox];
+  boxes.forEach((box) => expect(box.height).toBeGreaterThanOrEqual(44));
+  boxes.slice(1).forEach((box) => expect(Math.abs(box.width - firstBox.width)).toBeLessThanOrEqual(1));
+  expect(Math.abs((firstBox.x + firstBox.width / 2) - (previousBox.x + previousBox.width / 2)))
+    .toBeLessThanOrEqual(1);
+  expect(Math.abs((lastBox.x + lastBox.width / 2) - (nextBox.x + nextBox.width / 2)))
+    .toBeLessThanOrEqual(1);
+  expect(Math.abs((positionBox.x + positionBox.width / 2) - (controlsBox.x + controlsBox.width / 2)))
+    .toBeLessThanOrEqual(1);
+  expect(previousBox.y).toBeGreaterThan(firstBox.y);
+  expect(nextBox.y).toBeGreaterThan(lastBox.y);
+}
+
+async function expectNoHorizontalOverflow(page: Page) {
+  expect(await page.evaluate(() => (
+    document.documentElement.scrollWidth - document.documentElement.clientWidth
+  ))).toBeLessThanOrEqual(1);
 }

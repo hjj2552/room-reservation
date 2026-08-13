@@ -17,14 +17,14 @@ export function Pagination({ page, totalPages, totalItems, size, onPageChange }:
     );
   }
 
-  const pages = pageWindow(currentPage, totalPages);
+  const pages = pageGroup(currentPage, totalPages);
 
   return (
     <div className="pagination" aria-label="페이지 이동">
-      <p>
+      <p className="pagination-summary">
         총 {totalItems.toLocaleString()}건 · {currentPage}/{totalPages}페이지 · 페이지당 {size}건
       </p>
-      <div className="page-buttons">
+      <div className="page-buttons pagination-desktop-controls">
         <button
           type="button"
           className="ghost-button"
@@ -36,7 +36,7 @@ export function Pagination({ page, totalPages, totalItems, size, onPageChange }:
         {pages[0] > 1 ? (
           <>
             <PageButton pageNumber={1} currentPage={currentPage} onPageChange={onPageChange} />
-            {pages[0] > 2 ? <span className="page-ellipsis" aria-hidden="true">...</span> : null}
+            {pages[0] > 2 ? <span className="page-ellipsis" aria-hidden="true">…</span> : null}
           </>
         ) : null}
         {pages.map((pageNumber) => (
@@ -49,13 +49,54 @@ export function Pagination({ page, totalPages, totalItems, size, onPageChange }:
         ))}
         {pages[pages.length - 1] < totalPages ? (
           <>
-            {pages[pages.length - 1] < totalPages - 1 ? <span className="page-ellipsis" aria-hidden="true">...</span> : null}
+            {pages[pages.length - 1] < totalPages - 1 ? <span className="page-ellipsis" aria-hidden="true">…</span> : null}
             <PageButton pageNumber={totalPages} currentPage={currentPage} onPageChange={onPageChange} />
           </>
         ) : null}
         <button
           type="button"
           className="ghost-button"
+          disabled={page + 1 >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          다음
+        </button>
+      </div>
+      <div className="pagination-mobile-controls">
+        <button
+          type="button"
+          className="ghost-button pagination-first"
+          aria-label="첫 페이지"
+          disabled={page <= 0}
+          onClick={() => onPageChange(0)}
+        >
+          처음
+        </button>
+        <button
+          type="button"
+          className="ghost-button pagination-last"
+          aria-label="마지막 페이지"
+          disabled={page + 1 >= totalPages}
+          onClick={() => onPageChange(totalPages - 1)}
+        >
+          마지막
+        </button>
+        <button
+          type="button"
+          className="ghost-button pagination-previous"
+          aria-label="이전 페이지"
+          disabled={page <= 0}
+          onClick={() => onPageChange(page - 1)}
+        >
+          이전
+        </button>
+        <span className="pagination-position" aria-live="polite">
+          {currentPage}/{totalPages}
+        </span>
+        <button
+          type="button"
+          className="ghost-button pagination-next"
+          aria-label="다음 페이지"
           disabled={page + 1 >= totalPages}
           onClick={() => onPageChange(page + 1)}
         >
@@ -88,9 +129,8 @@ function PageButton({
   );
 }
 
-function pageWindow(currentPage: number, totalPages: number) {
-  const radius = 2;
-  const start = Math.max(1, currentPage - radius);
-  const end = Math.min(totalPages, currentPage + radius);
+function pageGroup(currentPage: number, totalPages: number) {
+  const start = Math.floor((currentPage - 1) / 5) * 5 + 1;
+  const end = Math.min(totalPages, start + 4);
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
