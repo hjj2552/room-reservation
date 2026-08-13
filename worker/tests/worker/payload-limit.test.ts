@@ -104,7 +104,7 @@ describe("JSON request body limit", () => {
     expect(exact.calls.product).toBe(1);
   });
 
-  it("rejects 65,537 bytes before session, database, or product work", async () => {
+  it("rejects 65,537 bytes after security checks and before product work", async () => {
     const { app, calls } = testApp();
     const body = reservationBody(65_537);
     const response = await app.request("/api/public/reservations", {
@@ -121,7 +121,7 @@ describe("JSON request body limit", () => {
       fieldErrors: [],
       path: "/api/public/reservations",
     });
-    expect(calls).toEqual({ sessionFind: 0, authenticate: 0, product: 0 });
+    expect(calls).toEqual({ sessionFind: 1, authenticate: 0, product: 0 });
   });
 
   it("counts multibyte characters by UTF-8 bytes", async () => {
@@ -136,7 +136,7 @@ describe("JSON request body limit", () => {
       body,
     });
     expect(response.status).toBe(413);
-    expect(calls.sessionFind).toBe(0);
+    expect(calls.sessionFind).toBe(1);
   });
 
   it("rejects an oversized valid Content-Length without reading the body", async () => {
@@ -154,7 +154,7 @@ describe("JSON request body limit", () => {
 
     expect(response.status).toBe(413);
     expect(pulls).toBe(0);
-    expect(calls.sessionFind).toBe(0);
+    expect(calls.sessionFind).toBe(1);
   });
 
   it.each([undefined, "1"])("rejects a streamed oversized body with Content-Length %s and cancels the reader", async (contentLength) => {
@@ -173,7 +173,7 @@ describe("JSON request body limit", () => {
 
     expect(response.status).toBe(413);
     expect(cancelled).toBe(true);
-    expect(calls.sessionFind).toBe(0);
+    expect(calls.sessionFind).toBe(1);
   });
 
   it.each([

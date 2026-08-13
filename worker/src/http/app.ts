@@ -151,42 +151,6 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
   });
 
   app.use("/api/*", async (context, next) => {
-    const contentType = context.req.header("content-type") || "";
-    if (!contentType.toLowerCase().includes("application/json")) {
-      await next();
-      return;
-    }
-
-    const contentLength = context.req.header("content-length");
-    if (contentLength && /^\d+$/.test(contentLength) && BigInt(contentLength) > BigInt(MAX_JSON_BODY_BYTES)) {
-      throw new HttpError(413, "PAYLOAD_TOO_LARGE", "JSON request body must not exceed 64 KiB.");
-    }
-
-    const bytes = new Uint8Array(MAX_JSON_BODY_BYTES);
-    const reader = context.req.raw.body?.getReader();
-    let byteLength = 0;
-    if (reader) {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (byteLength + value.byteLength > MAX_JSON_BODY_BYTES) {
-            void reader.cancel().catch(() => undefined);
-            throw new HttpError(413, "PAYLOAD_TOO_LARGE", "JSON request body must not exceed 64 KiB.");
-          }
-          bytes.set(value, byteLength);
-          byteLength += value.byteLength;
-        }
-      } catch (error) {
-        if (error instanceof HttpError) throw error;
-        throw new HttpError(400, "VALIDATION_ERROR", "Please check the request fields.");
-      }
-    }
-    context.set("jsonBodyBytes", bytes.subarray(0, byteLength));
-    await next();
-  });
-
-  app.use("/api/*", async (context, next) => {
     const clientIp = dependencies.resolveClientIp(context.req.raw);
     if (!clientIp) {
       console.error(JSON.stringify({
@@ -223,6 +187,42 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
       );
       if (!valid) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
     }
+    await next();
+  });
+
+  app.use("/api/*", async (context, next) => {
+    const contentType = context.req.header("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      await next();
+      return;
+    }
+
+    const contentLength = context.req.header("content-length");
+    if (contentLength && /^\d+$/.test(contentLength) && BigInt(contentLength) > BigInt(MAX_JSON_BODY_BYTES)) {
+      throw new HttpError(413, "PAYLOAD_TOO_LARGE", "JSON request body must not exceed 64 KiB.");
+    }
+
+    const bytes = new Uint8Array(MAX_JSON_BODY_BYTES);
+    const reader = context.req.raw.body?.getReader();
+    let byteLength = 0;
+    if (reader) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (byteLength + value.byteLength > MAX_JSON_BODY_BYTES) {
+            void reader.cancel().catch(() => undefined);
+            throw new HttpError(413, "PAYLOAD_TOO_LARGE", "JSON request body must not exceed 64 KiB.");
+          }
+          bytes.set(value, byteLength);
+          byteLength += value.byteLength;
+        }
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError(400, "VALIDATION_ERROR", "Please check the request fields.");
+      }
+    }
+    context.set("jsonBodyBytes", bytes.subarray(0, byteLength));
     await next();
   });
 
