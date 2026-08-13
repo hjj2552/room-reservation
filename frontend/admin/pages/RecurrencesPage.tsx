@@ -20,7 +20,7 @@ import {
 } from '../../shared/hooks/useRecurrences';
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
-import { useTags } from '../../shared/hooks/useTags';
+import { useAllTags } from '../../shared/hooks/useTags';
 import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
@@ -149,7 +149,7 @@ export function RecurrencesPage() {
   const createInFlightRef = useRef(false);
   const rooms = useRoomOptions();
   const settings = useSettings();
-  const tags = useTags({ size: 1000 });
+  const tags = useAllTags();
   const preview = usePreviewRecurrence();
   const create = useCreateRecurrence();
   const appliedFilters = useMemo(() => filterDraftFromParams(searchParams), [searchParams]);
@@ -394,7 +394,7 @@ export function RecurrencesPage() {
               onChange={(event) => setForm((prev) => ({ ...prev, tagId: event.target.value }))}
             >
               <option value="">없음</option>
-              {tags.data?.items.map((tag) => (
+              {tags.data?.map((tag) => (
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </select>

@@ -1,16 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createTag, deleteTag, listTags, updateTag } from '../api/tags';
+import { createTag, deleteTag, listAllTags, listTags, updateTag } from '../api/tags';
 import type { TagFilters, TagPayload } from '../api/types';
 
 export const tagKeys = {
   all: ['tags'] as const,
   list: (filters: TagFilters) => ['tags', 'list', filters] as const,
+  allOptions: () => ['tags', 'all-options'] as const,
 };
 
 export function useTags(filters: TagFilters = {}) {
   return useQuery({
     queryKey: tagKeys.list(filters),
     queryFn: () => listTags(filters),
+  });
+}
+
+export function useAllTags() {
+  return useQuery({
+    queryKey: tagKeys.allOptions(),
+    queryFn: listAllTags,
   });
 }
 

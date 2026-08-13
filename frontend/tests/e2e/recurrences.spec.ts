@@ -1,5 +1,8 @@
 import { expect, test } from './fixtures';
 import type { Page } from '@playwright/test';
+import { listAllTags } from '../../shared/api/tags';
+import type { Tag } from '../../shared/api/types';
+import { tagKeys } from '../../shared/hooks/useTags';
 import {
   cancelReservationByApi,
   deleteRecurrenceByApi,
@@ -10,6 +13,67 @@ import {
   nextWeekdayRecurrenceInputs,
   updateReservationPurposeByApi,
 } from './helpers';
+
+function tag(index: number): Tag {
+  return {
+    id: `tag-${index}`,
+    name: `Tag ${String(index).padStart(3, '0')}`,
+    color: '#245b47',
+    createdAt: '2026-01-01T00:00:00+09:00',
+    updatedAt: '2026-01-01T00:00:00+09:00',
+  };
+}
+
+test('all tag options follow every API page and propagate later page errors', async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    let requests: string[] = [];
+    globalThis.fetch = (async (input) => {
+      const path = String(input);
+      requests.push(path);
+      return Response.json({ items: [tag(1)], page: 0, size: 100, totalItems: 1, totalPages: 1 });
+    }) as typeof fetch;
+
+    await expect(listAllTags()).resolves.toEqual([tag(1)]);
+    expect(requests).toEqual(['/api/admin/tags?page=0&size=100']);
+
+    requests = [];
+    globalThis.fetch = (async (input) => {
+      const path = String(input);
+      requests.push(path);
+      const page = new URL(path, 'http://test').searchParams.get('page');
+      return Response.json(page === '0'
+        ? { items: [tag(1), tag(2)], page: 0, size: 100, totalItems: 3, totalPages: 2 }
+        : { items: [tag(3)], page: 1, size: 100, totalItems: 3, totalPages: 2 });
+    }) as typeof fetch;
+
+    await expect(listAllTags()).resolves.toEqual([tag(1), tag(2), tag(3)]);
+    expect(requests).toEqual([
+      '/api/admin/tags?page=0&size=100',
+      '/api/admin/tags?page=1&size=100',
+    ]);
+    expect(tagKeys.allOptions().slice(0, tagKeys.all.length)).toEqual(tagKeys.all);
+
+    requests = [];
+    globalThis.fetch = (async (input) => {
+      const path = String(input);
+      requests.push(path);
+      const page = new URL(path, 'http://test').searchParams.get('page');
+      return page === '0'
+        ? Response.json({ items: [tag(1)], page: 0, size: 100, totalItems: 2, totalPages: 2 })
+        : Response.json({ message: 'testing-page-failure' }, { status: 500 });
+    }) as typeof fetch;
+
+    await expect(listAllTags()).rejects.toMatchObject({ status: 500 });
+    expect(requests).toEqual([
+      '/api/admin/tags?page=0&size=100',
+      '/api/admin/tags?page=1&size=100',
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test('recurrence end date uses an inclusive 366-day native limit without rewriting the value', async ({ page, request }) => {
   await loginByApi(request);
@@ -342,6 +406,145 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await cancelReservationByApi(request, blocker.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
   }
+});
+
+test('recurrence form selects the 101st tag without changing tag management pagination', async ({ page }) => {
+  const room = {
+    id: 'testing-room-all-tags',
+    name: 'Testing Room',
+    location: null,
+    capacity: 10,
+    description: null,
+    enabled: true,
+    displayOrder: 0,
+  };
+  const settings = {
+    organizationName: 'Testing Organization',
+    publicNotice: null,
+    reservationEnabled: true,
+    reservationDisabledMessage: null,
+    semesterStartDate: '2026-01-01',
+    semesterEndDate: '2026-12-31',
+    openTime: '09:00',
+    closeTime: '18:00',
+    slotMinutes: 5,
+    availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+    minReservationMinutes: 30,
+    maxReservationMinutes: 240,
+    adminContactEmail: null,
+    adminContactPhone: null,
+    completionMessage: null,
+  };
+  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42 });
+  const tags = Array.from({ length: 101 }, (_, index) => tag(index + 1));
+  const tagRequests: string[] = [];
+
+  await page.route('**/api/public/settings', (route) => route.fulfill({ json: settings }));
+  await page.route('**/api/auth/admin/me', (route) => route.fulfill({
+    json: { id: 'testing-admin', username: 'admin', role: 'ADMIN' },
+  }));
+  await page.route('**/api/admin/settings', (route) => route.fulfill({
+    json: { ...settings, version: 1 },
+  }));
+  await page.route('**/api/admin/rooms/order', (route) => route.fulfill({
+    json: { orderVersion: 1, items: [room] },
+  }));
+  await page.route('**/api/admin/recurrences?**', (route) => route.fulfill({
+    json: { items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 },
+  }));
+
+  await page.route('**/api/admin/tags?**', async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+
+    tagRequests.push(url.search);
+    const pageNumber = Number(url.searchParams.get('page'));
+    const size = Number(url.searchParams.get('size'));
+    const items = size === 100
+      ? tags.slice(pageNumber * size, (pageNumber + 1) * size)
+      : tags.slice(0, size);
+
+    await route.fulfill({
+      json: {
+        items,
+        page: pageNumber,
+        size,
+        totalItems: tags.length,
+        totalPages: Math.ceil(tags.length / size),
+      },
+    });
+  });
+
+  await page.route('**/api/admin/recurrences/preview', async (route) => {
+    await route.fulfill({
+      json: {
+        conflictPolicy: 'FAIL_ALL',
+        totalCandidates: 1,
+        availableCount: 1,
+        conflictCount: 0,
+        createAllowed: true,
+        items: [{
+          date: recurrenceTime.startDate,
+          startAt: `${recurrenceTime.startDate}T${recurrenceTime.startTime}:00+09:00`,
+          endAt: `${recurrenceTime.startDate}T${recurrenceTime.endTime}:00+09:00`,
+          available: true,
+          reason: null,
+          message: null,
+        }],
+      },
+    });
+  });
+
+  await page.route('**/api/admin/recurrences', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 201,
+      json: {
+        recurrenceId: 'testing-recurrence-all-tags',
+        tagId: tags[100].id,
+        tagName: tags[100].name,
+        tagColor: tags[100].color,
+        conflictPolicy: 'FAIL_ALL',
+        totalCandidates: 1,
+        createdCount: 1,
+        skippedCount: 0,
+        failedCount: 0,
+        items: [{ date: recurrenceTime.startDate, status: 'CREATED', reason: null }],
+      },
+    });
+  });
+
+  await page.goto('/admin/recurrences');
+  const tagSelect = page.getByTestId('recurrence-tag-select');
+  await expect(tagSelect.locator('option')).toHaveCount(102);
+  await expect(tagSelect.locator('option[value=""]')).toHaveCount(1);
+  await expect(tagSelect.locator('option').filter({ hasText: tags[0].name })).toHaveCount(1);
+  await expect(tagSelect.locator('option').filter({ hasText: tags[100].name })).toHaveCount(1);
+  expect(tagRequests).toEqual(['?page=0&size=100', '?page=1&size=100']);
+
+  await fillRecurrenceDraft(page, room.id, 'testing-recurrence-all-tags', recurrenceTime);
+  await tagSelect.selectOption(tags[100].id);
+  await runRecurrencePreview(page);
+  await expect(tagSelect).toHaveValue(tags[100].id);
+
+  const createRequestPromise = page.waitForRequest((request) =>
+    new URL(request.url()).pathname === '/api/admin/recurrences'
+      && request.method() === 'POST',
+  );
+  await page.getByTestId('recurrence-create-button').click();
+  const createRequest = await createRequestPromise;
+  expect((createRequest.postDataJSON() as { tagId?: string }).tagId).toBe(tags[100].id);
+
+  tagRequests.length = 0;
+  await page.goto('/admin/settings/tags');
+  await expect(page.getByTestId('tags-table')).toBeVisible();
+  expect(tagRequests).toEqual(['?page=0&size=20']);
 });
 
 test('recurrence create can select a configured tag', async ({ page, request, e2eData }) => {
