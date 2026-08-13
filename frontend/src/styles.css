@@ -544,12 +544,16 @@ button:disabled {
 }
 
 .reservations-table { min-width: 1080px; }
-.reservations-table th:nth-child(1) { width: 180px; }
+.reservations-table th:nth-child(1) { width: 210px; }
 .reservations-table th:nth-child(2) { width: 145px; }
 .reservations-table th:nth-child(3) { width: 88px; }
 .reservations-table th:nth-child(4) { width: 185px; }
-.reservations-table th:nth-child(6) { width: 102px; }
-.reservations-table th:nth-child(7) { width: 110px; }
+.reservations-table th:nth-child(6) { width: 110px; }
+.reservations-table th:nth-child(7) { width: 125px; }
+
+.reservations-table-wrap {
+  max-width: 1280px;
+}
 
 .recurrences-table { min-width: 920px; }
 .recurrences-table th:nth-child(1) { width: 180px; }
@@ -557,9 +561,13 @@ button:disabled {
 .recurrences-table th:nth-child(3) { width: 150px; }
 .recurrences-table th:nth-child(5) { width: 110px; }
 
+.recurrences-table-wrap {
+  max-width: 1080px;
+}
+
 .recurrence-preview-table { min-width: 720px; }
 .recurrence-preview-table th:nth-child(1) { width: 140px; }
-.recurrence-preview-table th:nth-child(2) { width: 250px; }
+.recurrence-preview-table th:nth-child(2) { width: 160px; }
 
 .recurrence-reservations-table { min-width: 920px; }
 .recurrence-reservations-table th:nth-child(1) { width: 180px; }
@@ -567,23 +575,24 @@ button:disabled {
 .recurrence-reservations-table th:nth-child(3) { width: 88px; }
 .recurrence-reservations-table th:nth-child(5) { width: 110px; }
 
-.table-time-range,
+.table-cell-stack,
 .audit-actor-cell {
   display: grid;
   gap: 2px;
 }
 
-.table-time-range > span,
-.reservation-time-cell > strong,
-.reservation-time-cell > .muted,
+.table-cell-stack > span,
+.table-cell-stack > strong,
 .audit-snapshot-time {
   white-space: nowrap;
 }
 
 .table-room-cell,
+.reservation-room-cell,
 .table-applicant-cell,
 .table-description-cell {
   word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .table-break-anywhere {
@@ -630,7 +639,8 @@ button:disabled {
   cursor: pointer;
 }
 
-.clickable-row:hover {
+.clickable-row:hover > td,
+.clickable-row:focus-within > td {
   background: #efeee7;
 }
 

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { formatDateTime } from '../../shared/utils/date';
+import { formatDateTime, formatInstantTime } from '../../shared/utils/date';
 import {
   INTERACTION_INTERVAL_MINUTES,
   RESERVATION_INCREMENT_MINUTES,
@@ -157,8 +157,11 @@ test('serializes service-local reservation inputs with the Seoul offset', () => 
 
 test('formats instants and admin date boundaries in Seoul', () => {
   const formatted = formatDateTime('2026-07-13T15:30:00Z');
+  const timeOnly = formatInstantTime('2026-07-13T15:30:00Z');
   expect(formatted).toContain('2026. 7. 14.');
   expect(formatted).toContain('12:30');
+  expect(timeOnly).toContain('12:30');
+  expect(timeOnly).not.toContain('2026');
   expect(toServiceStartOfDayOffset('2026-07-14')).toBe('2026-07-14T00:00:00+09:00');
   const inclusiveEnd = toServiceEndOfDayOffset('2026-07-14');
   expect(inclusiveEnd).toBe('2026-07-14T23:59:59.999999+09:00');

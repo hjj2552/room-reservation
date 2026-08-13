@@ -276,6 +276,80 @@ test('reservation list keeps 12px between its table and result controls', async 
   await expectVerticalGap(tableWrap, resultSummary, 12);
 });
 
+test('administrator reservation and recurrence tables keep native cell geometry', async ({ page, request }) => {
+  await loginByApi(request);
+  const longRoomName = 'testing 아주 긴 공간 이름이 인접한 열을 침범하지 않아야 합니다';
+  const longPurpose = 'testing 긴 예약 목적은 지정된 목적 열 안에서 자연스럽게 줄바꿈되고 뒤쪽 열을 밀어내지 않습니다.';
+
+  await page.route('**/api/admin/reservations?**', (route) => route.fulfill({ json: {
+    items: [{
+      ...reservationItem('geometry', 'testing-room-geometry', longRoomName),
+      applicantEmail: 'testing-applicant-with-a-long-address@example.invalid',
+      purpose: longPurpose,
+    }],
+    page: 0,
+    size: 20,
+    totalItems: 1,
+    totalPages: 1,
+  } }));
+  await page.route('**/api/admin/recurrences?**', (route) => route.fulfill({ json: {
+    items: [{
+      ...recurrenceItem('geometry', 'testing-room-geometry', longRoomName),
+      purpose: longPurpose,
+    }],
+    page: 0,
+    size: 20,
+    totalItems: 1,
+    totalPages: 1,
+  } }));
+
+  for (const width of [1920, 1440]) {
+    await page.setViewportSize({ width, height: 1080 });
+    await page.goto('/admin/reservations');
+    const table = page.getByTestId('reservations-table');
+    await expect(table).toBeVisible();
+    await expectTableUsesNativeCells(table);
+    await expectWrapperHasNoOverflow(table);
+    await expectAdjacentCellsDoNotOverlap(table);
+    const timeStack = table.locator('tbody tr').first().locator('.table-cell-stack');
+    const roomCell = table.locator('tbody tr').first().locator('td').nth(1);
+    const [timeBox, roomBox] = await Promise.all([timeStack.boundingBox(), roomCell.boundingBox()]);
+    if (!timeBox || !roomBox) throw new Error('Could not measure reservation time and room cells.');
+    expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(roomBox.x + 1);
+  }
+
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/admin/recurrences');
+  const recurrenceTable = page.getByTestId('recurrences-table');
+  await expect(recurrenceTable).toBeVisible();
+  await expectTableUsesNativeCells(recurrenceTable);
+  await expectWrapperHasNoOverflow(recurrenceTable);
+  await expectAdjacentCellsDoNotOverlap(recurrenceTable);
+
+  const recurrenceRow = recurrenceTable.locator('tbody tr').first();
+  const initialBackground = await recurrenceRow.locator('td').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
+  await recurrenceRow.hover();
+  const hoverBackgrounds = await recurrenceRow.locator('td').evaluateAll((cells) =>
+    cells.map((cell) => getComputedStyle(cell).backgroundColor),
+  );
+  expect(new Set(hoverBackgrounds).size).toBe(1);
+  expect(hoverBackgrounds[0]).not.toBe(initialBackground);
+  await page.mouse.move(0, 0);
+  await recurrenceRow.focus();
+  const focusBackgrounds = await recurrenceRow.locator('td').evaluateAll((cells) =>
+    cells.map((cell) => getComputedStyle(cell).backgroundColor),
+  );
+  expect(new Set(focusBackgrounds).size).toBe(1);
+  expect(focusBackgrounds[0]).not.toBe(initialBackground);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin/recurrences');
+  const mobileTable = page.getByTestId('recurrences-table');
+  const mobileWrapper = mobileTable.locator('xpath=..');
+  expect(await mobileWrapper.evaluate((wrapper) => wrapper.scrollWidth > wrapper.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('shared pagination keeps five-page desktop groups stable', async ({ page, request }) => {
   await loginByApi(request);
   await mockReservationPages(page, 43);
@@ -414,6 +488,30 @@ function recurrenceItem(id: string, roomId: string, roomName: string) {
     showApplicantName: false,
     createdAt: '2026-09-01T00:00:00Z',
   };
+}
+
+async function expectTableUsesNativeCells(table: Locator) {
+  const displays = await table.locator('tbody tr').first().locator('td').evaluateAll((cells) =>
+    cells.map((cell) => getComputedStyle(cell).display),
+  );
+  expect(displays.every((display) => display === 'table-cell')).toBe(true);
+}
+
+async function expectWrapperHasNoOverflow(table: Locator) {
+  expect(await table.locator('xpath=..').evaluate((wrapper) => wrapper.scrollWidth <= wrapper.clientWidth + 1)).toBe(true);
+}
+
+async function expectAdjacentCellsDoNotOverlap(table: Locator) {
+  const cells = await table.locator('tbody tr').first().locator('td').evaluateAll((elements) =>
+    elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, right: box.right, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+    }),
+  );
+  cells.forEach((cell, index) => {
+    expect(cell.scrollWidth).toBeLessThanOrEqual(cell.clientWidth + 1);
+    if (index < cells.length - 1) expect(cell.right).toBeLessThanOrEqual(cells[index + 1].left + 1);
+  });
 }
 
 async function dispatchKoreanCompositionEnter(input: Locator, value: string) {

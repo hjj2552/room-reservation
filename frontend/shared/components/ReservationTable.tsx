@@ -13,7 +13,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
   const navigate = useNavigate();
 
   return (
-    <div className="table-wrap">
+    <div className="table-wrap reservations-table-wrap">
       <table className="data-table reservations-table" data-testid="reservations-table">
         <caption className="sr-only">예약 목록</caption>
         <thead>
@@ -40,9 +40,10 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               }}
             >
               <td className="reservation-time-cell">
-                <strong>{formatDateTime(reservation.startAt)}</strong>
-                <br />
-                <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                <span className="table-cell-stack">
+                  <strong>{formatDateTime(reservation.startAt)}</strong>
+                  <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                </span>
               </td>
               <td className="reservation-room-cell"><strong>{reservation.roomName}</strong></td>
               <td>

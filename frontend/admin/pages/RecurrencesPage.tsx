@@ -21,7 +21,7 @@ import {
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { useAllTags } from '../../shared/hooks/useTags';
-import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
+import { formatDate, formatInstantTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
 import {
@@ -504,9 +504,11 @@ export function RecurrencesPage() {
                     {validPreview.items.map((item) => (
                       <tr key={`${item.date}-${item.startAt}`}>
                         <td className="nowrap-cell">{formatDate(item.date)}</td>
-                        <td className="table-time-range">
-                          <span>{formatDateTime(item.startAt)}</span>
-                          <span className="muted">~ {formatDateTime(item.endAt)}</span>
+                        <td>
+                          <span className="table-cell-stack">
+                            <span>{formatInstantTime(item.startAt)}</span>
+                            <span className="muted">~ {formatInstantTime(item.endAt)}</span>
+                          </span>
                         </td>
                         <td className="table-description-cell">
                           {item.available ? '가능' : `충돌${item.reason ? `: ${item.reason}` : ''}`}
@@ -582,7 +584,7 @@ export function RecurrencesPage() {
           {recurrences.data?.items.length === 0 ? <EmptyState message="조건에 맞는 반복 예약이 없습니다." /> : null}
           {recurrences.data?.items.length ? (
             <>
-              <div className="table-wrap">
+              <div className="table-wrap recurrences-table-wrap">
                 <table className="data-table recurrences-table" data-testid="recurrences-table">
                   <caption className="sr-only">반복 예약 목록</caption>
                   <thead>
@@ -606,13 +608,17 @@ export function RecurrencesPage() {
                           if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
                         }}
                       >
-                        <td className="table-time-range">
-                          <span>{formatDate(item.startDate)}</span>
-                          <span className="muted">~ {formatDate(item.endDate)}</span>
+                        <td>
+                          <span className="table-cell-stack">
+                            <span>{formatDate(item.startDate)}</span>
+                            <span className="muted">~ {formatDate(item.endDate)}</span>
+                          </span>
                         </td>
-                        <td className="table-time-range">
-                          {formatDayCodes(item.daysOfWeek)}
-                          <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
+                        <td>
+                          <span className="table-cell-stack">
+                            <span>{formatDayCodes(item.daysOfWeek)}</span>
+                            <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
+                          </span>
                         </td>
                         <td className="table-room-cell">{item.roomName}</td>
                         <td className="purpose-cell table-description-cell">
