@@ -319,7 +319,7 @@ test('shared pagination uses a stable two-row mobile layout', async ({ page, req
   await expect(last).toBeEnabled();
   await expect(position).toHaveText('1/43');
   await expectMobilePaginationGeometry(controls, [first, previous, next, last], position);
-  await expectNoHorizontalOverflow(page);
+  await expectPaginationContained(controls);
 
   await next.click();
   await expect(position).toHaveText('2/43');
@@ -333,7 +333,7 @@ test('shared pagination uses a stable two-row mobile layout', async ({ page, req
   await expect(last).toBeDisabled();
   await expect(next).toBeVisible();
   await expect(last).toBeVisible();
-  await expectNoHorizontalOverflow(page);
+  await expectPaginationContained(controls);
 });
 
 function pagedResponse(
@@ -535,8 +535,22 @@ async function expectMobilePaginationGeometry(
   expect(nextBox.y).toBeGreaterThan(lastBox.y);
 }
 
-async function expectNoHorizontalOverflow(page: Page) {
-  expect(await page.evaluate(() => (
-    document.documentElement.scrollWidth - document.documentElement.clientWidth
-  ))).toBeLessThanOrEqual(1);
+async function expectPaginationContained(controls: Locator) {
+  const metrics = await controls.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const buttons = Array.from(element.querySelectorAll('button'));
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: window.innerWidth,
+      overflow: element.scrollWidth - element.clientWidth,
+      buttonsFit: buttons.every((button) => button.scrollWidth <= button.clientWidth),
+      buttonsDoNotWrap: buttons.every((button) => getComputedStyle(button).whiteSpace === 'nowrap'),
+    };
+  });
+  expect(metrics.left).toBeGreaterThanOrEqual(-1);
+  expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+  expect(metrics.overflow).toBeLessThanOrEqual(1);
+  expect(metrics.buttonsFit).toBe(true);
+  expect(metrics.buttonsDoNotWrap).toBe(true);
 }
