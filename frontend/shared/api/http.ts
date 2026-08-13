@@ -154,6 +154,7 @@ type CommonApiErrorCode = Exclude<ApiErrorCode, 'VALIDATION_ERROR' | 'NOT_FOUND'
 
 const commonErrorMessages: Record<CommonApiErrorCode, string> = {
   ADMIN_UNAUTHORIZED: '로그인이 필요합니다. 다시 로그인해 주세요.',
+  CSV_EXPORT_TOO_LARGE: '내보낼 예약이 너무 많습니다. 검색 조건을 좁힌 뒤 다시 시도해 주세요.',
   DATA_INTEGRITY_VIOLATION: '입력한 내용이 시스템 제약 조건과 맞지 않습니다. 값을 다시 확인해 주세요.',
   INVALID_DURATION: '예약 시간이 허용된 최소/최대 예약 시간을 벗어났습니다.',
   INVALID_SLOT_UNIT: '예약 시간을 5분 단위로 입력하고 초 단위 값이 없는지 확인해 주세요.',

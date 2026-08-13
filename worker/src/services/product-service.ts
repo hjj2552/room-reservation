@@ -1394,16 +1394,20 @@ export class ProductService {
   async exportReservationsCsv(query: ReservationFilterQuery): Promise<string> {
     const filter = this.reservationFilter(query);
     const result = await this.database.query(
-      `${this.reservationSelect} ${filter.where} ORDER BY r.start_at ASC`,
+      `${this.reservationSelect} ${filter.where} ORDER BY r.start_at ASC LIMIT 10001`,
       filter.values,
     );
+    if (result.rows.length > 10_000) {
+      policy("CSV_EXPORT_TOO_LARGE", "Too many reservations to export. Narrow the filters and try again.");
+    }
     const header = ["reservationId", "roomName", "applicantName", "applicantEmail", "applicantPhone", "purpose", "startAt", "endAt", "status", "source", "recurrenceId", "createdAt"];
     const formatKst = (input: unknown) => new Intl.DateTimeFormat("sv-SE", {
       timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
     }).format(new Date(input instanceof Date ? input : String(input)));
     const escape = (input: unknown) => {
-      const string = input === null || input === undefined ? "" : String(input);
+      let string = input === null || input === undefined ? "" : String(input);
+      if (/^\s*[=+\-@]/u.test(string)) string = `'${string}`;
       return /[",\r\n]/.test(string) ? `"${string.replaceAll('"', '""')}"` : string;
     };
     const lines = result.rows.map((row) => {

@@ -1789,9 +1789,9 @@ describe("direct Worker contracts", () => {
 
   it("exports the exact BOM CSV contract, all filtered rows, escaping and Seoul timestamps", async () => {
     await resetProductData();
-    const roomId = await insertRoom("ordinary-csv-room");
+    const roomId = await insertRoom("=ordinary-csv-room");
     const firstId = await insertReservation({
-      roomId, purpose: "testing-csv, \"quoted\"\nline", applicantName: "CsvNeedle one", hour: 10,
+      roomId, purpose: "\t=testing-csv, \"quoted\"\nline", applicantName: "  +CsvNeedle one", hour: 10,
       createdAt: "2026-01-02T00:00:00Z",
     });
     const secondId = await insertReservation({
@@ -1809,7 +1809,8 @@ describe("direct Worker contracts", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
     const csv = new TextDecoder().decode(bytes.slice(3));
     expect(csv.startsWith("reservationId,roomName,applicantName,applicantEmail,applicantPhone,purpose,startAt,endAt,status,source,recurrenceId,createdAt\r\n")).toBe(true);
-    expect(csv).toContain(`"testing-csv, ""quoted""\nline"`);
+    expect(csv).toContain(`'=ordinary-csv-room,'  +CsvNeedle one`);
+    expect(csv).toContain(`"'\t=testing-csv, ""quoted""\nline"`);
     expect(csv).toContain(firstId);
     expect(csv).toContain(secondId);
     expect(csv.indexOf(firstId)).toBeLessThan(csv.indexOf(secondId));

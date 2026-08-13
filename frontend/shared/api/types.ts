@@ -3,6 +3,7 @@ export type ReservationSource = 'PUBLIC_FORM' | 'ADMIN_GRID' | 'ADMIN_MANUAL' | 
 export type ConflictPolicy = 'FAIL_ALL' | 'SKIP_CONFLICTS';
 export type ApiErrorCode =
   | 'ADMIN_UNAUTHORIZED'
+  | 'CSV_EXPORT_TOO_LARGE'
   | 'DATA_INTEGRITY_VIOLATION'
   | 'INVALID_DURATION'
   | 'INVALID_SLOT_UNIT'
