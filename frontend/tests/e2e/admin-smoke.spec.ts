@@ -15,6 +15,13 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
     await page.goto('/admin/rooms');
     const table = page.getByTestId('rooms-table');
     await expect(table).toBeVisible();
+    await expect(table.getByRole('columnheader')).toHaveText([
+      '공간',
+      '예약 대상',
+      '정원',
+      '수정일',
+      '관리',
+    ]);
 
     const row = page.getByRole('row').filter({ hasText: room.name });
     await expect(row).toBeVisible();

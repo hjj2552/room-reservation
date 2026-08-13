@@ -210,7 +210,7 @@ export function ReservationsPage() {
           {csvError}
         </div>
       ) : null}
-      <div data-testid="reservation-list-results" aria-busy={reservations.isFetching}>
+      <div className="reservation-list-results" data-testid="reservation-list-results" aria-busy={reservations.isFetching}>
         {reservations.isLoading ? <LoadingState /> : null}
         {reservations.isError ? <ErrorState error={reservations.error} /> : null}
         {reservations.data && reservations.data.items.length === 0 ? (

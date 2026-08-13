@@ -17,6 +17,7 @@
   --action-soft: #e7f0eb;
   --focus: #285ea8;
   --danger: #a13d38;
+  --space-3: 12px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -532,9 +533,69 @@ button:disabled {
   word-break: keep-all;
 }
 
+.reservations-table,
+.recurrences-table,
+.recurrence-preview-table,
+.recurrence-reservations-table,
+.rooms-table,
+.tag-table,
+.audit-table {
+  table-layout: fixed;
+}
+
+.reservations-table { min-width: 1080px; }
+.reservations-table th:nth-child(1) { width: 180px; }
+.reservations-table th:nth-child(2) { width: 145px; }
+.reservations-table th:nth-child(3) { width: 88px; }
+.reservations-table th:nth-child(4) { width: 185px; }
+.reservations-table th:nth-child(6) { width: 102px; }
+.reservations-table th:nth-child(7) { width: 110px; }
+
+.recurrences-table { min-width: 920px; }
+.recurrences-table th:nth-child(1) { width: 180px; }
+.recurrences-table th:nth-child(2) { width: 145px; }
+.recurrences-table th:nth-child(3) { width: 150px; }
+.recurrences-table th:nth-child(5) { width: 110px; }
+
+.recurrence-preview-table { min-width: 720px; }
+.recurrence-preview-table th:nth-child(1) { width: 140px; }
+.recurrence-preview-table th:nth-child(2) { width: 250px; }
+
+.recurrence-reservations-table { min-width: 920px; }
+.recurrence-reservations-table th:nth-child(1) { width: 180px; }
+.recurrence-reservations-table th:nth-child(2) { width: 150px; }
+.recurrence-reservations-table th:nth-child(3) { width: 88px; }
+.recurrence-reservations-table th:nth-child(5) { width: 110px; }
+
+.table-time-range,
+.audit-actor-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.table-time-range > span,
+.reservation-time-cell > strong,
+.reservation-time-cell > .muted,
+.audit-snapshot-time {
+  white-space: nowrap;
+}
+
+.table-room-cell,
+.table-applicant-cell,
+.table-description-cell {
+  word-break: keep-all;
+}
+
+.table-break-anywhere {
+  overflow-wrap: anywhere;
+}
+
+.numeric-cell {
+  text-align: right !important;
+}
+
 .audit-reservation-snapshot {
   display: grid;
-  max-width: 320px;
   gap: 3px;
   color: #475466;
 }
@@ -542,9 +603,7 @@ button:disabled {
 .audit-snapshot-room,
 .audit-snapshot-time {
   display: block;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
+  word-break: keep-all;
 }
 
 .audit-snapshot-time {
@@ -552,24 +611,11 @@ button:disabled {
   font-size: 13px;
 }
 
-.rooms-table {
-  min-width: 900px;
-}
-
-.rooms-table th:nth-child(1),
-.rooms-table td:nth-child(1) {
-  width: 108px;
-}
-
-.rooms-table th:nth-child(3),
-.rooms-table td:nth-child(3) {
-  width: 72px;
-}
-
-.rooms-table th:nth-child(4),
-.rooms-table td:nth-child(4) {
-  width: 172px;
-}
+.rooms-table { min-width: 900px; }
+.rooms-table th:nth-child(2) { width: 108px; }
+.rooms-table th:nth-child(3) { width: 76px; }
+.rooms-table th:nth-child(4) { width: 176px; }
+.rooms-table th:nth-child(5) { width: 312px; }
 
 .room-list-panel {
   width: 100%;
@@ -589,7 +635,7 @@ button:disabled {
 }
 
 .purpose-cell {
-  max-width: 360px;
+  word-break: keep-all;
 }
 
 .reservation-time-cell,
@@ -633,9 +679,25 @@ button:disabled {
   margin-top: 12px;
 }
 
-.tag-table th:nth-child(3),
-.tag-table td:nth-child(3) {
-  width: 180px;
+.tag-table { min-width: 640px; }
+.tag-table th:nth-child(2) { width: 180px; }
+.tag-table th:nth-child(3) { width: 200px; }
+
+.audit-table { min-width: 1100px; }
+.audit-table th:nth-child(1) { width: 180px; }
+.audit-table th:nth-child(2) { width: 112px; }
+.audit-table th:nth-child(3) { width: 230px; }
+.audit-table th:nth-child(4) { width: 140px; }
+.audit-table th:nth-child(5) { width: 150px; }
+
+.audit-reservation-link {
+  display: block;
+}
+
+.recurrences-table .series-chip {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .tag-color-swatch {
@@ -1715,6 +1777,15 @@ button:disabled {
   text-align: right;
 }
 
+.reservation-list-results {
+  min-width: 0;
+}
+
+.reservation-list-results > .pagination,
+.reservation-list-results > .result-summary {
+  margin-top: var(--space-3);
+}
+
 .plain-badge {
   display: inline-flex;
   align-items: center;
@@ -1802,6 +1873,10 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.pagination-mobile-controls {
+  display: none;
+}
+
 .page-button {
   min-width: 34px;
   height: 34px;
@@ -1823,6 +1898,7 @@ button:disabled {
   background: var(--action);
   color: #ffffff;
   cursor: default;
+  opacity: 1;
 }
 
 .page-ellipsis {
@@ -2310,6 +2386,60 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
+  .pagination {
+    display: block;
+    width: 100%;
+  }
+
+  .pagination-summary,
+  .pagination .pagination-desktop-controls {
+    display: none;
+  }
+
+  .pagination-mobile-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+
+  .pagination-mobile-controls .ghost-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 4px;
+  }
+
+  .pagination-first {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .pagination-last {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .pagination-previous {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .pagination-position {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+    color: #687484;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .pagination-next {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
   .recurrence-delete-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

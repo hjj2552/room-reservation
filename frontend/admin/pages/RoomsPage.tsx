@@ -276,9 +276,9 @@ export function RoomsPage() {
                 <caption className="sr-only">공간 목록</caption>
                 <thead>
                   <tr>
-                    <th scope="col" className="nowrap-cell">예약 대상</th>
                     <th scope="col">공간</th>
-                    <th scope="col" className="nowrap-cell">정원</th>
+                    <th scope="col" className="nowrap-cell">예약 대상</th>
+                    <th scope="col" className="nowrap-cell numeric-cell">정원</th>
                     <th scope="col" className="nowrap-cell">수정일</th>
                     <th scope="col" className="nowrap-cell">관리</th>
                   </tr>
@@ -286,17 +286,17 @@ export function RoomsPage() {
                 <tbody>
                   {rooms.data.items.map((room) => (
                     <tr key={room.id}>
+                      <td className="table-room-cell">
+                        <strong>{room.name}</strong>
+                        <br />
+                        <span className="muted">{room.location || '-'}</span>
+                      </td>
                       <td className="nowrap-cell">
                         <span className={`plain-badge ${room.enabled ? 'good' : 'muted-badge'}`}>
                           {room.enabled ? '사용 중' : '제외됨'}
                         </span>
                       </td>
-                      <td>
-                        <strong>{room.name}</strong>
-                        <br />
-                        <span className="muted">{room.location || '-'}</span>
-                      </td>
-                      <td className="nowrap-cell">{room.capacity ?? 0}명</td>
+                      <td className="nowrap-cell numeric-cell">{room.capacity ?? 0}명</td>
                       <td className="nowrap-cell">{formatDateTime(room.updatedAt)}</td>
                       <td>
                         <div className="button-row table-actions">

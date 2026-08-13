@@ -150,7 +150,7 @@ export function TagSettingsPage() {
                   <tr>
                     <th scope="col">이름</th>
                     <th scope="col">색상</th>
-                    <th scope="col">작업</th>
+                    <th scope="col">관리</th>
                   </tr>
                 </thead>
                 <tbody>

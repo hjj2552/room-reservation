@@ -14,7 +14,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
 
   return (
     <div className="table-wrap">
-      <table className="data-table" data-testid="reservations-table">
+      <table className="data-table reservations-table" data-testid="reservations-table">
         <caption className="sr-only">예약 목록</caption>
         <thead>
           <tr>
@@ -48,18 +48,18 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               <td>
                 <StatusBadge status={reservation.status} />
               </td>
-              <td>
+              <td className="table-applicant-cell">
                 {reservation.applicantName}
                 {reservation.applicantEmail ? (
                   <>
                     <br />
-                    <span className="muted">{reservation.applicantEmail}</span>
+                    <span className="muted table-break-anywhere">{reservation.applicantEmail}</span>
                   </>
                 ) : null}
               </td>
               <td className="purpose-cell">{reservation.purpose}</td>
-              <td>{sourceLabels[reservation.source]}</td>
-              <td>
+              <td className="nowrap-cell">{sourceLabels[reservation.source]}</td>
+              <td className="nowrap-cell">
                 <Link
                   className="text-link"
                   to={timetableReservationUrl({ startAt: reservation.startAt, roomId: reservation.roomId })}

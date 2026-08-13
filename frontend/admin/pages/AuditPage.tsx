@@ -46,7 +46,7 @@ function cleanSnapshotValue(value?: string | null) {
   return trimmed ? trimmed : null;
 }
 
-function deletedReservationSnapshot(history: ReservationHistory) {
+function reservationSnapshot(history: ReservationHistory) {
   return {
     roomName: cleanSnapshotValue(history.reservationRoomName) || '-',
     time: reservationTimeRange(history) || '-',
@@ -181,53 +181,52 @@ export function AuditPage() {
       {audit.data && audit.data.items.length > 0 ? (
         <>
           <div className="table-wrap">
-            <table className="data-table" data-testid="audit-table">
+            <table className="data-table audit-table" data-testid="audit-table">
               <caption className="sr-only">감사 이력</caption>
               <thead>
                 <tr>
                   <th scope="col">처리 시각</th>
                   <th scope="col">처리 유형</th>
+                  <th scope="col">대상 예약</th>
                   <th scope="col">상태 변경</th>
                   <th scope="col">처리자</th>
-                  <th scope="col">예약</th>
                   <th scope="col">메모</th>
                 </tr>
               </thead>
               <tbody>
                 {audit.data.items.map((history) => {
                   const isDeleted = history.action === 'DELETED';
-                  const snapshot = isDeleted ? deletedReservationSnapshot(history) : null;
+                  const snapshot = reservationSnapshot(history);
+                  const summary = (
+                    <span className="audit-reservation-snapshot">
+                      <span className="audit-snapshot-room">{snapshot.roomName}</span>
+                      <span className="audit-snapshot-time">{snapshot.time}</span>
+                    </span>
+                  );
 
                   return (
                     <tr key={history.id}>
-                      <td>{formatDateTime(history.createdAt)}</td>
-                      <td>{historyActionLabel(history.action)}</td>
+                      <td className="nowrap-cell">{formatDateTime(history.createdAt)}</td>
+                      <td className="nowrap-cell">{historyActionLabel(history.action)}</td>
                       <td>
-                        {history.beforeStatus ? statusLabels[history.beforeStatus] : '-'} →{' '}
-                        {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
-                      </td>
-                      <td>
-                        {history.actorId}
-                        <br />
-                        <span className="muted">{history.actorType}</span>
-                      </td>
-                      <td>
-                        {isDeleted ? (
-                          <span className="audit-reservation-snapshot">
-                            <span className="audit-snapshot-room" title={snapshot?.roomName}>
-                              {snapshot?.roomName}
-                            </span>
-                            <span className="audit-snapshot-time" title={snapshot?.time}>
-                              {snapshot?.time}
-                            </span>
-                          </span>
-                        ) : (
-                          <Link className="text-link" to={`/admin/reservations/${history.reservationId}`}>
-                            상세 보기
+                        {isDeleted ? summary : (
+                          <Link
+                            className="text-link audit-reservation-link"
+                            to={`/admin/reservations/${history.reservationId}`}
+                          >
+                            {summary}
                           </Link>
                         )}
                       </td>
-                      <td>{history.memo || '-'}</td>
+                      <td className="nowrap-cell">
+                        {history.beforeStatus ? statusLabels[history.beforeStatus] : '-'} →{' '}
+                        {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
+                      </td>
+                      <td className="audit-actor-cell">
+                        <span className="table-break-anywhere">{history.actorId}</span>
+                        <span className="muted">{history.actorType}</span>
+                      </td>
+                      <td className="table-description-cell">{history.memo || '-'}</td>
                     </tr>
                   );
                 })}
