@@ -738,11 +738,12 @@ export class ProductService {
     };
   }
 
-  private async verifyPublicPassword(client: Queryable, reservationId: string, password: string): Promise<Row> {
+  private async verifyPublicPassword(client: Queryable, reservationId: string, password: string, lock = false): Promise<Row> {
     const result = await client.query(
       `${this.reservationSelect}
        WHERE r.id=$1 AND r.cancel_password_hash IS NOT NULL
-         AND r.cancel_password_hash = crypt($2, r.cancel_password_hash)`,
+         AND r.cancel_password_hash = crypt($2, r.cancel_password_hash)
+       ${lock ? "FOR UPDATE OF r" : ""}`,
       [reservationId, password],
     );
     const row = result.rows[0];
@@ -781,7 +782,7 @@ export class ProductService {
     validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
     try {
       await this.database.transaction(async (client) => {
-        const before = await this.verifyPublicPassword(client, reservationId, password);
+        const before = await this.verifyPublicPassword(client, reservationId, password, true);
         if (text(before, "status") === "CANCELLED") validation("CANCELLED status reservations cannot be edited.");
         await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
         if (sameReservationValues(before, input, "REQUESTED", false)) return;
@@ -805,7 +806,7 @@ export class ProductService {
   async cancelPublicReservation(reservationId: string, password: string) {
     try {
       await this.database.transaction(async (client) => {
-        const before = await this.verifyPublicPassword(client, reservationId, password);
+        const before = await this.verifyPublicPassword(client, reservationId, password, true);
         if (text(before, "status") === "CANCELLED") validation("CANCELLED status reservations cannot be cancelled again.");
         const result = await client.query(
           `UPDATE reservations SET status='CANCELLED', updated_by_actor_type='PUBLIC_USER',
@@ -1394,16 +1395,20 @@ export class ProductService {
   async exportReservationsCsv(query: ReservationFilterQuery): Promise<string> {
     const filter = this.reservationFilter(query);
     const result = await this.database.query(
-      `${this.reservationSelect} ${filter.where} ORDER BY r.start_at ASC`,
+      `${this.reservationSelect} ${filter.where} ORDER BY r.start_at ASC LIMIT 10001`,
       filter.values,
     );
+    if (result.rows.length > 10_000) {
+      policy("CSV_EXPORT_TOO_LARGE", "Too many reservations to export. Narrow the filters and try again.");
+    }
     const header = ["reservationId", "roomName", "applicantName", "applicantEmail", "applicantPhone", "purpose", "startAt", "endAt", "status", "source", "recurrenceId", "createdAt"];
     const formatKst = (input: unknown) => new Intl.DateTimeFormat("sv-SE", {
       timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
     }).format(new Date(input instanceof Date ? input : String(input)));
     const escape = (input: unknown) => {
-      const string = input === null || input === undefined ? "" : String(input);
+      let string = input === null || input === undefined ? "" : String(input);
+      if (/^\s*[=+\-@]/u.test(string)) string = `'${string}`;
       return /[",\r\n]/.test(string) ? `"${string.replaceAll('"', '""')}"` : string;
     };
     const lines = result.rows.map((row) => {

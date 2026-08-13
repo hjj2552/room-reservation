@@ -61,6 +61,7 @@ describe("application error HTTP mapping", () => {
     [400, "VALIDATION_ERROR"],
     [401, "ADMIN_UNAUTHORIZED"],
     [403, "INVALID_CSRF_TOKEN"],
+    [413, "PAYLOAD_TOO_LARGE"],
     [429, "RATE_LIMIT_EXCEEDED"],
     [503, "RATE_LIMIT_UNAVAILABLE"],
   ] as const)("keeps HTTP-boundary error %d/%s outside application errors", (status, code) => {

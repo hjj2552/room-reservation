@@ -2,7 +2,7 @@ import type { ApplicationErrorKind } from "../core/errors";
 import { AppError } from "../core/errors";
 
 type ApplicationErrorStatus = 400 | 403 | 404 | 409 | 422;
-type HttpErrorStatus = 400 | 401 | 403 | 429 | 503;
+type HttpErrorStatus = 400 | 401 | 403 | 413 | 429 | 503;
 
 const applicationStatusByKind: Record<ApplicationErrorKind, ApplicationErrorStatus> = {
   VALIDATION: 400,
