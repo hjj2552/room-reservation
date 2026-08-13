@@ -17,6 +17,7 @@
   --action-soft: #e7f0eb;
   --focus: #285ea8;
   --danger: #a13d38;
+  --space-3: 12px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
