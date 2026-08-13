@@ -269,7 +269,7 @@ const fieldLabels: Record<string, string> = {
   startTime: '시작 시간',
   endTime: '종료 시간',
   daysOfWeek: '반복 요일',
-  conflictPolicy: '등록 정책',
+  conflictPolicy: '충돌 정책',
   status: '상태',
   memo: '메모',
   organizationName: '기관명',

@@ -237,6 +237,15 @@ test('reservation list keeps 12px between its table and result controls', async 
   await page.goto('/admin/reservations?keyword=testing-many-pages&page=0');
   const results = page.getByTestId('reservation-list-results');
   const tableWrap = results.locator(':scope > .table-wrap');
+  await expect(tableWrap.getByRole('columnheader')).toHaveText([
+    '예약 시간',
+    '공간',
+    '상태',
+    '신청자',
+    '목적',
+    '신청 경로',
+    '시간표',
+  ]);
   const pagination = results.locator(':scope > .pagination');
   await expect(pagination).toBeVisible();
   await expectVerticalGap(tableWrap, pagination, 12);

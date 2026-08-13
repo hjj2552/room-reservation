@@ -269,7 +269,7 @@ export function RecurrencesPage() {
       <div className="page-header">
         <div>
           <h1 id="recurrences-title">반복 예약</h1>
-          <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 등록 정책을 선택합니다.</p>
+          <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 충돌 정책을 선택합니다.</p>
         </div>
       </div>
 
@@ -407,7 +407,7 @@ export function RecurrencesPage() {
             ))}
           </fieldset>
           <label className="full-span">
-            등록 정책
+            충돌 정책
             <select
               data-testid="recurrence-conflict-policy-select"
               name="conflictPolicy"
@@ -472,7 +472,7 @@ export function RecurrencesPage() {
                 <div><strong>{validPreview.createAllowed ? '가능' : '불가능'}</strong><span>생성 여부</span></div>
               </div>
               <div className="table-wrap compact">
-                <table className="data-table" data-testid="recurrence-preview-table">
+                <table className="data-table recurrence-preview-table" data-testid="recurrence-preview-table">
                   <caption className="sr-only">반복 예약 미리보기 결과</caption>
                   <thead>
                     <tr>
@@ -484,9 +484,12 @@ export function RecurrencesPage() {
                   <tbody>
                     {validPreview.items.map((item) => (
                       <tr key={`${item.date}-${item.startAt}`}>
-                        <td>{formatDate(item.date)}</td>
-                        <td>{formatDateTime(item.startAt)} ~ {formatDateTime(item.endAt)}</td>
-                        <td>
+                        <td className="nowrap-cell">{formatDate(item.date)}</td>
+                        <td className="table-time-range">
+                          <span>{formatDateTime(item.startAt)}</span>
+                          <span className="muted">~ {formatDateTime(item.endAt)}</span>
+                        </td>
+                        <td className="table-description-cell">
                           {item.available ? '가능' : `충돌${item.reason ? `: ${item.reason}` : ''}`}
                           {item.message ? <div className="muted">{item.message}</div> : null}
                         </td>
@@ -561,15 +564,15 @@ export function RecurrencesPage() {
           {recurrences.data?.items.length ? (
             <>
               <div className="table-wrap">
-                <table className="data-table" data-testid="recurrences-table">
+                <table className="data-table recurrences-table" data-testid="recurrences-table">
                   <caption className="sr-only">반복 예약 목록</caption>
                   <thead>
                     <tr>
-                      <th scope="col">공간</th>
                       <th scope="col">기간</th>
                       <th scope="col">요일/시간</th>
+                      <th scope="col">공간</th>
                       <th scope="col">목적</th>
-                      <th scope="col">등록 정책</th>
+                      <th scope="col">상세</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -584,22 +587,16 @@ export function RecurrencesPage() {
                           if (event.key === 'Enter') navigate(`/admin/recurrences/${item.id}`);
                         }}
                       >
-                        <td>
-                          <Link
-                            className="text-link"
-                            to={`/admin/recurrences/${item.id}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            {item.roomName}
-                          </Link>
+                        <td className="table-time-range">
+                          <span>{formatDate(item.startDate)}</span>
+                          <span className="muted">~ {formatDate(item.endDate)}</span>
                         </td>
-                        <td>{formatDate(item.startDate)} ~ {formatDate(item.endDate)}</td>
-                        <td>
+                        <td className="table-time-range">
                           {formatDayCodes(item.daysOfWeek)}
-                          <br />
                           <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
                         </td>
-                        <td className="purpose-cell">
+                        <td className="table-room-cell">{item.roomName}</td>
+                        <td className="purpose-cell table-description-cell">
                           {item.tagName ? (
                             <span
                               className="series-chip"
@@ -610,7 +607,15 @@ export function RecurrencesPage() {
                           ) : null}
                           {item.purpose}
                         </td>
-                        <td>{conflictPolicyLabels[item.conflictPolicy]}</td>
+                        <td className="nowrap-cell">
+                          <Link
+                            className="text-link"
+                            to={`/admin/recurrences/${item.id}`}
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            상세 보기
+                          </Link>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

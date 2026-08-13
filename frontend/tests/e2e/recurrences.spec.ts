@@ -23,6 +23,9 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
   try {
     await page.goto('/admin/recurrences');
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
+    await expect(
+      page.getByTestId('recurrence-conflict-policy-select').locator('xpath=ancestor::label'),
+    ).toContainText('충돌 정책');
     await expect(page.getByTestId('recurrence-start-time-input').locator('option[value="09:05"]')).toHaveCount(1);
     await expect(page.getByTestId('recurrence-start-time-input')).toHaveValue(settings.openTime.slice(0, 5));
     await expect(page.getByTestId('recurrence-end-time-input')).toHaveValue(
@@ -63,6 +66,11 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     expect(preview.totalCandidates, previewBody).toBeGreaterThan(0);
     expect(preview.availableCount, previewBody).toBeGreaterThan(0);
     await expect(page.getByTestId('recurrence-preview-summary')).toContainText(String(preview.availableCount));
+    await expect(page.getByTestId('recurrence-preview-table').getByRole('columnheader')).toHaveText([
+      '날짜',
+      '시간',
+      '결과',
+    ]);
 
     const createResponsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -104,9 +112,22 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await page.goto('/admin/recurrences');
     let row = page.getByRole('row').filter({ hasText: purpose });
     const recurrenceTable = page.getByTestId('recurrences-table');
+    await expect(recurrenceTable.getByRole('columnheader')).toHaveText([
+      '기간',
+      '요일/시간',
+      '공간',
+      '목적',
+      '상세',
+    ]);
     await expect(page.getByTestId('recurrence-status-filter')).toHaveCount(0);
     await expect(recurrenceTable.getByRole('columnheader', { name: '상태' })).toHaveCount(0);
+    await expect(recurrenceTable.getByRole('columnheader', { name: /등록 정책|충돌 정책/ })).toHaveCount(0);
     await expect(row.locator('.plain-badge')).toHaveCount(0);
+    await expect(row.getByText(room.name, { exact: true })).not.toHaveAttribute('href');
+    await expect(row.getByRole('link', { name: '상세 보기' })).toHaveAttribute(
+      'href',
+      `/admin/recurrences/${recurrenceId}`,
+    );
     await expect(row).toContainText('화, 수, 목');
     await page.reload();
     row = page.getByRole('row').filter({ hasText: purpose });
@@ -117,7 +138,17 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
       const body = await response.json() as { daysOfWeek: string };
       await route.fulfill({ response, json: { ...body, daysOfWeek: 'THU,TUE,WED' } });
     }, { times: 1 });
-    await page.goto(`/admin/recurrences/${recurrenceId}`);
+    await row.getByRole('link', { name: '상세 보기' }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrenceId}$`));
+    await page.goBack();
+    row = page.getByRole('row').filter({ hasText: purpose });
+    await row.click();
+    await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrenceId}$`));
+    await page.goBack();
+    row = page.getByRole('row').filter({ hasText: purpose });
+    await row.focus();
+    await row.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrenceId}$`));
     await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
@@ -128,6 +159,7 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await expect(page.getByTestId('recurrence-detail-applicant-phone').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('recurrence-detail-applicant-phone')).toContainText('(비공개)');
     await expect(page.getByTestId('recurrence-detail-status')).toHaveCount(0);
+    await expect(page.getByText('충돌 정책', { exact: true })).toBeVisible();
 
     const detailResponse = await request.get(`/api/admin/recurrences/${recurrenceId}`);
     expect(detailResponse.ok()).toBe(true);
@@ -141,8 +173,16 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await cancelReservationByApi(request, cancelledReservation.id, 'testing-recurrence-child-cancel');
 
     await page.reload();
-    await expect(page.getByTestId('recurrence-reservations-table')).toContainText(modifiedPurpose);
-    await expect(page.getByTestId('recurrence-reservations-table')).toContainText('개별 수정됨');
+    const recurrenceReservationsTable = page.getByTestId('recurrence-reservations-table');
+    await expect(recurrenceReservationsTable.getByRole('columnheader')).toHaveText([
+      '예약 시간',
+      '공간',
+      '상태',
+      '목적',
+      '시간표',
+    ]);
+    await expect(recurrenceReservationsTable).toContainText(modifiedPurpose);
+    await expect(recurrenceReservationsTable).toContainText('개별 수정됨');
     await expect(page.getByTestId('recurrence-reservations-table')).toContainText('취소');
     await expect(page.getByTestId('recurrence-delete-button')).toBeVisible();
     await page.getByTestId('recurrence-delete-button').click();

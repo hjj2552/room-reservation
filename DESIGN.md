@@ -326,6 +326,15 @@ document scrolling when all content fits in one viewport.
 - Labels stay visible above or beside controls; placeholders are examples, not
   replacements for labels.
 - Place related date/time fields together and make their relationship visible.
+- Reservation creation and edit forms follow a stable task sequence: purpose,
+  room, date/time, applicant identity, contact information, then any
+  context-specific status, security, or administration fields, followed by the
+  form actions.
+- Public and administrator variants preserve this shared core sequence while
+  showing only the fields allowed by their product policies. Administrator
+  forms may add name visibility, editable status, and an administration memo;
+  public forms may use read-only status and password verification. Omitting or
+  adding a variant-specific field must not reorder the common core fields.
 - Search and filter controls should be compact enough to preserve data space.
 - Error text appears next to the affected field and remains after focus moves.
 - A single checkbox that changes how one field is used or disclosed belongs
@@ -364,6 +373,32 @@ document scrolling when all content fits in one viewport.
 - Use alignment, whitespace, and rules before adding containers.
 - Text aligns left; numeric values align right where comparison matters;
   dates and times use tabular numerals.
+- Reservation and timetable tables prioritize date/time, room, status or
+  result, applicant or purpose, secondary policy and source, then navigation.
+  Management tables prioritize the managed name, enabled state or primary
+  attribute, supporting information, then management actions. Audit history
+  prioritizes processed time, action, reservation and change, actor, then memo.
+- Stable-width columns hold fixed-format dates, statuses, numbers, navigation,
+  and management actions. Descriptive columns such as purpose, memo, and room
+  names absorb the remaining width.
+- Long values wrap inside their own column without shifting later columns.
+  Header X positions and column widths remain stable across content and page
+  changes. Important operational information is not hidden with ellipses.
+- On small screens, preserve column order and visibility and scroll only inside
+  an explicit table wrapper. CSS, not this document, is the source of exact
+  pixel widths and selectors.
+- Official administrator table columns are:
+  - reservation list: reservation time, room, status, applicant, purpose,
+    request source, timetable;
+  - recurrence list: period, weekday/time, room, purpose, detail;
+  - recurrence preview: date, time, result;
+  - recurrence detail reservations: reservation time, room, status, purpose,
+    timetable;
+  - room management: room, reservable state, capacity, updated date,
+    management;
+  - tag management: name, color, management;
+  - audit history: processed time, action, reservation, status change, actor,
+    memo.
 - Loading, empty, error, and permission states must preserve the surrounding
   layout instead of replacing it with a generic illustration card.
 

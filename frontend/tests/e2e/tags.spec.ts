@@ -28,6 +28,11 @@ test('tag settings smoke: create, update, and delete tag', async ({ page, reques
   e2eData.registerTag(tagId);
 
   await expect(page.getByTestId('tag-form-panel')).toBeHidden();
+  await expect(page.getByTestId('tags-table').getByRole('columnheader')).toHaveText([
+    '이름',
+    '색상',
+    '관리',
+  ]);
   const createdRow = page.getByRole('row').filter({ hasText: tagName });
   await expect(createdRow).toBeVisible();
   await expect(createdRow).toContainText('#2563eb');

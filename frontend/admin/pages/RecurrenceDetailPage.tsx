@@ -85,7 +85,7 @@ export function RecurrenceDetailPage() {
               <dd data-testid="recurrence-detail-schedule">{formatDayCodes(detail.daysOfWeek)} / {formatTime(detail.startTime)}~{formatTime(detail.endTime)}</dd>
             </div>
             <div>
-              <dt>등록 정책</dt>
+              <dt>충돌 정책</dt>
               <dd>{conflictPolicyLabels[detail.conflictPolicy]}</dd>
             </div>
             <div>
@@ -143,12 +143,12 @@ export function RecurrenceDetailPage() {
       <section className="panel recurrence-reservations-panel" aria-labelledby="recurrence-reservations-title">
         <h2 id="recurrence-reservations-title">생성된 개별 예약</h2>
         <div className="table-wrap compact">
-          <table className="data-table" data-testid="recurrence-reservations-table">
+          <table className="data-table recurrence-reservations-table" data-testid="recurrence-reservations-table">
             <thead>
               <tr>
-                <th scope="col">상태</th>
-                <th scope="col">공간</th>
                 <th scope="col">예약 시간</th>
+                <th scope="col">공간</th>
+                <th scope="col">상태</th>
                 <th scope="col">목적</th>
                 <th scope="col">시간표</th>
               </tr>
@@ -165,20 +165,17 @@ export function RecurrenceDetailPage() {
                     if (event.key === 'Enter') navigate(`/admin/reservations/${reservation.id}`);
                   }}
                 >
-                  <td>
-                    <StatusBadge status={reservation.status} />
-                  </td>
-                  <td>{reservation.roomName}</td>
-                  <td>
-                    {formatDateTime(reservation.startAt)}
-                    <br />
+                  <td className="table-time-range">
+                    <span>{formatDateTime(reservation.startAt)}</span>
                     <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
                   </td>
-                  <td className="purpose-cell">
+                  <td className="table-room-cell">{reservation.roomName}</td>
+                  <td><StatusBadge status={reservation.status} /></td>
+                  <td className="purpose-cell table-description-cell">
                     {reservation.purpose}
                     {reservation.exception ? <div className="muted">개별 수정됨</div> : null}
                   </td>
-                  <td>
+                  <td className="nowrap-cell">
                     <Link
                       className="text-link"
                       to={timetableReservationUrl({ startAt: reservation.startAt, roomId: reservation.roomId })}
