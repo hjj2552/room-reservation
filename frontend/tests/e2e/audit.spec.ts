@@ -190,6 +190,8 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
 
   await page.locator('.pagination-desktop-controls').getByRole('button', { name: '다음', exact: true }).click();
   await expect(page).toHaveURL(/page=1/);
+  await expect(table.locator('tbody tr')).toHaveCount(1);
+  await expect(table.locator('tbody tr')).toContainText('testing-short-memo');
   const nextHeaderGeometry = await table.getByRole('columnheader').evaluateAll((headers) =>
     headers.map((header) => {
       const box = header.getBoundingClientRect();
