@@ -544,6 +544,7 @@ async function expectPaginationContained(controls: Locator) {
       right: rect.right,
       viewportWidth: window.innerWidth,
       overflow: element.scrollWidth - element.clientWidth,
+      documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       buttonsFit: buttons.every((button) => button.scrollWidth <= button.clientWidth),
       buttonsDoNotWrap: buttons.every((button) => getComputedStyle(button).whiteSpace === 'nowrap'),
     };
@@ -551,6 +552,7 @@ async function expectPaginationContained(controls: Locator) {
   expect(metrics.left).toBeGreaterThanOrEqual(-1);
   expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth + 1);
   expect(metrics.overflow).toBeLessThanOrEqual(1);
+  expect(metrics.documentOverflow).toBeLessThanOrEqual(1);
   expect(metrics.buttonsFit).toBe(true);
   expect(metrics.buttonsDoNotWrap).toBe(true);
 }

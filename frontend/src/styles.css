@@ -1716,6 +1716,10 @@ button:disabled {
   text-align: right;
 }
 
+.reservation-list-results {
+  min-width: 0;
+}
+
 .reservation-list-results > .pagination,
 .reservation-list-results > .result-summary {
   margin-top: var(--space-3);
