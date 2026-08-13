@@ -2327,7 +2327,7 @@ button:disabled {
   }
 
   .pagination-summary,
-  .pagination-desktop-controls {
+  .pagination .pagination-desktop-controls {
     display: none;
   }
 
