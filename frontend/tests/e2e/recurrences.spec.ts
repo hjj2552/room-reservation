@@ -151,6 +151,26 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
       '시간',
       '결과',
     ]);
+    const previewCells = page.getByTestId('recurrence-preview-table').locator('tbody tr').first().locator('td');
+    const [previewDate, previewTime] = await Promise.all([
+      previewCells.nth(0).innerText(),
+      previewCells.nth(1).innerText(),
+    ]);
+    expect(previewDate).toMatch(/\d{4}/);
+    expect(previewTime).toMatch(/오전|오후/);
+    expect(previewTime).not.toContain(previewDate);
+    expect(await previewCells.evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).display)))
+      .toEqual(['table-cell', 'table-cell', 'table-cell']);
+    const previewCellBoxes = await previewCells.evaluateAll((cells) => cells.map((cell) => {
+      const box = cell.getBoundingClientRect();
+      return { left: box.left, right: box.right, scrollWidth: cell.scrollWidth, clientWidth: cell.clientWidth };
+    }));
+    previewCellBoxes.forEach((cell, index) => {
+      expect(cell.scrollWidth).toBeLessThanOrEqual(cell.clientWidth + 1);
+      if (index < previewCellBoxes.length - 1) {
+        expect(cell.right).toBeLessThanOrEqual(previewCellBoxes[index + 1].left + 1);
+      }
+    });
 
     const createResponsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());

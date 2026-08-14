@@ -165,9 +165,11 @@ export function RecurrenceDetailPage() {
                     if (event.key === 'Enter') navigate(`/admin/reservations/${reservation.id}`);
                   }}
                 >
-                  <td className="table-time-range">
-                    <span>{formatDateTime(reservation.startAt)}</span>
-                    <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                  <td>
+                    <span className="table-cell-stack">
+                      <span>{formatDateTime(reservation.startAt)}</span>
+                      <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                    </span>
                   </td>
                   <td className="table-room-cell">{reservation.roomName}</td>
                   <td><StatusBadge status={reservation.status} /></td>

@@ -222,9 +222,11 @@ export function AuditPage() {
                         {history.beforeStatus ? statusLabels[history.beforeStatus] : '-'} →{' '}
                         {history.afterStatus ? statusLabels[history.afterStatus] : '-'}
                       </td>
-                      <td className="audit-actor-cell">
-                        <span className="table-break-anywhere">{history.actorId}</span>
-                        <span className="muted">{history.actorType}</span>
+                      <td>
+                        <span className="table-cell-stack audit-actor-cell">
+                          <span className="table-break-anywhere">{history.actorId}</span>
+                          <span className="muted">{history.actorType}</span>
+                        </span>
                       </td>
                       <td className="table-description-cell">{history.memo || '-'}</td>
                     </tr>
