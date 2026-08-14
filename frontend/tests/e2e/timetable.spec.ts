@@ -78,6 +78,64 @@ test('admin timetable menu restores room view week and room context', async ({ p
   await expect(page.getByTestId('timetable-room-select')).toHaveValue(room.id);
 });
 
+test('admin timetable menu replaces unavailable room context with active rooms', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const fallbackRoom = await e2eData.createTestRoom('timetable-context-fallback');
+  const unavailableRoom = await e2eData.createTestRoom('timetable-context-unavailable');
+  const date = '2026-09-15';
+  const weekStart = '2026-09-14';
+
+  await page.goto(
+    `/admin/timetable?view=date&date=${date}&weekStart=${weekStart}`
+      + `&roomId=${unavailableRoom.id}&roomViewRoomId=${unavailableRoom.id}`,
+  );
+  await expect(page.getByTestId('timetable-date-room-select')).toHaveValue(unavailableRoom.id);
+
+  await page.locator('a[href="/admin/reservations"]').click();
+  await e2eData.setTestRoomEnabled(unavailableRoom.id, false);
+  await page.reload();
+  await page.locator('a[href^="/admin/timetable"]').click();
+
+  await expect(page).toHaveURL((url) => (
+    url.pathname === '/admin/timetable'
+    && url.searchParams.get('view') === 'date'
+    && url.searchParams.get('date') === date
+    && url.searchParams.get('weekStart') === weekStart
+    && !url.searchParams.has('roomId')
+    && Boolean(url.searchParams.get('roomViewRoomId'))
+    && url.searchParams.get('roomViewRoomId') !== unavailableRoom.id
+    && !url.search.includes(unavailableRoom.id)
+  ));
+  await expect(page.getByTestId('timetable-date-room-select')).toHaveValue('');
+  const recoveredRoomId = new URL(page.url()).searchParams.get('roomViewRoomId') || '';
+
+  await page.goBack();
+  await expect(page).toHaveURL((url) => url.pathname === '/admin/reservations');
+  await page.locator('a[href^="/admin/timetable"]').click();
+  await page.getByTestId('timetable-view-room').click();
+  const roomSelect = page.getByTestId('timetable-room-select');
+  await expect(roomSelect).toHaveValue(recoveredRoomId);
+  expect(await roomSelect.locator('option').first().getAttribute('value')).toBe(recoveredRoomId);
+  await expect(roomSelect.locator(`option[value="${fallbackRoom.id}"]`)).toHaveCount(1);
+
+  await page.locator('a[href="/admin/reservations"]').click();
+  await page.locator('a[href^="/admin/timetable"]').click();
+  await expect(page).toHaveURL((url) => (
+    url.pathname === '/admin/timetable'
+    && url.searchParams.get('view') === 'room'
+    && url.searchParams.get('date') === date
+    && url.searchParams.get('weekStart') === weekStart
+    && !url.searchParams.has('roomId')
+    && url.searchParams.get('roomViewRoomId') === recoveredRoomId
+    && !url.search.includes(unavailableRoom.id)
+  ));
+  await expect(page.getByTestId('timetable-room-select')).toHaveValue(recoveredRoomId);
+});
+
 test('admin timetable menu falls back safely when session storage is unavailable', async ({ page }) => {
   await page.addInitScript(() => {
     for (const method of ['getItem', 'setItem', 'removeItem'] as const) {
