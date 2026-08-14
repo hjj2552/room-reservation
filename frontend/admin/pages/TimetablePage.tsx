@@ -115,6 +115,29 @@ export function TimetablePage() {
     ? roomViewRoomIdParam
     : roomViewRooms[0]?.id || '';
   const selectedRoomViewRoom = roomViewRooms.find((room) => room.id === selectedRoomViewRoomId);
+
+  useEffect(() => {
+    if (!rooms.isSuccess) return;
+
+    const activeRoomIds = new Set(roomViewRooms.map((room) => room.id));
+    const next = new URLSearchParams(searchParamsRef.current);
+    let changed = false;
+
+    if (roomId && !activeRoomIds.has(roomId)) {
+      next.delete('roomId');
+      changed = true;
+    }
+    if (roomViewRoomIdParam && !activeRoomIds.has(roomViewRoomIdParam)) {
+      if (roomViewRooms[0]) next.set('roomViewRoomId', roomViewRooms[0].id);
+      else next.delete('roomViewRoomId');
+      changed = true;
+    }
+    if (!changed) return;
+
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [roomId, roomViewRoomIdParam, roomViewRooms, rooms.isSuccess, setSearchParams]);
+
   const roomTimetableFilters = useMemo<ReservationFilters>(
     () => ({
       status,
