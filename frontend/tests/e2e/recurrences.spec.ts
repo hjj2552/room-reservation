@@ -284,6 +284,36 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await expect(recurrenceReservationsTable).toContainText(modifiedPurpose);
     await expect(recurrenceReservationsTable).toContainText('개별 수정됨');
     await expect(page.getByTestId('recurrence-reservations-table')).toContainText('취소');
+
+    for (const width of [1920, 1440]) {
+      await page.setViewportSize({ width, height: 1080 });
+      const wrapper = recurrenceReservationsTable.locator('xpath=..');
+      const sizes = await wrapper.evaluate((element) => ({
+        wrapper: element.getBoundingClientRect().width,
+        container: element.parentElement?.getBoundingClientRect().width ?? 0,
+        scroll: element.scrollWidth,
+        client: element.clientWidth,
+      }));
+      expect(Math.abs(sizes.wrapper - sizes.container)).toBeLessThanOrEqual(1);
+      expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
+
+      const firstRowCells = recurrenceReservationsTable.locator('tbody tr').first().locator('td');
+      expect(await firstRowCells.evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).display)))
+        .toEqual(['table-cell', 'table-cell', 'table-cell', 'table-cell', 'table-cell']);
+      const [timeBox, roomBox] = await Promise.all([
+        firstRowCells.nth(0).locator('.table-cell-stack').boundingBox(),
+        firstRowCells.nth(1).boundingBox(),
+      ]);
+      if (!timeBox || !roomBox) throw new Error('Could not measure recurrence reservation cells.');
+      expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(roomBox.x + 1);
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileWrapper = recurrenceReservationsTable.locator('xpath=..');
+    expect(await mobileWrapper.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.setViewportSize({ width: 1440, height: 900 });
+
     await expect(page.getByTestId('recurrence-delete-button')).toBeVisible();
     await page.getByTestId('recurrence-delete-button').click();
 

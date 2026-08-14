@@ -564,10 +564,11 @@ button:disabled {
 .recurrence-preview-table th:nth-child(2) { width: 160px; }
 
 .recurrence-reservations-table { min-width: 920px; }
-.recurrence-reservations-table th:nth-child(1) { width: 180px; }
-.recurrence-reservations-table th:nth-child(2) { width: 150px; }
-.recurrence-reservations-table th:nth-child(3) { width: 88px; }
-.recurrence-reservations-table th:nth-child(5) { width: 110px; }
+.recurrence-reservations-table th:nth-child(1) { width: 23%; }
+.recurrence-reservations-table th:nth-child(2) { width: 18%; }
+.recurrence-reservations-table th:nth-child(3) { width: 10%; }
+.recurrence-reservations-table th:nth-child(4) { width: 37%; }
+.recurrence-reservations-table th:nth-child(5) { width: 12%; }
 
 .table-cell-stack,
 .audit-actor-cell {
