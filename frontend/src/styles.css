@@ -544,26 +544,20 @@ button:disabled {
 }
 
 .reservations-table { min-width: 1080px; }
-.reservations-table th:nth-child(1) { width: 210px; }
-.reservations-table th:nth-child(2) { width: 145px; }
-.reservations-table th:nth-child(3) { width: 88px; }
-.reservations-table th:nth-child(4) { width: 185px; }
-.reservations-table th:nth-child(6) { width: 110px; }
-.reservations-table th:nth-child(7) { width: 125px; }
-
-.reservations-table-wrap {
-  max-width: 1280px;
-}
+.reservations-table th:nth-child(1) { width: 20%; }
+.reservations-table th:nth-child(2) { width: 14%; }
+.reservations-table th:nth-child(3) { width: 8%; }
+.reservations-table th:nth-child(4) { width: 17%; }
+.reservations-table th:nth-child(5) { width: 20%; }
+.reservations-table th:nth-child(6) { width: 10%; }
+.reservations-table th:nth-child(7) { width: 11%; }
 
 .recurrences-table { min-width: 920px; }
-.recurrences-table th:nth-child(1) { width: 180px; }
-.recurrences-table th:nth-child(2) { width: 145px; }
-.recurrences-table th:nth-child(3) { width: 150px; }
-.recurrences-table th:nth-child(5) { width: 110px; }
-
-.recurrences-table-wrap {
-  max-width: 1080px;
-}
+.recurrences-table th:nth-child(1) { width: 20%; }
+.recurrences-table th:nth-child(2) { width: 17%; }
+.recurrences-table th:nth-child(3) { width: 20%; }
+.recurrences-table th:nth-child(4) { width: 31%; }
+.recurrences-table th:nth-child(5) { width: 12%; }
 
 .recurrence-preview-table { min-width: 720px; }
 .recurrence-preview-table th:nth-child(1) { width: 140px; }
