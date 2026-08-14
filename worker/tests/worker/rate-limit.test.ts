@@ -5,7 +5,7 @@ import { createOpaqueToken, isValidOpaqueToken } from "../../src/core/security";
 import { createHttpApp } from "../../src/http/app";
 import { CloudflareRateLimiter } from "../../src/infra/cloudflare-rate-limit";
 import type { Database } from "../../src/infra/database";
-import { CloudflareClientIpProvider } from "../../src/infra/cloudflare-client-ip";
+import { resolveCloudflareClientIp } from "../../src/infra/cloudflare-client-ip";
 import { ProductService } from "../../src/services/product-service";
 import { SessionService, type SessionRecord } from "../../src/services/session-service";
 import {
@@ -369,34 +369,32 @@ describe("Cloudflare rate-limit and direct client-IP adapters", () => {
   });
 
   it("accepts only Cloudflare edge client IP and ignores spoofable forwarding headers", () => {
-    const provider = new CloudflareClientIpProvider();
-    expect(provider.getClientIp(new Request("https://worker.test", {
+    expect(resolveCloudflareClientIp(new Request("https://worker.test", {
       headers: {
         "X-Room-Reservation-Client-IP": "203.0.113.42",
         "CF-Connecting-IP": "198.51.100.1",
         "X-Forwarded-For": "198.51.100.2",
       },
     }))).toBe("198.51.100.1");
-    expect(provider.getClientIp(new Request("https://worker.test", {
+    expect(resolveCloudflareClientIp(new Request("https://worker.test", {
       headers: {
         "X-Room-Reservation-Client-IP": "203.0.113.42",
         "X-Forwarded-For": "198.51.100.2",
       },
     }))).toBeNull();
-    expect(provider.getClientIp(new Request("https://worker.test", {
+    expect(resolveCloudflareClientIp(new Request("https://worker.test", {
       headers: { "CF-Connecting-IP": "not-an-ip" },
     }))).toBeNull();
-    expect(provider.getClientIp(new Request("https://worker.test", {
+    expect(resolveCloudflareClientIp(new Request("https://worker.test", {
       headers: { "CF-Connecting-IP": "2001:db8::1" },
     }))).toBe("2001:db8::1");
   });
 
   it("keeps the limiter actor key on CF-Connecting-IP when browser headers are forged", async () => {
-    const provider = new CloudflareClientIpProvider();
     const check = vi.fn(async (_request: Parameters<RateLimiter["check"]>[0]) => ({ allowed: true }));
     const { app } = testApp({
       limiter: { check },
-      resolveClientIp: (request) => provider.getClientIp(request),
+      resolveClientIp: resolveCloudflareClientIp,
     });
     for (const forgedIp of ["192.0.2.10", "192.0.2.11"]) {
       const response = await app.request("/api/public/settings", {

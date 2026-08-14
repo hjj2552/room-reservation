@@ -19,10 +19,8 @@ function isIpv6(value: string): boolean {
   }
 }
 
-export class CloudflareClientIpProvider {
-  getClientIp(request: Request): string | null {
-    const value = request.headers.get(CLOUDFLARE_CLIENT_IP_HEADER)?.trim();
-    if (!value || (!isIpv4(value) && !isIpv6(value))) return null;
-    return value;
-  }
+export function resolveCloudflareClientIp(request: Request): string | null {
+  const value = request.headers.get(CLOUDFLARE_CLIENT_IP_HEADER)?.trim();
+  if (!value || (!isIpv4(value) && !isIpv6(value))) return null;
+  return value;
 }
