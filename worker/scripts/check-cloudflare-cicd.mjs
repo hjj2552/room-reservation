@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 const workflow = await readFile(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
 
 const requiredFragments = [
+  "pull_request:\n    branches:\n      - main\n  push:\n    branches:\n      - main",
   "cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}",
   "production-deploy:",
   "if: github.event_name == 'push' && github.ref == 'refs/heads/main'",
