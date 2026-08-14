@@ -72,7 +72,7 @@ export function RoomsPage() {
   }, [appliedKeyword]);
 
   useEffect(() => {
-    const invalidPage = pageParam !== null && Number(pageParam) !== page;
+    const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!rooms.data || page < rooms.data.totalPages)) return;
     const nextPage = invalidPage ? 0 : Math.max(rooms.data!.totalPages - 1, 0);
     if (!invalidPage && page === nextPage) return;

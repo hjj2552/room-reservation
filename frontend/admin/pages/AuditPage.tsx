@@ -99,7 +99,7 @@ export function AuditPage() {
   const audit = useReservationHistoryAudit(filters);
 
   useEffect(() => {
-    const invalidPage = pageParam !== null && Number(pageParam) !== page;
+    const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!audit.data || page < audit.data.totalPages)) return;
     const nextPage = invalidPage ? 0 : Math.max(audit.data!.totalPages - 1, 0);
     if (!invalidPage && page === nextPage) return;

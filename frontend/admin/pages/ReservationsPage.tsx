@@ -85,7 +85,7 @@ export function ReservationsPage() {
   const reservations = useReservations(filters, { keepPreviousData: true });
 
   useEffect(() => {
-    const invalidPage = pageParam !== null && Number(pageParam) !== page;
+    const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (
       !reservations.data
       || reservations.isPlaceholderData

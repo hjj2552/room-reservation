@@ -42,7 +42,7 @@ export function TagSettingsPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    const invalidPage = pageParam !== null && Number(pageParam) !== page;
+    const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!tags.data || page < tags.data.totalPages)) return;
     const nextPage = invalidPage ? 0 : Math.max(tags.data!.totalPages - 1, 0);
     if (!invalidPage && page === nextPage) return;

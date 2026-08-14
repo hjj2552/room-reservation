@@ -104,7 +104,7 @@ test('page parameter parser accepts only non-negative safe integers', () => {
   expect(parsePageParam('2')).toBe(2);
 });
 
-test('invalid reservation page values request page zero and normalize the URL', async ({ page }) => {
+test('invalid and non-canonical reservation page values normalize the URL', async ({ page }) => {
   const requestedPages: string[] = [];
   await page.route('**/api/admin/reservations?**', async (route) => {
     const requestUrl = new URL(route.request().url());
@@ -120,7 +120,9 @@ test('invalid reservation page values request page zero and normalize the URL', 
     });
   });
 
-  for (const value of ['0.5', '-1', 'abc', 'Infinity', '9007199254740992']) {
+  for (const value of [
+    '0.5', '-1', 'abc', 'Infinity', '9007199254740992', '', '02', '2.0', '-0',
+  ]) {
     await page.goto(`/admin/reservations?page=${encodeURIComponent(value)}`);
     await expect(page).toHaveURL(/page=0(?:&|$)/);
     await expect(page.getByTestId('reservations-table')).toBeVisible();
