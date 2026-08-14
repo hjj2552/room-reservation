@@ -78,10 +78,6 @@ jobs:
         working-directory: worker
         run: npm run build
 
-      - name: Record combined artifact receipt
-        working-directory: worker
-        run: npm run artifact:manifest
-
       - name: Install Playwright browser
         working-directory: frontend
         run: npx playwright install --with-deps chromium
@@ -193,10 +189,6 @@ jobs:
       - name: Build combined Worker and Static Assets dry-run artifact
         working-directory: worker
         run: npm run build
-
-      - name: Record combined artifact receipt
-        working-directory: worker
-        run: npm run artifact:manifest
 
       - name: Deploy combined production Worker
         working-directory: worker

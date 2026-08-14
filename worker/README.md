@@ -12,7 +12,7 @@
 - `src/http`: Hono route, session cookie, CSRF, 오류 응답
 - `src/index.ts`: Worker composition root
 - `migrations/001_worker_baseline_v1.ts`: 빈 PostgreSQL용 Worker baseline V1
-- `scripts`: migration, 격리 PostgreSQL/E2E, Static Assets 배포와 artifact provenance 도구
+- `scripts`: migration, 격리 PostgreSQL/E2E와 Static Assets 배포 도구
 
 Hono는 HTTP 경계에서만 사용한다. 일반 query는 Neon HTTP를 사용하고, 중간 결과에 따라 다음 statement가 달라지는 transaction은 요청 범위 WebSocket `Client`로 `BEGIN`/`COMMIT`/`ROLLBACK` 후 항상 연결을 닫는다.
 
@@ -102,13 +102,3 @@ npm.cmd run test:uat-e2e
 ```
 
 script는 입력 origin의 첫 label이 exact UAT Worker 이름과 일치하는 HTTPS `workers.dev` URL만 허용한다. 테스트 종료 후 cleanup preview가 0건이어야 하며, 배포 정리는 exact disposable Worker와 Neon 대상만 수행한다.
-
-## Artifact와 baseline 동일성
-
-최종 commit에서 `npm.cmd run build` 후 아래 receipt를 생성한다.
-
-```powershell
-npm.cmd run artifact:manifest
-```
-
-receipt의 `gitCommit`, Worker bundle과 Static Assets의 SHA-256·파일 수·크기, baseline migration SHA-256, 결합 candidate SHA-256을 배포 기록에 함께 보관한다. receipt는 build 결과이므로 Git에 커밋하지 않는다. production 변경 후보는 배포 직전 같은 commit에서 다시 생성하고, UAT에서 검증한 receipt와 일치할 때만 배포한다.

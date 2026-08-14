@@ -23,7 +23,6 @@ const requiredFragments = [
   "run: npm run migrate:production:apply",
   "run: npm run migrate:production:verify",
   "run: npm run build",
-  "run: npm run artifact:manifest",
   "run: npm run deploy:production",
   "run: npm run deploy:smoke:production",
 ];
