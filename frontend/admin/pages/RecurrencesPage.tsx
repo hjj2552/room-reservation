@@ -23,6 +23,7 @@ import { useSettings } from '../../shared/hooks/useSettings';
 import { useAllTags } from '../../shared/hooks/useTags';
 import { formatDate, formatInstantTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
 import {
   canonicalizeWeekdayCodes,
@@ -84,11 +85,6 @@ const initialForm: RecurrenceForm = {
 };
 
 const pageSize = 20;
-
-function numberParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
 
 function filterDraftFromParams(searchParams: URLSearchParams): RecurrenceFilterDraft {
   return {
@@ -180,7 +176,8 @@ export function RecurrencesPage() {
   }, [settings.data]);
 
   const { roomId, fromDate, toDate, keyword } = appliedFilters;
-  const page = numberParam(searchParams.get('page'), 0);
+  const pageParam = searchParams.get('page');
+  const page = parsePageParam(pageParam);
 
   const filters = useMemo<RecurrenceFilters>(
     () => ({
@@ -194,6 +191,21 @@ export function RecurrencesPage() {
     [roomId, fromDate, toDate, keyword, page],
   );
   const recurrences = useRecurrences(filters, { keepPreviousData: true });
+
+  useEffect(() => {
+    const invalidPage = pageParam !== null && pageParam !== String(page);
+    if (!invalidPage && (
+      !recurrences.data
+      || recurrences.isPlaceholderData
+      || page < recurrences.data.totalPages
+    )) return;
+    const nextPage = invalidPage ? 0 : lastPageIndex(recurrences.data!.totalPages);
+    if (!invalidPage && page === nextPage) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [page, pageParam, recurrences.data, recurrences.isPlaceholderData, searchParams, setSearchParams]);
   const currentPreviewFingerprint = recurrencePreviewFingerprint(form);
   const previewFingerprintMatches = successfulPreview?.fingerprint === currentPreviewFingerprint;
   const previewIsValid = previewFingerprintMatches && !preview.isPending && !preview.isError;

@@ -46,6 +46,7 @@ Changing this setting is a privacy-relevant administrator action, so its previou
 ## Reservation Password Policy
 
 - Public request creation requires a reservation password. The API field remains `cancelPassword` for compatibility.
+- The password must be 4–64 printable ASCII characters (`!` through `~`). Spaces, Korean characters, emoji, and other Unicode characters are not accepted or normalized.
 - The backend stores only a password hash in `reservations.cancel_password_hash`; it must not store the raw password.
 - Public editing and cancellation verify the same password hash.
 - If the password is wrong, the API returns the existing action-specific error code and the UI consistently shows a reservation-password mismatch message.

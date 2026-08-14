@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Navigate, type Location, type To, useLocation, useNavigate } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { isUnauthorized, useAdminSession, useLogin } from '../../shared/hooks/useAuth';
 
@@ -10,10 +10,13 @@ export function LoginPage() {
   const session = useAdminSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: Location } | null)?.from?.pathname || '/admin/reservations';
+  const from = (location.state as { from?: Location } | null)?.from;
+  const returnTo: To = from
+    ? { pathname: from.pathname, search: from.search, hash: from.hash }
+    : '/admin/reservations';
 
   if (session.data) {
-    return <Navigate to="/admin/reservations" replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -21,7 +24,7 @@ export function LoginPage() {
     login.mutate(
       { username, password },
       {
-        onSuccess: () => navigate(from, { replace: true }),
+        onSuccess: () => navigate(returnTo, { replace: true }),
       },
     );
   }

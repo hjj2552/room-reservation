@@ -29,6 +29,8 @@ Worker environment configuration:
 
 세 rate-limit namespace는 서로 다른 production 전용 positive integer ID여야 합니다. Worker는 Cloudflare edge의 `CF-Connecting-IP`만 rate-limit client IP로 사용하며 browser가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 신뢰하지 않습니다. IP가 없거나 limiter binding이 실패하면 session DB 조회 전에 fail closed 합니다.
 
+API 요청은 신뢰 IP 확인 → INGRESS 제한 → 유효한 session 조회 → 비관리자 READ/WRITE 제한 → CSRF 검증 → body와 제품 처리 순서로 진행합니다.
+
 ## GitHub Actions secrets
 
 실제 값은 모두 Repository Secrets에 저장합니다.
@@ -45,7 +47,7 @@ Worker environment configuration:
 - `NEON_MIGRATION_EXPECTED_DATABASE`
 - `NEON_MIGRATION_EXPECTED_ROLE`
 
-`CLOUDFLARE_PRODUCTION_ORIGIN`은 path, query, fragment가 없는 exact HTTPS `workers.dev` origin입니다. Pages 전용 Secret은 Static Assets 전환 검증과 별도 삭제 승인 전까지 유지합니다. 공개 가능한 식별자도 Repository Variables나 committed configuration에 실제 값을 두지 않으며 명령 인자, artifact, cache, receipt와 log에 운영 값을 출력하지 않습니다.
+`CLOUDFLARE_PRODUCTION_ORIGIN`은 path, query, fragment가 없는 exact HTTPS `workers.dev` origin입니다. Pages 전용 Secret은 Static Assets 전환 검증과 별도 삭제 승인 전까지 유지합니다. 공개 가능한 식별자도 Repository Variables나 committed configuration에 실제 값을 두지 않으며 명령 인자, build output, cache와 log에 운영 값을 출력하지 않습니다.
 
 `NEON_MIGRATION_DATABASE_URL`은 production Neon direct connection URL이며 pooled endpoint를 사용하지 않습니다. expected host, database와 role은 연결 대상을 fail-closed로 검증합니다. schema 변경 권한이 있는 migration role과 Worker runtime role은 분리합니다.
 
@@ -54,7 +56,7 @@ Worker environment configuration:
 `main` push에서 다음 순서를 지킵니다.
 
 1. Worker unit/contract, disposable PostgreSQL integration과 frontend production build 통과
-2. combined Worker + Static Assets dry-run 및 artifact receipt 생성
+2. combined Worker + Static Assets dry-run
 3. Worker 기반 전체 Playwright E2E 통과
 4. production 설정과 기존 Worker target read-only 검증
 5. production Neon identity와 `worker_migrations` 정합성 검증
@@ -64,7 +66,7 @@ Worker environment configuration:
 
 Migration identity, ledger 또는 schema 검증이 실패하면 Worker를 배포하지 않습니다. pending migration이 없으면 성공적인 no-op으로 처리합니다. 자동 down migration이나 DB rollback은 수행하지 않고 forward-fix합니다.
 
-`artifact:manifest` receipt는 Git commit, Worker bundle, Static Assets와 migrations의 SHA-256 및 안전한 크기 통계만 포함합니다. 운영 Worker 이름, hostname, account/resource/version ID는 포함하지 않습니다.
+GitHub Actions가 checkout한 immutable event commit SHA를 배포 소스 식별자로 사용하고, `npm ci`와 committed lockfile을 의존성 기준으로 사용합니다. 실제 배포 결과는 Cloudflare의 Worker version과 deployment 기록에서 확인하되 실제 운영 식별자는 Git이나 Actions log에 출력하지 않습니다.
 
 ## 전환 전 검증
 
@@ -83,7 +85,7 @@ Production 전환은 별도 승인 후 진행합니다. 기존 Pages 프로젝�
 
 Static Assets 전환은 DB schema를 변경하지 않습니다. 전환 직전에 다음 조건을 모두 만족해야 합니다.
 
-1. 현재 production Worker의 안정 version과 deployment를 Git 외부 운영 기록에 식별합니다. 실제 version ID는 저장소, Actions log와 artifact에 기록하지 않습니다.
+1. 현재 production Worker의 안정 version과 deployment를 Git 외부 운영 기록에 식별합니다. 실제 version ID는 저장소와 Actions log에 기록하지 않습니다.
 2. 해당 version이 Cloudflare Deployments 화면에서 rollback 대상으로 선택 가능한지 확인합니다. Worker version에는 code, Static Assets, bindings와 compatibility 설정이 함께 보존됩니다.
 3. 기존 Pages의 `API_BACKEND`가 같은 production Worker를 가리키고, 전환 전 Pages → 기존 Worker read-only smoke가 통과하는지 확인합니다.
 4. 기존 Pages의 Git 자동 배포와 branch control 상태를 사용자가 dashboard에서 확인합니다. 이번 작업은 해당 설정을 변경하지 않습니다.

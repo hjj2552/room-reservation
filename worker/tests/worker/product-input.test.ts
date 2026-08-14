@@ -8,6 +8,7 @@ import {
   parseRecurrencePreview,
   parseReservationFilter,
   parseRoomList,
+  parseSaveRoom,
   parseSaveRoomOrder,
   parseUpdateSettings,
 } from "../../src/http/product-input";
@@ -29,6 +30,25 @@ function publicBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("typed HTTP product input", () => {
+  it("normalizes room names while preserving internal whitespace and validation", () => {
+    const room = {
+      location: "Building A",
+      capacity: 10,
+      description: "Room description",
+      enabled: true,
+    };
+
+    expect(parseSaveRoom({ ...room, name: " \t공간  A\r\n " }).name).toBe("공간  A");
+    const maxName = "가".repeat(100);
+    expect(parseSaveRoom({ ...room, name: ` ${maxName} ` }).name).toBe(maxName);
+    expect(() => parseSaveRoom({ ...room, name: " \t\r\n " })).toThrowError(
+      expect.objectContaining({ code: "VALIDATION_ERROR" }),
+    );
+    expect(() => parseSaveRoom({ ...room, name: "a".repeat(101) })).toThrowError(
+      expect.objectContaining({ code: "VALIDATION_ERROR" }),
+    );
+  });
+
   it("normalizes weekdays without mutating input and sorts them Monday through Sunday", () => {
     const mixedDays = ["THU", "TUE", "WED"];
     const duplicateDays = ["THU", "TUE", "THU", "WED"];

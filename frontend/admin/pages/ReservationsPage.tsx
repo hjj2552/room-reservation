@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../shared/components/St
 import { useReservations } from '../../shared/hooks/useReservations';
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { statusLabels } from '../../shared/utils/labels';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import {
   toServiceEndOfDayOffset,
   toServiceStartOfDayOffset,
@@ -43,11 +44,6 @@ function sameFilterDraft(first: ReservationFilterDraft, second: ReservationFilte
     && first.keyword === second.keyword;
 }
 
-function numberParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
 export function ReservationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
@@ -71,7 +67,8 @@ export function ReservationsPage() {
   }, [appliedFilters]);
 
   const { status, roomId, fromDate, toDate, keyword } = appliedFilters;
-  const page = numberParam(searchParams.get('page'), 0);
+  const pageParam = searchParams.get('page');
+  const page = parsePageParam(pageParam);
 
   const filters = useMemo<ReservationFilters>(
     () => ({
@@ -86,6 +83,21 @@ export function ReservationsPage() {
     [status, roomId, keyword, fromDate, toDate, page],
   );
   const reservations = useReservations(filters, { keepPreviousData: true });
+
+  useEffect(() => {
+    const invalidPage = pageParam !== null && pageParam !== String(page);
+    if (!invalidPage && (
+      !reservations.data
+      || reservations.isPlaceholderData
+      || page < reservations.data.totalPages
+    )) return;
+    const nextPage = invalidPage ? 0 : lastPageIndex(reservations.data!.totalPages);
+    if (!invalidPage && page === nextPage) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [page, pageParam, reservations.data, reservations.isPlaceholderData, searchParams, setSearchParams]);
 
   function updateSearchParams(updater: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(searchParamsRef.current);

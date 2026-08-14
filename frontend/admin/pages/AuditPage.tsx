@@ -7,6 +7,7 @@ import { useRoomOptions } from '../../shared/hooks/useRooms';
 import type { ReservationHistory } from '../../shared/api/types';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import {
   reservationServiceTimeZone,
   toServiceEndOfDayOffset,
@@ -35,11 +36,6 @@ const actions = [
   'DELETED',
   'RECURRENCE_CANCELLED',
 ];
-
-function numberParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
 
 function cleanSnapshotValue(value?: string | null) {
   const trimmed = value?.trim();
@@ -85,7 +81,8 @@ export function AuditPage() {
   const action = searchParams.get('action') || '';
   const fromDate = searchParams.get('fromDate') || '';
   const toDate = searchParams.get('toDate') || '';
-  const page = numberParam(searchParams.get('page'), 0);
+  const pageParam = searchParams.get('page');
+  const page = parsePageParam(pageParam);
 
   const filters = useMemo(
     () => ({
@@ -100,6 +97,17 @@ export function AuditPage() {
     [reservationId, roomId, action, fromDate, toDate, page],
   );
   const audit = useReservationHistoryAudit(filters);
+
+  useEffect(() => {
+    const invalidPage = pageParam !== null && pageParam !== String(page);
+    if (!invalidPage && (!audit.data || page < audit.data.totalPages)) return;
+    const nextPage = invalidPage ? 0 : lastPageIndex(audit.data!.totalPages);
+    if (!invalidPage && page === nextPage) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [audit.data, page, pageParam, searchParams, setSearchParams]);
 
   function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
     const next = new URLSearchParams(searchParamsRef.current);

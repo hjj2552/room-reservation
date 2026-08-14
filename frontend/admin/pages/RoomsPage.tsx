@@ -15,6 +15,7 @@ import {
   useUpdateRoomEnabled,
 } from '../../shared/hooks/useRooms';
 import { formatDateTime } from '../../shared/utils/date';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 
 interface RoomFormState {
   name: string;
@@ -37,15 +38,11 @@ const RoomOrderPanelContent = lazy(() => import('../components/RoomOrderPanel').
   default: module.RoomOrderPanelContent,
 })));
 
-function numberParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
 export function RoomsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const appliedKeyword = searchParams.get('keyword') || '';
-  const page = numberParam(searchParams.get('page'), 0);
+  const pageParam = searchParams.get('page');
+  const page = parsePageParam(pageParam);
   const [keyword, setKeyword] = useState(appliedKeyword);
   const previousAppliedKeywordRef = useRef(appliedKeyword);
   const [editingRoom, setEditingRoom] = useState<AdminRoom | null>(null);
@@ -75,13 +72,14 @@ export function RoomsPage() {
   }, [appliedKeyword]);
 
   useEffect(() => {
-    if (!rooms.data || page < rooms.data.totalPages) return;
-    const nextPage = Math.max(rooms.data.totalPages - 1, 0);
-    if (page === nextPage) return;
+    const invalidPage = pageParam !== null && pageParam !== String(page);
+    if (!invalidPage && (!rooms.data || page < rooms.data.totalPages)) return;
+    const nextPage = invalidPage ? 0 : lastPageIndex(rooms.data!.totalPages);
+    if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));
     setSearchParams(next, { replace: true });
-  }, [page, rooms.data, searchParams, setSearchParams]);
+  }, [page, pageParam, rooms.data, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!editingRoom) {

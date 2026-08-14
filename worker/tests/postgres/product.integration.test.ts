@@ -1149,6 +1149,92 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
   return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
 }
 
+describe("room name normalization HTTP contract", () => {
+  it("normalizes create and update names, preserves duplicate handling, and records normalized snapshots", async () => {
+    await resetProductData();
+    const { app, writeHeaders } = await authenticatedApp();
+
+    const createResponse = await app.request("http://worker.test/api/admin/rooms", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        name: " \t testing-room-trim \r\n",
+        location: "Building A",
+        capacity: 10,
+        description: "Room description",
+        enabled: true,
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as { id: string; name: string };
+    expect(created.name).toBe("testing-room-trim");
+
+    const duplicateResponse = await app.request("http://worker.test/api/admin/rooms", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        name: " testing-room-trim ",
+        location: "Building B",
+        capacity: 5,
+        description: null,
+        enabled: true,
+      }),
+    });
+    expect(duplicateResponse.status).toBe(409);
+    await expect(duplicateResponse.json()).resolves.toMatchObject({
+      code: "ROOM_NAME_DUPLICATED",
+    });
+
+    const updateResponse = await app.request(`http://worker.test/api/admin/rooms/${created.id}`, {
+      method: "PUT",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        name: "\n testing-room-trim-updated\t ",
+        location: "Building A",
+        capacity: 10,
+        description: "Room description",
+        enabled: true,
+      }),
+    });
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      id: created.id,
+      name: "testing-room-trim-updated",
+    });
+
+    const storedRoom = await database.query<{ name: string }>(
+      "SELECT name FROM rooms WHERE id=$1",
+      [created.id],
+    );
+    expect(storedRoom.rows[0]?.name).toBe("testing-room-trim-updated");
+
+    const startAt = futureWeekday(30, 10);
+    const reservation = await products.createAdminReservation(
+      parseAdminReservation({
+        roomId: created.id,
+        applicantName: "testing-room-trim-applicant",
+        applicantEmail: "testing-room-trim@example.test",
+        applicantPhone: null,
+        purpose: "testing-room-trim-audit",
+        startAt,
+        endAt: addHour(startAt),
+        status: "CONFIRMED",
+        showApplicantName: false,
+      }),
+      "admin",
+    );
+    const history = await database.query<{ reservation_room_name: string }>(
+      `SELECT reservation_room_name
+       FROM reservation_histories
+       WHERE reservation_id=$1 AND action='CREATED_BY_ADMIN'`,
+      [reservation.id],
+    );
+    expect(history.rows).toEqual([
+      { reservation_room_name: "testing-room-trim-updated" },
+    ]);
+  });
+});
+
 describe("room display order HTTP contract", () => {
   it("returns the complete ordinary-room order and rejects invalid or stale saves", async () => {
     await resetProductData();
