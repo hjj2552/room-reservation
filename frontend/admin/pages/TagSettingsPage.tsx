@@ -7,6 +7,7 @@ import { ModalDialog } from '../../shared/components/ModalDialog';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '../../shared/hooks/useTags';
+import { parsePageParam } from '../../shared/utils/page';
 
 interface TagForm {
   name: string;
@@ -19,11 +20,6 @@ const initialForm: TagForm = {
 };
 const pageSize = 20;
 
-function numberParam(value: string | null, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-}
-
 export function TagSettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
@@ -32,7 +28,8 @@ export function TagSettingsPage() {
   const [deletingTag, setDeletingTag] = useState<Tag | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [form, setForm] = useState<TagForm>(initialForm);
-  const page = numberParam(searchParams.get('page'), 0);
+  const pageParam = searchParams.get('page');
+  const page = parsePageParam(pageParam);
   const filters = useMemo<TagFilters>(() => ({ page, size: pageSize }), [page]);
   const tags = useTags(filters);
   const createTag = useCreateTag();
@@ -43,6 +40,17 @@ export function TagSettingsPage() {
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
+
+  useEffect(() => {
+    const invalidPage = pageParam !== null && Number(pageParam) !== page;
+    if (!invalidPage && (!tags.data || page < tags.data.totalPages)) return;
+    const nextPage = invalidPage ? 0 : Math.max(tags.data!.totalPages - 1, 0);
+    if (!invalidPage && page === nextPage) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('page', String(nextPage));
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [page, pageParam, searchParams, setSearchParams, tags.data]);
 
   useEffect(() => {
     if (!isFormOpen) return undefined;
