@@ -309,6 +309,7 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     const table = page.getByTestId('reservations-table');
     await expect(table).toBeVisible();
     await expectTableUsesNativeCells(table);
+    await expectTableFillsContainer(table);
     await expectWrapperHasNoOverflow(table);
     await expectAdjacentCellsDoNotOverlap(table);
     const timeStack = table.locator('tbody tr').first().locator('.table-cell-stack');
@@ -323,6 +324,7 @@ test('administrator reservation and recurrence tables keep native cell geometry'
   const recurrenceTable = page.getByTestId('recurrences-table');
   await expect(recurrenceTable).toBeVisible();
   await expectTableUsesNativeCells(recurrenceTable);
+  await expectTableFillsContainer(recurrenceTable);
   await expectWrapperHasNoOverflow(recurrenceTable);
   await expectAdjacentCellsDoNotOverlap(recurrenceTable);
 
@@ -495,6 +497,14 @@ async function expectTableUsesNativeCells(table: Locator) {
     cells.map((cell) => getComputedStyle(cell).display),
   );
   expect(displays.every((display) => display === 'table-cell')).toBe(true);
+}
+
+async function expectTableFillsContainer(table: Locator) {
+  const sizes = await table.locator('xpath=..').evaluate((wrapper) => ({
+    wrapper: wrapper.getBoundingClientRect().width,
+    container: wrapper.parentElement?.getBoundingClientRect().width ?? 0,
+  }));
+  expect(Math.abs(sizes.wrapper - sizes.container)).toBeLessThanOrEqual(1);
 }
 
 async function expectWrapperHasNoOverflow(table: Locator) {
