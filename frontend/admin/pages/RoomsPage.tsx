@@ -15,7 +15,7 @@ import {
   useUpdateRoomEnabled,
 } from '../../shared/hooks/useRooms';
 import { formatDateTime } from '../../shared/utils/date';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 
 interface RoomFormState {
   name: string;
@@ -74,7 +74,7 @@ export function RoomsPage() {
   useEffect(() => {
     const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!rooms.data || page < rooms.data.totalPages)) return;
-    const nextPage = invalidPage ? 0 : Math.max(rooms.data!.totalPages - 1, 0);
+    const nextPage = invalidPage ? 0 : lastPageIndex(rooms.data!.totalPages);
     if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));

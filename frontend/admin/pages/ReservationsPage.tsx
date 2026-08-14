@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../shared/components/St
 import { useReservations } from '../../shared/hooks/useReservations';
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { statusLabels } from '../../shared/utils/labels';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import {
   toServiceEndOfDayOffset,
   toServiceStartOfDayOffset,
@@ -91,7 +91,7 @@ export function ReservationsPage() {
       || reservations.isPlaceholderData
       || page < reservations.data.totalPages
     )) return;
-    const nextPage = invalidPage ? 0 : Math.max(reservations.data!.totalPages - 1, 0);
+    const nextPage = invalidPage ? 0 : lastPageIndex(reservations.data!.totalPages);
     if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));

@@ -23,7 +23,7 @@ import { useSettings } from '../../shared/hooks/useSettings';
 import { useAllTags } from '../../shared/hooks/useTags';
 import { formatDate, formatInstantTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
 import {
   canonicalizeWeekdayCodes,
@@ -199,7 +199,7 @@ export function RecurrencesPage() {
       || recurrences.isPlaceholderData
       || page < recurrences.data.totalPages
     )) return;
-    const nextPage = invalidPage ? 0 : Math.max(recurrences.data!.totalPages - 1, 0);
+    const nextPage = invalidPage ? 0 : lastPageIndex(recurrences.data!.totalPages);
     if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));

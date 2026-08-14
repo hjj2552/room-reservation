@@ -7,7 +7,7 @@ import { useRoomOptions } from '../../shared/hooks/useRooms';
 import type { ReservationHistory } from '../../shared/api/types';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import {
   reservationServiceTimeZone,
   toServiceEndOfDayOffset,
@@ -101,7 +101,7 @@ export function AuditPage() {
   useEffect(() => {
     const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!audit.data || page < audit.data.totalPages)) return;
-    const nextPage = invalidPage ? 0 : Math.max(audit.data!.totalPages - 1, 0);
+    const nextPage = invalidPage ? 0 : lastPageIndex(audit.data!.totalPages);
     if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));

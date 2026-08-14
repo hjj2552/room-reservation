@@ -7,7 +7,7 @@ import { ModalDialog } from '../../shared/components/ModalDialog';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from '../../shared/hooks/useTags';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 
 interface TagForm {
   name: string;
@@ -44,7 +44,7 @@ export function TagSettingsPage() {
   useEffect(() => {
     const invalidPage = pageParam !== null && pageParam !== String(page);
     if (!invalidPage && (!tags.data || page < tags.data.totalPages)) return;
-    const nextPage = invalidPage ? 0 : Math.max(tags.data!.totalPages - 1, 0);
+    const nextPage = invalidPage ? 0 : lastPageIndex(tags.data!.totalPages);
     if (!invalidPage && page === nextPage) return;
     const next = new URLSearchParams(searchParams);
     next.set('page', String(nextPage));

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { parsePageParam } from '../../shared/utils/page';
+import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import { expect, test } from './fixtures';
 
 interface ListScenario {
@@ -102,6 +102,10 @@ test('page parameter parser accepts only non-negative safe integers', () => {
     parsePageParam('9007199254740992'),
   ]).toEqual([0, 0, 0, 0, 0]);
   expect(parsePageParam('2')).toBe(2);
+});
+
+test('last page index stays at zero for empty results', () => {
+  expect([lastPageIndex(0), lastPageIndex(1), lastPageIndex(3)]).toEqual([0, 0, 2]);
 });
 
 test('invalid and non-canonical reservation page values normalize the URL', async ({ page }) => {
