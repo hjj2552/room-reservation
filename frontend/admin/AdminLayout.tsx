@@ -1,19 +1,45 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
 
 const timetablePath = '/admin/timetable';
 const timetableContextKey = 'admin-timetable-context';
 const timetableContextParams = ['view', 'date', 'weekStart', 'roomId', 'roomViewRoomId'] as const;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isActualDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isTimetableContextValue(name: (typeof timetableContextParams)[number], value: string) {
+  if (name === 'view') return value === 'date' || value === 'room';
+  if (name === 'date' || name === 'weekStart') return isActualDate(value);
+  return uuidPattern.test(value);
+}
 
 function timetableSearch(search: string) {
   const current = new URLSearchParams(search);
   const saved = new URLSearchParams();
   for (const name of timetableContextParams) {
     const value = current.get(name);
-    if (value) saved.set(name, value);
+    if (value && isTimetableContextValue(name, value)) saved.set(name, value);
   }
   return saved.toString();
+}
+
+function normalizedTimetableSearch(search: string) {
+  const current = new URLSearchParams(search);
+  let changed = false;
+  for (const name of timetableContextParams) {
+    const value = current.get(name);
+    if (value !== null && !isTimetableContextValue(name, value)) {
+      current.delete(name);
+      changed = true;
+    }
+  }
+  return changed ? current.toString() : null;
 }
 
 function readTimetableSearch() {
@@ -47,12 +73,19 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [savedTimetableSearch, setSavedTimetableSearch] = useState(readTimetableSearch);
+  const normalizedSearch = location.pathname === timetablePath
+    ? normalizedTimetableSearch(location.search)
+    : null;
 
   useEffect(() => {
     if (location.pathname !== timetablePath) return;
     const nextSearch = timetableSearch(location.search);
     setSavedTimetableSearch(saveTimetableSearch(nextSearch) ? nextSearch : '');
   }, [location.pathname, location.search]);
+
+  if (normalizedSearch !== null) {
+    return <Navigate to={{ pathname: timetablePath, search: normalizedSearch, hash: location.hash }} replace />;
+  }
 
   return (
     <div className="app-shell">

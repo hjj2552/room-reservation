@@ -95,6 +95,27 @@ test('admin timetable menu falls back safely when session storage is unavailable
   await expect(page).toHaveURL((url) => url.pathname === '/admin/timetable' && url.search === '');
 });
 
+test('admin timetable rejects invalid direct and stored context values', async ({ page }) => {
+  await page.goto(
+    '/admin/timetable?view=calendar&date=2026-02-29&weekStart=2026-99-99'
+      + '&roomId=not-a-uuid&roomViewRoomId=also-not-a-uuid',
+  );
+  await expect(page).toHaveURL((url) => url.pathname === '/admin/timetable' && url.search === '');
+  await expect(page.getByTestId('timetable-date-input')).toHaveValue(serviceDateInputValue());
+
+  await page.getByRole('link', { name: '예약 목록', exact: true }).click();
+  await page.evaluate(() => {
+    window.sessionStorage.setItem(
+      'admin-timetable-context',
+      'view=calendar&weekStart=2026-99-99&roomViewRoomId=not-a-uuid',
+    );
+  });
+  await page.reload();
+  await page.getByRole('link', { name: '시간표', exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === '/admin/timetable' && url.search === '');
+  await expect(page.getByTestId('timetable-date-input')).toHaveValue(serviceDateInputValue());
+});
+
 test('date view reads URL context and opens the reservation detail page', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('date-timetable-room');
