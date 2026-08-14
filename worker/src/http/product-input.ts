@@ -180,8 +180,9 @@ export function parseRoomList(params: URLSearchParams): RoomListQuery {
 
 export function parseSaveRoom(body: unknown): SaveRoomCommand {
   const input = requireObject(body);
+  const name = typeof input.name === "string" ? input.name.trim() : input.name;
   return {
-    name: requireString(input, "name", { max: 100 }).trim(),
+    name: requireString({ name }, "name", { max: 100 }),
     location: optionalText(input, "location", { max: 150, allowBlank: true }),
     capacity: requireInteger(input, "capacity", 0),
     description: optionalText(input, "description", { allowBlank: true }),

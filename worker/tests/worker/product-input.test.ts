@@ -39,6 +39,8 @@ describe("typed HTTP product input", () => {
     };
 
     expect(parseSaveRoom({ ...room, name: " \t공간  A\r\n " }).name).toBe("공간  A");
+    const maxName = "가".repeat(100);
+    expect(parseSaveRoom({ ...room, name: ` ${maxName} ` }).name).toBe(maxName);
     expect(() => parseSaveRoom({ ...room, name: " \t\r\n " })).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
