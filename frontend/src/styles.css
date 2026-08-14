@@ -565,7 +565,7 @@ button:disabled {
 .recurrence-reservations-table th:nth-child(1) { width: 210px; }
 .recurrence-reservations-table th:nth-child(2) { width: 18%; }
 .recurrence-reservations-table th:nth-child(3) { width: 88px; }
-.recurrence-reservations-table th:nth-child(5) { width: 112px; }
+.recurrence-reservations-table th:nth-child(5) { width: 125px; }
 
 .table-cell-stack,
 .audit-actor-cell {
