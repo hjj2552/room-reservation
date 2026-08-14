@@ -29,6 +29,8 @@ Worker environment configuration:
 
 세 rate-limit namespace는 서로 다른 production 전용 positive integer ID여야 합니다. Worker는 Cloudflare edge의 `CF-Connecting-IP`만 rate-limit client IP로 사용하며 browser가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 신뢰하지 않습니다. IP가 없거나 limiter binding이 실패하면 session DB 조회 전에 fail closed 합니다.
 
+API 요청은 신뢰 IP 확인 → INGRESS 제한 → 유효한 session 조회 → 비관리자 READ/WRITE 제한 → CSRF 검증 → body와 제품 처리 순서로 진행합니다.
+
 ## GitHub Actions secrets
 
 실제 값은 모두 Repository Secrets에 저장합니다.
