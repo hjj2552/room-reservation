@@ -90,6 +90,12 @@ test('직접 관리자 로그인 후 기본 예약 목록에 진입할 수 있�
 
 test('관리자 로그아웃 후 로그인 화면으로 이동한다', async ({ page }) => {
   await loginByUi(page);
+  await page.goto('/admin/timetable?view=date&date=2026-09-15');
+  await expect(page.getByTestId('timetable-date-input')).toHaveValue('2026-09-15');
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page).toHaveURL(/\/admin\/login$/);
+
+  await loginByUi(page);
+  await page.getByRole('link', { name: '시간표', exact: true }).click();
+  await expect(page).toHaveURL((url) => url.pathname === '/admin/timetable' && url.search === '');
 });
