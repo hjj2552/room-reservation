@@ -809,13 +809,7 @@ export class ProductService {
           || iso(value(before, "end_at")) !== parseInstant(input.endAt).toISOString();
         if (roomChanged || timeChanged) {
           const { room, settings } = await this.roomAndSettings(input.roomId, client);
-          if (timeChanged) {
-            validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
-          } else if (!bool(room, "enabled") || bool(room, "system_reserved")) {
-            policy("ROOM_DISABLED", "This room is not available.");
-          } else if (!settings.reservationEnabled) {
-            policy("RESERVATION_DISABLED", settings.reservationDisabledMessage || "Reservation is currently disabled.");
-          }
+          validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
         }
         await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
         if (sameReservationValues(before, input, "REQUESTED", false)) return;

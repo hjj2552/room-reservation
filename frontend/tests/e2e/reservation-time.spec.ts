@@ -15,7 +15,11 @@ import {
   toServiceStartOfDayOffset,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
-import { hasReservationTimeChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
+import {
+  hasReservationPlacementChanges,
+  hasReservationTimeChanges,
+  hasReservationValueChanges,
+} from '../../shared/utils/reservationChanges';
 import {
   isTimetableSlotSelectable,
   timetableDayAvailability,
@@ -234,8 +238,12 @@ test('compares reservation edits by their semantic persisted values', () => {
   })).toBe(true);
 });
 
-test('detects time changes separately so content-only edits stay non-retroactive', () => {
-  const current = { startAt: '2026-07-13T10:00:00+09:00', endAt: '2026-07-13T11:00:00+09:00' };
+test('detects placement changes so only content-only edits stay non-retroactive', () => {
+  const current = {
+    roomId: '11111111-1111-4111-8111-111111111111',
+    startAt: '2026-07-13T10:00:00+09:00',
+    endAt: '2026-07-13T11:00:00+09:00',
+  };
   expect(hasReservationTimeChanges(current, {
     startAt: '2026-07-13T01:00:00Z',
     endAt: '2026-07-13T02:00:00Z',
@@ -244,6 +252,11 @@ test('detects time changes separately so content-only edits stay non-retroactive
     startAt: '2026-07-13T10:05:00+09:00',
     endAt: current.endAt,
   })).toBe(true);
+  expect(hasReservationPlacementChanges(current, {
+    ...current,
+    roomId: '22222222-2222-4222-8222-222222222222',
+  })).toBe(true);
+  expect(hasReservationPlacementChanges(current, { ...current })).toBe(false);
 });
 
 function expectSelection(

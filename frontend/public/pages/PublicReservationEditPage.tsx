@@ -17,7 +17,7 @@ import {
 import { formatDateTime } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
-import { hasReservationTimeChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
+import { hasReservationPlacementChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -139,7 +139,11 @@ export function PublicReservationEditPage() {
       endAt: fromServiceDateTimeLocal(values.endAt),
       cancelPassword: reservationPassword,
     };
-    if (hasReservationTimeChanges(verifiedReservation, payload) && isPastServiceReservationTime(values.startAt)) {
+    if (hasReservationPlacementChanges({
+      roomId: verifiedReservation.room.id,
+      startAt: verifiedReservation.startAt,
+      endAt: verifiedReservation.endAt,
+    }, payload) && isPastServiceReservationTime(values.startAt)) {
       setSubmissionPolicyError(publicPastReservationMessage);
       return;
     }

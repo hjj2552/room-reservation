@@ -69,16 +69,16 @@ The public frontend maps `TIME_SLOT_CONFLICT` to:
 ## Time Policy
 
 - Facility operating hours/days and public reservation hours/days are separate settings. Public hours and days must remain inside the operating schedule.
-- Public creation, availability checks, time-changing edits, toolbar suggestions, and time inputs use the public schedule. Administrator single reservations, timetable Quick Add, edits, and recurrences use the operating schedule.
+- Public creation, availability checks, room- or time-changing edits, toolbar suggestions, and time inputs use the public schedule. Administrator single reservations, timetable Quick Add, edits, and recurrences use the operating schedule.
 - Administrators may reserve inside operating hours even when that interval is unavailable to public users. Neither public users nor administrators may reserve outside operating hours or days.
 - The timetable grid and empty-slot interaction candidates always use 30-minute intervals.
 - Reservation start and end inputs always use 5-minute increments.
 - The administrator-configured minimum duration is at least 30 minutes; minimum and maximum durations are multiples of 5.
 - Suggested reservations and empty-slot hover ranges use exactly `minReservationMinutes` and must fit completely inside the applicable public or operating schedule.
 - Toolbar suggestions use the first strictly future 30-minute candidate in `Asia/Seoul`, considering the semester and the applicable schedule weekdays.
-- Past timetable candidates remain clickable so users can inspect the exact interval. Public creation, time-changing edits, and availability checks reject past start times with `이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
-- Administrators can create and edit past reservations. Public users cannot move a reservation to a past time, but may update applicant/contact/purpose fields without changing an existing time.
-- Existing reservations are not rewritten when settings change. Public applicant/contact/purpose-only edits remain available; the current public time/day policy is applied when the reservation time changes.
+- Past timetable candidates remain clickable so users can inspect the exact interval. Public creation, room- or time-changing edits, and availability checks reject past start times with `이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
+- Administrators can create and edit past reservations. Public users cannot move a past reservation to another room or time, but may update applicant/contact/purpose fields without changing its room or time.
+- Existing reservations are not rewritten when settings change. Public applicant/contact/purpose-only edits remain available; the current public time/day policy is applied when the room or time changes.
 - Nighttime, safety, or contact guidance belongs in the existing `publicNotice` setting rather than a separate application resource or reception flow.
 - The `slotMinutes` API field is retained only for frontend contract compatibility, always returns `5`, and is not a product setting. The Worker database has no `slot_minutes` column.
 

@@ -2325,6 +2325,10 @@ describe("direct Worker contracts", () => {
       ...existingPayload,
       purpose: "testing-public-schedule-text-only",
     }))).resolves.toMatchObject({ purpose: "testing-public-schedule-text-only" });
+    await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
+      ...existingPayload,
+      roomId: publicRoomId,
+    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
     const changedStart = existingPayload.startAt.replace("09:00:00", "09:30:00");
     await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
       ...existingPayload,

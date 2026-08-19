@@ -19,11 +19,18 @@ export function hasReservationTimeChanges(
   return !sameInstant(current.startAt, next.startAt) || !sameInstant(current.endAt, next.endAt);
 }
 
+export function hasReservationPlacementChanges(
+  current: Pick<ComparableReservationValues, 'roomId' | 'startAt' | 'endAt'>,
+  next: Pick<ComparableReservationValues, 'roomId' | 'startAt' | 'endAt'>,
+): boolean {
+  return current.roomId !== next.roomId || hasReservationTimeChanges(current, next);
+}
+
 export function hasReservationValueChanges(
   current: ComparableReservationValues,
   next: ComparableReservationValues,
 ): boolean {
-  return current.roomId !== next.roomId
+  return hasReservationPlacementChanges(current, next)
     || current.applicantName !== next.applicantName
     || current.applicantEmail !== next.applicantEmail
     || current.applicantPhone !== next.applicantPhone
