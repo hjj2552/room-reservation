@@ -246,10 +246,27 @@ test('public and admin timetables share availability colors but keep different i
   await expect(page.getByText('공개 예약 불가', { exact: true })).toBeVisible();
   await expect(page.getByText('운영하지 않음', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
-  await expect(page.locator('.timetable-room-column.availability-public-unavailable')).toHaveCount(1);
+  const publicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable');
+  await expect(publicUnavailableColumn).toHaveCount(1);
+  await expect(publicUnavailableColumn.locator('.timetable-grid-line').first()).toHaveCSS('z-index', '1');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  await page.getByTestId('public-timetable-date-input').fill('2026-07-14');
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto(`/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`);
+  const publicUnavailableHeader = page.locator('.timetable-day-header.availability-public-unavailable').first();
+  const weeklyPublicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable').first();
+  await expect(publicUnavailableHeader).toHaveCSS(
+    'background-color',
+    await weeklyPublicUnavailableColumn.evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
+  const operatingUnavailableHeader = page.locator('.timetable-day-header.availability-operating-unavailable').first();
+  const weeklyOperatingUnavailableColumn = page.locator('.timetable-room-column.availability-operating-unavailable').first();
+  await expect(operatingUnavailableHeader).toHaveCSS(
+    'background-color',
+    await weeklyOperatingUnavailableColumn.evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
+
+  await page.goto('/timetable?view=date&date=2026-07-14');
   await expect(page.getByRole('button', { name: `${room.name} 09:30-10:00 예약 신청` })).toHaveCount(0);
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toBeEnabled();
   await expect(page.getByRole('button', { name: `${room.name} 16:30-17:00 예약 신청` })).toBeEnabled();

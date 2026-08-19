@@ -890,6 +890,10 @@ button:disabled {
   padding: 7px 10px;
 }
 
+.timetable-day-header.availability-public-unavailable {
+  background: var(--public-unavailable-soft);
+}
+
 .timetable-day-header.availability-public-unavailable strong,
 .timetable-day-header.availability-public-unavailable span {
   color: var(--public-unavailable);
@@ -1001,6 +1005,7 @@ button:disabled {
   position: absolute;
   right: 0;
   left: 0;
+  z-index: 1;
   height: 1px;
   background: #edf1f5;
   pointer-events: none;
