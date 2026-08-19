@@ -352,6 +352,7 @@ export function TimetablePage() {
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
               minReservationMinutes={settings.data.minReservationMinutes}
+              availability={{ ...settings.data, context: 'ADMIN' }}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
               onRoomInfoClick={(room) => setRoomInfoDialog(room)}
@@ -432,6 +433,7 @@ export function TimetablePage() {
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
               minReservationMinutes={settings.data.minReservationMinutes}
+              availability={{ ...settings.data, context: 'ADMIN' }}
               highlightedReservationId={highlightedReservationId}
               onEmptySlotClick={handleEmptySlotClick}
               onRoomInfoClick={hasRoomDescription(selectedRoomViewRoom.description)

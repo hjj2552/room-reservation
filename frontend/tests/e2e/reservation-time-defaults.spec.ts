@@ -234,10 +234,48 @@ test('empty slot hover fills the 30-minute grid cell when minimum duration is sh
   expect(sizes.slotHeight).toBe(48);
 });
 
+test('public and admin timetables share availability colors but keep different interaction rules', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '10:00',
+    publicCloseTime: '17:00',
+    publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto('/timetable?view=date&date=2026-07-13');
+  await expect(page.getByText('공개 예약 불가', { exact: true })).toBeVisible();
+  await expect(page.getByText('운영하지 않음', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
+  await expect(page.locator('.timetable-room-column.availability-public-unavailable')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  await page.getByTestId('public-timetable-date-input').fill('2026-07-14');
+  await expect(page.getByRole('button', { name: `${room.name} 09:30-10:00 예약 신청` })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toBeEnabled();
+  await expect(page.getByRole('button', { name: `${room.name} 16:30-17:00 예약 신청` })).toBeEnabled();
+  await expect(page.getByRole('button', { name: `${room.name} 17:00-17:30 예약 신청` })).toHaveCount(0);
+
+  await page.goto('/admin/timetable?view=date&date=2026-07-13');
+  const adminPublicUnavailable = page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` });
+  await expect(adminPublicUnavailable).toBeEnabled();
+  await expect(adminPublicUnavailable).toHaveClass(/availability-public-unavailable/);
+
+  await page.goto('/admin/timetable?view=date&date=2026-07-12');
+  await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
+  await expect(page.locator('.timetable-room-column.availability-operating-unavailable')).toHaveCount(1);
+});
+
 async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
-  overrides: Partial<{ minReservationMinutes: number; maxReservationMinutes: number }> = {},
+  overrides: Partial<{
+    minReservationMinutes: number;
+    maxReservationMinutes: number;
+    publicOpenTime: string;
+    publicCloseTime: string;
+    availableDaysOfWeek: string[];
+    publicAvailableDaysOfWeek: string[];
+  }> = {},
 ) {
   const settings = {
     organizationName: 'testing-organization',
@@ -248,8 +286,11 @@ async function mockReservationApis(
     semesterEndDate,
     openTime: '09:00',
     closeTime: '18:00',
+    publicOpenTime: '09:00',
+    publicCloseTime: '18:00',
     slotMinutes: 5,
     availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+    publicAvailableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
     minReservationMinutes: 30,
     maxReservationMinutes: 240,
     adminContactEmail: null,

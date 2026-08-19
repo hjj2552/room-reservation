@@ -17,6 +17,9 @@
   --action-soft: #e7f0eb;
   --focus: #285ea8;
   --danger: #a13d38;
+  --public-unavailable: #8b4f49;
+  --public-unavailable-soft: #f7ece9;
+  --operating-unavailable-soft: #efefeb;
   --space-3: 12px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -795,6 +798,50 @@ button:disabled {
   color: #17202a;
 }
 
+.timetable-summary-details,
+.timetable-availability-legend,
+.timetable-availability-legend > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.timetable-summary-details {
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.timetable-availability-legend {
+  gap: 10px;
+  color: #475466;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.timetable-availability-legend > span {
+  gap: 5px;
+}
+
+.timetable-availability-legend i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--rule);
+}
+
+.timetable-availability-legend i.public-unavailable {
+  border-color: #d9bdb8;
+  background: var(--public-unavailable-soft);
+}
+
+.timetable-availability-legend i.operating-unavailable {
+  background: var(--operating-unavailable-soft);
+}
+
+.timetable-summary-separator {
+  color: #a2a8ae;
+}
+
 .timetable-scroll {
   overflow: auto;
   overscroll-behavior-x: none;
@@ -841,6 +888,15 @@ button:disabled {
   gap: 3px;
   border-left: 1px solid #d9e0e8;
   padding: 7px 10px;
+}
+
+.timetable-day-header.availability-public-unavailable strong,
+.timetable-day-header.availability-public-unavailable span {
+  color: var(--public-unavailable);
+}
+
+.timetable-day-header.availability-operating-unavailable {
+  background: var(--operating-unavailable-soft);
 }
 
 .timetable-room-header strong,
@@ -902,6 +958,14 @@ button:disabled {
   min-height: 100%;
 }
 
+.timetable-room-column.availability-public-unavailable {
+  background: var(--public-unavailable-soft);
+}
+
+.timetable-room-column.availability-operating-unavailable {
+  background: var(--operating-unavailable-soft);
+}
+
 .timetable-time-column {
   position: sticky;
   left: 0;
@@ -942,7 +1006,8 @@ button:disabled {
   pointer-events: none;
 }
 
-.timetable-empty-slot {
+.timetable-empty-slot,
+.timetable-unavailable-slot {
   position: absolute;
   right: 0;
   left: 0;
@@ -951,7 +1016,19 @@ button:disabled {
   border-radius: 0;
   padding: 0;
   background: transparent;
+}
+
+.timetable-empty-slot {
   cursor: copy;
+}
+
+.timetable-empty-slot.availability-public-unavailable,
+.timetable-unavailable-slot.availability-public-unavailable {
+  background: var(--public-unavailable-soft);
+}
+
+.timetable-unavailable-slot.availability-operating-unavailable {
+  background: var(--operating-unavailable-soft);
 }
 
 .timetable-empty-slot::before {

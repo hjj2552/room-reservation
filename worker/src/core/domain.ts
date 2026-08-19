@@ -13,8 +13,11 @@ export interface OperationSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
+  publicOpenTime: string;
+  publicCloseTime: string;
   slotMinutes: 5;
   availableDaysOfWeek: string[];
+  publicAvailableDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
   adminContactEmail: string | null;
@@ -284,13 +287,24 @@ export function validateReservationPolicy(
   if (startDate < settings.semesterStartDate || startDate > settings.semesterEndDate) {
     policy("OUTSIDE_SEMESTER_PERIOD", "The requested date is outside the semester period.");
   }
+  const schedule = context === "PUBLIC"
+    ? {
+        openTime: settings.publicOpenTime,
+        closeTime: settings.publicCloseTime,
+        daysOfWeek: settings.publicAvailableDaysOfWeek,
+      }
+    : {
+        openTime: settings.openTime,
+        closeTime: settings.closeTime,
+        daysOfWeek: settings.availableDaysOfWeek,
+      };
   const weekday = startParts.weekday?.slice(0, 3).toUpperCase();
-  if (!weekday || !settings.availableDaysOfWeek.includes(weekday)) {
+  if (!weekday || !schedule.daysOfWeek.includes(weekday)) {
     policy("OUTSIDE_OPERATING_DAYS", "The requested day is not available for reservations.");
   }
   const startTime = `${startParts.hour}:${startParts.minute}`;
   const endTime = `${endParts.hour}:${endParts.minute}`;
-  if (startTime < settings.openTime.slice(0, 5) || endTime > settings.closeTime.slice(0, 5)) {
+  if (startTime < schedule.openTime.slice(0, 5) || endTime > schedule.closeTime.slice(0, 5)) {
     policy("OUTSIDE_OPERATING_HOURS", "The requested time is outside operating hours.");
   }
   const duration = (end.getTime() - start.getTime()) / 60_000;
@@ -302,12 +316,12 @@ export function validateReservationPolicy(
   }
 }
 
-export function normalizeDays(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length === 0) validation("must not be empty", "daysOfWeek");
+export function normalizeDays(value: unknown, field = "daysOfWeek"): string[] {
+  if (!Array.isArray(value) || value.length === 0) validation("must not be empty", field);
   const normalizedDays = [...new Set(value.map((item) => {
-    if (typeof item !== "string") validation("Invalid day of week", "daysOfWeek");
+    if (typeof item !== "string") validation("Invalid day of week", field);
     const normalized = item.trim().toUpperCase().slice(0, 3);
-    if (!days.has(normalized)) validation(`Invalid day of week: ${item}`, "daysOfWeek");
+    if (!days.has(normalized)) validation(`Invalid day of week: ${item}`, field);
     return normalized;
   }))];
   return normalizedDays.sort(

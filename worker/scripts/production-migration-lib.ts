@@ -12,6 +12,7 @@ const V2_MIGRATION = "002_room_display_order_v2";
 const V3_MIGRATION = "003_admin_optional_contact_v3";
 const V4_MIGRATION = "004_applicant_name_visibility_v4";
 const V5_MIGRATION = "005_recurrence_hard_delete_v5";
+const V6_MIGRATION = "006_public_reservation_schedule_v6";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -617,8 +618,9 @@ export async function verifyProductionV4Schema(
 export async function verifyProductionV5Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  expectedLatestMigration = V5_MIGRATION,
 ): Promise<void> {
-  await verifyProductionV3Schema(client, config, V5_MIGRATION);
+  await verifyProductionV3Schema(client, config, expectedLatestMigration);
 
   try {
     const migrations = await client.query(
@@ -640,6 +642,63 @@ export async function verifyProductionV5Schema(
   }
 }
 
+export async function verifyProductionV6Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV5Schema(client, config, V6_MIGRATION);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V6_MIGRATION],
+    );
+    const schema = await client.query(
+      `SELECT
+         count(*) FILTER (
+           WHERE table_name='operation_settings'
+             AND column_name = ANY($1::text[])
+             AND is_nullable='NO'
+         )::integer AS required_columns,
+         (SELECT count(*)::integer
+          FROM pg_constraint
+          WHERE conrelid='public.operation_settings'::regclass
+            AND conname = ANY($2::text[])) AS required_constraints
+       FROM information_schema.columns
+       WHERE table_schema='public'`,
+      [["public_open_time", "public_close_time", "public_available_days_of_week"], [
+        "chk_operation_settings_public_time_range",
+        "chk_operation_settings_public_grid",
+        "chk_operation_settings_public_min_minutes",
+        "chk_operation_settings_public_days_not_blank",
+        "chk_operation_settings_public_days_subset",
+      ]],
+    );
+    const values = await client.query(
+      `SELECT count(*)::integer AS invalid_count
+       FROM operation_settings
+       WHERE public_open_time IS NULL
+          OR public_close_time IS NULL
+          OR public_available_days_of_week IS NULL
+          OR NOT (open_time <= public_open_time AND public_open_time < public_close_time AND public_close_time <= close_time)
+          OR NOT (string_to_array(public_available_days_of_week, ',') <@ string_to_array(available_days_of_week, ','))`,
+    );
+    if (
+      migration.rows[0]?.count !== 1
+      || schema.rows[0]?.required_columns !== 3
+      || schema.rows[0]?.required_constraints !== 5
+      || values.rows[0]?.invalid_count !== 0
+    ) {
+      throw new ProductionMigrationError("schema", "Production V6 public reservation schedule schema is incomplete.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V6 schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -647,6 +706,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV5Schema(client, config);
+    await verifyProductionV6Schema(client, config);
   });
 }

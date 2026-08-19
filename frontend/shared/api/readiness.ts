@@ -101,6 +101,8 @@ function isPublicSettingsShape(value: unknown): value is PublicSettings {
     'semesterEndDate',
     'openTime',
     'closeTime',
+    'publicOpenTime',
+    'publicCloseTime',
   ];
   const nullableStringFields = [
     'publicNotice',
@@ -122,5 +124,7 @@ function isPublicSettingsShape(value: unknown): value is PublicSettings {
     && numberFields.every((field) => typeof settings[field] === 'number')
     && typeof settings.reservationEnabled === 'boolean'
     && Array.isArray(settings.availableDaysOfWeek)
-    && settings.availableDaysOfWeek.every((day) => typeof day === 'string');
+    && settings.availableDaysOfWeek.every((day) => typeof day === 'string')
+    && Array.isArray(settings.publicAvailableDaysOfWeek)
+    && settings.publicAvailableDaysOfWeek.every((day) => typeof day === 'string');
 }
