@@ -267,11 +267,14 @@ test('public and admin timetables share availability colors but keep different i
   await page.goto(`/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`);
   const publicUnavailableHeader = page.locator('.timetable-day-header.availability-public-unavailable').first();
   const weeklyPublicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable').first();
-  await expect(publicUnavailableHeader).toHaveCSS('background-color', 'rgb(253, 247, 246)');
+  const availableHeader = page.locator('.timetable-day-header.availability-available').first();
+  await expect(publicUnavailableHeader).toHaveCSS(
+    'background-color',
+    await availableHeader.evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
   await expect(weeklyPublicUnavailableColumn).toHaveCSS('background-color', 'rgb(253, 247, 246)');
   const operatingUnavailableHeader = page.locator('.timetable-day-header.availability-operating-unavailable').first();
   const weeklyOperatingUnavailableColumn = page.locator('.timetable-room-column.availability-operating-unavailable').first();
-  const availableHeader = page.locator('.timetable-day-header.availability-available').first();
   await expect(operatingUnavailableHeader).toHaveCSS(
     'background-color',
     await availableHeader.evaluate((element) => getComputedStyle(element).backgroundColor),

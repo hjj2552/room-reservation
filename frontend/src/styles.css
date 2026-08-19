@@ -899,15 +899,6 @@ button:disabled {
   padding: 7px 10px;
 }
 
-.timetable-day-header.availability-public-unavailable {
-  background: var(--public-unavailable-soft);
-}
-
-.timetable-day-header.availability-public-unavailable strong,
-.timetable-day-header.availability-public-unavailable span {
-  color: var(--public-unavailable);
-}
-
 .timetable-room-header strong,
 .timetable-day-header strong {
   overflow: hidden;
