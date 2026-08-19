@@ -238,58 +238,79 @@ test('public timetables reuse recurrence tag colors without exposing private app
   e2eData,
 }) => {
   await loginByApi(request);
-  const room = await e2eData.createTestRoom('public-recurrence-tag-room');
-  const tag = await e2eData.createTestTag('public-recurrence-tag', { color: '#b5453f' });
-  const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42, startHour: 10, endHour: 11 });
-  const recurrence = await e2eData.createTestRecurringReservation(room.id, 'public-recurrence-tag', {
-    startDate: recurrenceTime.startDate,
-    endDate: recurrenceTime.endDate,
-    dayOfWeek: recurrenceTime.dayOfWeek,
-    startTime: recurrenceTime.startTime,
-    endTime: recurrenceTime.endTime,
-    tagId: tag.id,
-  });
-  expect(recurrence.createdCount).toBe(1);
-  const untagged = await e2eData.createTestReservation(room.id, 'public-untagged', {
-    startAt: `${recurrenceTime.startDate}T12:00:00+09:00`,
-    endAt: `${recurrenceTime.startDate}T13:00:00+09:00`,
-  });
-  const weekStart = mondayOf(recurrenceTime.startDate);
+  const originalSettings = await getSettingsByApi(request);
+  try {
+    const room = await e2eData.createTestRoom('public-recurrence-tag-room');
+    const tag = await e2eData.createTestTag('public-recurrence-tag', { color: '#b5453f' });
+    const recurrenceTime = nextWeekdayRecurrenceInputs({ daysAhead: 42, startHour: 10, endHour: 11 });
+    const recurrence = await e2eData.createTestRecurringReservation(room.id, 'public-recurrence-tag', {
+      startDate: recurrenceTime.startDate,
+      endDate: recurrenceTime.endDate,
+      dayOfWeek: recurrenceTime.dayOfWeek,
+      startTime: recurrenceTime.startTime,
+      endTime: recurrenceTime.endTime,
+      tagId: tag.id,
+    });
+    expect(recurrence.createdCount).toBe(1);
+    const untagged = await e2eData.createTestReservation(room.id, 'public-untagged', {
+      startAt: `${recurrenceTime.startDate}T12:00:00+09:00`,
+      endAt: `${recurrenceTime.startDate}T13:00:00+09:00`,
+    });
+    const weekStart = mondayOf(recurrenceTime.startDate);
 
-  await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
-  const publicDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
-  const publicUntaggedBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: untagged.purpose });
-  const publicDateCard = publicDateBlock.locator('.reservation-block-card');
-  const publicUntaggedCard = publicUntaggedBlock.locator('.reservation-block-card');
-  await expect(publicDateBlock).toBeVisible();
-  await expect(publicDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
-  await expect(publicDateCard).toHaveCSS('border-color', 'rgb(181, 69, 63)');
-  await expect(publicDateCard).toHaveCSS('background-color', 'rgba(181, 69, 63, 0.12)');
-  await expect(publicDateBlock).not.toContainText('testing-recurring-admin');
-  await expect(publicDateBlock).not.toContainText(recurrence.recurrenceId);
-  await expect(publicUntaggedBlock.locator('.reservation-block-series')).toHaveCount(0);
-  expect(await inlineTimetableColors(publicUntaggedCard)).toEqual({
-    borderColor: '',
-    backgroundColor: '',
-  });
-  const publicDateColors = await computedTimetableColors(publicDateCard);
+    await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
+    const publicDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
+    const publicUntaggedBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: untagged.purpose });
+    const publicDateCard = publicDateBlock.locator('.reservation-block-card');
+    const publicUntaggedCard = publicUntaggedBlock.locator('.reservation-block-card');
+    await expect(publicDateBlock).toBeVisible();
+    await expect(publicDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+    await expect(publicDateBlock.locator('.status-badge')).toContainText('승인');
+    await expect(publicDateCard).toHaveCSS('border-color', 'rgb(181, 69, 63)');
+    await expect(publicDateCard).toHaveCSS('background-color', 'rgb(240, 229, 230)');
+    await expect(publicDateCard).toHaveCSS('color', 'rgb(23, 32, 42)');
+    await expect(publicDateBlock).not.toContainText('testing-recurring-admin');
+    await expect(publicDateBlock).not.toContainText(recurrence.recurrenceId);
+    await expect(publicUntaggedBlock.locator('.reservation-block-series')).toHaveCount(0);
+    expect(await inlineTimetableColors(publicUntaggedCard)).toEqual({
+      borderColor: '',
+      backgroundColor: '',
+    });
+    const publicDateColors = await computedTimetableColors(publicDateCard);
 
-  await page.getByTestId('public-timetable-view-room').click();
-  await page.getByTestId('public-timetable-room-select').selectOption(room.id);
-  await page.getByTestId('public-timetable-week-input').fill(weekStart);
-  const publicRoomBlock = page.getByTestId('reservation-room-timetable-block').filter({ hasText: tag.name });
-  const publicRoomCard = publicRoomBlock.locator('.reservation-block-card');
-  await expect(publicRoomBlock).toBeVisible();
-  await expect(publicRoomBlock.locator('.reservation-block-series')).toHaveText(tag.name);
-  expect(await computedTimetableColors(publicRoomCard)).toEqual(publicDateColors);
-  await expect(publicRoomBlock).not.toContainText('testing-recurring-admin');
+    await page.getByTestId('public-timetable-view-room').click();
+    await page.getByTestId('public-timetable-room-select').selectOption(room.id);
+    await page.getByTestId('public-timetable-week-input').fill(weekStart);
+    const publicRoomBlock = page.getByTestId('reservation-room-timetable-block').filter({ hasText: tag.name });
+    const publicRoomCard = publicRoomBlock.locator('.reservation-block-card');
+    await expect(publicRoomBlock).toBeVisible();
+    await expect(publicRoomBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+    expect(await computedTimetableColors(publicRoomCard)).toEqual(publicDateColors);
+    await expect(publicRoomBlock).not.toContainText('testing-recurring-admin');
 
-  await page.goto(`/admin/timetable?view=date&date=${recurrenceTime.startDate}&roomId=${room.id}`);
-  const adminDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
-  const adminDateCard = adminDateBlock.locator('.reservation-block-card');
-  await expect(adminDateBlock).toBeVisible();
-  await expect(adminDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
-  expect(await computedTimetableColors(adminDateCard)).toEqual(publicDateColors);
+    await updateSettingsByApi(request, {
+      ...originalSettings,
+      publicOpenTime: '11:00',
+    });
+    await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
+    await expect(page.locator('.timetable-unavailable-slot.availability-public-unavailable').first()).toBeVisible();
+    const unavailablePublicBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
+    expect(await computedTimetableColors(unavailablePublicBlock.locator('.reservation-block-card')))
+      .toEqual(publicDateColors);
+
+    await page.goto(`/admin/timetable?view=date&date=${recurrenceTime.startDate}&roomId=${room.id}`);
+    await expect(page.locator('.timetable-empty-slot.availability-public-unavailable').first()).toBeVisible();
+    const adminDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
+    const adminDateCard = adminDateBlock.locator('.reservation-block-card');
+    await expect(adminDateBlock).toBeVisible();
+    await expect(adminDateBlock.locator('.reservation-block-series')).toHaveText(tag.name);
+    expect(await computedTimetableColors(adminDateCard)).toEqual(publicDateColors);
+    await adminDateBlock.click();
+    await expect(page).toHaveURL(/\/admin\/reservations\/[0-9a-f-]+$/);
+  } finally {
+    const latestSettings = await getSettingsByApi(request);
+    await updateSettingsByApi(request, { ...originalSettings, version: latestSettings.version });
+  }
 });
 
 test('public timetable supports slot-based request, masked detail page, and password cancellation', async ({ page, request, e2eData }) => {
