@@ -18,8 +18,8 @@
   --focus: #285ea8;
   --danger: #a13d38;
   --public-unavailable: #8b4f49;
-  --public-unavailable-soft: #f7ece9;
-  --operating-unavailable-soft: #efefeb;
+  --public-unavailable-soft: #fdf7f6;
+  --operating-unavailable: #9a9d96;
   --space-3: 12px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -835,7 +835,16 @@ button:disabled {
 }
 
 .timetable-availability-legend i.operating-unavailable {
-  background: var(--operating-unavailable-soft);
+  display: grid;
+  place-items: center;
+  color: var(--operating-unavailable);
+  font-style: normal;
+}
+
+.timetable-availability-legend i.operating-unavailable::before {
+  font-size: 11px;
+  line-height: 1;
+  content: '×';
 }
 
 .timetable-summary-separator {
@@ -897,10 +906,6 @@ button:disabled {
 .timetable-day-header.availability-public-unavailable strong,
 .timetable-day-header.availability-public-unavailable span {
   color: var(--public-unavailable);
-}
-
-.timetable-day-header.availability-operating-unavailable {
-  background: var(--operating-unavailable-soft);
 }
 
 .timetable-room-header strong,
@@ -966,10 +971,6 @@ button:disabled {
   background: var(--public-unavailable-soft);
 }
 
-.timetable-room-column.availability-operating-unavailable {
-  background: var(--operating-unavailable-soft);
-}
-
 .timetable-time-column {
   position: sticky;
   left: 0;
@@ -1033,7 +1034,15 @@ button:disabled {
 }
 
 .timetable-unavailable-slot.availability-operating-unavailable {
-  background: var(--operating-unavailable-soft);
+  display: grid;
+  place-items: center;
+  color: var(--operating-unavailable);
+}
+
+.timetable-unavailable-slot.availability-operating-unavailable::after {
+  font-size: 12px;
+  line-height: 1;
+  content: '×';
 }
 
 .timetable-empty-slot::before {
