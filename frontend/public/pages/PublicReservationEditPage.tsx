@@ -17,7 +17,7 @@ import {
 import { formatDateTime } from '../../shared/utils/date';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
-import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
+import { hasReservationPlacementChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -128,11 +128,6 @@ export function PublicReservationEditPage() {
 
   function onSubmit(values: PublicReservationEditValues) {
     if (!verifiedReservation) return;
-    if (isPastServiceReservationTime(values.startAt)) {
-      setSubmissionPolicyError(publicPastReservationMessage);
-      return;
-    }
-    setSubmissionPolicyError('');
     const previousStatus = verifiedReservation.status;
     const payload = {
       roomId: values.roomId,
@@ -144,6 +139,15 @@ export function PublicReservationEditPage() {
       endAt: fromServiceDateTimeLocal(values.endAt),
       cancelPassword: reservationPassword,
     };
+    if (hasReservationPlacementChanges({
+      roomId: verifiedReservation.room.id,
+      startAt: verifiedReservation.startAt,
+      endAt: verifiedReservation.endAt,
+    }, payload) && isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(publicPastReservationMessage);
+      return;
+    }
+    setSubmissionPolicyError('');
     if (
       previousStatus === 'REQUESTED'
       && !hasReservationValueChanges(
@@ -274,8 +278,8 @@ export function PublicReservationEditPage() {
           <ReservationTimeRangeInput
             startAt={startAt}
             endAt={endAt}
-            openTime={settings.data?.openTime || '09:00'}
-            closeTime={settings.data?.closeTime || '18:00'}
+            openTime={settings.data?.publicOpenTime || '09:00'}
+            closeTime={settings.data?.publicCloseTime || '18:00'}
             minReservationMinutes={settings.data?.minReservationMinutes || 30}
             maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
             onStartAtChange={(value) => setValue('startAt', value, { shouldDirty: true, shouldValidate: true })}

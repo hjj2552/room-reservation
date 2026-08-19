@@ -198,7 +198,12 @@ export function PublicReservationPage() {
 
   function handleNewRequestClick() {
     if (isUnavailable || !settings.data) return;
-    const nextSelection = newRequestSelection(settings.data);
+    const nextSelection = newRequestSelection({
+      ...settings.data,
+      openTime: settings.data.publicOpenTime,
+      closeTime: settings.data.publicCloseTime,
+      availableDaysOfWeek: settings.data.publicAvailableDaysOfWeek,
+    });
     setSubmissionPolicyError(null);
     setQuickSelection(nextSelection.selection);
     setQuickSelectionUnavailableMessage(nextSelection.unavailableMessage);
@@ -258,8 +263,8 @@ export function PublicReservationPage() {
           <div>
             {settings.data.publicNotice ? <strong className="public-notice-message">{settings.data.publicNotice}</strong> : null}
             <strong>
-              신청 가능 시간 {String(settings.data.openTime).slice(0, 5)}-
-              {String(settings.data.closeTime).slice(0, 5)}
+              신청 가능 시간 {String(settings.data.publicOpenTime).slice(0, 5)}-
+              {String(settings.data.publicCloseTime).slice(0, 5)}
             </strong>
             <p>{timetablePageSizeNote}</p>
           </div>
@@ -332,6 +337,7 @@ export function PublicReservationPage() {
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
                 minReservationMinutes={settings.data.minReservationMinutes}
+                availability={{ ...settings.data, context: 'PUBLIC' }}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
@@ -395,6 +401,7 @@ export function PublicReservationPage() {
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
                 minReservationMinutes={settings.data.minReservationMinutes}
+                availability={{ ...settings.data, context: 'PUBLIC' }}
                 highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
@@ -413,8 +420,8 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          openTime={settings.data?.openTime || '09:00'}
-          closeTime={settings.data?.closeTime || '18:00'}
+          openTime={settings.data?.publicOpenTime || '09:00'}
+          closeTime={settings.data?.publicCloseTime || '18:00'}
           minReservationMinutes={settings.data?.minReservationMinutes || 30}
           maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
           unavailableMessage={quickSelectionUnavailableMessage}

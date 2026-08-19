@@ -7,28 +7,39 @@ import { dayLabels } from '../../shared/utils/labels';
 import { operatingTimeOptions } from '../../shared/utils/timeOptions';
 import { canonicalizeWeekdayCodes, toggleWeekday, WEEKDAY_ORDER } from '../../shared/utils/weekdays';
 
+function timeMinutes(value: string) {
+  const [hour, minute] = value.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
 export function SettingsPage() {
   const settings = useSettings();
   const updateSettings = useUpdateSettings();
   const [form, setForm] = useState<OperationSettings | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (settings.data) {
       setForm({
         ...settings.data,
         availableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.availableDaysOfWeek),
+        publicAvailableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.publicAvailableDaysOfWeek),
         slotMinutes: 5,
         openTime: settings.data.openTime.slice(0, 5),
         closeTime: settings.data.closeTime.slice(0, 5),
+        publicOpenTime: settings.data.publicOpenTime.slice(0, 5),
+        publicCloseTime: settings.data.publicCloseTime.slice(0, 5),
       });
     }
   }, [settings.data]);
 
   function updateField<K extends keyof OperationSettings>(key: K, value: OperationSettings[K]) {
+    setValidationErrors({});
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
   function toggleDay(day: string) {
+    setValidationErrors({});
     setForm((prev) => {
       if (!prev) return prev;
       return {
@@ -38,12 +49,40 @@ export function SettingsPage() {
     });
   }
 
+  function togglePublicDay(day: string) {
+    setValidationErrors({});
+    setForm((prev) => prev ? {
+      ...prev,
+      publicAvailableDaysOfWeek: toggleWeekday(prev.publicAvailableDaysOfWeek, day),
+    } : prev);
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form) return;
+    const errors: Record<string, string> = {};
+    if (form.publicOpenTime < form.openTime || form.publicCloseTime > form.closeTime || form.publicOpenTime >= form.publicCloseTime) {
+      errors.publicTime = '공개 예약 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
+    } else if (timeMinutes(form.publicCloseTime) - timeMinutes(form.publicOpenTime) < form.minReservationMinutes) {
+      errors.publicTime = '공개 예약 시간 범위에 최소 예약 시간이 들어가야 합니다.';
+    }
+    if (form.availableDaysOfWeek.length === 0) {
+      errors.operatingDays = '운영 요일을 하나 이상 선택해 주세요.';
+    }
+    if (form.publicAvailableDaysOfWeek.length === 0) {
+      errors.publicDays = '공개 예약 가능 요일을 하나 이상 선택해 주세요.';
+    } else if (form.publicAvailableDaysOfWeek.some((day) => !form.availableDaysOfWeek.includes(day))) {
+      errors.publicDays = '공개 예약 가능 요일은 운영 요일에 포함되어야 합니다.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+    setValidationErrors({});
     updateSettings.mutate({
       ...form,
       availableDaysOfWeek: canonicalizeWeekdayCodes(form.availableDaysOfWeek),
+      publicAvailableDaysOfWeek: canonicalizeWeekdayCodes(form.publicAvailableDaysOfWeek),
       slotMinutes: 5,
       publicNotice: form.publicNotice || null,
       reservationDisabledMessage: form.reservationDisabledMessage || null,
@@ -149,6 +188,37 @@ export function SettingsPage() {
             </select>
           </label>
         </div>
+        <div className="settings-field-pair full-span" data-testid="settings-public-hours-pair">
+          <label>
+            공개 예약 시작 시간
+            <select
+              data-testid="settings-public-open-time-input"
+              value={form.publicOpenTime}
+              onChange={(event) => updateField('publicOpenTime', event.target.value)}
+              required
+            >
+              {operatingTimeOptions().map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            공개 예약 종료 시간
+            <select
+              data-testid="settings-public-close-time-input"
+              value={form.publicCloseTime}
+              onChange={(event) => updateField('publicCloseTime', event.target.value)}
+              required
+            >
+              {operatingTimeOptions().map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {validationErrors.publicTime ? (
+          <div className="field-error full-span" role="alert">{validationErrors.publicTime}</div>
+        ) : null}
         <div className="settings-field-pair full-span" data-testid="settings-duration-pair">
           <label>
             최소 예약 시간(분)
@@ -179,7 +249,7 @@ export function SettingsPage() {
           최소·최대 예약 시간을 5(분)의 배수로 입력해 주세요. 최소 예약 시간은 30분 이상이어야 합니다.
         </p>
         <fieldset className="full-span checkbox-group">
-          <legend>예약 가능 요일</legend>
+          <legend>운영 요일</legend>
           {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input
@@ -192,6 +262,26 @@ export function SettingsPage() {
             </label>
           ))}
         </fieldset>
+        {validationErrors.operatingDays ? (
+          <div className="field-error full-span" role="alert">{validationErrors.operatingDays}</div>
+        ) : null}
+        <fieldset className="full-span checkbox-group">
+          <legend>공개 예약 가능 요일</legend>
+          {WEEKDAY_ORDER.map((day) => (
+            <label key={day}>
+              <input
+                data-testid={`settings-public-day-${day}`}
+                type="checkbox"
+                checked={form.publicAvailableDaysOfWeek.includes(day)}
+                onChange={() => togglePublicDay(day)}
+              />
+              {dayLabels[day]}
+            </label>
+          ))}
+        </fieldset>
+        {validationErrors.publicDays ? (
+          <div className="field-error full-span" role="alert">{validationErrors.publicDays}</div>
+        ) : null}
         <label>
           문의 이메일
           <input

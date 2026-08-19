@@ -113,7 +113,9 @@ beforeAll(async () => {
     `UPDATE operation_settings SET reservation_enabled=true,
       semester_start_date=(current_date - interval '1 day')::date,
       semester_end_date=(current_date + interval '180 days')::date,
-      available_days_of_week='MON,TUE,WED,THU,FRI', version=0`,
+      open_time='09:00', close_time='18:00', available_days_of_week='MON,TUE,WED,THU,FRI',
+      public_open_time='09:00', public_close_time='18:00',
+      public_available_days_of_week='MON,TUE,WED,THU,FRI', version=0`,
   );
 });
 
@@ -137,7 +139,7 @@ describe("Worker migrations", () => {
     expect(sentinel.rows).toEqual([{ name: "삭제된 공간" }]);
   });
 
-  it("removes the legacy recurrence deletion column and index at V5", async () => {
+  it("keeps the V5 recurrence cleanup and adds the V6 public reservation schedule", async () => {
     const schema = await database.query(
       `SELECT
          EXISTS (
@@ -165,7 +167,21 @@ describe("Worker migrations", () => {
       "003_admin_optional_contact_v3",
       "004_applicant_name_visibility_v4",
       "005_recurrence_hard_delete_v5",
+      "006_public_reservation_schedule_v6",
     ]);
+    const settings = await database.query(
+      `SELECT open_time::text, close_time::text, available_days_of_week,
+        public_open_time::text, public_close_time::text, public_available_days_of_week
+       FROM operation_settings WHERE id=1`,
+    );
+    expect(settings.rows[0]).toEqual({
+      open_time: "09:00:00",
+      close_time: "18:00:00",
+      available_days_of_week: "MON,TUE,WED,THU,FRI",
+      public_open_time: "09:00:00",
+      public_close_time: "18:00:00",
+      public_available_days_of_week: "MON,TUE,WED,THU,FRI",
+    });
   });
 
   it("rolls transactions back", async () => {
@@ -1054,6 +1070,8 @@ async function resetProductData() {
       semester_start_date=(current_date - interval '1 day')::date,
       semester_end_date=(current_date + interval '180 days')::date,
       open_time='09:00', close_time='18:00', available_days_of_week='MON,TUE,WED,THU,FRI',
+      public_open_time='09:00', public_close_time='18:00',
+      public_available_days_of_week='MON,TUE,WED,THU,FRI',
       min_reservation_minutes=30, max_reservation_minutes=240,
       admin_contact_email='admin@example.test', admin_contact_phone=NULL,
       completion_message=NULL, updated_by=NULL, version=0`,
@@ -1885,8 +1903,8 @@ describe("direct Worker contracts", () => {
     }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
     await expect(products.updatePublicReservation(
       existingPublic.id,
-      parsePublicReservation(existingPublicPayload),
-    )).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "RESERVATION_DISABLED" });
+      parsePublicReservation({ ...existingPublicPayload, purpose: "testing-public-text-update-disabled" }),
+    )).resolves.toMatchObject({ purpose: "testing-public-text-update-disabled" });
 
     const adminStartAt = futureWeekday(21, 13);
     const adminCreated = await products.createAdminReservation(parseAdminReservation({
@@ -2152,11 +2170,13 @@ describe("direct Worker contracts", () => {
     const updatedSettings = await products.updateSettings(parseUpdateSettings({
       ...settingsBefore,
       availableDaysOfWeek: ["THU", "TUE", "WED"],
+      publicAvailableDaysOfWeek: ["THU", "TUE", "WED"],
     }), "admin");
     expect(updatedSettings.availableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
+    expect(updatedSettings.publicAvailableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
     expect((await database.query(
-      "SELECT available_days_of_week FROM operation_settings WHERE id=1",
-    )).rows).toEqual([{ available_days_of_week: "TUE,WED,THU" }]);
+      "SELECT available_days_of_week, public_available_days_of_week FROM operation_settings WHERE id=1",
+    )).rows).toEqual([{ available_days_of_week: "TUE,WED,THU", public_available_days_of_week: "TUE,WED,THU" }]);
 
     const recurrence = await products.createRecurrence(parseRecurrenceCreate({
       roomId,
@@ -2194,7 +2214,7 @@ describe("direct Worker contracts", () => {
     expect((await products.getRecurrence(recurrence.recurrenceId)).daysOfWeek).toBe("TUE,WED,THU");
 
     await database.query(
-      "UPDATE operation_settings SET available_days_of_week='THU,TUE,WED' WHERE id=1",
+      "UPDATE operation_settings SET available_days_of_week='THU,TUE,WED', public_available_days_of_week='THU,TUE,WED' WHERE id=1",
     );
     const { app, cookie } = await authenticatedApp();
     const publicSettingsResponse = await app.request("http://worker.test/api/public/settings");
@@ -2241,6 +2261,95 @@ describe("direct Worker contracts", () => {
     const updated = await products.updateSettings(command, "admin");
     expect(updated).toMatchObject({ organizationName: "Updated atomically", version: 1 });
     await expect(products.updateSettings(command, "admin")).rejects.toMatchObject({ kind: "CONFLICT", code: "VERSION_CONFLICT" });
+  });
+
+  it("separates public reservation hours and days from admin operating policy", async () => {
+    await resetProductData();
+    const existingRoomId = await insertRoom("testing-room-public-schedule-existing");
+    const publicRoomId = await insertRoom("testing-room-public-schedule-create");
+    const adminRoomId = await insertRoom("testing-room-public-schedule-admin");
+    const password = "Schedule1!";
+    const existingPayload = publicPayload(existingRoomId, password, "testing-public-schedule-existing", 9);
+    const existing = await products.createPublicReservation(parsePublicReservation(existingPayload));
+    const before = await products.getSettings();
+
+    const settings = await products.updateSettings(parseUpdateSettings({
+      ...before,
+      publicOpenTime: "10:00",
+      publicCloseTime: "17:00",
+      publicAvailableDaysOfWeek: ["FRI", "MON", "WED", "TUE", "THU"],
+    }), "admin");
+    expect(settings.publicAvailableDaysOfWeek).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
+
+    await expect(products.createPublicReservation(parsePublicReservation(
+      publicPayload(publicRoomId, password, "testing-public-before-open", 9),
+    ))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+
+    const crossingStart = futureWeekday(21, 16).replace("16:00:00", "16:30:00");
+    expect(await products.checkAvailability({
+      roomId: publicRoomId,
+      startAt: crossingStart,
+      endAt: new Date(new Date(crossingStart).getTime() + 60 * 60_000).toISOString(),
+    })).toMatchObject({ available: false, reason: "OUTSIDE_OPERATING_HOURS" });
+
+    const publicBoundary = publicPayload(publicRoomId, password, "testing-public-boundary", 16);
+    await expect(products.createPublicReservation(parsePublicReservation(publicBoundary))).resolves.toMatchObject({
+      status: "REQUESTED",
+    });
+
+    const adminInsideOperating = futureWeekday(21, 9);
+    await expect(products.createAdminReservation(parseAdminReservation({
+      roomId: adminRoomId,
+      applicantName: "testing-admin-public-limited",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-admin-public-limited",
+      startAt: adminInsideOperating,
+      endAt: addHour(adminInsideOperating),
+      status: "CONFIRMED",
+    }), "admin")).resolves.toMatchObject({ status: "CONFIRMED" });
+
+    const outsideOperating = futureWeekday(21, 8);
+    await expect(products.createAdminReservation(parseAdminReservation({
+      roomId: adminRoomId,
+      applicantName: "testing-admin-outside-operating",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-admin-outside-operating",
+      startAt: outsideOperating,
+      endAt: addHour(outsideOperating),
+      status: "CONFIRMED",
+    }), "admin")).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+
+    await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
+      ...existingPayload,
+      purpose: "testing-public-schedule-text-only",
+    }))).resolves.toMatchObject({ purpose: "testing-public-schedule-text-only" });
+    await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
+      ...existingPayload,
+      roomId: publicRoomId,
+    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+    const changedStart = existingPayload.startAt.replace("09:00:00", "09:30:00");
+    await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
+      ...existingPayload,
+      startAt: changedStart,
+      endAt: addHour(changedStart),
+    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+
+    await expect(products.updateSettings(parseUpdateSettings({
+      ...settings,
+      publicAvailableDaysOfWeek: ["SUN"],
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicAvailableDaysOfWeek" }] });
+    await expect(products.updateSettings(parseUpdateSettings({
+      ...settings,
+      publicOpenTime: "08:30",
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicOpenTime" }] });
+    await expect(products.updateSettings(parseUpdateSettings({
+      ...settings,
+      publicOpenTime: "16:30",
+      publicCloseTime: "17:00",
+      minReservationMinutes: 60,
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicCloseTime" }] });
   });
 
   it("leaves no recurrence, child reservation or history when FAIL_ALL sees one conflict", async () => {

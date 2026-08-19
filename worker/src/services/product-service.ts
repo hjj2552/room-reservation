@@ -115,8 +115,11 @@ function mapSettings(row: Row): OperationSettings {
     semesterEndDate: dateText(value(row, "semester_end_date")),
     openTime: timeText(value(row, "open_time")),
     closeTime: timeText(value(row, "close_time")),
+    publicOpenTime: timeText(value(row, "public_open_time")),
+    publicCloseTime: timeText(value(row, "public_close_time")),
     slotMinutes: 5,
     availableDaysOfWeek: normalizeDays(text(row, "available_days_of_week").split(",")),
+    publicAvailableDaysOfWeek: normalizeDays(text(row, "public_available_days_of_week").split(",")),
     minReservationMinutes: number(row, "min_reservation_minutes"),
     maxReservationMinutes: number(row, "max_reservation_minutes"),
     adminContactEmail: nullableText(row, "admin_contact_email"),
@@ -184,7 +187,10 @@ export class ProductService {
       semesterEndDate,
       openTime,
       closeTime,
+      publicOpenTime,
+      publicCloseTime,
       availableDaysOfWeek,
+      publicAvailableDaysOfWeek,
       minReservationMinutes,
       maxReservationMinutes,
       adminContactEmail,
@@ -196,26 +202,42 @@ export class ProductService {
     if (semesterStartDate > semesterEndDate) validation("Semester start date must be before or equal to end date.");
     if (openTime >= closeTime) validation("Open time must be before close time.");
     const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
-    if (minutes(openTime) % 30 !== 0 || minutes(closeTime) % 30 !== 0) {
-      validation("Open and close time must align to 30-minute timetable boundaries.");
+    if (
+      minutes(openTime) % 30 !== 0
+      || minutes(closeTime) % 30 !== 0
+      || minutes(publicOpenTime) % 30 !== 0
+      || minutes(publicCloseTime) % 30 !== 0
+    ) {
+      validation("Operating and public reservation times must align to 30-minute timetable boundaries.");
     }
     if (minReservationMinutes % 5 !== 0 || maxReservationMinutes % 5 !== 0) {
       validation("Min and max reservation minutes must be multiples of 5.");
     }
     if (maxReservationMinutes < minReservationMinutes) validation("Max reservation minutes must be greater than or equal to min.");
     if (minutes(closeTime) - minutes(openTime) < minReservationMinutes) validation("Min reservation minutes must fit within operating hours.");
+    if (publicOpenTime < openTime || publicCloseTime > closeTime || publicOpenTime >= publicCloseTime) {
+      validation("Public reservation time must be within operating hours.", "publicOpenTime");
+    }
+    if (minutes(publicCloseTime) - minutes(publicOpenTime) < minReservationMinutes) {
+      validation("Min reservation minutes must fit within public reservation hours.", "publicCloseTime");
+    }
+    if (publicAvailableDaysOfWeek.some((day) => !availableDaysOfWeek.includes(day))) {
+      validation("Public reservation days must be included in operating days.", "publicAvailableDaysOfWeek");
+    }
 
     const result = await this.database.query(
       `UPDATE operation_settings SET
         organization_name = $1, public_notice = $2, reservation_enabled = $3,
         reservation_disabled_message = $4, semester_start_date = $5, semester_end_date = $6,
         open_time = $7, close_time = $8, available_days_of_week = $9,
-        min_reservation_minutes = $10, max_reservation_minutes = $11,
-        admin_contact_email = $12, admin_contact_phone = $13, completion_message = $14,
-        updated_by = $15, updated_at = now(), version = version + 1
-       WHERE id = 1 AND version = $16 RETURNING *`,
+        public_open_time = $10, public_close_time = $11, public_available_days_of_week = $12,
+        min_reservation_minutes = $13, max_reservation_minutes = $14,
+        admin_contact_email = $15, admin_contact_phone = $16, completion_message = $17,
+        updated_by = $18, updated_at = now(), version = version + 1
+       WHERE id = 1 AND version = $19 RETURNING *`,
       [organizationName, publicNotice, reservationEnabled, reservationDisabledMessage,
         semesterStartDate, semesterEndDate, openTime, closeTime, availableDaysOfWeek.join(","),
+        publicOpenTime, publicCloseTime, publicAvailableDaysOfWeek.join(","),
         minReservationMinutes, maxReservationMinutes, adminContactEmail, adminContactPhone,
         completionMessage, adminUsername, version],
     );
@@ -778,12 +800,17 @@ export class ProductService {
 
   async updatePublicReservation(reservationId: string, command: PublicReservationCommand) {
     const { reservation: input, password } = command;
-    const { room, settings } = await this.roomAndSettings(input.roomId);
-    validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
     try {
       await this.database.transaction(async (client) => {
         const before = await this.verifyPublicPassword(client, reservationId, password, true);
         if (text(before, "status") === "CANCELLED") validation("CANCELLED status reservations cannot be edited.");
+        const roomChanged = text(before, "room_id") !== input.roomId;
+        const timeChanged = iso(value(before, "start_at")) !== parseInstant(input.startAt).toISOString()
+          || iso(value(before, "end_at")) !== parseInstant(input.endAt).toISOString();
+        if (roomChanged || timeChanged) {
+          const { room, settings } = await this.roomAndSettings(input.roomId, client);
+          validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
+        }
         await this.assertNoConflict(client, input.roomId, input.startAt, input.endAt, reservationId);
         if (sameReservationValues(before, input, "REQUESTED", false)) return;
         const result = await client.query(

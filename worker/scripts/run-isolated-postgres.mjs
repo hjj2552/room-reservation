@@ -125,7 +125,7 @@ try {
     "testing-room-middle|2",
     "testing-room-zulu|3",
   ])) {
-    throw new Error(`V1 to V5 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
+    throw new Error(`V1 to V6 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
   }
   const sentinelDisplayOrder = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
@@ -152,7 +152,7 @@ try {
               'chk_recurrences_applicant_email_optional'
             )) = 2`,
   ]).trim();
-  if (upgradedContactSchema !== "t") throw new Error("V1 to V5 contact migration failed");
+  if (upgradedContactSchema !== "t") throw new Error("V1 to V6 contact migration failed");
   const upgradedVisibilitySchema = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
     "--tuples-only", "--no-align",
@@ -190,7 +190,7 @@ try {
            AND indexname='idx_recurrences_deleted_at'
        )`,
   ]).trim();
-  if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V5 schema migration failed");
+  if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V6 schema migration failed");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v4_upgrade"]);
   const v4UpgradeUrl = `${baseUrl}/worker_v4_upgrade`;
@@ -295,9 +295,44 @@ try {
        AND (SELECT count(*) FROM reservations WHERE recurrence_id IS NOT NULL) = 2
        AND (SELECT count(*) FROM reservation_histories) = 2`,
   ]).trim();
-  if (v4UpgradeState !== "t") throw new Error("V4 to V5 standalone migration contract failed");
+  if (v4UpgradeState !== "t") throw new Error("V4 to V6 standalone migration contract failed");
   const afterV5 = preservationSnapshot("worker_v4_upgrade");
-  if (beforeV5 !== afterV5) throw new Error("V4 to V5 migration changed recurrence product data");
+  if (beforeV5 !== afterV5) throw new Error("V4 to V6 migration changed recurrence product data");
+
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v5_upgrade"]);
+  const v5UpgradeUrl = `${baseUrl}/worker_v5_upgrade`;
+  runMigration("scripts/migrate-v5-for-test.ts", v5UpgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v5_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c",
+    `UPDATE operation_settings
+     SET open_time='08:00', close_time='20:00', available_days_of_week='MON,TUE,WED,THU,FRI,SAT'`,
+  ]);
+  runMigration("scripts/migrate.ts", v5UpgradeUrl);
+  runMigration("scripts/migrate.ts", v5UpgradeUrl);
+  const v5UpgradeState = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v5_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations
+        WHERE name='006_public_reservation_schedule_v6') = 1
+       AND (SELECT public_open_time=open_time
+              AND public_close_time=close_time
+              AND public_available_days_of_week=available_days_of_week
+            FROM operation_settings WHERE id=1)
+       AND (SELECT count(*) FROM pg_constraint
+            WHERE conrelid='operation_settings'::regclass
+              AND conname IN (
+                'chk_operation_settings_public_time_range',
+                'chk_operation_settings_public_grid',
+                'chk_operation_settings_public_min_minutes',
+                'chk_operation_settings_public_days_not_blank',
+                'chk_operation_settings_public_days_subset'
+              )) = 5`,
+  ]).trim();
+  if (v5UpgradeState !== "t") throw new Error("V5 to V6 standalone migration contract failed");
 
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
@@ -307,7 +342,9 @@ try {
   const replaySchema = dump("worker_replay");
   if (primarySchema !== replaySchema) throw new Error("Replayed baseline schema differs");
   const v4UpgradeSchema = dump("worker_v4_upgrade");
-  if (primarySchema !== v4UpgradeSchema) throw new Error("V4 to V5 standalone upgrade schema differs");
+  if (primarySchema !== v4UpgradeSchema) throw new Error("V4 to V6 standalone upgrade schema differs");
+  const v5UpgradeSchema = dump("worker_v5_upgrade");
+  if (primarySchema !== v5UpgradeSchema) throw new Error("V5 to V6 standalone upgrade schema differs");
   const schemaSha256 = createHash("sha256").update(primarySchema).digest("hex");
   process.stdout.write(`isolated_postgres=passed schema_sha256=${schemaSha256}\n`);
 } finally {

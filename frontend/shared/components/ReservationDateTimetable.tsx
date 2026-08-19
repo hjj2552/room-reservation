@@ -39,6 +39,16 @@ export interface TimetableReservation {
   seriesColor?: string | null;
 }
 
+export interface TimetableAvailability {
+  context: 'PUBLIC' | 'ADMIN';
+  availableDaysOfWeek: string[];
+  publicAvailableDaysOfWeek: string[];
+  publicOpenTime: string;
+  publicCloseTime: string;
+}
+
+export type TimetableAvailabilityState = 'available' | 'public-unavailable' | 'operating-unavailable';
+
 interface ReservationDateTimetableProps {
   rooms: TimetableRoom[];
   reservations: TimetableReservation[];
@@ -46,6 +56,7 @@ interface ReservationDateTimetableProps {
   openTime?: string;
   closeTime?: string;
   minReservationMinutes?: number;
+  availability?: TimetableAvailability;
   highlightedReservationId?: string | null;
   onEmptySlotClick?: (slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) => void;
   onReservationClick?: (reservation: TimetableReservation) => void;
@@ -87,6 +98,52 @@ export function buildSlots(openMinutes: number, closeMinutes: number, incrementM
   return slots;
 }
 
+function weekdayCode(date: string) {
+  return ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][new Date(`${date}T00:00:00Z`).getUTCDay()];
+}
+
+export function timetableDayAvailability(
+  date: string,
+  availability?: TimetableAvailability,
+): TimetableAvailabilityState {
+  if (!availability) return 'available';
+  const day = weekdayCode(date);
+  if (!availability.availableDaysOfWeek.some((value) => value.slice(0, 3).toUpperCase() === day)) return 'operating-unavailable';
+  if (!availability.publicAvailableDaysOfWeek.some((value) => value.slice(0, 3).toUpperCase() === day)) return 'public-unavailable';
+  return 'available';
+}
+
+export function timetableSlotAvailability(
+  date: string,
+  startMinutes: number,
+  endMinutes: number,
+  availability?: TimetableAvailability,
+): TimetableAvailabilityState {
+  const dayState = timetableDayAvailability(date, availability);
+  if (dayState !== 'available' || !availability) return dayState;
+  if (
+    startMinutes < clockToMinutes(availability.publicOpenTime)
+    || endMinutes > clockToMinutes(availability.publicCloseTime)
+  ) return 'public-unavailable';
+  return 'available';
+}
+
+export function isTimetableSlotSelectable(
+  state: TimetableAvailabilityState,
+  context?: TimetableAvailability['context'],
+) {
+  return state !== 'operating-unavailable' && (state === 'available' || context === 'ADMIN');
+}
+
+export function TimetableAvailabilityLegend() {
+  return (
+    <span className="timetable-availability-legend" aria-label="시간표 이용 가능 상태 범례">
+      <span><i className="public-unavailable" aria-hidden="true" />공개 예약 불가</span>
+      <span><i className="operating-unavailable" aria-hidden="true" />운영하지 않음</span>
+    </span>
+  );
+}
+
 export function timetableGridStyle(columnCount: number) {
   const safeColumnCount = Math.max(columnCount, 1);
 
@@ -118,6 +175,7 @@ export function ReservationDateTimetable({
   openTime = fallbackOpenTime,
   closeTime = fallbackCloseTime,
   minReservationMinutes = TIMETABLE_GRID_MINUTES,
+  availability,
   highlightedReservationId,
   onEmptySlotClick,
   onReservationClick,
@@ -154,9 +212,13 @@ export function ReservationDateTimetable({
     <div className="timetable-card" data-testid="reservation-date-timetable">
       <div className="timetable-summary" aria-live="polite">
         <strong>{selectedDate}</strong>
-        <span>
-          {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 활성 공간 {rooms.length}개 · 예약{' '}
-          {reservations.filter((reservation) => roomIds.has(reservation.roomId)).length}건
+        <span className="timetable-summary-details">
+          {availability ? <TimetableAvailabilityLegend /> : null}
+          {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
+          <span>
+            {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 활성 공간 {rooms.length}개 · 예약{' '}
+            {reservations.filter((reservation) => roomIds.has(reservation.roomId)).length}건
+          </span>
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>
@@ -200,22 +262,31 @@ export function ReservationDateTimetable({
               </div>
             ))}
           </div>
-          {rooms.map((room) => (
-            <div key={room.id} className="timetable-room-column" style={{ height: bodyHeight }}>
+          {rooms.map((room) => {
+            const dayState = timetableDayAvailability(selectedDate, availability);
+            return (
+            <div
+              key={room.id}
+              className={`timetable-room-column availability-${dayState}`}
+              style={{ height: bodyHeight }}
+              aria-label={`${room.name} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '공개 예약 불가' : '공개 예약 가능'}`}
+            >
               {emptySlots.slice(0, -1).map((slot) => {
                 const endMinutes = slot + suggestedDurationMinutes;
                 if (endMinutes > closeMinutes) return null;
+                const state = timetableSlotAvailability(selectedDate, slot, endMinutes, availability);
+                const selectable = isTimetableSlotSelectable(state, availability?.context);
                 const selection = {
                   date: selectedDate,
                   startMinutes: slot,
                   endMinutes,
                   roomId: room.id,
                 };
-                return (
+                return selectable ? (
                   <button
                     key={`empty-${slot}`}
                     type="button"
-                    className="timetable-empty-slot"
+                    className={`timetable-empty-slot availability-${state}`}
                     style={{
                       top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
                       height: TIMETABLE_GRID_MINUTES * TIMETABLE_MINUTE_HEIGHT,
@@ -223,6 +294,17 @@ export function ReservationDateTimetable({
                     onClick={() => onEmptySlotClick?.(selection)}
                     aria-label={`${room.name} ${formatClock(slot)}-${formatClock(endMinutes)} 예약 신청`}
                     data-testid="timetable-empty-slot"
+                  />
+                ) : (
+                  <div
+                    key={`empty-${slot}`}
+                    className={`timetable-unavailable-slot availability-${state}`}
+                    style={{
+                      top: (slot - openMinutes) * TIMETABLE_MINUTE_HEIGHT,
+                      height: TIMETABLE_GRID_MINUTES * TIMETABLE_MINUTE_HEIGHT,
+                    }}
+                    aria-hidden="true"
+                    data-testid="timetable-unavailable-slot"
                   />
                 );
               })}
@@ -287,7 +369,8 @@ export function ReservationDateTimetable({
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

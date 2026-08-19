@@ -8,6 +8,7 @@ import {
   verifyProductionV3Schema,
   verifyProductionV4Schema,
   verifyProductionV5Schema,
+  verifyProductionV6Schema,
   type ProductionMigrationConfig,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
@@ -147,9 +148,12 @@ describe("production migration schema verification", () => {
     contactValues?: Record<string, unknown>;
     visibilitySchema?: Record<string, unknown>;
     visibilityValues?: Record<string, unknown>;
-    version?: 2 | 3 | 4 | 5;
+    version?: 2 | 3 | 4 | 5 | 6;
     v5?: boolean;
+    v6?: boolean;
     v5Migrations?: Array<Record<string, unknown>>;
+    publicScheduleSchema?: Record<string, unknown>;
+    publicScheduleValues?: Record<string, unknown>;
   } = {}): SqlClient {
     const commonRows: Array<Array<Record<string, unknown>>> = [
       [{ database_name: "production_db", role_name: "migration_role", schema_name: "public" }],
@@ -160,7 +164,8 @@ describe("production migration schema verification", () => {
         { name: "003_admin_optional_contact_v3" },
         { name: "004_applicant_name_visibility_v4" },
         { name: "005_recurrence_hard_delete_v5" },
-      ].slice(0, overrides.v5 ? 5 : (overrides.version ?? 4)),
+        { name: "006_public_reservation_schedule_v6" },
+      ].slice(0, overrides.v6 ? 6 : overrides.v5 ? 5 : (overrides.version ?? 4)),
       [{ count: 1 }],
       [{
         state_table_exists: true,
@@ -199,8 +204,8 @@ describe("production migration schema verification", () => {
         visibility_columns: 2,
         history_columns: 2,
         public_constraint_exists: true,
-        recurrence_deleted_at_columns: overrides.v5 ? 0 : 1,
-        recurrence_deleted_at_index_exists: !overrides.v5,
+        recurrence_deleted_at_columns: overrides.v5 || overrides.v6 ? 0 : 1,
+        recurrence_deleted_at_index_exists: !(overrides.v5 || overrides.v6),
         ...overrides.visibilitySchema,
       }],
       [{
@@ -210,15 +215,23 @@ describe("production migration schema verification", () => {
         ...overrides.visibilityValues,
       }],
     ];
-    if (overrides.v5) {
-      return clientForRows([
+    if (overrides.v5 || overrides.v6) {
+      const rows = [
         ...commonRows,
         overrides.v5Migrations ?? [
           { name: "004_applicant_name_visibility_v4", count: 1 },
           { name: "005_recurrence_hard_delete_v5", count: 1 },
         ],
         ...visibilityRows,
-      ]);
+      ];
+      if (overrides.v6) {
+        rows.push(
+          [{ count: 1 }],
+          [{ required_columns: 3, required_constraints: 5, ...overrides.publicScheduleSchema }],
+          [{ invalid_count: 0, ...overrides.publicScheduleValues }],
+        );
+      }
+      return clientForRows(rows);
     }
     return clientForRows([...commonRows, [{ count: 1 }], ...visibilityRows]);
   }
@@ -237,6 +250,21 @@ describe("production migration schema verification", () => {
 
   it("accepts V5 after removing the legacy recurrence deletion column and index", async () => {
     await expect(verifyProductionV5Schema(validSchemaClient({ v5: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("accepts V6 public reservation schedule columns, constraints, and values", async () => {
+    await expect(verifyProductionV6Schema(validSchemaClient({ v6: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("rejects incomplete V6 public reservation schedule schema and values", async () => {
+    await expect(verifyProductionV6Schema(validSchemaClient({
+      v6: true,
+      publicScheduleSchema: { required_constraints: 4 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV6Schema(validSchemaClient({
+      v6: true,
+      publicScheduleValues: { invalid_count: 1 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("requires exactly one V5 ledger record and complete recurrence schema removal", async () => {

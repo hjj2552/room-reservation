@@ -15,7 +15,17 @@ import {
   toServiceStartOfDayOffset,
   type ReservationTimeSettings,
 } from '../../shared/utils/reservationTime';
-import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
+import {
+  hasReservationPlacementChanges,
+  hasReservationTimeChanges,
+  hasReservationValueChanges,
+} from '../../shared/utils/reservationChanges';
+import {
+  isTimetableSlotSelectable,
+  timetableDayAvailability,
+  timetableSlotAvailability,
+  type TimetableAvailability,
+} from '../../shared/components/ReservationDateTimetable';
 import {
   includeExistingTime,
   operatingTimeOptions,
@@ -33,6 +43,14 @@ const settings: ReservationTimeSettings = {
   maxReservationMinutes: 240,
 };
 
+const availability: TimetableAvailability = {
+  context: 'PUBLIC',
+  availableDaysOfWeek: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+  publicAvailableDaysOfWeek: ['TUE', 'WED', 'THU'],
+  publicOpenTime: '10:00',
+  publicCloseTime: '17:00',
+};
+
 test('uses a fixed 30-minute timetable interaction interval', () => {
   expect(INTERACTION_INTERVAL_MINUTES).toBe(30);
   expect(RESERVATION_INCREMENT_MINUTES).toBe(5);
@@ -41,6 +59,30 @@ test('uses a fixed 30-minute timetable interaction interval', () => {
   expect(defaultSuggestedDurationMinutes(45)).toBe(45);
   expect(defaultSuggestedDurationMinutes(60)).toBe(60);
   expect(defaultSuggestedDurationMinutes(120)).toBe(120);
+});
+
+test('distinguishes operating and public availability without changing admin access', () => {
+  expect(timetableDayAvailability('2026-07-13', availability)).toBe('public-unavailable');
+  expect(timetableDayAvailability('2026-07-14', availability)).toBe('available');
+  expect(timetableDayAvailability('2026-07-12', availability)).toBe('operating-unavailable');
+  expect(timetableSlotAvailability('2026-07-14', 9 * 60 + 30, 10 * 60, availability)).toBe('public-unavailable');
+  expect(timetableSlotAvailability('2026-07-14', 10 * 60, 10 * 60 + 30, availability)).toBe('available');
+  expect(timetableSlotAvailability('2026-07-14', 16 * 60 + 30, 17 * 60 + 30, availability)).toBe('public-unavailable');
+  expect(isTimetableSlotSelectable('public-unavailable', 'PUBLIC')).toBe(false);
+  expect(isTimetableSlotSelectable('public-unavailable', 'ADMIN')).toBe(true);
+  expect(isTimetableSlotSelectable('operating-unavailable', 'PUBLIC')).toBe(false);
+  expect(isTimetableSlotSelectable('operating-unavailable', 'ADMIN')).toBe(false);
+});
+
+test('public toolbar suggestions use the public schedule passed by the caller', () => {
+  const result = newRequestSelection({
+    ...settings,
+    openTime: availability.publicOpenTime,
+    closeTime: availability.publicCloseTime,
+    availableDaysOfWeek: availability.publicAvailableDaysOfWeek,
+  }, new Date('2026-07-13T00:00:00Z'));
+  expect(result.selection.startAt).toBe('2026-07-14T10:00');
+  expect(result.selection.endAt).toBe('2026-07-14T10:30');
 });
 
 test('uses the operating start before opening time', () => {
@@ -194,6 +236,27 @@ test('compares reservation edits by their semantic persisted values', () => {
     ...current,
     purpose: 'testing-purpose-updated',
   })).toBe(true);
+});
+
+test('detects placement changes so only content-only edits stay non-retroactive', () => {
+  const current = {
+    roomId: '11111111-1111-4111-8111-111111111111',
+    startAt: '2026-07-13T10:00:00+09:00',
+    endAt: '2026-07-13T11:00:00+09:00',
+  };
+  expect(hasReservationTimeChanges(current, {
+    startAt: '2026-07-13T01:00:00Z',
+    endAt: '2026-07-13T02:00:00Z',
+  })).toBe(false);
+  expect(hasReservationTimeChanges(current, {
+    startAt: '2026-07-13T10:05:00+09:00',
+    endAt: current.endAt,
+  })).toBe(true);
+  expect(hasReservationPlacementChanges(current, {
+    ...current,
+    roomId: '22222222-2222-4222-8222-222222222222',
+  })).toBe(true);
+  expect(hasReservationPlacementChanges(current, { ...current })).toBe(false);
 });
 
 function expectSelection(

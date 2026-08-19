@@ -154,8 +154,11 @@ export function parseUpdateSettings(body: unknown): UpdateSettingsCommand {
     semesterEndDate: parseDate(requireString(input, "semesterEndDate"), "semesterEndDate"),
     openTime: parseTime(requireString(input, "openTime"), "openTime"),
     closeTime: parseTime(requireString(input, "closeTime"), "closeTime"),
+    publicOpenTime: parseTime(requireString(input, "publicOpenTime"), "publicOpenTime"),
+    publicCloseTime: parseTime(requireString(input, "publicCloseTime"), "publicCloseTime"),
     slotMinutes: requireInteger(input, "slotMinutes"),
-    availableDaysOfWeek: normalizeDays(input.availableDaysOfWeek),
+    availableDaysOfWeek: normalizeDays(input.availableDaysOfWeek, "availableDaysOfWeek"),
+    publicAvailableDaysOfWeek: normalizeDays(input.publicAvailableDaysOfWeek, "publicAvailableDaysOfWeek"),
     minReservationMinutes: requireInteger(input, "minReservationMinutes", 30),
     maxReservationMinutes: requireInteger(input, "maxReservationMinutes", 1),
     adminContactEmail: input.adminContactEmail === null || input.adminContactEmail === "" || input.adminContactEmail === undefined
