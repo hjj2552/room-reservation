@@ -1658,6 +1658,11 @@ button:disabled {
   line-height: 1.45;
 }
 
+.processing-memo {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .timeline-memo .timeline-memo-label {
   display: inline;
   color: #364152;

@@ -45,7 +45,8 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await page.setViewportSize({ width: 1440, height: 900 });
   const longPurpose = 'testing-deleted-snapshot-purpose-that-should-not-be-rendered';
   const longActorId = 'testing-audit-actor-id-without-breakpoints-0123456789';
-  const longMemo = 'testing 감사 이력의 긴 메모는 자신의 열 안에서 자연스럽게 여러 줄로 표시됩니다.';
+  const processingMemo = '첫 번째 처리 내용\n두 번째 처리 내용';
+  const longMemo = `${processingMemo}\ntesting-${'unbroken'.repeat(20)}`;
 
   await page.route('**/api/admin/audit/reservation-histories**', async (route) => {
     const requestedPage = Number(new URL(route.request().url()).searchParams.get('page') || 0);
@@ -190,6 +191,11 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
     wordBreak: getComputedStyle(element).wordBreak,
     fitsColumn: element.scrollWidth <= element.clientWidth,
   }))).toEqual({ wordBreak: 'keep-all', fitsColumn: true });
+  const memoCell = rows.nth(0).locator('.processing-memo');
+  await expect(memoCell).toHaveCSS('white-space', 'pre-wrap');
+  await expect(memoCell).toHaveCSS('overflow-wrap', 'anywhere');
+  expect((await memoCell.innerText()).split('\n').slice(0, 2)).toEqual(processingMemo.split('\n'));
+  expect(await memoCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   const processingTimeCell = rows.nth(0).locator('td').nth(0);
   const actionCell = rows.nth(0).locator('td').nth(1);
   const targetCell = rows.nth(0).locator('td').nth(2);

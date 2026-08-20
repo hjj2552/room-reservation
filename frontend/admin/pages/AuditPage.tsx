@@ -236,7 +236,7 @@ export function AuditPage() {
                           <span className="muted">{history.actorType}</span>
                         </span>
                       </td>
-                      <td className="table-description-cell">{history.memo || '-'}</td>
+                      <td className="table-description-cell processing-memo">{history.memo || '-'}</td>
                     </tr>
                   );
                 })}
