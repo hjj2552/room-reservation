@@ -214,7 +214,7 @@ export function ReservationDetailPage() {
                   </dl>
                 ) : null}
                 {history.memo ? (
-                  <p className="timeline-memo">
+                  <p className="timeline-memo processing-memo">
                     <span className="timeline-memo-label">처리 메모:</span> {history.memo}
                   </p>
                 ) : null}

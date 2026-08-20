@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
+import {
+  adminListContextForPath,
+  adminListContexts,
+  clearAdminListSearches,
+  readAdminListSearches,
+  saveAdminListSearch,
+} from './utils/listContext';
 
 const timetablePath = '/admin/timetable';
 const timetableContextKey = 'admin-timetable-context';
@@ -73,6 +80,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [savedTimetableSearch, setSavedTimetableSearch] = useState(readTimetableSearch);
+  const [savedListSearches, setSavedListSearches] = useState(readAdminListSearches);
   const normalizedSearch = location.pathname === timetablePath
     ? normalizedTimetableSearch(location.search)
     : null;
@@ -81,6 +89,15 @@ export function AdminLayout() {
     if (location.pathname !== timetablePath) return;
     const nextSearch = timetableSearch(location.search);
     setSavedTimetableSearch(saveTimetableSearch(nextSearch) ? nextSearch : '');
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const context = adminListContextForPath(location.pathname);
+    if (!context) return;
+    const nextSearch = saveAdminListSearch(context, location.search);
+    setSavedListSearches((current) => (
+      current[context] === nextSearch ? current : { ...current, [context]: nextSearch }
+    ));
   }, [location.pathname, location.search]);
 
   if (normalizedSearch !== null) {
@@ -95,16 +112,22 @@ export function AdminLayout() {
           <span>관리자</span>
         </div>
         <nav className="nav-list">
-          <NavLink to="/admin/reservations" end>
+          <NavLink to={{
+            pathname: adminListContexts.reservations.path,
+            search: savedListSearches.reservations,
+          }} end>
             예약 목록
           </NavLink>
           <NavLink to={{ pathname: timetablePath, search: savedTimetableSearch }}>
             시간표
           </NavLink>
-          <NavLink to="/admin/recurrences">
+          <NavLink to={{
+            pathname: adminListContexts.recurrences.path,
+            search: savedListSearches.recurrences,
+          }}>
             반복 예약
           </NavLink>
-          <NavLink to="/admin/rooms">
+          <NavLink to={{ pathname: adminListContexts.rooms.path, search: savedListSearches.rooms }}>
             공간 관리
           </NavLink>
           <NavLink to="/admin/settings" end>
@@ -113,7 +136,7 @@ export function AdminLayout() {
           <NavLink to="/admin/settings/tags">
             태그 설정
           </NavLink>
-          <NavLink to="/admin/audit">
+          <NavLink to={{ pathname: adminListContexts.audit.path, search: savedListSearches.audit }}>
             감사 이력
           </NavLink>
         </nav>
@@ -126,7 +149,9 @@ export function AdminLayout() {
               logout.mutate(undefined, {
                 onSettled: () => {
                   clearTimetableSearch();
+                  clearAdminListSearches();
                   setSavedTimetableSearch('');
+                  setSavedListSearches(readAdminListSearches());
                   navigate('/admin/login', { replace: true });
                 },
               })

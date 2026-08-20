@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { formatDateTime, formatDateTimeWithWeekday, formatInstantTime } from '../../shared/utils/date';
+import { formatDateTime, formatInstantTime } from '../../shared/utils/date';
 import {
   INTERACTION_INTERVAL_MINUTES,
   RESERVATION_INCREMENT_MINUTES,
@@ -199,8 +199,8 @@ test('serializes service-local reservation inputs with the Seoul offset', () => 
 
 test('formats instants and admin date boundaries in Seoul', () => {
   const formatted = formatDateTime('2026-07-13T15:30:00Z');
-  const mondayWithWeekday = formatDateTimeWithWeekday('2026-09-14T04:00:00Z');
-  const thursdayWithWeekday = formatDateTimeWithWeekday('2026-09-17T04:00:00Z');
+  const mondayWithWeekday = formatDateTime('2026-09-14T04:00:00Z');
+  const thursdayWithWeekday = formatDateTime('2026-09-17T04:00:00Z');
   const timeOnly = formatInstantTime('2026-07-13T15:30:00Z');
   expect(formatted).toContain('2026. 7. 14.');
   expect(formatted).toContain('12:30');

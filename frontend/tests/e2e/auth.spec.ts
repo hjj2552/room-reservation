@@ -92,8 +92,20 @@ test('관리자 로그아웃 후 로그인 화면으로 이동한다', async ({ 
   await loginByUi(page);
   await page.goto('/admin/timetable?view=date&date=2026-09-15');
   await expect(page.getByTestId('timetable-date-input')).toHaveValue('2026-09-15');
+  const contextKeys = [
+    'admin-timetable-context',
+    'admin-reservations-context',
+    'admin-recurrences-context',
+    'admin-rooms-context',
+    'admin-audit-context',
+  ];
+  await page.evaluate((keys) => {
+    for (const key of keys) window.sessionStorage.setItem(key, 'page=1');
+  }, contextKeys);
   await page.getByRole('button', { name: '로그아웃' }).click();
   await expect(page).toHaveURL(/\/admin\/login$/);
+  expect(await page.evaluate((keys) => keys.filter((key) => window.sessionStorage.getItem(key) !== null), contextKeys))
+    .toEqual([]);
 
   await loginByUi(page);
   await page.getByRole('link', { name: '시간표', exact: true }).click();

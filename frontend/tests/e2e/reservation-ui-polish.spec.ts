@@ -253,7 +253,8 @@ test('reservation audit labels stay on one line without mobile overflow', async 
   const room = await e2eData.createTestRoom('mobile-audit-label');
   const reservation = await e2eData.createTestReservation(room.id, 'mobile-audit-label');
 
-  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+  await page.goto(`/admin/reservations/${reservation.id}`);
+  await page.getByTestId('reservation-edit-link').click();
   await page.getByText('신청자 이름 보이기', { exact: true }).click();
   const updateResponse = page.waitForResponse((response) =>
     response.url().includes(`/api/admin/reservations/${reservation.id}`)

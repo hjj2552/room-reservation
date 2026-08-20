@@ -229,9 +229,7 @@ export function RoomsPage() {
       </div>
 
       <section className="panel room-list-panel" aria-labelledby="room-list-title">
-          <div className="panel-header">
-            <h2 id="room-list-title">공간 목록</h2>
-          </div>
+          <h2 id="room-list-title" className="sr-only">공간 목록</h2>
           <form
             className="inline-filter"
             onSubmit={(event) => {

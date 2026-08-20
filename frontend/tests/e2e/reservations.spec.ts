@@ -224,6 +224,10 @@ test('reservation list and detail expose timetable links with reservation date a
 
     await page.goto(`/admin/reservations/${reservation.id}`);
     await expect(page.getByRole('button', { name: '목록으로', exact: true })).toHaveCount(0);
+    await expect(page.locator('.reservation-detail-page-header .muted')).toContainText(/\([월화수목금토일]\)/);
+    const adminDateTime = await page.locator('.reservation-detail-main dt', { hasText: '날짜/시간' })
+      .locator('xpath=following-sibling::dd').innerText();
+    expect(adminDateTime.match(/\([월화수목금토일]\)/g)).toHaveLength(2);
     const detailActions = page.getByTestId('reservation-primary-actions').locator('button, a');
     await expect(detailActions).toHaveText([
       '승인',
@@ -272,6 +276,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
   const room = await e2eData.createTestRoom('reservation-edit-room');
   const reservation = await e2eData.createTestReservation(room.id, 'reservation-edit-seed');
   const updatedPurpose = e2eData.name('reservation-edit-updated');
+  const processingMemo = '첫 번째 처리 내용\n두 번째 처리 내용';
 
   try {
     await page.goto(`/admin/reservations/${reservation.id}`);
@@ -310,7 +315,7 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
     await page.getByTestId('reservation-email-input').fill('');
     await page.getByTestId('reservation-phone-input').fill('');
-    await page.getByTestId('reservation-memo-input').fill('testing-reservation-edit-smoke');
+    await page.getByTestId('reservation-memo-input').fill(processingMemo);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.url().includes(`/api/admin/reservations/${reservation.id}`) &&
       response.request().method() === 'PUT',
@@ -320,9 +325,11 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     const updatePayload = JSON.parse(updateResponse.request().postData() || '{}') as {
       applicantEmail?: string | null;
       applicantPhone?: string | null;
+      memo?: string;
     };
     expect(updatePayload.applicantEmail).toBeNull();
     expect(updatePayload.applicantPhone).toBeNull();
+    expect(updatePayload.memo).toBe(processingMemo);
 
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(updatedPurpose);
@@ -330,8 +337,15 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
     await expect(page.getByTestId('reservation-detail-applicant-phone').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('reservation-detail-applicant-phone')).toContainText('(비공개)');
-    const updatedHistory = page.locator('.timeline > li').filter({ hasText: 'testing-reservation-edit-smoke' });
+    const updatedHistory = page.locator('.timeline > li').filter({ hasText: '첫 번째 처리 내용' });
     await expect(updatedHistory).toBeVisible();
+    const displayedMemo = updatedHistory.locator('.processing-memo');
+    await expect(displayedMemo).toHaveCSS('white-space', 'pre-wrap');
+    await expect(displayedMemo).toHaveCSS('overflow-wrap', 'anywhere');
+    expect((await displayedMemo.innerText()).split('\n')).toEqual([
+      '처리 메모: 첫 번째 처리 내용',
+      '두 번째 처리 내용',
+    ]);
     await expect(updatedHistory).not.toContainText('삭제된 공간');
     await expect(updatedHistory.locator('.timeline-diff-row', { hasText: '공간' })).toHaveCount(0);
 
@@ -351,7 +365,8 @@ test('reservation edit replaces an inactive current room without getting stuck l
   const reservation = await e2eData.createTestReservation(inactiveRoom.id, 'reservation-edit-inactive-room');
   await e2eData.setTestRoomEnabled(inactiveRoom.id, false);
 
-  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+  await page.goto(`/admin/reservations/${reservation.id}`);
+  await page.getByTestId('reservation-edit-link').click();
 
   const roomSelect = page.getByTestId('reservation-room-select');
   await expect(roomSelect).toBeVisible();

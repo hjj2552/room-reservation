@@ -7,10 +7,11 @@ import { PublicVisibilityValue } from '../../shared/components/ReservationDetail
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useDeleteRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
-import { formatDate, formatDateTime, formatDateTimeWithWeekday, formatTime } from '../../shared/utils/date';
+import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels } from '../../shared/utils/labels';
 import { timetableReservationUrl } from '../../shared/utils/timetable';
 import { formatDayCodes } from '../../shared/utils/weekdays';
+import { adminListPath } from '../utils/listContext';
 
 export function RecurrenceDetailPage() {
   const { recurrenceId = '' } = useParams();
@@ -26,7 +27,7 @@ export function RecurrenceDetailPage() {
       {
         onSuccess: () => {
           setShowDeleteModal(false);
-          navigate('/admin/recurrences');
+          navigate(adminListPath('recurrences'));
         },
       },
     );
@@ -59,7 +60,7 @@ export function RecurrenceDetailPage() {
           <p className="muted" data-testid="recurrence-detail-purpose">{detail.purpose}</p>
         </div>
         <div className="header-actions">
-          <button type="button" className="ghost-button" onClick={() => navigate('/admin/recurrences')}>
+          <button type="button" className="ghost-button" onClick={() => navigate(adminListPath('recurrences'))}>
             목록으로
           </button>
           <Link className="secondary-button" to="/admin/reservations">
@@ -167,8 +168,8 @@ export function RecurrenceDetailPage() {
                 >
                   <td>
                     <span className="table-cell-stack">
-                      <span>{formatDateTimeWithWeekday(reservation.startAt)}</span>
-                      <span className="muted">~ {formatDateTimeWithWeekday(reservation.endAt)}</span>
+                      <span>{formatDateTime(reservation.startAt)}</span>
+                      <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
                     </span>
                   </td>
                   <td className="table-room-cell">{reservation.roomName}</td>

@@ -45,7 +45,8 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await page.setViewportSize({ width: 1440, height: 900 });
   const longPurpose = 'testing-deleted-snapshot-purpose-that-should-not-be-rendered';
   const longActorId = 'testing-audit-actor-id-without-breakpoints-0123456789';
-  const longMemo = 'testing 감사 이력의 긴 메모는 자신의 열 안에서 자연스럽게 여러 줄로 표시됩니다.';
+  const processingMemo = '첫 번째 처리 내용\n두 번째 처리 내용';
+  const longMemo = `${processingMemo}\ntesting-${'unbroken'.repeat(20)}`;
 
   await page.route('**/api/admin/audit/reservation-histories**', async (route) => {
     const requestedPage = Number(new URL(route.request().url()).searchParams.get('page') || 0);
@@ -163,10 +164,13 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   );
   const rows = table.locator('tbody tr');
   await expect(rows).toHaveCount(5);
+  await expect(rows.nth(0).locator('td').nth(0)).toContainText('2026. 5. 28. (목)');
   const liveSummaryLink = rows.nth(0).locator('.audit-reservation-link');
   await expect(liveSummaryLink).toHaveAttribute('href', '/admin/reservations/10000000-0000-0000-0000-000000000000');
   await expect(liveSummaryLink.locator('.audit-snapshot-room')).toHaveText('testing-live-room');
   await expect(liveSummaryLink.locator('.audit-snapshot-time')).toContainText('2026. 6. 3.');
+  await expect(liveSummaryLink.locator('.audit-snapshot-time')).toContainText('(수)');
+  expect((await liveSummaryLink.locator('.audit-snapshot-time').innerText()).match(/2026\. 6\. 3\./g)).toHaveLength(1);
   await expect(rows.nth(1).locator('.audit-snapshot-room')).toHaveText('testing-deleted-room');
   await expect(rows.nth(1).locator('.audit-snapshot-time')).toContainText('2026. 6. 1.');
   await expect(rows.nth(1).locator('.audit-reservation-snapshot')).not.toContainText(longPurpose);
@@ -187,6 +191,31 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
     wordBreak: getComputedStyle(element).wordBreak,
     fitsColumn: element.scrollWidth <= element.clientWidth,
   }))).toEqual({ wordBreak: 'keep-all', fitsColumn: true });
+  const memoCell = rows.nth(0).locator('.processing-memo');
+  await expect(memoCell).toHaveCSS('white-space', 'pre-wrap');
+  await expect(memoCell).toHaveCSS('overflow-wrap', 'anywhere');
+  expect((await memoCell.innerText()).split('\n').slice(0, 2)).toEqual(processingMemo.split('\n'));
+  expect(await memoCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  const processingTimeCell = rows.nth(0).locator('td').nth(0);
+  const actionCell = rows.nth(0).locator('td').nth(1);
+  const targetCell = rows.nth(0).locator('td').nth(2);
+  const statusCell = rows.nth(0).locator('td').nth(3);
+  expect(await processingTimeCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  expect(await targetCell.locator('.audit-snapshot-time').evaluate(
+    (element) => element.scrollWidth <= element.clientWidth + 1,
+  )).toBe(true);
+  const [processingBox, actionBox, targetBox, statusBox] = await Promise.all([
+    processingTimeCell.boundingBox(),
+    actionCell.boundingBox(),
+    targetCell.boundingBox(),
+    statusCell.boundingBox(),
+  ]);
+  if (!processingBox || !actionBox || !targetBox || !statusBox) {
+    throw new Error('Could not measure audit date columns.');
+  }
+  expect(processingBox.x + processingBox.width).toBeLessThanOrEqual(actionBox.x + 1);
+  expect(targetBox.x + targetBox.width).toBeLessThanOrEqual(statusBox.x + 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.locator('.pagination-desktop-controls').getByRole('button', { name: '다음', exact: true }).click();
   await expect(page).toHaveURL(/page=1/);

@@ -56,6 +56,8 @@ test('rooms layout uses the page width and registration panel closes on Escape o
 
   const listPanel = page.locator('.room-list-panel');
   const tableWrap = listPanel.locator('.table-wrap');
+  const table = page.getByTestId('rooms-table');
+  await expect(table).toBeVisible();
   const layoutMetrics = await listPanel.evaluate((element) => {
     const pageSection = element.closest('.rooms-page');
     const listBox = element.getBoundingClientRect();
@@ -68,6 +70,14 @@ test('rooms layout uses the page width and registration panel closes on Escape o
   expect(Math.abs(layoutMetrics.pageWidth - layoutMetrics.listWidth)).toBeLessThanOrEqual(1);
   expect(await tableWrap.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const firstRowCells = table.locator('tbody tr').first().locator('td');
+  const updatedAtCell = firstRowCells.nth(3);
+  const manageCell = firstRowCells.nth(4);
+  await expect(updatedAtCell).toContainText(/\([월화수목금토일]\)/);
+  expect(await updatedAtCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  const [updatedAtBox, manageBox] = await Promise.all([updatedAtCell.boundingBox(), manageCell.boundingBox()]);
+  if (!updatedAtBox || !manageBox) throw new Error('Could not measure room updated-at and management cells.');
+  expect(updatedAtBox.x + updatedAtBox.width).toBeLessThanOrEqual(manageBox.x + 1);
 
   const createButton = page.getByTestId('room-create-button');
   await createButton.click();
@@ -100,6 +110,7 @@ test('rooms layout uses the page width and registration panel closes on Escape o
   await expect(createButton).toBeFocused();
 
   await page.setViewportSize({ width: 390, height: 844 });
+  expect(await tableWrap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
   await createButton.click();
   await expect(page.getByTestId('room-form-panel')).toBeVisible();
   await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
