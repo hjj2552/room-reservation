@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router';
 import type { ReservationListItem } from '../api/types';
-import { formatDateTime } from '../utils/date';
+import { formatDateTimeWithWeekday } from '../utils/date';
 import { sourceLabels } from '../utils/labels';
 import { timetableReservationUrl } from '../utils/timetable';
 import { StatusBadge } from './StatusBadge';
@@ -41,8 +41,8 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
             >
               <td className="reservation-time-cell">
                 <span className="table-cell-stack">
-                  <strong>{formatDateTime(reservation.startAt)}</strong>
-                  <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                  <strong>{formatDateTimeWithWeekday(reservation.startAt)}</strong>
+                  <span className="muted">~ {formatDateTimeWithWeekday(reservation.endAt)}</span>
                 </span>
               </td>
               <td className="reservation-room-cell"><strong>{reservation.roomName}</strong></td>

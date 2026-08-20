@@ -245,32 +245,70 @@ test('public and admin timetables share availability colors but keep different i
   await page.goto('/timetable?view=date&date=2026-07-13');
   await expect(page.getByText('공개 예약 불가', { exact: true })).toBeVisible();
   await expect(page.getByText('운영하지 않음', { exact: true })).toBeVisible();
+  await expect(page.locator('.timetable-availability-legend i.public-unavailable')).toHaveCSS(
+    'background-color',
+    'rgb(253, 247, 246)',
+  );
+  expect(
+    await page.locator('.timetable-availability-legend i.operating-unavailable')
+      .evaluate((element) => getComputedStyle(element, '::before').content.replace(/["']/g, '')),
+  ).toBe('×');
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
   const publicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable');
   await expect(publicUnavailableColumn).toHaveCount(1);
-  await expect(publicUnavailableColumn.locator('.timetable-grid-line').first()).toHaveCSS('z-index', '1');
+  await expect(publicUnavailableColumn).toHaveCSS('background-color', 'rgb(253, 247, 246)');
+  await expect(publicUnavailableColumn).toHaveCSS('border-left-width', '1px');
+  const publicUnavailableGridLine = publicUnavailableColumn.locator('.timetable-grid-line').first();
+  await expect(publicUnavailableGridLine).toHaveCSS('z-index', '1');
+  await expect(publicUnavailableGridLine).toHaveCSS('background-color', 'rgb(237, 241, 245)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto(`/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`);
   const publicUnavailableHeader = page.locator('.timetable-day-header.availability-public-unavailable').first();
   const weeklyPublicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable').first();
+  const availableHeader = page.locator('.timetable-day-header.availability-available').first();
   await expect(publicUnavailableHeader).toHaveCSS(
     'background-color',
-    await weeklyPublicUnavailableColumn.evaluate((element) => getComputedStyle(element).backgroundColor),
+    await availableHeader.evaluate((element) => getComputedStyle(element).backgroundColor),
   );
+  await expect(weeklyPublicUnavailableColumn).toHaveCSS('background-color', 'rgb(253, 247, 246)');
   const operatingUnavailableHeader = page.locator('.timetable-day-header.availability-operating-unavailable').first();
   const weeklyOperatingUnavailableColumn = page.locator('.timetable-room-column.availability-operating-unavailable').first();
   await expect(operatingUnavailableHeader).toHaveCSS(
     'background-color',
-    await weeklyOperatingUnavailableColumn.evaluate((element) => getComputedStyle(element).backgroundColor),
+    await availableHeader.evaluate((element) => getComputedStyle(element).backgroundColor),
   );
+  await expect(weeklyOperatingUnavailableColumn).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  const weeklyOperatingSlots = weeklyOperatingUnavailableColumn.locator(
+    '.timetable-unavailable-slot.availability-operating-unavailable',
+  );
+  expect(await weeklyOperatingSlots.count()).toBeGreaterThan(0);
+  expect(
+    await weeklyOperatingSlots.evaluateAll((elements) => elements.every(
+      (element) => getComputedStyle(element, '::after').content.replace(/["']/g, '') === '×',
+    )),
+  ).toBe(true);
 
   await page.goto('/timetable?view=date&date=2026-07-14');
   await expect(page.getByRole('button', { name: `${room.name} 09:30-10:00 예약 신청` })).toHaveCount(0);
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toBeEnabled();
   await expect(page.getByRole('button', { name: `${room.name} 16:30-17:00 예약 신청` })).toBeEnabled();
   await expect(page.getByRole('button', { name: `${room.name} 17:00-17:30 예약 신청` })).toHaveCount(0);
+
+  await page.goto('/timetable?view=date&date=2026-07-12');
+  await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
+  const publicOperatingColumn = page.locator('.timetable-room-column.availability-operating-unavailable');
+  await expect(publicOperatingColumn).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  const publicOperatingSlots = publicOperatingColumn.locator(
+    '.timetable-unavailable-slot.availability-operating-unavailable',
+  );
+  expect(await publicOperatingSlots.count()).toBeGreaterThan(0);
+  expect(
+    await publicOperatingSlots.evaluateAll((elements) => elements.every(
+      (element) => getComputedStyle(element, '::after').content.replace(/["']/g, '') === '×',
+    )),
+  ).toBe(true);
 
   await page.goto('/admin/timetable?view=date&date=2026-07-13');
   const adminPublicUnavailable = page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` });
@@ -279,7 +317,15 @@ test('public and admin timetables share availability colors but keep different i
 
   await page.goto('/admin/timetable?view=date&date=2026-07-12');
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
-  await expect(page.locator('.timetable-room-column.availability-operating-unavailable')).toHaveCount(1);
+  const adminOperatingColumn = page.locator('.timetable-room-column.availability-operating-unavailable');
+  await expect(adminOperatingColumn).toHaveCount(1);
+  await expect(adminOperatingColumn).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  expect(
+    await adminOperatingColumn.locator('.timetable-unavailable-slot.availability-operating-unavailable')
+      .evaluateAll((elements) => elements.every(
+        (element) => getComputedStyle(element, '::after').content.replace(/["']/g, '') === '×',
+      )),
+  ).toBe(true);
 });
 
 async function mockReservationApis(

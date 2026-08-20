@@ -173,8 +173,8 @@ visual implementation, but their roles must remain stable.
 | Status confirmed | `#2f6b4f` | Confirmed reservation state |
 | Status cancelled | `#73766f` | Cancelled historical state |
 | Public unavailable | `#8b4f49` | Text and markers for times or days unavailable to public reservation |
-| Public unavailable soft | `#f7ece9` | Timetable cells unavailable to public reservation but still available to administrators |
-| Operating unavailable soft | `#efefeb` | Timetable cells outside the operating days or hours for every user |
+| Public unavailable soft | `#fdf7f6` | Very pale timetable background for cells unavailable to public reservation but still available to administrators |
+| Operating unavailable | `#9a9d96` | Muted `×` marker for timetable cells outside the operating days or hours for every user |
 | Danger | `#a13d38` | Destructive action and failure |
 | Warning | `#8a6100` | Pending or caution |
 
@@ -299,15 +299,17 @@ document scrolling when all content fits in one viewport.
 - Use the public-unavailable text and soft-surface roles for operating periods
   that administrators may reserve but public users may not. Public users cannot
   select those cells; administrators retain their normal reservation actions.
-- Use the operating-unavailable soft surface for days or times outside the
-  operating schedule. Those cells are unavailable to both public users and
+- Use the neutral timetable background with a muted `×` marker in each
+  30-minute cell for days or times outside the operating schedule. Do not use a
+  gray surface fill. Those cells are unavailable to both public users and
   administrators. Operating unavailability takes visual precedence when both
   restrictions apply.
 - Existing reservation blocks remain visible and keep their normal status
   treatment over unavailable backgrounds.
 - Show timetable availability legends on both public and administrator
-  surfaces. Pair each color swatch with a literal label such as `공개 예약 불가`
-  or `운영하지 않음`; color alone must not carry the meaning.
+  surfaces. Pair the public-unavailable swatch and operating-unavailable `×`
+  marker with literal labels such as `공개 예약 불가` or `운영하지 않음`;
+  color alone must not carry the meaning.
 - Place the availability legend immediately before the timetable's time, room,
   and reservation-count summary. Separate the legend from those statistics
   with a visibly spaced `|`, not the same middle-dot separator used between

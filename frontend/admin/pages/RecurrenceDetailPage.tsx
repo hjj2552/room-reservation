@@ -7,7 +7,7 @@ import { PublicVisibilityValue } from '../../shared/components/ReservationDetail
 import { StatusBadge } from '../../shared/components/StatusBadge';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import { useDeleteRecurrence, useRecurrence } from '../../shared/hooks/useRecurrences';
-import { formatDate, formatDateTime, formatTime } from '../../shared/utils/date';
+import { formatDate, formatDateTime, formatDateTimeWithWeekday, formatTime } from '../../shared/utils/date';
 import { conflictPolicyLabels } from '../../shared/utils/labels';
 import { timetableReservationUrl } from '../../shared/utils/timetable';
 import { formatDayCodes } from '../../shared/utils/weekdays';
@@ -142,7 +142,7 @@ export function RecurrenceDetailPage() {
 
       <section className="panel recurrence-reservations-panel" aria-labelledby="recurrence-reservations-title">
         <h2 id="recurrence-reservations-title">생성된 개별 예약</h2>
-        <div className="table-wrap compact">
+        <div className="table-wrap">
           <table className="data-table recurrence-reservations-table" data-testid="recurrence-reservations-table">
             <thead>
               <tr>
@@ -167,8 +167,8 @@ export function RecurrenceDetailPage() {
                 >
                   <td>
                     <span className="table-cell-stack">
-                      <span>{formatDateTime(reservation.startAt)}</span>
-                      <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                      <span>{formatDateTimeWithWeekday(reservation.startAt)}</span>
+                      <span className="muted">~ {formatDateTimeWithWeekday(reservation.endAt)}</span>
                     </span>
                   </td>
                   <td className="table-room-cell">{reservation.roomName}</td>
