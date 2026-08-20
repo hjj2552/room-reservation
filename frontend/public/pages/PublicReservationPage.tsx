@@ -14,6 +14,7 @@ import {
 } from '../../shared/components/TimetableQuickAddPanel';
 import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import {
   publicReservationKeys,
   useCreatePublicReservation,
@@ -37,7 +38,7 @@ interface RoomInfoDialogState {
   room: RoomInfoRoom;
 }
 
-const timetablePageSizeNote = '표시된 신청/예약은 승인 대기 또는 승인 상태입니다.';
+const defaultCompletionMessage = '예약 신청이 완료되었습니다.';
 const publicStatusLabels = {
   REQUESTED: statusLabels.REQUESTED,
   CONFIRMED: statusLabels.CONFIRMED,
@@ -102,7 +103,7 @@ export function PublicReservationPage() {
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [quickSelectionUnavailableMessage, setQuickSelectionUnavailableMessage] = useState<string>();
   const [submissionPolicyError, setSubmissionPolicyError] = useState<Error | null>(null);
-  const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
   useEffect(() => {
@@ -127,12 +128,6 @@ export function PublicReservationPage() {
       enabled: viewMode === 'date',
     })),
   });
-
-  useEffect(() => {
-    if (!highlightedReservationId) return;
-    const timer = window.setTimeout(() => setHighlightedReservationId(null), 5000);
-    return () => window.clearTimeout(timer);
-  }, [highlightedReservationId]);
 
   const dateReservations = useMemo(
     () =>
@@ -235,11 +230,11 @@ export function PublicReservationPage() {
         cancelPassword: values.cancelPassword,
       },
       {
-        onSuccess: (created) => {
-          setHighlightedReservationId(created.id);
+        onSuccess: () => {
           setQuickSelection(null);
           setQuickSelectionUnavailableMessage(undefined);
           setSubmissionPolicyError(null);
+          setShowCompletionDialog(true);
         },
       },
     );
@@ -248,7 +243,6 @@ export function PublicReservationPage() {
   return (
     <div className="public-shell" aria-labelledby="timetable-title">
       <TimetablePageHeader
-        helperText="신청은 승인 대기 상태로 저장되며 관리자 승인 후 예약됩니다."
         buttonTestId="public-new-request-button"
         buttonDisabled={Boolean(isUnavailable) || !settings.data}
         onNewRequest={handleNewRequestClick}
@@ -258,16 +252,9 @@ export function PublicReservationPage() {
       {rooms.isError ? <ErrorState error={rooms.error} /> : null}
       {settings.isError ? <ErrorState error={settings.error} /> : null}
 
-      {settings.data ? (
+      {settings.data?.publicNotice?.trim() ? (
         <section className="public-notice" aria-live="polite">
-          <div>
-            {settings.data.publicNotice ? <strong className="public-notice-message">{settings.data.publicNotice}</strong> : null}
-            <strong>
-              신청 가능 시간 {String(settings.data.publicOpenTime).slice(0, 5)}-
-              {String(settings.data.publicCloseTime).slice(0, 5)}
-            </strong>
-            <p>{timetablePageSizeNote}</p>
-          </div>
+          <strong className="public-notice-message">{settings.data.publicNotice.trim()}</strong>
         </section>
       ) : null}
 
@@ -309,9 +296,6 @@ export function PublicReservationPage() {
               <h2 id="public-timetable-title">
                 {viewMode === 'date' ? timetableCopy.dateTitle : timetableCopy.roomTitle}
               </h2>
-              <p className="muted">
-                {viewMode === 'date' ? timetableCopy.dateDescription : timetableCopy.roomDescription}
-              </p>
             </div>
           </div>
 
@@ -338,7 +322,6 @@ export function PublicReservationPage() {
                 closeTime={settings.data.closeTime}
                 minReservationMinutes={settings.data.minReservationMinutes}
                 availability={{ ...settings.data, context: 'PUBLIC' }}
-                highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={(room) => openRoomInfo(room)}
@@ -402,7 +385,6 @@ export function PublicReservationPage() {
                 closeTime={settings.data.closeTime}
                 minReservationMinutes={settings.data.minReservationMinutes}
                 availability={{ ...settings.data, context: 'PUBLIC' }}
-                highlightedReservationId={highlightedReservationId}
                 onEmptySlotClick={handleSlotClick}
                 onReservationClick={handleReservationClick}
                 onRoomInfoClick={hasRoomDescription(selectedRoom?.description) && selectedRoom
@@ -440,6 +422,32 @@ export function PublicReservationPage() {
         room={roomInfoDialog?.room || null}
         onClose={() => setRoomInfoDialog(null)}
       />
+
+      {showCompletionDialog ? (
+        <ModalDialog
+          title="예약 신청 완료"
+          titleId="public-reservation-completion-title"
+          ariaDescribedBy="public-reservation-completion-description"
+          className="reservation-password-modal"
+          onClose={() => setShowCompletionDialog(false)}
+          testId="public-reservation-completion-dialog"
+        >
+          <div id="public-reservation-completion-description">
+            <p>{settings.data?.completionMessage?.trim() || defaultCompletionMessage}</p>
+            <p className="muted">예약 상태: 승인 대기</p>
+          </div>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => setShowCompletionDialog(false)}
+              autoFocus
+            >
+              확인
+            </button>
+          </div>
+        </ModalDialog>
+      ) : null}
 
     </div>
   );

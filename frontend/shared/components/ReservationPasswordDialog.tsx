@@ -50,7 +50,7 @@ export function ReservationPasswordDialog({
 
   return (
     <ModalDialog
-      title="예약 비밀번호 확인"
+      title="수정 및 취소용 비밀번호 확인"
       titleId={titleId}
       ariaDescribedBy={descriptionId}
       className="reservation-password-modal"
@@ -59,11 +59,11 @@ export function ReservationPasswordDialog({
       initialFocusRef={inputRef}
     >
       <p id={descriptionId} className="muted">
-        예약할 때 설정한 비밀번호를 입력해 주세요.
+        예약 신청 시 설정한 수정 및 취소용 비밀번호를 입력해 주세요.
       </p>
       <form className="form-stack" onSubmit={handleSubmit}>
         <label>
-          예약 비밀번호
+          수정 및 취소용 비밀번호
           <input
             ref={inputRef}
             type="password"
@@ -98,7 +98,7 @@ export function ReservationPasswordDialog({
             disabled={isPending || !publicPasswordPattern.test(password)}
             data-testid={submitTestId}
           >
-            {isPending ? '확인 중...' : '예약 비밀번호 확인'}
+            {isPending ? '확인 중...' : '비밀번호 확인'}
           </button>
         </div>
       </form>

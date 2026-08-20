@@ -32,6 +32,7 @@ import {
   reservationEndTimeOptions,
   reservationStartTimeOptions,
 } from '../../shared/utils/timeOptions';
+import { publicPasswordHelp } from '../../shared/utils/publicPassword';
 
 const settings: ReservationTimeSettings = {
   semesterStartDate: '2026-07-01',
@@ -176,6 +177,17 @@ test('builds reservation choices at exactly five-minute increments within min an
 
   const ends = reservationEndTimeOptions('09:10', '10:00', 35, 45);
   expect(ends.map((option) => option.value)).toEqual(['09:45', '09:50', '09:55']);
+  expect(ends.map((option) => option.label)).toEqual([
+    '09:45 · 35분', '09:50 · 40분', '09:55 · 45분',
+  ]);
+
+  expect(reservationEndTimeOptions('15:00', '17:00', 30, 120)).toEqual(expect.arrayContaining([
+    { value: '15:30', label: '15:30 · 30분' },
+    { value: '15:35', label: '15:35 · 35분' },
+    { value: '16:00', label: '16:00 · 1시간' },
+    { value: '16:05', label: '16:05 · 1시간 5분' },
+    { value: '17:00', label: '17:00 · 2시간' },
+  ]));
 });
 
 test('builds operating choices at exactly thirty-minute increments', () => {
@@ -190,6 +202,10 @@ test('keeps an existing reservation time visible when it is outside current choi
   expect(includeExistingTime([], '08:55')).toEqual([
     { value: '08:55', label: '08:55 (기존 시간)', existing: true },
   ]);
+});
+
+test('uses the unified public reservation password validation copy', () => {
+  expect(publicPasswordHelp).toBe('수정 및 취소용 비밀번호를 4자 이상 입력해 주세요.');
 });
 
 test('serializes service-local reservation inputs with the Seoul offset', () => {
