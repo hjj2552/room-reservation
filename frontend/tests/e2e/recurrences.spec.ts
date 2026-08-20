@@ -75,6 +75,55 @@ test('all tag options follow every API page and propagate later page errors', as
   }
 });
 
+test('recurrence reservation editing preserves one-step detail history and list context', async ({
+  page,
+  request,
+  e2eData,
+}) => {
+  await loginByApi(request);
+  const room = await e2eData.createTestRoom('recurrence-navigation');
+  const recurrence = await e2eData.createTestRecurringReservation(room.id, 'recurrence-navigation');
+  const detailResponse = await request.get(`/api/admin/recurrences/${recurrence.recurrenceId}`);
+  expect(detailResponse.ok(), await detailResponse.text()).toBeTruthy();
+  const detail = await detailResponse.json() as { purpose: string; reservations: Array<{ id: string }> };
+  const reservationId = detail.reservations[0]?.id;
+  expect(reservationId).toBeTruthy();
+  const listUrl = `/admin/recurrences?roomId=${room.id}&keyword=${encodeURIComponent(detail.purpose)}&page=0`;
+
+  await page.goto(listUrl);
+  await page.getByRole('row').filter({ hasText: detail.purpose }).click();
+  await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrence.recurrenceId}$`));
+
+  const reservationRow = page.getByTestId('recurrence-reservations-table').locator('tbody tr').first();
+  await reservationRow.click();
+  await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservationId}$`));
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrence.recurrenceId}$`));
+
+  await page.getByTestId('recurrence-reservations-table').locator('tbody tr').first().click();
+  await page.getByTestId('reservation-edit-link').click();
+  const updatedPurpose = `${detail.purpose}-updated`;
+  await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
+  const updateResponse = page.waitForResponse((response) => (
+    new URL(response.url()).pathname === `/api/admin/reservations/${reservationId}`
+    && response.request().method() === 'PUT'
+  ));
+  await page.getByTestId('reservation-save-button').click();
+  await updateResponse;
+  await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservationId}$`));
+  await expect(page.getByTestId('reservation-purpose')).toHaveText(updatedPurpose);
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/admin/recurrences/${recurrence.recurrenceId}$`));
+  await page.getByRole('button', { name: '목록으로', exact: true }).click();
+  await expect(page).toHaveURL((url) => (
+    url.pathname === '/admin/recurrences'
+    && url.searchParams.get('roomId') === room.id
+    && url.searchParams.get('keyword') === detail.purpose
+    && url.searchParams.get('page') === '0'
+  ));
+});
+
 test('recurrence end date uses an inclusive 366-day native limit without rewriting the value', async ({ page, request }) => {
   await loginByApi(request);
   await page.goto('/admin/recurrences');
@@ -101,7 +150,7 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
   let deleted = false;
 
   try {
-    await page.goto('/admin/recurrences');
+    await page.goto(`/admin/recurrences?keyword=${encodeURIComponent(purpose)}&page=0`);
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
     await expect(
       page.getByTestId('recurrence-conflict-policy-select').locator('xpath=ancestor::label'),
@@ -209,7 +258,7 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
         },
       });
     }, { times: 1 });
-    await page.goto('/admin/recurrences');
+    await page.goto(`/admin/recurrences?keyword=${encodeURIComponent(purpose)}&page=0`);
     let row = page.getByRole('row').filter({ hasText: purpose });
     const recurrenceTable = page.getByTestId('recurrences-table');
     await expect(recurrenceTable.getByRole('columnheader')).toHaveText([
@@ -391,7 +440,11 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     expect(deleteResponse.status()).toBe(204);
     deleted = true;
 
-    await expect(page).toHaveURL(/\/admin\/recurrences$/);
+    await expect(page).toHaveURL((url) => (
+      url.pathname === '/admin/recurrences'
+      && url.searchParams.get('keyword') === purpose
+      && url.searchParams.get('page') === '0'
+    ));
     row = page.getByRole('row').filter({ hasText: purpose });
     await expect(row).toHaveCount(0);
     expect((await request.get(`/api/admin/recurrences/${recurrenceId}`)).status()).toBe(404);

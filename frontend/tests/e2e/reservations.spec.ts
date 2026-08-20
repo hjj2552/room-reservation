@@ -365,7 +365,8 @@ test('reservation edit replaces an inactive current room without getting stuck l
   const reservation = await e2eData.createTestReservation(inactiveRoom.id, 'reservation-edit-inactive-room');
   await e2eData.setTestRoomEnabled(inactiveRoom.id, false);
 
-  await page.goto(`/admin/reservations/${reservation.id}/edit`);
+  await page.goto(`/admin/reservations/${reservation.id}`);
+  await page.getByTestId('reservation-edit-link').click();
 
   const roomSelect = page.getByTestId('reservation-room-select');
   await expect(roomSelect).toBeVisible();

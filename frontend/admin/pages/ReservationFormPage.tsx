@@ -136,7 +136,7 @@ export function ReservationFormPage() {
       return;
     }
     update.mutate(payload, {
-      onSuccess: (updated) => navigate(`/admin/reservations/${updated.id}`),
+      onSuccess: () => navigate(-1),
     });
   }
 
