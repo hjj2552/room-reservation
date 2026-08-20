@@ -286,6 +286,8 @@ test('administrator reservation and recurrence tables keep native cell geometry'
       ...reservationItem('geometry', 'testing-room-geometry', longRoomName),
       applicantEmail: 'testing-applicant-with-a-long-address@example.invalid',
       purpose: longPurpose,
+      startAt: '2026-09-14T13:00:00+09:00',
+      endAt: '2026-09-14T20:00:00+09:00',
     }],
     page: 0,
     size: 20,
@@ -313,11 +315,20 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     await expectWrapperHasNoOverflow(table);
     await expectAdjacentCellsDoNotOverlap(table);
     const timeStack = table.locator('tbody tr').first().locator('.table-cell-stack');
+    await expect(timeStack).toContainText('2026. 9. 14. (월) 오후 1:00');
+    await expect(timeStack).toContainText('~ 2026. 9. 14. (월) 오후 8:00');
     const roomCell = table.locator('tbody tr').first().locator('td').nth(1);
     const [timeBox, roomBox] = await Promise.all([timeStack.boundingBox(), roomCell.boundingBox()]);
     if (!timeBox || !roomBox) throw new Error('Could not measure reservation time and room cells.');
     expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(roomBox.x + 1);
   }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin/reservations');
+  const mobileReservationTable = page.getByTestId('reservations-table');
+  const mobileReservationWrapper = mobileReservationTable.locator('xpath=..');
+  expect(await mobileReservationWrapper.evaluate((wrapper) => wrapper.scrollWidth > wrapper.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/admin/recurrences');

@@ -9,6 +9,19 @@ export function formatDateTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+export function formatDateTimeWithWeekday(value?: string | null) {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: reservationServiceTimeZone,
+  }).format(new Date(value));
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('ko-KR', {
