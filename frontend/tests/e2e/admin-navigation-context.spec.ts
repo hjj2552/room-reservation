@@ -30,6 +30,11 @@ async function mockPagedLists(page: Page) {
   }
 }
 
+async function visitSettings(page: Page) {
+  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '운영 설정', exact: true })).toBeVisible();
+}
+
 test('administrator list menus restore only applied URL context', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('navigation-context');
@@ -41,8 +46,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
   );
   await expect(page.getByTestId('reservation-keyword-filter')).toHaveValue('testing-applied');
   await page.getByTestId('reservation-keyword-filter').fill('testing-unapplied');
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '예약 목록', exact: true }).click();
   await expect(page.getByTestId('reservation-keyword-filter')).toHaveValue('testing-applied');
   expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
@@ -59,8 +63,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
       + '&toDate=2026-10-31&keyword=testing-recurring&page=1',
   );
   await expect(page.getByTestId('recurrence-list-keyword-filter')).toHaveValue('testing-recurring');
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '반복 예약', exact: true }).click();
   await expect(page).toHaveURL((url) => (
     url.pathname === '/admin/recurrences'
@@ -76,8 +79,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
   const roomListRegion = page.getByRole('region', { name: '공간 목록' });
   await expect(roomListRegion).toBeVisible();
   await expect(roomListRegion.getByRole('heading', { name: '공간 목록' })).toHaveClass(/sr-only/);
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '공간 관리', exact: true }).click();
   await expect(page).toHaveURL(/keyword=testing-room/);
   await expect(page).toHaveURL(/page=1/);
@@ -87,8 +89,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
     && !url.searchParams.has('keyword')
     && url.searchParams.get('page') === '0'
   ));
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '공간 관리', exact: true }).click();
   await expect(page.getByTestId('room-keyword-input')).toHaveValue('');
   await expect(page).toHaveURL((url) => url.searchParams.get('page') === '0');
@@ -98,8 +99,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
       + '&action=UPDATED&fromDate=2026-11-01&toDate=2026-11-30&page=1',
   );
   await expect(page.getByTestId('audit-reservation-id-input')).toHaveValue('testing-reservation-id');
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '감사 이력', exact: true }).click();
   await expect(page).toHaveURL((url) => (
     url.pathname === '/admin/audit'
@@ -113,8 +113,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
 
   await page.goto('/admin/rooms?keyword=testing-corrected&page=invalid');
   await expect(page).toHaveURL((url) => url.searchParams.get('page') === '0');
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '공간 관리', exact: true }).click();
   await expect(page).toHaveURL((url) => (
     url.searchParams.get('keyword') === 'testing-corrected'
@@ -136,8 +135,7 @@ test('administrator list navigation falls back to bare URLs when session storage
 
   await page.goto('/admin/reservations?keyword=testing-explicit&page=1');
   await expect(page.getByTestId('reservation-keyword-filter')).toHaveValue('testing-explicit');
-  await page.getByRole('link', { name: '운영 설정', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/settings$/);
+  await visitSettings(page);
   await page.getByRole('link', { name: '예약 목록', exact: true }).click();
   await expect(page).toHaveURL((url) => url.pathname === '/admin/reservations' && url.search === '');
 });
