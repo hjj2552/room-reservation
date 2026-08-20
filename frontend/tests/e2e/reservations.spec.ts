@@ -224,6 +224,10 @@ test('reservation list and detail expose timetable links with reservation date a
 
     await page.goto(`/admin/reservations/${reservation.id}`);
     await expect(page.getByRole('button', { name: '목록으로', exact: true })).toHaveCount(0);
+    await expect(page.locator('.reservation-detail-page-header .muted')).toContainText(/\([월화수목금토일]\)/);
+    const adminDateTime = await page.locator('.reservation-detail-main dt', { hasText: '날짜/시간' })
+      .locator('xpath=following-sibling::dd').innerText();
+    expect(adminDateTime.match(/\([월화수목금토일]\)/g)).toHaveLength(2);
     const detailActions = page.getByTestId('reservation-primary-actions').locator('button, a');
     await expect(detailActions).toHaveText([
       '승인',

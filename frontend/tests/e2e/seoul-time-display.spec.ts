@@ -65,9 +65,11 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
 
       const auditRow = page.getByTestId('audit-table').locator('tbody tr').first();
       await expect(auditRow.locator('td').first()).toContainText('2026. 7. 14.');
+      await expect(auditRow.locator('td').first()).toContainText('(화)');
       await expect(auditRow.locator('td').first()).toContainText('12:30');
       const snapshotText = await auditRow.locator('.audit-snapshot-time').innerText();
       expect(snapshotText.match(/2026\. 7\. 14\./g)).toHaveLength(1);
+      expect(snapshotText).toContain('(화)');
       expect(snapshotText).not.toContain('2026. 7. 13.');
       expect(snapshotText).toContain('12:30');
       expect(snapshotText).toContain('11:30');

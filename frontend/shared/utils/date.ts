@@ -3,15 +3,6 @@ import { reservationServiceTimeZone } from './reservationTime';
 export function formatDateTime(value?: string | null) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: reservationServiceTimeZone,
-  }).format(new Date(value));
-}
-
-export function formatDateTimeWithWeekday(value?: string | null) {
-  if (!value) return '-';
-  return new Intl.DateTimeFormat('ko-KR', {
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',

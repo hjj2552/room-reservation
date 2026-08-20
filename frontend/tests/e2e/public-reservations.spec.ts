@@ -378,6 +378,9 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(detailPanel).toContainText('신청 목적');
     await expect(detailPanel).toContainText('공간');
     await expect(detailPanel).toContainText('날짜/시간');
+    const publicDateTime = await detailPanel.locator('dt', { hasText: '날짜/시간' })
+      .locator('xpath=following-sibling::dd').innerText();
+    expect(publicDateTime.match(/\([월화수목금토일]\)/g)).toHaveLength(2);
     await expect(detailPanel).toContainText('신청자 이름');
     await expect(detailPanel).toContainText('이메일');
     await expect(detailPanel).toContainText('전화번호');
