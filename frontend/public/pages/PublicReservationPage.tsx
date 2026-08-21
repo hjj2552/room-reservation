@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
@@ -14,7 +14,6 @@ import {
 } from '../../shared/components/TimetableQuickAddPanel';
 import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
-import { ModalDialog } from '../../shared/components/ModalDialog';
 import {
   publicReservationKeys,
   useCreatePublicReservation,
@@ -38,7 +37,8 @@ interface RoomInfoDialogState {
   room: RoomInfoRoom;
 }
 
-const defaultCompletionMessage = '예약 신청이 완료되었습니다.';
+const completionToastDurationMs = 6_000;
+const defaultCompletionMessage = '예약 신청이 완료되었습니다. 관리자 승인 후 예약이 확정됩니다.';
 const publicStatusLabels = {
   REQUESTED: statusLabels.REQUESTED,
   CONFIRMED: statusLabels.CONFIRMED,
@@ -103,12 +103,21 @@ export function PublicReservationPage() {
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [quickSelectionUnavailableMessage, setQuickSelectionUnavailableMessage] = useState<string>();
   const [submissionPolicyError, setSubmissionPolicyError] = useState<Error | null>(null);
-  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [completionToast, setCompletionToast] = useState<{ message: string } | null>(null);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(searchParams);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!completionToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setCompletionToast(null), completionToastDurationMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [completionToast]);
 
   const viewMode = isPublicTimetableViewMode(searchParams.get('view')) ? searchParams.get('view') : 'date';
   const selectedDate = searchParams.get('date') || todayInputValue();
@@ -234,7 +243,9 @@ export function PublicReservationPage() {
           setQuickSelection(null);
           setQuickSelectionUnavailableMessage(undefined);
           setSubmissionPolicyError(null);
-          setShowCompletionDialog(true);
+          setCompletionToast({
+            message: settings.data?.completionMessage?.trim() || defaultCompletionMessage,
+          });
         },
       },
     );
@@ -423,30 +434,17 @@ export function PublicReservationPage() {
         onClose={() => setRoomInfoDialog(null)}
       />
 
-      {showCompletionDialog ? (
-        <ModalDialog
-          title="예약 신청 완료"
-          titleId="public-reservation-completion-title"
-          ariaDescribedBy="public-reservation-completion-description"
-          className="reservation-password-modal"
-          onClose={() => setShowCompletionDialog(false)}
-          testId="public-reservation-completion-dialog"
+      {completionToast ? (
+        <div
+          className="public-reservation-success-toast"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="public-reservation-success-toast"
         >
-          <div id="public-reservation-completion-description">
-            <p>{settings.data?.completionMessage?.trim() || defaultCompletionMessage}</p>
-            <p className="muted">예약 상태: 승인 대기</p>
-          </div>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => setShowCompletionDialog(false)}
-              autoFocus
-            >
-              확인
-            </button>
-          </div>
-        </ModalDialog>
+          <Check size={20} strokeWidth={2.5} aria-hidden="true" data-testid="public-reservation-success-icon" />
+          <span>{completionToast.message}</span>
+        </div>
       ) : null}
 
     </div>
