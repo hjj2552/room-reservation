@@ -38,7 +38,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(adminStart).toHaveValue('09:00');
       await expect(adminEnd).toHaveValue('09:30');
-      await expect(adminEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(adminEnd.locator('option[value="09:30"]')).toHaveText('09:30 (총 30분)');
       await expect(page.getByText('관리자는 신청을 바로 승인 상태로 저장할 수 있습니다.')).toBeVisible();
       await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toBeVisible();
       const adminSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
@@ -68,7 +68,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(publicStart).toHaveValue('09:00');
       await expect(publicEnd).toHaveValue('09:30');
-      await expect(publicEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(publicEnd.locator('option[value="09:30"]')).toHaveText('09:30 (총 30분)');
       await expect(page.getByText('시간표의 빈 칸을 누르면 해당 날짜, 시간, 공간으로 예약 신청 화면이 열립니다.'))
         .toBeVisible();
       await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toHaveCount(0);

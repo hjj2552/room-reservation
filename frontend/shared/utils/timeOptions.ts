@@ -62,7 +62,7 @@ export function reservationEndTimeOptions(
     const durationLabel = [hours ? `${hours}시간` : '', minutes ? `${minutes}분` : '']
       .filter(Boolean)
       .join(' ');
-    return { ...option, label: `${option.label} · ${durationLabel}` };
+    return { ...option, label: `${option.label} (총 ${durationLabel})` };
   });
 }
 
