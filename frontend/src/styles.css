@@ -2302,6 +2302,13 @@ button:disabled {
 .public-notice-message {
   display: block;
   margin-bottom: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.public-reservation-disabled-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .public-notice p:first-child,
@@ -2723,6 +2730,34 @@ button:disabled {
   .timetable-summary {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timetable-summary-details {
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .timetable-availability-legend {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .timetable-availability-legend > span {
+    white-space: nowrap;
+  }
+
+  .timetable-summary-separator {
+    display: none;
+  }
+
+  .timetable-summary-details > span:last-child {
+    width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .timetable-scroll {

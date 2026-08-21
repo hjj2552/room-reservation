@@ -178,15 +178,15 @@ test('builds reservation choices at exactly five-minute increments within min an
   const ends = reservationEndTimeOptions('09:10', '10:00', 35, 45);
   expect(ends.map((option) => option.value)).toEqual(['09:45', '09:50', '09:55']);
   expect(ends.map((option) => option.label)).toEqual([
-    '09:45 · 35분', '09:50 · 40분', '09:55 · 45분',
+    '09:45 (총 35분)', '09:50 (총 40분)', '09:55 (총 45분)',
   ]);
 
   expect(reservationEndTimeOptions('15:00', '17:00', 30, 120)).toEqual(expect.arrayContaining([
-    { value: '15:30', label: '15:30 · 30분' },
-    { value: '15:35', label: '15:35 · 35분' },
-    { value: '16:00', label: '16:00 · 1시간' },
-    { value: '16:05', label: '16:05 · 1시간 5분' },
-    { value: '17:00', label: '17:00 · 2시간' },
+    { value: '15:30', label: '15:30 (총 30분)' },
+    { value: '15:35', label: '15:35 (총 35분)' },
+    { value: '16:00', label: '16:00 (총 1시간)' },
+    { value: '16:05', label: '16:05 (총 1시간 5분)' },
+    { value: '17:00', label: '17:00 (총 2시간)' },
   ]));
 });
 

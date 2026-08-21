@@ -38,7 +38,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(adminStart).toHaveValue('09:00');
       await expect(adminEnd).toHaveValue('09:30');
-      await expect(adminEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(adminEnd.locator('option[value="09:30"]')).toHaveText('09:30 (총 30분)');
       await expect(page.getByText('관리자는 신청을 바로 승인 상태로 저장할 수 있습니다.')).toBeVisible();
       await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toBeVisible();
       const adminSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
@@ -68,7 +68,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(publicStart).toHaveValue('09:00');
       await expect(publicEnd).toHaveValue('09:30');
-      await expect(publicEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(publicEnd.locator('option[value="09:30"]')).toHaveText('09:30 (총 30분)');
       await expect(page.getByText('시간표의 빈 칸을 누르면 해당 날짜, 시간, 공간으로 예약 신청 화면이 열립니다.'))
         .toBeVisible();
       await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toHaveCount(0);
@@ -113,9 +113,10 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
 }
 
 test('public completion toast stays within mobile viewport and restarts its timeout', async ({ page }) => {
+  const completionMessage = `testing-toast-first-line\n${'testing-toast-unbroken-'.repeat(12)}`;
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await mockReservationApis(page, '2026-07-31', { completionMessage: null });
+  await mockReservationApis(page, '2026-07-31', { completionMessage: `  ${completionMessage}  ` });
   await page.goto('/timetable');
   await page.clock.setFixedTime(fixedInstant);
 
@@ -143,6 +144,9 @@ test('public completion toast stays within mobile viewport and restarts its time
   const toast = page.getByTestId('public-reservation-success-toast');
   await expect(toast).toBeVisible();
   await expect(toast).toHaveCSS('animation-name', 'public-reservation-toast-lifecycle-reduced');
+  await expect(toast).toHaveCSS('white-space', 'pre-wrap');
+  await expect(toast).toHaveCSS('overflow-wrap', 'anywhere');
+  expect(await toast.locator('span').textContent()).toBe(completionMessage);
   const toastBox = await toast.boundingBox();
   expect(toastBox).not.toBeNull();
   expect(toastBox!.x).toBeGreaterThanOrEqual(0);
@@ -154,6 +158,104 @@ test('public completion toast stays within mobile viewport and restarts its time
   await page.waitForTimeout(3_500);
   await expect(toast).toBeVisible();
   await expect(toast).toBeHidden({ timeout: 3_500 });
+});
+
+test('public disabled message preserves line breaks within the mobile viewport', async ({ page }) => {
+  const disabledMessage = `testing-disabled-first-line\n${'testing-disabled-unbroken-'.repeat(12)}`;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReservationApis(page, '2026-07-31', {
+    reservationEnabled: false,
+    reservationDisabledMessage: disabledMessage,
+  });
+
+  await page.goto('/timetable');
+  const message = page.locator('.public-reservation-disabled-message');
+  expect(await message.textContent()).toBe(disabledMessage);
+  await expect(message).toHaveCSS('white-space', 'pre-wrap');
+  await expect(message).toHaveCSS('overflow-wrap', 'anywhere');
+  const messageBox = await message.boundingBox();
+  expect(messageBox).not.toBeNull();
+  expect(messageBox!.x).toBeGreaterThanOrEqual(0);
+  expect(messageBox!.x + messageBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('public and admin timetable summaries use stable mobile rows without changing desktop layout', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '09:00',
+    publicCloseTime: '18:00',
+  });
+  const cases = [
+    { url: '/timetable?view=date&date=2026-07-13', testId: 'reservation-date-timetable' },
+    { url: `/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`, testId: 'reservation-room-timetable' },
+    { url: '/admin/timetable?view=date&date=2026-07-13', testId: 'reservation-date-timetable' },
+    { url: `/admin/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`, testId: 'reservation-room-timetable' },
+  ];
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const scenario of cases) {
+    await page.goto(scenario.url);
+    const summary = page.getByTestId(scenario.testId).locator('.timetable-summary');
+    const details = summary.locator('.timetable-summary-details');
+    const legend = details.locator('.timetable-availability-legend');
+    const legendItems = legend.locator(':scope > span');
+    const separator = details.locator('.timetable-summary-separator');
+    const hours = details.locator(':scope > span').last();
+
+    await expect(details).toHaveCSS('flex-direction', 'column');
+    await expect(details).toHaveCSS('justify-content', 'flex-start');
+    await expect(legend).toHaveCSS('flex-wrap', 'wrap');
+    await expect(separator).toBeHidden();
+    expect(await legendItems.evaluateAll((elements) =>
+      elements.every((element) => getComputedStyle(element).whiteSpace === 'nowrap'))).toBe(true);
+
+    const [detailsBox, legendBox, hoursBox, itemBoxes] = await Promise.all([
+      details.boundingBox(),
+      legend.boundingBox(),
+      hours.boundingBox(),
+      legendItems.evaluateAll((elements) => elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y };
+      })),
+    ]);
+    expect(detailsBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(hoursBox).not.toBeNull();
+    expect(Math.abs(legendBox!.x - detailsBox!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(hoursBox!.x - detailsBox!.x)).toBeLessThanOrEqual(1);
+    expect(hoursBox!.y).toBeGreaterThanOrEqual(legendBox!.y + legendBox!.height - 1);
+    expect(Math.max(...itemBoxes.map((box) => box.y)) - Math.min(...itemBoxes.map((box) => box.y)))
+      .toBeLessThanOrEqual(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  }
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  for (const scenario of cases) {
+    await page.goto(scenario.url);
+    const summary = page.getByTestId(scenario.testId).locator('.timetable-summary');
+    const details = summary.locator('.timetable-summary-details');
+    const legend = details.locator('.timetable-availability-legend');
+    const separator = details.locator('.timetable-summary-separator');
+    const hours = details.locator(':scope > span').last();
+
+    await expect(summary).toHaveCSS('flex-direction', 'row');
+    await expect(details).toHaveCSS('flex-direction', 'row');
+    await expect(details).toHaveCSS('justify-content', 'flex-end');
+    await expect(separator).toBeVisible();
+    await expect(separator).toHaveText('|');
+    const [summaryBox, detailsBox, legendBox, hoursBox] = await Promise.all([
+      summary.boundingBox(), details.boundingBox(), legend.boundingBox(), hours.boundingBox(),
+    ]);
+    expect(summaryBox).not.toBeNull();
+    expect(detailsBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(hoursBox).not.toBeNull();
+    expect(Math.abs(detailsBox!.x + detailsBox!.width - (summaryBox!.x + summaryBox!.width)))
+      .toBeLessThanOrEqual(1);
+    expect(Math.abs(
+      legendBox!.y + legendBox!.height / 2 - (hoursBox!.y + hoursBox!.height / 2),
+    )).toBeLessThanOrEqual(1);
+  }
 });
 
 test('public blocks unavailable future suggestions while admin allows manual past input', async ({ page }) => {
@@ -309,19 +411,28 @@ test('empty slot hover fills the 30-minute grid cell when minimum duration is sh
 });
 
 test('public and admin timetables share availability colors but keep different interaction rules', async ({ page }) => {
+  const publicNoticeMessage = `testing-public-notice-first-line\n${'testing-public-notice-unbroken-'.repeat(12)}`;
   await mockReservationApis(page, '2026-07-31', {
     publicOpenTime: '10:00',
     publicCloseTime: '17:00',
     publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
-    publicNotice: '  testing-public-notice  ',
+    publicNotice: `  ${publicNoticeMessage}  `,
   });
   await page.setViewportSize({ width: 390, height: 844 });
 
   await page.goto('/timetable?view=date&date=2026-07-13');
   const publicNotice = page.locator('.public-notice');
-  await expect(publicNotice).toHaveText('testing-public-notice');
+  const publicNoticeText = publicNotice.locator('.public-notice-message');
+  expect(await publicNoticeText.textContent()).toBe(publicNoticeMessage);
+  await expect(publicNoticeText).toHaveCSS('white-space', 'pre-wrap');
+  await expect(publicNoticeText).toHaveCSS('overflow-wrap', 'anywhere');
   await expect(publicNotice).not.toContainText('신청 가능 시간');
   await expect(publicNotice).not.toContainText('승인 대기');
+  const publicNoticeBox = await publicNotice.boundingBox();
+  expect(publicNoticeBox).not.toBeNull();
+  expect(publicNoticeBox!.x).toBeGreaterThanOrEqual(0);
+  expect(publicNoticeBox!.x + publicNoticeBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   const publicDateSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
   await expect(publicDateSummary).toContainText('운영 시간 09:00–18:00 · 신청 가능 시간 10:00–17:00');
   await expect(publicDateSummary).not.toContainText('활성 공간');
@@ -425,6 +536,8 @@ async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
   overrides: Partial<{
+    reservationEnabled: boolean;
+    reservationDisabledMessage: string | null;
     minReservationMinutes: number;
     maxReservationMinutes: number;
     publicOpenTime: string;
