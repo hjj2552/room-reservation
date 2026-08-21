@@ -1,6 +1,6 @@
 # room-reservation
 
-하나의 public Cloudflare Worker가 React Static Assets와 `/api/*` TypeScript API를 제공하고 Neon PostgreSQL에 연결하는 공간 예약 MVP입니다. `frontend`와 `worker` 소스는 분리되어 있으며 배포 시에만 하나의 Worker version으로 결합합니다.
+하나의 공개 Cloudflare Worker가 React 정적 자산과 `/api/*` TypeScript API를 제공하고 Neon PostgreSQL에 연결하는 공간 예약 MVP입니다. `frontend`와 `worker` 소스는 분리되어 있으며 배포 시에만 하나의 Worker 버전으로 결합합니다.
 
 ## 문서
 
@@ -9,7 +9,7 @@
 - [개발자 실행/검증 문서](docs/dev-setup.md)
 - [현재 제한 사항](docs/known-limitations.md)
 - [공개 예약 신청 흐름](docs/public-reservation.md)
-- [관리자 E2E 문서](docs/admin-e2e.md)
+- [프런트엔드 E2E 문서](docs/admin-e2e.md)
 - [배포 체크리스트](docs/deployment-checklist.md)
 - [공간 삭제 정책](docs/room-deletion-policy.md)
 
@@ -23,7 +23,7 @@ Copy-Item .env.example .env
 
 `.env`의 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 로컬 값으로 채웁니다. 이 파일들은 Git에 커밋하지 않습니다.
 
-첫 번째 터미널에서 로컬 PostgreSQL과 Worker 백엔드를 실행합니다. 최초 실행 시 Worker 의존성 설치와 database migration도 수행합니다.
+첫 번째 터미널에서 로컬 PostgreSQL과 Worker 백엔드를 실행합니다. 최초 실행 시 Worker 의존성 설치와 데이터베이스 마이그레이션도 수행합니다.
 
 ```powershell
 ./start-worker.bat
@@ -35,9 +35,9 @@ Copy-Item .env.example .env
 ./start-frontend.bat
 ```
 
-Worker는 `http://127.0.0.1:8080`, 프런트엔드는 `http://localhost:5173`에서 실행됩니다. 로컬 데이터는 Docker PostgreSQL의 `room_reservation_worker` database에 저장됩니다.
+Worker는 `http://127.0.0.1:8080`, 프런트엔드는 `http://localhost:5173`에서 실행됩니다. 로컬 데이터는 Docker PostgreSQL의 `room_reservation_worker` 데이터베이스에 저장됩니다.
 
-관리자 계정은 `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 사용합니다. `admin` / `admin1234`는 test/E2E profile의 일회성 기본값일 뿐 local 또는 운영 계정이 아닙니다. 자세한 실행, 테스트, E2E 절차는 [docs/dev-setup.md](docs/dev-setup.md)를 참고하세요.
+관리자 계정은 `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 사용합니다. `admin` / `admin1234`는 테스트/E2E 환경의 일회성 기본값일 뿐 로컬 또는 운영 계정이 아닙니다. 자세한 실행, 테스트, E2E 절차는 [docs/dev-setup.md](docs/dev-setup.md)를 참고하세요.
 
 ## 라이선스
 

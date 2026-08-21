@@ -13,7 +13,7 @@ Windows와 PowerShell을 기준으로 문서화한 이유는 현재 이 저장�
 ```text
 room-reservation/
   worker/                 # Cloudflare Worker/Hono API
-  frontend/               # React/Vite SPA와 Worker Static Assets source
+  frontend/               # React/Vite SPA와 Worker 정적 자산 소스
   docs/
   docker-compose.yml      # 로컬 Worker PostgreSQL
   start-worker.bat
@@ -40,7 +40,7 @@ cd <repo>
 .\start-worker.bat
 ```
 
-이 스크립트는 PostgreSQL 기동, Worker 의존성 설치, `room_reservation_worker` database 생성, migration 적용과 HTTP adapter 시작을 처리합니다. Worker는 `http://127.0.0.1:8080`에서 실행됩니다. Docker를 이미 실행했다면 다음 명령만 실행해도 됩니다.
+이 스크립트는 PostgreSQL 기동, Worker 의존성 설치, `room_reservation_worker` 데이터베이스 생성, 마이그레이션 적용과 HTTP 어댑터 시작을 처리합니다. Worker는 `http://127.0.0.1:8080`에서 실행됩니다. Docker를 이미 실행했다면 다음 명령만 실행해도 됩니다.
 
 ```powershell
 cd <repo>\worker
@@ -58,7 +58,7 @@ cd <repo>
 
 ## 검사와 테스트
 
-Worker 정적 검사, unit/contract test, 격리 PostgreSQL 통합 test와 dry-run build:
+Worker 정적 검사, 단위·계약 테스트, 격리 PostgreSQL 통합 테스트와 사전 빌드:
 
 ```powershell
 cd <repo>\worker
@@ -69,7 +69,7 @@ npm.cmd run test:isolated-postgres
 npm.cmd run build
 ```
 
-프런트엔드 production build:
+프런트엔드 운영 빌드:
 
 ```powershell
 cd <repo>\frontend
@@ -77,30 +77,30 @@ npm.cmd ci
 npm.cmd run build
 ```
 
-전체 Playwright E2E는 고유 이름의 일회용 PostgreSQL container와 같은 Hono app을 사용하는 로컬 Worker adapter를 자동으로 시작합니다.
+전체 Playwright E2E는 고유 이름의 일회용 PostgreSQL 컨테이너와 같은 Hono 애플리케이션을 사용하는 로컬 Worker 어댑터를 자동으로 시작합니다.
 
 ```powershell
 cd <repo>\worker
 npm.cmd run test:local-e2e
 ```
 
-E2E가 만든 데이터는 `testing-` 표식을 사용하며 suite 전후 id 기반 best-effort teardown과 guarded prefix cleanup을 수행합니다. 자세한 내용은 [admin-e2e.md](admin-e2e.md)를 참고하세요.
+E2E가 만든 데이터는 `testing-` 표식을 사용하며 테스트 전후 ID 기반 정리를 먼저 시도하고, 보호된 접두사 정리를 예비 절차로 수행합니다. 자세한 내용은 [admin-e2e.md](admin-e2e.md)를 참고하세요.
 
 ## GitHub Actions 검증 범위
 
-`.github/workflows/ci.yml`은 다음 두 검증 job을 배포 전에 요구합니다.
+`.github/workflows/ci.yml`은 다음 두 검증 작업을 배포 전에 요구합니다.
 
-- `worker-validation`: Worker 검사, unit/contract test, 격리 PostgreSQL test와 dependency audit
-- `worker-frontend-e2e`: 프런트엔드 build, combined Static Assets Worker dry-run과 Worker 기반 전체 Playwright E2E
+- `worker-validation`: Worker 검사, 단위·계약 테스트, 격리 PostgreSQL 테스트와 의존성 감사
+- `worker-frontend-e2e`: 프런트엔드 빌드, 정적 자산 결합 Worker 사전 빌드와 Worker 기반 전체 Playwright E2E
 
 `main` push의 production 배포는 두 검증 중 Worker E2E 경로가 성공한 뒤에만 실행됩니다.
 
 ## 트러블슈팅
 
 - DB 연결 실패: `docker compose ps`와 `.env`의 loopback DB 설정을 확인합니다.
-- API proxy 오류: Worker가 `http://127.0.0.1:8080`에서 실행 중인지 확인합니다.
+- API 프록시 오류: Worker가 `http://127.0.0.1:8080`에서 실행 중인지 확인합니다.
 - 포트 충돌: `5432`, `8080`, `5173`을 사용하는 프로세스를 확인합니다.
-- Playwright browser 오류: `frontend`에서 `npx playwright install --with-deps chromium`을 다시 실행합니다.
+- Playwright 브라우저 오류: `frontend`에서 `npx playwright install --with-deps chromium`을 다시 실행합니다.
 - 관리자 로그인 실패: `.env`의 `ADMIN_USERNAME`, `ADMIN_PASSWORD`를 확인합니다.
 
 ## 문서 유지 기준
@@ -108,4 +108,4 @@ E2E가 만든 데이터는 `testing-` 표식을 사용하며 suite 전후 id 기
 - 관리자 절차 변경: `docs/admin-manual.md`
 - 실행·CI·테스트 방식 변경: `docs/dev-setup.md`
 - 구현 범위 변경: `docs/known-limitations.md`
-- E2E data workflow 변경: `docs/admin-e2e.md`와 `frontend/AGENTS.md`
+- E2E 테스트 데이터 절차 변경: `docs/admin-e2e.md`와 `frontend/AGENTS.md`

@@ -27,7 +27,7 @@ Worker environment configuration:
 - `PUBLIC_WRITE_RATE_LIMITER`: 비로그인 non-GET 24/60초
 - `workers_dev=true`, preview URL과 route/custom domain 없음
 
-세 rate-limit namespace는 서로 다른 production 전용 positive integer ID여야 합니다. Worker는 Cloudflare edge의 `CF-Connecting-IP`만 rate-limit client IP로 사용하며 browser가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 신뢰하지 않습니다. IP가 없거나 limiter binding이 실패하면 session DB 조회 전에 fail closed 합니다.
+세 요청 제한 네임스페이스는 서로 다른 운영 전용 양의 정수 ID여야 합니다. Worker는 Cloudflare 엣지의 `CF-Connecting-IP`만 요청 제한용 클라이언트 IP로 사용하며 브라우저가 보낸 `X-Forwarded-For`와 `X-Room-Reservation-Client-IP`를 신뢰하지 않습니다. IP가 없거나 제한기 바인딩이 실패하면 세션 DB 조회 전에 요청을 거부합니다.
 
 API 요청은 신뢰 IP 확인 → INGRESS 제한 → 유효한 session 조회 → 비관리자 READ/WRITE 제한 → CSRF 검증 → body와 제품 처리 순서로 진행합니다.
 
@@ -55,7 +55,7 @@ API 요청은 신뢰 IP 확인 → INGRESS 제한 → 유효한 session 조회 �
 
 `main` push에서 다음 순서를 지킵니다.
 
-1. Worker unit/contract, disposable PostgreSQL integration과 frontend production build 통과
+1. Worker 단위·계약 테스트, 일회용 PostgreSQL 통합 테스트와 프런트엔드 운영 빌드 통과
 2. combined Worker + Static Assets dry-run
 3. Worker 기반 전체 Playwright E2E 통과
 4. production 설정과 기존 Worker target read-only 검증
@@ -68,33 +68,31 @@ Migration identity, ledger 또는 schema 검증이 실패하면 Worker를 배포
 
 GitHub Actions가 checkout한 immutable event commit SHA를 배포 소스 식별자로 사용하고, `npm ci`와 committed lockfile을 의존성 기준으로 사용합니다. 실제 배포 결과는 Cloudflare의 Worker version과 deployment 기록에서 확인하되 실제 운영 식별자는 Git이나 Actions log에 출력하지 않습니다.
 
-## 전환 전 검증
+## 운영 배포 전 검증
 
-1. disposable Neon과 명시적으로 격리된 UAT Worker에서 combined deploy를 수행합니다.
+1. 일회용 Neon과 명시적으로 격리된 UAT Worker에서 정적 자산 결합 배포를 수행합니다.
 2. `/`, `/timetable`, 공개 상세·수정과 관리자 deep link 새로고침을 확인합니다.
-3. JavaScript, CSS와 Wanted Sans font를 same-origin에서 확인합니다.
-4. 전체 React E2E로 관리자 login, session refresh, CSRF와 logout을 검증합니다.
-5. `Secure`, `HttpOnly`, `SameSite=Lax` cookie 계약을 확인합니다.
-6. INGRESS/READ/WRITE rate limit과 forged IP header 무시를 확인합니다.
-7. cleanup 후 `testing-*` 잔여가 0건인지 확인합니다.
-8. production 구성에서 cleanup route가 `404`인지 확인합니다.
+3. JavaScript, CSS와 Wanted Sans 글꼴을 동일 출처에서 확인합니다.
+4. 전체 React E2E로 관리자 로그인, 세션 갱신, CSRF와 로그아웃을 검증합니다.
+5. `Secure`, `HttpOnly`, `SameSite=Lax` 쿠키 계약을 확인합니다.
+6. INGRESS/READ/WRITE 요청 제한과 위조 IP 헤더 무시를 확인합니다.
+7. 정리 후 `testing-*` 잔여가 0건인지 확인합니다.
+8. 운영 구성에서 정리 경로가 `404`인지 확인합니다.
 
-Production 전환은 별도 승인 후 진행합니다. 기존 Pages 프로젝트는 전환 중 이전 프런트 자산과 rollback 진입점으로만 보존합니다. combined Worker가 배포되면 Pages의 `API_BACKEND`도 같은 새 Worker를 호출하므로, Pages URL 자체는 이전 API fallback이 아니며 정상 운영 주소로 사용하지 않습니다. 새 Worker의 direct `CF-Connecting-IP` 계약은 기존 Pages Function이 전달하던 내부 IP header 계약과 다르므로 Pages → 새 Worker 경로를 방문자별 rate-limit 보존 경로로 간주하지 않습니다.
+현재 배포 구조는 프런트엔드 정적 자산과 `/api/*`를 하나의 운영 Worker 버전으로 배포하는 방식입니다. 운영 배포와 실제 서비스 주소 전환은 별도 승인 후 진행합니다.
 
-## 전환 rollback gate
+## 롤백 확인
 
-Static Assets 전환은 DB schema를 변경하지 않습니다. 전환 직전에 다음 조건을 모두 만족해야 합니다.
+운영 배포 전에 다음 조건을 모두 만족해야 합니다.
 
-1. 현재 production Worker의 안정 version과 deployment를 Git 외부 운영 기록에 식별합니다. 실제 version ID는 저장소와 Actions log에 기록하지 않습니다.
-2. 해당 version이 Cloudflare Deployments 화면에서 rollback 대상으로 선택 가능한지 확인합니다. Worker version에는 code, Static Assets, bindings와 compatibility 설정이 함께 보존됩니다.
-3. 기존 Pages의 `API_BACKEND`가 같은 production Worker를 가리키고, 전환 전 Pages → 기존 Worker read-only smoke가 통과하는지 확인합니다.
-4. 기존 Pages의 Git 자동 배포와 branch control 상태를 사용자가 dashboard에서 확인합니다. 이번 작업은 해당 설정을 변경하지 않습니다.
-5. 격리된 UAT Worker에서 새 combined version 배포 후 직전 version rollback을 리허설하고, rollback 뒤 API·session·CSRF·rate limit과 정적 진입점이 복구되는지 확인합니다.
-6. preflight에서 pending migration이 없거나 이전 Worker와 호환됨을 확인합니다. 호환되지 않는 DB 변경이 있으면 자동 DB rollback을 시도하지 않고 전환을 중단합니다.
+1. 현재 운영 Worker의 안정 버전과 배포를 Git 외부 운영 기록에 식별합니다. 실제 버전 ID는 저장소와 Actions 로그에 기록하지 않습니다.
+2. 해당 버전이 Cloudflare Deployments 화면에서 롤백 대상으로 선택 가능한지 확인합니다. Worker 버전에는 코드, 정적 자산, 바인딩과 호환성 설정이 함께 보존됩니다.
+3. 격리된 UAT Worker에서 새 버전 배포 후 직전 버전 롤백을 연습하고, 롤백 뒤 API·세션·CSRF·요청 제한과 정적 진입점이 복구되는지 확인합니다.
+4. 사전 검사에서 적용 대기 중인 마이그레이션이 없거나 이전 Worker와 호환됨을 확인합니다. 호환되지 않는 DB 변경이 있으면 자동 DB 롤백을 시도하지 않고 배포를 중단합니다.
 
-Production 장애 시 Cloudflare dashboard의 **Workers & Pages → production Worker → Deployments**에서 사전에 확인한 안정 version의 **Rollback**을 실행합니다. 이 작업은 해당 version을 100% traffic으로 즉시 배포합니다. rollback 뒤 새 Worker URL이 아니라 기존 Pages URL에서 `/api/public/settings`, 공개 공간 조회, 미인증 관리자 `401`, 관리자 session·CSRF·logout을 확인합니다. 실패하면 데이터베이스를 되돌리지 않고 접근을 제한한 뒤 forward-fix합니다. Cloudflare는 최근 100개 version까지만 rollback 대상으로 유지하므로 전환 전 대상 존재 확인을 생략하지 않습니다. 세부 동작은 [Cloudflare Worker rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)를 기준으로 합니다.
+운영 장애 시 Cloudflare 대시보드의 **Workers & Pages → 운영 Worker → Deployments**에서 사전에 확인한 안정 버전의 **Rollback**을 실행합니다. 이 작업은 해당 버전을 전체 트래픽에 즉시 배포합니다. 롤백 뒤 Worker 직접 주소와 실제 운영 주소에서 `/`, `/timetable`, `/api/public/settings`, 공개 공간 조회, 미인증 관리자 `401`, 관리자 세션·CSRF·로그아웃을 확인합니다. 실패하면 데이터베이스를 되돌리지 않고 접근을 제한한 뒤 수정 버전을 배포합니다. Cloudflare는 최근 100개 버전까지만 롤백 대상으로 유지하므로 배포 전 대상 존재 확인을 생략하지 않습니다. 세부 동작은 [Cloudflare Worker rollbacks](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/)를 기준으로 합니다.
 
-새 Worker URL smoke와 위 rollback gate를 모두 통과한 뒤에만 전환 완료로 판정합니다. Pages 프로젝트·binding·Secret 삭제는 안정화 후 다시 승인받습니다.
+이전에 사용하던 Pages 프로젝트가 아직 남아 있다면 별도 폐기 승인 전까지 보존할 수 있습니다. 다만 Pages의 `API_BACKEND`도 현재 Worker를 호출하므로 Pages 주소는 이전 API로 돌아가는 롤백 수단이 아닙니다. Pages 프로젝트·바인딩·Secret 삭제는 실제 보존 여부를 확인하고 별도로 승인받습니다.
 
 ## Handover
 

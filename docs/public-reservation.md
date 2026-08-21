@@ -1,90 +1,96 @@
-# Public Reservation Requests
+# 공개 예약 이용 및 운영 정책
 
-The public reservation timetable and Quick Add flow are available at `/timetable`.
+공개 사용자는 관리자 로그인 없이 공간 시간표를 확인하고 예약을 신청할 수 있습니다. 공개 예약 화면은 `/timetable`이며, 첫 화면 `/`에서 `공간 예약`을 선택해 이동할 수도 있습니다.
 
-## User Flow
+## 공개 사용자 이용 흐름
 
-- Public users view the same timetable-style reservation grid used by the admin UI.
-- Date view shows enabled rooms for the selected date. Room view shows one room across the selected week.
-- Clicking an empty timetable slot opens a public quick request panel with room, date, and time prefilled.
-- Clicking an existing request/reservation block opens a public-safe detail page.
-- Public users do not log in. They provide a reservation-specific password when creating the request.
+1. 첫 화면에서 `공간 예약`을 선택하거나 `/timetable`로 이동합니다.
+2. 날짜별 보기 또는 공간별 보기를 선택해 시간표를 확인합니다.
+3. 빈 시간대를 누르거나 화면 상단의 `예약 신청`을 누릅니다.
+4. 공간, 날짜, 시작 시간과 종료 시간을 선택합니다. 빈 시간대에서 시작하면 해당 값이 미리 채워집니다.
+5. 신청자 이름, 이메일, 전화번호, 예약 목적과 예약 비밀번호를 입력합니다.
+6. `예약 신청`을 누릅니다.
+7. 신청 완료 안내에서 관리자 승인 후 예약이 확정된다는 내용을 확인합니다.
 
-## Request State
+날짜별 보기에는 선택한 날짜의 예약 대상 공간이 표시됩니다. 공간별 보기에는 선택한 공간의 일주일 시간표가 표시됩니다. 기존 신청 또는 예약을 누르면 공개용 상세 화면으로 이동합니다.
 
-- Public submissions are stored as 승인 대기 상태(`REQUESTED`), not as 승인 상태(`CONFIRMED`) reservations.
-- The success message must say that the reservation request was received, not that the reservation is complete.
-- Admin approval, rejection, forced registration, recurrence registration, audit history, and admin memo fields are not exposed in the public UI.
-- Reservation state labels are `REQUESTED` = 승인 대기, `CONFIRMED` = 승인, and `CANCELLED` = 취소. `APPROVED` is not a reservation state; it is an audit history action for 승인 처리.
+`공개 예약 접수 사용`이 꺼져 있으면 시간표는 볼 수 있지만 새 예약은 신청할 수 없습니다. 화면에 관리자가 입력한 접수 중지 안내가 표시됩니다.
 
-## Applicant Name Visibility
+## 예약 상태
 
-The public timetable and the public-safe reservation detail use a per-reservation policy to decide whether the applicant name is masked or shown as entered.
+- 공개 사용자가 신청한 예약은 `승인 대기(REQUESTED)` 상태로 저장됩니다.
+- 관리자가 승인하면 `승인(CONFIRMED)`, 취소하면 `취소(CANCELLED)` 상태가 됩니다.
+- 신청 완료는 접수가 끝났다는 의미이며, 공간 사용이 확정됐다는 의미가 아닙니다.
+- 관리자 승인·취소, 강제 등록, 반복 예약, 감사 이력과 처리 메모는 공개 화면에 제공되지 않습니다.
+- `APPROVED`는 예약 상태가 아니라 관리자가 승인한 작업을 나타내는 감사 이력 처리 유형입니다.
 
-- The administrator-facing control is labeled `신청자 이름 보이기`.
-- The control affects only the applicant name. Applicant email and phone remain masked on public screens regardless of this setting.
-- The default value is off. Existing reservations also transition to off and remain masked unless an eligible administrator reservation is explicitly changed.
-- `ADMIN_MANUAL` reservations may enable or disable the setting during administrator creation and editing.
-- A recurring reservation stores the setting and passes it to each generated `RECURRING_GENERATED` reservation.
-- An administrator may override the inherited value while editing an individual generated reservation.
-- `PUBLIC_FORM` reservations always keep the setting off. Public create and update requests do not accept the setting, and administrator editing cannot enable it for a `PUBLIC_FORM` reservation.
+## 신청자 정보 표시
 
-`PUBLIC_FORM` reservations cannot be made public by an administrator because the public applicant did not consent to having their unmasked name exposed. Official events or group schedules that require a visible organizer must be created through an administrator single reservation or recurring reservation flow.
+공개 시간표와 공개용 상세 화면은 예약별 설정에 따라 신청자 이름을 표시하거나 가립니다.
 
-When the setting is off, the Worker masks the applicant name in the public timetable API and the public-safe detail API. When the setting is on for an eligible administrator reservation, those APIs may return the applicant name as entered. The Worker response is the privacy boundary; frontend-only masking is not sufficient.
+- 관리자 화면의 설정 이름은 `신청자 이름 보이기`입니다.
+- 기본값은 꺼짐이며, 꺼진 예약의 신청자 이름은 공개 화면에서 가려집니다.
+- 이메일과 전화번호는 이름 표시 설정과 관계없이 공개 화면에서 항상 가려집니다.
+- 관리자가 직접 등록한 단건 예약은 이 설정을 켜거나 끌 수 있습니다.
+- 반복 예약은 그룹에 저장된 설정을 각 회차에 적용합니다. 관리자는 생성된 개별 예약을 수정하면서 설정을 바꿀 수 있습니다.
+- 공개 사용자가 직접 신청한 예약은 이 설정을 켤 수 없습니다. 관리자가 해당 예약을 수정해도 이름 공개를 허용할 수 없습니다.
 
-Password-verified public editing may continue to show the applicant their own original information, but it does not expose or change the visibility setting. Authenticated administrator screens and APIs continue to use unmasked applicant information.
+공개 신청은 신청자가 이름 공개에 동의한 것으로 보지 않습니다. 공개 시간표에 담당자나 단체 이름을 표시해야 하는 일정은 관리자가 단건 예약 또는 반복 예약으로 등록합니다.
 
-Changing this setting is a privacy-relevant administrator action, so its previous and new values must remain reviewable in audit history.
+Worker는 공개 API 응답 단계에서 이름과 연락처를 가립니다. 공개 사용자가 비밀번호를 확인하고 본인 예약을 수정할 때는 자신의 원래 입력값을 볼 수 있지만, 이름 표시 설정은 보거나 변경할 수 없습니다. 이름 표시 설정을 바꾼 기록은 예약 감사 이력에서 확인할 수 있습니다.
 
-## Public Edit Policy
+## 공개 예약 수정과 취소
 
-- Public users can edit their own 승인 대기 상태(`REQUESTED`) reservations after password verification. Saving keeps the state as `REQUESTED`.
-- Public users can edit their own 승인 상태(`CONFIRMED`) reservations after password verification. Saving runs the normal room/time conflict check again and changes the state back to 승인 대기 상태(`REQUESTED`).
-- Public users cannot edit 취소 상태(`CANCELLED`) reservations. Public cancellation restore is not supported.
+- 공개 사용자는 예약 비밀번호를 확인한 뒤 자신의 `승인 대기` 예약을 수정할 수 있습니다. 수정 후에도 `승인 대기` 상태를 유지합니다.
+- `승인` 예약을 공개 사용자가 수정하면 공간과 시간 충돌을 다시 검사하고 `승인 대기` 상태로 돌아갑니다.
+- `취소` 예약은 공개 화면에서 수정하거나 복구할 수 없습니다.
+- 공개 사용자는 예약 비밀번호를 확인한 뒤 자신의 예약을 취소할 수 있습니다.
 
-## Reservation Password Policy
+## 예약 비밀번호
 
-- Public request creation requires a reservation password. The API field remains `cancelPassword` for compatibility.
-- The password must be 4–64 printable ASCII characters (`!` through `~`). Spaces, Korean characters, emoji, and other Unicode characters are not accepted or normalized.
-- The backend stores only a password hash in `reservations.cancel_password_hash`; it must not store the raw password.
-- Public editing and cancellation verify the same password hash.
-- If the password is wrong, the API returns the existing action-specific error code and the UI consistently shows a reservation-password mismatch message.
-- If the user loses the reservation password, they cannot self-edit or self-cancel through the public UI and must ask an administrator for help.
+- 공개 예약을 신청할 때 예약별 비밀번호를 입력해야 합니다.
+- 비밀번호는 공백 없는 영문, 숫자, 기호를 사용한 4~64자여야 합니다. 한글과 이모지는 사용할 수 없습니다.
+- 서버에는 원문 비밀번호가 아니라 해시값만 저장됩니다.
+- 예약 수정과 취소에는 신청할 때 입력한 비밀번호를 사용합니다.
+- 비밀번호가 틀리면 화면에 예약 비밀번호가 일치하지 않는다는 안내가 표시됩니다.
+- 비밀번호를 잃어버리면 공개 화면에서 직접 수정하거나 취소할 수 없으므로 관리자에게 요청해야 합니다.
 
-## Conflict Policy
+API 필드 이름 `cancelPassword`는 기존 호환성을 위해 유지됩니다.
 
-The backend is the final authority for overlap checks.
+## 충돌 정책
 
-- A public request is rejected when it overlaps an existing `CONFIRMED` reservation for the same room.
-- A public request is also rejected when it overlaps an existing `REQUESTED` request for the same room.
-- Public edits also run this conflict check before saving. The reservation being edited is excluded from its own overlap check.
-- This keeps the policy to one 승인 대기 request per room/time slot.
-- 취소 상태(`CANCELLED`) reservations do not block new requests.
+서버가 최종적으로 예약 시간 중복 여부를 판단합니다.
 
-The public frontend maps `TIME_SLOT_CONFLICT` to:
+- 같은 공간과 시간대에 `승인 대기` 또는 `승인` 예약이 있으면 새 신청을 등록할 수 없습니다.
+- 예약 수정 시에도 같은 검사를 하며 수정 중인 예약 자체는 검사에서 제외합니다.
+- `취소` 예약은 새 신청을 막지 않습니다.
+
+충돌이 발생하면 화면에 다음 안내가 표시됩니다.
 
 > 이미 다른 신청 또는 예약이 있어 신청할 수 없습니다. 다른 공간이나 시간을 선택해 주세요.
 
-## Time Policy
+## 예약 가능 시간 정책
 
-- Facility operating hours/days and public reservation hours/days are separate settings. Public hours and days must remain inside the operating schedule.
-- Public creation, availability checks, room- or time-changing edits, toolbar suggestions, and time inputs use the public schedule. Administrator single reservations, timetable Quick Add, edits, and recurrences use the operating schedule.
-- Administrators may reserve inside operating hours even when that interval is unavailable to public users. Neither public users nor administrators may reserve outside operating hours or days.
-- The timetable grid and empty-slot interaction candidates always use 30-minute intervals.
-- Reservation start and end inputs always use 5-minute increments.
-- The administrator-configured minimum duration is at least 30 minutes; minimum and maximum durations are multiples of 5.
-- Suggested reservations and empty-slot hover ranges use exactly `minReservationMinutes` and must fit completely inside the applicable public or operating schedule.
-- Toolbar suggestions use the first strictly future 30-minute candidate in `Asia/Seoul`, considering the semester and the applicable schedule weekdays.
-- Past timetable candidates remain clickable so users can inspect the exact interval. Public creation, room- or time-changing edits, and availability checks reject past start times with `이미 지난 시간에는 예약할 수 없습니다. 예약 시간을 다시 확인해 주세요.`
-- Administrators can create and edit past reservations. Public users cannot move a past reservation to another room or time, but may update applicant/contact/purpose fields without changing its room or time.
-- Existing reservations are not rewritten when settings change. Public applicant/contact/purpose-only edits remain available; the current public time/day policy is applied when the room or time changes.
-- Nighttime, safety, or contact guidance belongs in the existing `publicNotice` setting rather than a separate application resource or reception flow.
-- The `slotMinutes` API field is retained only for frontend contract compatibility, always returns `5`, and is not a product setting. The Worker database has no `slot_minutes` column.
+- 전체 운영 시간·요일과 공개 예약 시간·요일은 별도로 설정합니다. 공개 예약 범위는 전체 운영 범위 안에 있어야 합니다.
+- 공개 신청, 예약 가능 여부 확인, 공간·시간 변경, 자동 시간 제안은 공개 예약 범위를 사용합니다.
+- 관리자 단건 예약, 시간표 예약 신청, 예약 수정과 반복 예약은 전체 운영 범위를 사용합니다.
+- 관리자도 전체 운영 시간과 요일 밖에는 예약을 등록할 수 없습니다.
+- 시간표 눈금과 빈 시간대 선택 후보는 30분 간격입니다.
+- 예약 시작·종료 시간 입력은 5분 간격입니다.
+- 최소 예약 시간은 30분 이상이며 최소·최대 예약 시간은 모두 5분의 배수입니다.
+- 자동 제안 시간은 설정된 최소 예약 시간과 같으며 해당 예약 가능 범위 안에 완전히 들어가야 합니다.
+- 자동 시간 제안은 한국 시간 기준으로 현재보다 미래인 첫 30분 후보를 사용합니다.
+- 과거 시간대도 내용을 확인하기 위해 누를 수 있지만 새 공개 예약을 등록하거나 공간·시간을 변경할 수는 없습니다.
+- 과거 예약에서 공간과 시간을 그대로 유지하면 신청자 정보, 연락처와 목적만 수정할 수 있습니다.
+- 운영 설정을 바꿔도 기존 예약은 자동으로 변경되거나 취소되지 않습니다.
+- 야간 운영, 안전 수칙과 문의 안내는 운영 설정의 `공개 안내`에 작성합니다.
 
-## Request Protection
+`slotMinutes` API 필드는 프런트엔드 계약 호환을 위해 항상 `5`로 반환되며 운영자가 변경하는 설정은 아닙니다.
 
-- Public users do not need an administrator session, but state-changing requests are protected by CSRF validation.
-- The frontend obtains a CSRF token from `GET /api/auth/csrf` and automatically sends `X-XSRF-TOKEN` when creating, editing, or cancelling a reservation.
-- Public and unauthenticated GET requests are limited to 120 requests per IP per minute. State-changing requests are limited to 24 requests per IP per minute.
-- A limit excess returns HTTP `429`, error code `RATE_LIMIT_EXCEEDED`, and a `Retry-After` header.
+## 요청 보호와 제한
+
+- 공개 사용자는 관리자 세션 없이 이용하지만 예약 등록·수정·취소 요청에는 CSRF 보호가 적용됩니다.
+- 프런트엔드는 `GET /api/auth/csrf`에서 토큰을 받아 상태 변경 요청의 `X-XSRF-TOKEN` 헤더로 전송합니다.
+- 공개 및 비로그인 조회 요청은 IP당 1분에 120회로 제한됩니다.
+- 예약 등록·수정·취소 같은 상태 변경 요청은 IP당 1분에 24회로 제한됩니다.
+- 요청 제한을 넘으면 HTTP `429`, 오류 코드 `RATE_LIMIT_EXCEEDED`와 재시도 대기 시간이 반환됩니다.

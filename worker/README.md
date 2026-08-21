@@ -11,7 +11,8 @@
 - `src/infra`: database port와 Neon HTTP/WebSocket adapter
 - `src/http`: Hono route, session cookie, CSRF, 오류 응답
 - `src/index.ts`: Worker composition root
-- `migrations/001_worker_baseline_v1.ts`: 빈 PostgreSQL용 Worker baseline V1
+- `migrations/001_worker_baseline_v1.ts`: 빈 PostgreSQL용 Worker 기준 스키마 V1
+- `migrations/002_room_display_order_v2.ts`: 전역 공간 표시 순서와 순서 버전 V2
 - `scripts`: migration, 격리 PostgreSQL/E2E와 Static Assets 배포 도구
 
 Hono는 HTTP 경계에서만 사용한다. 일반 query는 Neon HTTP를 사용하고, 중간 결과에 따라 다음 statement가 달라지는 transaction은 요청 범위 WebSocket `Client`로 `BEGIN`/`COMMIT`/`ROLLBACK` 후 항상 연결을 닫는다.
@@ -22,7 +23,7 @@ Hono는 HTTP 경계에서만 사용한다. 일반 query는 Neon HTTP를 사용�
 - production은 `APP_ENV=prod`, `E2E_CLEANUP_ENABLED=false`다.
 - cleanup route는 production app에 등록되지 않는다.
 - non-prod에서도 `E2E_CLEANUP_ENABLED=true`가 명시돼야 route가 등록된다.
-- cleanup 대상은 `testing-` 식별자를 증명할 수 있는 row뿐이다.
+- 정리 대상은 `testing-` 식별자를 증명할 수 있는 데이터뿐이다.
 - 실제 connection string과 관리자 자격 증명은 Wrangler secret으로만 주입한다.
 
 ## 로컬 검증
@@ -48,7 +49,7 @@ npm.cmd run test:local-e2e
 npm.cmd run build
 ```
 
-`test:isolated-postgres`와 `test:local-e2e`는 고유 이름의 일회용 PostgreSQL container를 만들고 `finally`에서 exact container만 중지한다. 전체 E2E는 일회용 DB에서만 예약 접수를 활성화하고, suite 전후 `testing-` cleanup과 최종 0건 preview를 요구한다.
+`test:isolated-postgres`와 `test:local-e2e`는 고유 이름의 일회용 PostgreSQL 컨테이너를 만들고 `finally`에서 자신이 만든 컨테이너만 정확히 중지한다. 전체 E2E는 일회용 DB에서만 예약 접수를 활성화하고, 테스트 전후 `testing-` 정리와 최종 0건 미리보기를 요구한다.
 
 ## Disposable UAT 절차
 
@@ -58,7 +59,7 @@ npm.cmd run build
 - Worker runtime: pooled connection string을 `wrangler secret put DATABASE_URL --env uat`로 주입
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD`도 UAT 전용 값을 Wrangler secret으로 주입
 
-baseline 적용 후 disposable UAT DB에서만 이중 guard가 있는 준비 명령으로 공개 접수를 활성화한다. 이 명령은 예상 database 이름, owner role과 제품 row 0건을 먼저 확인한다.
+기준 마이그레이션 적용 후 일회용 UAT DB에서만 이중 보호가 있는 준비 명령으로 공개 접수를 활성화한다. 이 명령은 예상 데이터베이스 이름, 소유자 역할과 제품 데이터 0건을 먼저 확인한다.
 
 ```powershell
 $env:APP_ENV='uat'
