@@ -229,7 +229,7 @@ export function ReservationRequestPanel({
   const panelDescription = (
     <>
       {selection.source === 'slot'
-        ? `${selection.date} 선택 슬롯`
+        ? `${selection.date} · 선택한 빈칸`
         : selection.date
           ? `${selection.date} 새 신청`
           : '예약 가능한 미래 시간 없음'}
