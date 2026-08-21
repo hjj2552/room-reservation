@@ -48,6 +48,9 @@ test('immediate readiness success shows the entry choices and reuses the setting
 
   await expect(page.getByTestId('entry-public-link')).toBeVisible();
   await expect(page.getByTestId('entry-admin-link')).toBeVisible();
+  await expect(page.getByTestId('entry-public-link')).toContainText('공간 예약');
+  await expect(page.getByTestId('entry-public-link')).toContainText('시간표 확인 및 예약 신청');
+  await expect(page.getByTestId('entry-public-link')).not.toContainText('일반 사용자');
   await expect(page.locator('.entry-organization-name')).toHaveText(publicSettings.organizationName);
   await expect(page.locator('.entry-organization-name')).toHaveCSS('font-size', '34px');
   await expect(page.getByText(loadingMessage)).toHaveCount(0);

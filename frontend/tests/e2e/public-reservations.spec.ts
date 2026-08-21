@@ -159,19 +159,20 @@ test('public toolbar request opens the shared panel without slot room context', 
       'public-request-applicant-name-input',
       'public-request-email-input',
       'public-request-phone-input',
-      'public-request-status-select',
       'public-request-cancel-password-input',
     ]);
     await expectTestIdPairsOnSameRow(page, [
       ['public-request-room-select', 'public-request-start-input-date'],
       ['public-request-start-input', 'public-request-end-input'],
       ['public-request-applicant-name-input', 'public-request-email-input'],
-      ['public-request-phone-input', 'public-request-status-select'],
+      ['public-request-phone-input', 'public-request-cancel-password-input'],
     ]);
     await expect(page.getByTestId('public-request-purpose-input').locator('..')).toContainText('신청 목적');
     await expect(page.getByTestId('public-request-room-select').locator('..')).toContainText('예약 공간');
     await expect(page.getByTestId('public-request-applicant-name-input').locator('..')).toContainText('신청자');
-    await expect(page.getByTestId('public-request-status-select')).not.toBeEditable();
+    await expect(page.getByTestId('public-request-status-select')).toHaveCount(0);
+    await expect(page.getByTestId('public-request-cancel-password-input').locator('..'))
+      .toContainText('수정 및 취소용 비밀번호');
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByTestId('public-request-room-select')).toHaveValue('');
@@ -319,6 +320,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
     ...originalSettings,
     reservationEnabled: true,
     reservationDisabledMessage: originalSettings.reservationDisabledMessage || 'Reservation is currently disabled.',
+    completionMessage: 'testing-public-completion-message',
   });
   const room = await e2eData.createTestRoom('public-request-room');
   const reservationTime = nextWeekdayReservationLocalInputs({ daysAhead: 21, startHour: 10, endHour: 11 });
@@ -362,10 +364,16 @@ test('public timetable supports slot-based request, masked detail page, and pass
     e2eData.registerReservation(created.id);
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+    const completionDialog = page.getByRole('dialog', { name: '예약 신청 완료' });
+    await expect(completionDialog).toContainText('testing-public-completion-message');
+    await expect(completionDialog).toContainText('예약 상태: 승인 대기');
     await expect(page.getByText(purpose)).toBeVisible();
     const timetableBlock = page.locator('.reservation-block').filter({ hasText: purpose });
+    await expect(timetableBlock).not.toHaveClass(/reservation-block-highlighted/);
     await expect(timetableBlock).toContainText(maskName(applicantName));
     await expect(timetableBlock).not.toContainText(applicantName);
+    await completionDialog.getByRole('button', { name: '확인', exact: true }).click();
+    await expect(completionDialog).toBeHidden();
     await page.getByText(purpose).click();
 
     const detailPanel = page.locator('.reservation-detail-main');
@@ -401,7 +409,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
 
     const cancelButton = page.getByRole('button', { name: '취소', exact: true });
     await cancelButton.click();
-    const passwordDialog = page.getByRole('dialog', { name: '예약 비밀번호 확인' });
+    const passwordDialog = page.getByRole('dialog', { name: '수정 및 취소용 비밀번호 확인' });
     await expect(passwordDialog).toBeVisible();
     await expect(passwordDialog.locator('.modal-close-button')).toHaveCount(0);
     await page.keyboard.press('Escape');
@@ -412,7 +420,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
     await expect(passwordDialog).toBeVisible();
     await page.getByTestId('public-cancel-password-input').fill('wrong-password');
     await page.getByTestId('public-cancel-submit-button').click();
-    await expect(page.getByRole('alert')).toContainText('예약 비밀번호가 일치하지 않습니다');
+    await expect(page.getByRole('alert')).toContainText('수정 및 취소용 비밀번호가 일치하지 않습니다');
 
     await page.getByTestId('public-cancel-password-input').fill(cancelPassword);
     await page.getByTestId('public-cancel-submit-button').click();
@@ -580,10 +588,10 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.goto(`/reservations/${reservation.id}`);
     await expect(page.locator('.status-badge')).toContainText('승인');
     await page.getByTestId('public-reservation-edit-link').click();
-    await expect(page.getByRole('dialog', { name: '예약 비밀번호 확인' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '수정 및 취소용 비밀번호 확인' })).toBeVisible();
     await page.getByTestId('public-edit-password-input').fill('wrong-password');
     await page.getByTestId('public-edit-verify-button').click();
-    await expect(page.getByRole('alert')).toContainText('예약 비밀번호가 일치하지 않습니다');
+    await expect(page.getByRole('alert')).toContainText('수정 및 취소용 비밀번호가 일치하지 않습니다');
     await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
     await page.getByTestId('public-edit-verify-button').click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}/edit$`));

@@ -368,13 +368,7 @@ export function ReservationRequestPanel({
             </select>
             {fieldError('status')}
           </label>
-        ) : (
-          <label>
-            예약 상태
-            <input value={statusLabels.REQUESTED} readOnly data-testid={ids.status} {...inputErrorProps('status')} />
-            {fieldError('status')}
-          </label>
-        )}
+        ) : null}
         {isAdmin ? (
           <label>
             처리 메모
@@ -388,7 +382,7 @@ export function ReservationRequestPanel({
           </label>
         ) : (
           <label>
-            예약 비밀번호
+            수정 및 취소용 비밀번호
             <input
               type="password"
               data-testid="public-request-cancel-password-input"

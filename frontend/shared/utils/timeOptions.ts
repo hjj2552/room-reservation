@@ -55,7 +55,15 @@ export function reservationEndTimeOptions(
     startMinutes + minReservationMinutes,
     Math.min(startMinutes + maxReservationMinutes, closeMinutes),
     RESERVATION_INCREMENT_MINUTES,
-  );
+  ).map((option) => {
+    const durationMinutes = timeValueToMinutes(option.value)! - startMinutes;
+    const hours = Math.floor(durationMinutes / 60);
+    const minutes = durationMinutes % 60;
+    const durationLabel = [hours ? `${hours}시간` : '', minutes ? `${minutes}분` : '']
+      .filter(Boolean)
+      .join(' ');
+    return { ...option, label: `${option.label} · ${durationLabel}` };
+  });
 }
 
 export function includeExistingTime(options: TimeOption[], existingTime: string) {

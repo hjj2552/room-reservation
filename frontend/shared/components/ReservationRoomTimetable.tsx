@@ -19,6 +19,7 @@ import {
   isTimetableSlotSelectable,
   timetableDayAvailability,
   timetableSlotAvailability,
+  timetableHoursSummary,
   TimetableAvailabilityLegend,
 } from './ReservationDateTimetable';
 import { StatusBadge } from './StatusBadge';
@@ -125,10 +126,7 @@ export function ReservationRoomTimetable({
         <span className="timetable-summary-details">
           {availability ? <TimetableAvailabilityLegend /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
-          <span>
-            {weekStart}-{addDays(weekStart, 6)} · {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 예약{' '}
-            {reservations.length}건
-          </span>
+          <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${room.name} 주간 예약 시간표`}>

@@ -87,6 +87,23 @@ export function formatClock(totalMinutes: number) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+export function timetableHoursSummary(
+  openTime: string,
+  closeTime: string,
+  availability?: TimetableAvailability,
+) {
+  const normalizedOpenTime = openTime.slice(0, 5);
+  const normalizedCloseTime = closeTime.slice(0, 5);
+  const publicOpenTime = availability?.publicOpenTime.slice(0, 5);
+  const publicCloseTime = availability?.publicCloseTime.slice(0, 5);
+  const operatingHours = `운영 시간 ${normalizedOpenTime}–${normalizedCloseTime}`;
+
+  return publicOpenTime && publicCloseTime
+    && (publicOpenTime !== normalizedOpenTime || publicCloseTime !== normalizedCloseTime)
+    ? `${operatingHours} · 신청 가능 시간 ${publicOpenTime}–${publicCloseTime}`
+    : operatingHours;
+}
+
 export function buildSlots(openMinutes: number, closeMinutes: number, incrementMinutes: number) {
   const slots: number[] = [];
   for (let minutes = openMinutes; minutes <= closeMinutes; minutes += incrementMinutes) {
@@ -215,10 +232,7 @@ export function ReservationDateTimetable({
         <span className="timetable-summary-details">
           {availability ? <TimetableAvailabilityLegend /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
-          <span>
-            {formatClock(openMinutes)}-{formatClock(closeMinutes)} · 활성 공간 {rooms.length}개 · 예약{' '}
-            {reservations.filter((reservation) => roomIds.has(reservation.roomId)).length}건
-          </span>
+          <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>

@@ -23,7 +23,11 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
     test.use({ timezoneId });
 
     test('admin and public panels use the same exact Seoul time and preserve manual edits', async ({ page }) => {
-      await mockReservationApis(page, '2026-07-31');
+      await mockReservationApis(page, '2026-07-31', {
+        completionMessage: '   ',
+        publicOpenTime: '09:00:00',
+        publicCloseTime: '18:00:00',
+      });
 
       await page.goto('/admin/timetable');
       await expect(page.getByTestId('timetable-new-request-button')).toBeVisible();
@@ -34,6 +38,13 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(adminStart).toHaveValue('09:00');
       await expect(adminEnd).toHaveValue('09:30');
+      await expect(adminEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(page.getByText('관리자는 신청을 바로 승인 상태로 저장할 수 있습니다.')).toBeVisible();
+      await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toBeVisible();
+      const adminSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
+      await expect(adminSummary).toContainText('운영 시간 09:00–18:00');
+      await expect(adminSummary).not.toContainText('활성 공간');
+      await expect(adminSummary).not.toContainText(/예약 \d+건/);
       await expect(adminStart.locator('option[value="09:05"]')).toHaveCount(1);
       await expect(adminStart.locator('option[value="09:01"]')).toHaveCount(0);
 
@@ -46,12 +57,23 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await page.getByTestId('timetable-quick-add-close').click();
 
       await page.goto('/timetable');
+      const publicSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
+      await expect(publicSummary).toContainText('운영 시간 09:00–18:00');
+      await expect(publicSummary).not.toContainText('신청 가능 시간');
+      await expect(publicSummary).not.toContainText('활성 공간');
+      await expect(publicSummary).not.toContainText(/예약 \d+건/);
       await page.getByTestId('public-new-request-button').click();
       const publicStart = page.getByTestId('public-request-start-input');
       const publicEnd = page.getByTestId('public-request-end-input');
       await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
       await expect(publicStart).toHaveValue('09:00');
       await expect(publicEnd).toHaveValue('09:30');
+      await expect(publicEnd.locator('option[value="09:30"]')).toHaveText('09:30 · 30분');
+      await expect(page.getByText('시간표의 빈 칸을 누르면 해당 날짜, 시간, 공간으로 예약 신청 화면이 열립니다.'))
+        .toBeVisible();
+      await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toHaveCount(0);
+      await expect(page.locator('.public-notice')).toHaveCount(0);
+      await expect(page.getByTestId('public-request-status-select')).toHaveCount(0);
 
       await page.getByTestId('public-request-start-input-date').fill('2026-07-15');
       await publicStart.selectOption('10:00');
@@ -69,15 +91,22 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await page.getByTestId('public-request-email-input').fill('testing-user@example.test');
       await page.getByTestId('public-request-phone-input').fill('010-1234-5678');
       await page.getByTestId('public-request-cancel-password-input').fill('testing-password');
-      const requestPromise = page.waitForRequest((request) =>
-        request.url().includes('/api/public/reservations') && request.method() === 'POST',
+      const responsePromise = page.waitForResponse((response) =>
+        response.url().includes('/api/public/reservations') && response.request().method() === 'POST',
       );
       await page.getByTestId('public-request-submit-button').click();
-      const createRequest = await requestPromise;
+      const createResponse = await responsePromise;
+      const createRequest = createResponse.request();
       expect(createRequest.postDataJSON()).toMatchObject({
         startAt: '2026-07-15T10:00:00+09:00',
         endAt: '2026-07-15T10:30:00+09:00',
       });
+      expect((await createResponse.json() as { status: string }).status).toBe('REQUESTED');
+      const completionDialog = page.getByRole('dialog', { name: '예약 신청 완료' });
+      await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+      await expect(completionDialog).toContainText('예약 신청이 완료되었습니다.');
+      await expect(completionDialog).toContainText('예약 상태: 승인 대기');
+      await completionDialog.getByRole('button', { name: '확인', exact: true }).click();
     });
   });
 }
@@ -239,10 +268,20 @@ test('public and admin timetables share availability colors but keep different i
     publicOpenTime: '10:00',
     publicCloseTime: '17:00',
     publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+    publicNotice: '  testing-public-notice  ',
   });
   await page.setViewportSize({ width: 390, height: 844 });
 
   await page.goto('/timetable?view=date&date=2026-07-13');
+  const publicNotice = page.locator('.public-notice');
+  await expect(publicNotice).toHaveText('testing-public-notice');
+  await expect(publicNotice).not.toContainText('신청 가능 시간');
+  await expect(publicNotice).not.toContainText('승인 대기');
+  const publicDateSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
+  await expect(publicDateSummary).toContainText('운영 시간 09:00–18:00 · 신청 가능 시간 10:00–17:00');
+  await expect(publicDateSummary).not.toContainText('활성 공간');
+  await expect(publicDateSummary).not.toContainText(/예약 \d+건/);
+  await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toHaveCount(0);
   await expect(page.getByText('공개 예약 불가', { exact: true })).toBeVisible();
   await expect(page.getByText('운영하지 않음', { exact: true })).toBeVisible();
   await expect(page.locator('.timetable-availability-legend i.public-unavailable')).toHaveCSS(
@@ -265,6 +304,10 @@ test('public and admin timetables share availability colors but keep different i
 
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.goto(`/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`);
+  const publicRoomSummary = page.getByTestId('reservation-room-timetable').locator('.timetable-summary');
+  await expect(publicRoomSummary).toContainText('운영 시간 09:00–18:00 · 신청 가능 시간 10:00–17:00');
+  await expect(publicRoomSummary).not.toContainText(/예약 \d+건/);
+  await expect(page.getByText('선택한 공간의 예약 현황을 날짜와 시간 기준으로 보여줍니다.')).toHaveCount(0);
   const publicUnavailableHeader = page.locator('.timetable-day-header.availability-public-unavailable').first();
   const weeklyPublicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable').first();
   const availableHeader = page.locator('.timetable-day-header.availability-available').first();
@@ -311,6 +354,11 @@ test('public and admin timetables share availability colors but keep different i
   ).toBe(true);
 
   await page.goto('/admin/timetable?view=date&date=2026-07-13');
+  await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toBeVisible();
+  const adminDateSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
+  await expect(adminDateSummary).toContainText('운영 시간 09:00–18:00 · 신청 가능 시간 10:00–17:00');
+  await expect(adminDateSummary).not.toContainText('활성 공간');
+  await expect(adminDateSummary).not.toContainText(/예약 \d+건/);
   const adminPublicUnavailable = page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` });
   await expect(adminPublicUnavailable).toBeEnabled();
   await expect(adminPublicUnavailable).toHaveClass(/availability-public-unavailable/);
@@ -338,6 +386,8 @@ async function mockReservationApis(
     publicCloseTime: string;
     availableDaysOfWeek: string[];
     publicAvailableDaysOfWeek: string[];
+    publicNotice: string | null;
+    completionMessage: string | null;
   }> = {},
 ) {
   const settings = {

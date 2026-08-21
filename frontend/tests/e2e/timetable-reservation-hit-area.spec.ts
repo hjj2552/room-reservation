@@ -119,7 +119,15 @@ async function expectReservationHitArea(
   await expect(page).toHaveURL(timetableCase.detailUrl);
 
   block = await loadBlock();
-  const box = await requiredBox(block, `${timetableCase.label} ${viewportLabel} reservation`);
+  let box = await requiredBox(block, `${timetableCase.label} ${viewportLabel} reservation`);
+  const viewportHeight = page.viewportSize()?.height;
+  const clickBottom = box.y + box.height + 8;
+  if (viewportHeight && clickBottom >= viewportHeight) {
+    await block.evaluate((element, scrollBy) => {
+      element.closest('.timetable-scroll')?.scrollBy(0, scrollBy);
+    }, clickBottom - viewportHeight + 16);
+    box = await requiredBox(block, `${timetableCase.label} ${viewportLabel} reservation after scroll`);
+  }
   await page.mouse.click(box.x + box.width / 2, box.y + box.height + 8);
   await expect(page.getByTestId(timetableCase.panelTestId)).toBeVisible();
   await page.getByTestId(timetableCase.closeTestId).click();

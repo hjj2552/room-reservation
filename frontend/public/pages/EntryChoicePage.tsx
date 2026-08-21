@@ -16,8 +16,8 @@ export function EntryChoicePage() {
         <div className="entry-options">
           <Link className="entry-option" to="/timetable" data-testid="entry-public-link">
             <span>
-              <strong>일반 사용자</strong>
-              <span>공간 예약 신청 및 확인</span>
+              <strong>공간 예약</strong>
+              <span>시간표 확인 및 예약 신청</span>
             </span>
           </Link>
 
