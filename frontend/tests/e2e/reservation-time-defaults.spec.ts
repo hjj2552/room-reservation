@@ -113,9 +113,10 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
 }
 
 test('public completion toast stays within mobile viewport and restarts its timeout', async ({ page }) => {
+  const completionMessage = `testing-toast-first-line\n${'testing-toast-unbroken-'.repeat(12)}`;
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await mockReservationApis(page, '2026-07-31', { completionMessage: null });
+  await mockReservationApis(page, '2026-07-31', { completionMessage: `  ${completionMessage}  ` });
   await page.goto('/timetable');
   await page.clock.setFixedTime(fixedInstant);
 
@@ -143,6 +144,9 @@ test('public completion toast stays within mobile viewport and restarts its time
   const toast = page.getByTestId('public-reservation-success-toast');
   await expect(toast).toBeVisible();
   await expect(toast).toHaveCSS('animation-name', 'public-reservation-toast-lifecycle-reduced');
+  await expect(toast).toHaveCSS('white-space', 'pre-wrap');
+  await expect(toast).toHaveCSS('overflow-wrap', 'anywhere');
+  expect(await toast.locator('span').textContent()).toBe(completionMessage);
   const toastBox = await toast.boundingBox();
   expect(toastBox).not.toBeNull();
   expect(toastBox!.x).toBeGreaterThanOrEqual(0);
@@ -309,19 +313,28 @@ test('empty slot hover fills the 30-minute grid cell when minimum duration is sh
 });
 
 test('public and admin timetables share availability colors but keep different interaction rules', async ({ page }) => {
+  const publicNoticeMessage = `testing-public-notice-first-line\n${'testing-public-notice-unbroken-'.repeat(12)}`;
   await mockReservationApis(page, '2026-07-31', {
     publicOpenTime: '10:00',
     publicCloseTime: '17:00',
     publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
-    publicNotice: '  testing-public-notice  ',
+    publicNotice: `  ${publicNoticeMessage}  `,
   });
   await page.setViewportSize({ width: 390, height: 844 });
 
   await page.goto('/timetable?view=date&date=2026-07-13');
   const publicNotice = page.locator('.public-notice');
-  await expect(publicNotice).toHaveText('testing-public-notice');
+  const publicNoticeText = publicNotice.locator('.public-notice-message');
+  expect(await publicNoticeText.textContent()).toBe(publicNoticeMessage);
+  await expect(publicNoticeText).toHaveCSS('white-space', 'pre-wrap');
+  await expect(publicNoticeText).toHaveCSS('overflow-wrap', 'anywhere');
   await expect(publicNotice).not.toContainText('신청 가능 시간');
   await expect(publicNotice).not.toContainText('승인 대기');
+  const publicNoticeBox = await publicNotice.boundingBox();
+  expect(publicNoticeBox).not.toBeNull();
+  expect(publicNoticeBox!.x).toBeGreaterThanOrEqual(0);
+  expect(publicNoticeBox!.x + publicNoticeBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   const publicDateSummary = page.getByTestId('reservation-date-timetable').locator('.timetable-summary');
   await expect(publicDateSummary).toContainText('운영 시간 09:00–18:00 · 신청 가능 시간 10:00–17:00');
   await expect(publicDateSummary).not.toContainText('활성 공간');

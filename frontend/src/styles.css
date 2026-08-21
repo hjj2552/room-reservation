@@ -2302,6 +2302,8 @@ button:disabled {
 .public-notice-message {
   display: block;
   margin-bottom: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .public-notice p:first-child,
