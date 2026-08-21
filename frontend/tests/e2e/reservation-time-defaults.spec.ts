@@ -180,6 +180,84 @@ test('public disabled message preserves line breaks within the mobile viewport',
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
 
+test('public and admin timetable summaries use stable mobile rows without changing desktop layout', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '09:00',
+    publicCloseTime: '18:00',
+  });
+  const cases = [
+    { url: '/timetable?view=date&date=2026-07-13', testId: 'reservation-date-timetable' },
+    { url: `/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`, testId: 'reservation-room-timetable' },
+    { url: '/admin/timetable?view=date&date=2026-07-13', testId: 'reservation-date-timetable' },
+    { url: `/admin/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`, testId: 'reservation-room-timetable' },
+  ];
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const scenario of cases) {
+    await page.goto(scenario.url);
+    const summary = page.getByTestId(scenario.testId).locator('.timetable-summary');
+    const details = summary.locator('.timetable-summary-details');
+    const legend = details.locator('.timetable-availability-legend');
+    const legendItems = legend.locator(':scope > span');
+    const separator = details.locator('.timetable-summary-separator');
+    const hours = details.locator(':scope > span').last();
+
+    await expect(details).toHaveCSS('flex-direction', 'column');
+    await expect(details).toHaveCSS('justify-content', 'flex-start');
+    await expect(legend).toHaveCSS('flex-wrap', 'wrap');
+    await expect(separator).toBeHidden();
+    expect(await legendItems.evaluateAll((elements) =>
+      elements.every((element) => getComputedStyle(element).whiteSpace === 'nowrap'))).toBe(true);
+
+    const [detailsBox, legendBox, hoursBox, itemBoxes] = await Promise.all([
+      details.boundingBox(),
+      legend.boundingBox(),
+      hours.boundingBox(),
+      legendItems.evaluateAll((elements) => elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y };
+      })),
+    ]);
+    expect(detailsBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(hoursBox).not.toBeNull();
+    expect(Math.abs(legendBox!.x - detailsBox!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(hoursBox!.x - detailsBox!.x)).toBeLessThanOrEqual(1);
+    expect(hoursBox!.y).toBeGreaterThanOrEqual(legendBox!.y + legendBox!.height - 1);
+    expect(Math.max(...itemBoxes.map((box) => box.y)) - Math.min(...itemBoxes.map((box) => box.y)))
+      .toBeLessThanOrEqual(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  }
+
+  await page.setViewportSize({ width: 1024, height: 768 });
+  for (const scenario of cases) {
+    await page.goto(scenario.url);
+    const summary = page.getByTestId(scenario.testId).locator('.timetable-summary');
+    const details = summary.locator('.timetable-summary-details');
+    const legend = details.locator('.timetable-availability-legend');
+    const separator = details.locator('.timetable-summary-separator');
+    const hours = details.locator(':scope > span').last();
+
+    await expect(summary).toHaveCSS('flex-direction', 'row');
+    await expect(details).toHaveCSS('flex-direction', 'row');
+    await expect(details).toHaveCSS('justify-content', 'flex-end');
+    await expect(separator).toBeVisible();
+    await expect(separator).toHaveText('|');
+    const [summaryBox, detailsBox, legendBox, hoursBox] = await Promise.all([
+      summary.boundingBox(), details.boundingBox(), legend.boundingBox(), hours.boundingBox(),
+    ]);
+    expect(summaryBox).not.toBeNull();
+    expect(detailsBox).not.toBeNull();
+    expect(legendBox).not.toBeNull();
+    expect(hoursBox).not.toBeNull();
+    expect(Math.abs(detailsBox!.x + detailsBox!.width - (summaryBox!.x + summaryBox!.width)))
+      .toBeLessThanOrEqual(1);
+    expect(Math.abs(
+      legendBox!.y + legendBox!.height / 2 - (hoursBox!.y + hoursBox!.height / 2),
+    )).toBeLessThanOrEqual(1);
+  }
+});
+
 test('public blocks unavailable future suggestions while admin allows manual past input', async ({ page }) => {
   await mockReservationApis(page, '2026-07-13');
 
