@@ -102,14 +102,59 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
         endAt: '2026-07-15T10:30:00+09:00',
       });
       expect((await createResponse.json() as { status: string }).status).toBe('REQUESTED');
-      const completionDialog = page.getByRole('dialog', { name: '예약 신청 완료' });
       await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
-      await expect(completionDialog).toContainText('예약 신청이 완료되었습니다.');
-      await expect(completionDialog).toContainText('예약 상태: 승인 대기');
-      await completionDialog.getByRole('button', { name: '확인', exact: true }).click();
+      const completionToast = page.getByTestId('public-reservation-success-toast');
+      await expect(completionToast).toContainText(
+        '예약 신청이 완료되었습니다. 관리자 승인 후 예약이 확정됩니다.',
+      );
+      await expect(page.getByRole('dialog', { name: '예약 신청 완료' })).toHaveCount(0);
     });
   });
 }
+
+test('public completion toast stays within mobile viewport and restarts its timeout', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockReservationApis(page, '2026-07-31', { completionMessage: null });
+  await page.goto('/timetable');
+  await page.clock.setFixedTime(fixedInstant);
+
+  async function submitRequest(purpose: string) {
+    await page.getByTestId('public-new-request-button').click();
+    await page.getByTestId('public-request-start-input-date').fill('2026-07-15');
+    await page.getByTestId('public-request-start-input').selectOption('10:00');
+    await page.getByTestId('public-request-end-input').selectOption('10:30');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    await page.getByTestId('public-request-purpose-input').fill(purpose);
+    await page.getByTestId('public-request-applicant-name-input').fill('testing-toast-user');
+    await page.getByTestId('public-request-email-input').fill('testing-toast-user@example.test');
+    await page.getByTestId('public-request-phone-input').fill('010-1234-5678');
+    await page.getByTestId('public-request-cancel-password-input').fill('testing-password');
+    const responsePromise = page.waitForResponse((response) =>
+      response.url().includes('/api/public/reservations') && response.request().method() === 'POST',
+    );
+    await page.getByTestId('public-request-submit-button').click();
+    const response = await responsePromise;
+    expect((await response.json() as { status: string }).status).toBe('REQUESTED');
+    await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+  }
+
+  await submitRequest('testing-toast-first');
+  const toast = page.getByTestId('public-reservation-success-toast');
+  await expect(toast).toBeVisible();
+  await expect(toast).toHaveCSS('animation-name', 'public-reservation-toast-lifecycle-reduced');
+  const toastBox = await toast.boundingBox();
+  expect(toastBox).not.toBeNull();
+  expect(toastBox!.x).toBeGreaterThanOrEqual(0);
+  expect(toastBox!.x + toastBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  await page.waitForTimeout(3_000);
+  await submitRequest('testing-toast-second');
+  await page.waitForTimeout(3_500);
+  await expect(toast).toBeVisible();
+  await expect(toast).toBeHidden({ timeout: 3_500 });
+});
 
 test('public blocks unavailable future suggestions while admin allows manual past input', async ({ page }) => {
   await mockReservationApis(page, '2026-07-13');

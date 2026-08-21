@@ -320,7 +320,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
     ...originalSettings,
     reservationEnabled: true,
     reservationDisabledMessage: originalSettings.reservationDisabledMessage || 'Reservation is currently disabled.',
-    completionMessage: 'testing-public-completion-message',
+    completionMessage: '  testing-public-completion-message\n두 번째 완료 안내  ',
   });
   const room = await e2eData.createTestRoom('public-request-room');
   const reservationTime = nextWeekdayReservationLocalInputs({ daysAhead: 21, startHour: 10, endHour: 11 });
@@ -364,16 +364,22 @@ test('public timetable supports slot-based request, masked detail page, and pass
     e2eData.registerReservation(created.id);
 
     await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
-    const completionDialog = page.getByRole('dialog', { name: '예약 신청 완료' });
-    await expect(completionDialog).toContainText('testing-public-completion-message');
-    await expect(completionDialog).toContainText('예약 상태: 승인 대기');
+    const completionToast = page.getByTestId('public-reservation-success-toast');
+    await expect(completionToast).toBeVisible();
+    await expect(completionToast).toHaveAttribute('role', 'status');
+    await expect(completionToast).toHaveAttribute('aria-live', 'polite');
+    await expect(completionToast).toHaveAttribute('aria-atomic', 'true');
+    await expect(completionToast.locator('span')).toHaveText('testing-public-completion-message\n두 번째 완료 안내');
+    await expect(completionToast).toHaveCSS('white-space', 'pre-wrap');
+    await expect(page.getByTestId('public-reservation-success-icon')).toBeVisible();
+    await expect(completionToast.getByRole('button')).toHaveCount(0);
+    await expect(page.getByTestId('public-reservation-completion-dialog')).toHaveCount(0);
+    await expect(page.locator('.modal-backdrop')).toHaveCount(0);
     await expect(page.getByText(purpose)).toBeVisible();
     const timetableBlock = page.locator('.reservation-block').filter({ hasText: purpose });
     await expect(timetableBlock).not.toHaveClass(/reservation-block-highlighted/);
     await expect(timetableBlock).toContainText(maskName(applicantName));
     await expect(timetableBlock).not.toContainText(applicantName);
-    await completionDialog.getByRole('button', { name: '확인', exact: true }).click();
-    await expect(completionDialog).toBeHidden();
     await page.getByText(purpose).click();
 
     const detailPanel = page.locator('.reservation-detail-main');

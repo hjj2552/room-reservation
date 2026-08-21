@@ -1699,6 +1699,76 @@ button:disabled {
   color: #126045;
 }
 
+.public-reservation-success-toast {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: min(560px, calc(100vw - 32px));
+  border: 1px solid var(--action-hover);
+  border-radius: 6px;
+  padding: var(--space-3) 16px;
+  background: var(--action);
+  box-shadow: 0 12px 30px rgba(34, 37, 33, 0.2);
+  color: #ffffff;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  transform: translateX(-50%);
+  animation: public-reservation-toast-lifecycle 6s ease both;
+}
+
+.public-reservation-success-toast svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+@keyframes public-reservation-toast-lifecycle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+
+  3% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  96% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes public-reservation-toast-lifecycle-reduced {
+  0% {
+    opacity: 0;
+  }
+
+  3%,
+  96% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-reservation-success-toast {
+    animation-name: public-reservation-toast-lifecycle-reduced;
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
