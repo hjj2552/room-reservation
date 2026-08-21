@@ -2306,6 +2306,11 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.public-reservation-disabled-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .public-notice p:first-child,
 .public-notice-message:first-child {
   margin-top: 0;

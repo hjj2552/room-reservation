@@ -270,7 +270,7 @@ export function PublicReservationPage() {
       ) : null}
 
       {isUnavailable ? (
-        <div className="inline-error" role="alert">
+        <div className="inline-error public-reservation-disabled-message" role="alert">
           {settings.data?.reservationDisabledMessage || '현재 예약 신청 접수가 중지되어 있습니다.'}
         </div>
       ) : null}

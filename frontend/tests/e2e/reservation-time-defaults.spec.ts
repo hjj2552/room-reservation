@@ -160,6 +160,26 @@ test('public completion toast stays within mobile viewport and restarts its time
   await expect(toast).toBeHidden({ timeout: 3_500 });
 });
 
+test('public disabled message preserves line breaks within the mobile viewport', async ({ page }) => {
+  const disabledMessage = `testing-disabled-first-line\n${'testing-disabled-unbroken-'.repeat(12)}`;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockReservationApis(page, '2026-07-31', {
+    reservationEnabled: false,
+    reservationDisabledMessage: disabledMessage,
+  });
+
+  await page.goto('/timetable');
+  const message = page.locator('.public-reservation-disabled-message');
+  expect(await message.textContent()).toBe(disabledMessage);
+  await expect(message).toHaveCSS('white-space', 'pre-wrap');
+  await expect(message).toHaveCSS('overflow-wrap', 'anywhere');
+  const messageBox = await message.boundingBox();
+  expect(messageBox).not.toBeNull();
+  expect(messageBox!.x).toBeGreaterThanOrEqual(0);
+  expect(messageBox!.x + messageBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
 test('public blocks unavailable future suggestions while admin allows manual past input', async ({ page }) => {
   await mockReservationApis(page, '2026-07-13');
 
@@ -438,6 +458,8 @@ async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
   overrides: Partial<{
+    reservationEnabled: boolean;
+    reservationDisabledMessage: string | null;
     minReservationMinutes: number;
     maxReservationMinutes: number;
     publicOpenTime: string;
