@@ -33,6 +33,9 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(page.getByTestId('timetable-new-request-button')).toBeVisible();
       await page.clock.setFixedTime(fixedInstant);
       await page.getByTestId('timetable-new-request-button').click();
+      await expect(page.getByTestId('timetable-quick-add-panel').locator('.side-panel-header .muted')).toHaveText(
+        '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.',
+      );
       const adminStart = page.getByTestId('quick-add-start-input');
       const adminEnd = page.getByTestId('quick-add-end-input');
       await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
@@ -63,6 +66,9 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
       await expect(publicSummary).not.toContainText('활성 공간');
       await expect(publicSummary).not.toContainText(/예약 \d+건/);
       await page.getByTestId('public-new-request-button').click();
+      await expect(page.getByTestId('public-quick-request-panel').locator('.side-panel-header .muted')).toHaveText(
+        '신청은 승인 대기 상태로 저장됩니다.',
+      );
       const publicStart = page.getByTestId('public-request-start-input');
       const publicEnd = page.getByTestId('public-request-end-input');
       await expect(page.getByTestId('public-request-start-input-date')).toHaveValue(expectedStart.slice(0, 10));
@@ -266,7 +272,7 @@ test('public blocks unavailable future suggestions while admin allows manual pas
   await page.clock.setFixedTime(fixedInstant);
   await page.getByTestId('timetable-new-request-button').click();
   await expect(page.getByTestId('reservation-time-unavailable')).toHaveCount(0);
-  await expect(page.getByTestId('timetable-quick-add-panel')).toContainText(
+  await expect(page.getByTestId('timetable-quick-add-panel').locator('.side-panel-header .muted')).toHaveText(
     '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.',
   );
   await expect(page.getByTestId('quick-add-start-input')).toHaveValue('');
@@ -276,6 +282,9 @@ test('public blocks unavailable future suggestions while admin allows manual pas
 
   await page.goto('/timetable');
   await page.getByTestId('public-new-request-button').click();
+  await expect(page.getByTestId('public-quick-request-panel').locator('.side-panel-header .muted')).toHaveText(
+    '신청은 승인 대기 상태로 저장됩니다.',
+  );
   await expect(page.getByTestId('reservation-time-unavailable')).toContainText(
     '설정된 예약 가능 기간에 예약 가능한 미래 운영 시간이 없습니다. 운영 설정을 확인해 주세요.',
   );
@@ -345,6 +354,9 @@ test('public and admin can open a past slot while public submission shows the po
   await publicPastSlot.hover();
   expect(await publicPastSlot.evaluate((element) => getComputedStyle(element, '::before').height)).toBe('48px');
   await publicPastSlot.click();
+  await expect(page.getByTestId('public-quick-request-panel').locator('.side-panel-header .muted')).toHaveText(
+    '신청은 승인 대기 상태로 저장됩니다.',
+  );
   await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-13');
   await expect(page.getByTestId('public-request-start-input')).toHaveValue('09:00');
   await expect(page.getByTestId('public-request-end-input')).toHaveValue('09:30');
@@ -382,7 +394,7 @@ test('public and admin can open a past slot while public submission shows the po
   await adminPastSlot.click();
   await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue('2026-07-13');
   await expect(page.getByTestId('quick-add-start-input')).toHaveValue('09:00');
-  await expect(page.getByTestId('timetable-quick-add-panel')).toContainText(
+  await expect(page.getByTestId('timetable-quick-add-panel').locator('.side-panel-header .muted')).toHaveText(
     '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.',
   );
   await page.getByTestId('quick-add-applicant-name-input').fill('testing-admin');
