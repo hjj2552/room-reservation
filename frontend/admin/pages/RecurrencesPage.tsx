@@ -539,7 +539,7 @@ export function RecurrencesPage() {
                           {item.available
                             ? '등록 예정'
                             : validPreview.conflictPolicy === 'SKIP_CONFLICTS' && item.reason === 'TIME_SLOT_CONFLICT'
-                              ? '충돌 취소 예정'
+                              ? '충돌 → 취소로 기록 예정'
                               : validPreview.conflictPolicy === 'SKIP_CONFLICTS'
                                 ? `건너뜀${item.reason ? `: ${item.reason}` : ''}`
                                 : `충돌${item.reason ? `: ${item.reason}` : ''}`}
@@ -662,7 +662,6 @@ export function RecurrencesPage() {
                             </span>
                           ) : null}
                           {item.purpose}
-                          <div className="muted">{conflictPolicyLabels[item.conflictPolicy]}</div>
                         </td>
                         <td className="nowrap-cell">
                           <Link
