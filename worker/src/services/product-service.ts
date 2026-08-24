@@ -1226,12 +1226,15 @@ export class ProductService {
     }
     const availableCount = items.filter((item) => item.available).length;
     const conflictCount = items.length - availableCount;
+    const timeSlotConflictCount = items.filter((item) => item.reason === "TIME_SLOT_CONFLICT").length;
     return {
       conflictPolicy: input.conflictPolicy,
       totalCandidates: items.length,
       availableCount,
       conflictCount,
-      createAllowed: input.conflictPolicy === "FAIL_ALL" ? items.length > 0 && conflictCount === 0 : availableCount > 0,
+      createAllowed: input.conflictPolicy === "FAIL_ALL"
+        ? items.length > 0 && conflictCount === 0
+        : availableCount + timeSlotConflictCount > 0,
       items,
     };
   }
@@ -1258,12 +1261,43 @@ export class ProductService {
             input.endTime, input.conflictPolicy, adminUsername, input.showApplicantName],
         );
         const recurrence = recurrenceResult.rows[0]!;
-        const resultItems: Array<{ date: string; status: string; reason: string | null }> = [];
+        const resultItems: Array<{ date: string; status: "CREATED" | "CANCELLED" | "SKIPPED"; reason: string | null }> = [];
         let createdCount = 0;
+        let cancelledCount = 0;
         let skippedCount = 0;
+        const insertGeneratedReservation = async (
+          item: (typeof preview.items)[number],
+          status: "CONFIRMED" | "CANCELLED",
+          memo: string | null,
+        ) => {
+          const inserted = await client.query(
+            `INSERT INTO reservations (
+              room_id, recurrence_id, applicant_name, applicant_email, applicant_phone, purpose,
+              start_at, end_at, status, source, created_by_actor_type, created_by_actor_id,
+              show_applicant_name
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'RECURRING_GENERATED','ADMIN',$10,$11) RETURNING *`,
+            [input.roomId, value(recurrence, "id"), input.applicantName, input.applicantEmail,
+              input.applicantPhone, input.purpose, item.startAt, item.endAt, status, adminUsername,
+              input.showApplicantName],
+          );
+          await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, memo, "ADMIN", adminUsername);
+        };
+        const recordTimeSlotConflict = async (item: (typeof preview.items)[number]) => {
+          await insertGeneratedReservation(
+            item,
+            "CANCELLED",
+            "반복 예약 생성 시 시간 충돌로 취소 상태 기록",
+          );
+          cancelledCount += 1;
+          resultItems.push({ date: item.date, status: "CANCELLED", reason: "TIME_SLOT_CONFLICT" });
+        };
         for (let index = 0; index < preview.items.length; index += 1) {
           const item = preview.items[index]!;
           if (!item.available) {
+            if (input.conflictPolicy === "SKIP_CONFLICTS" && item.reason === "TIME_SLOT_CONFLICT") {
+              await recordTimeSlotConflict(item);
+              continue;
+            }
             skippedCount += 1;
             resultItems.push({ date: item.date, status: "SKIPPED", reason: item.reason });
             continue;
@@ -1271,25 +1305,15 @@ export class ProductService {
           const savepoint = `recurrence_candidate_${index}`;
           await client.query(`SAVEPOINT ${savepoint}`);
           try {
-            const inserted = await client.query(
-              `INSERT INTO reservations (
-                room_id, recurrence_id, applicant_name, applicant_email, applicant_phone, purpose,
-                start_at, end_at, status, source, created_by_actor_type, created_by_actor_id,
-                show_applicant_name
-               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'CONFIRMED','RECURRING_GENERATED','ADMIN',$9,$10) RETURNING *`,
-              [input.roomId, value(recurrence, "id"), input.applicantName, input.applicantEmail,
-                input.applicantPhone, input.purpose, item.startAt, item.endAt, adminUsername,
-                input.showApplicantName],
-            );
-            await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, null, "ADMIN", adminUsername);
+            await insertGeneratedReservation(item, "CONFIRMED", null);
             await client.query(`RELEASE SAVEPOINT ${savepoint}`);
             createdCount += 1;
             resultItems.push({ date: item.date, status: "CREATED", reason: null });
           } catch (error) {
             await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
             if (input.conflictPolicy === "SKIP_CONFLICTS" && isDatabaseCode(error, "23P01")) {
-              skippedCount += 1;
-              resultItems.push({ date: item.date, status: "SKIPPED", reason: "TIME_SLOT_CONFLICT" });
+              await recordTimeSlotConflict(item);
+              await client.query(`RELEASE SAVEPOINT ${savepoint}`);
               continue;
             }
             throw error;
@@ -1304,6 +1328,7 @@ export class ProductService {
           conflictPolicy: input.conflictPolicy,
           totalCandidates: preview.totalCandidates,
           createdCount,
+          cancelledCount,
           skippedCount,
           failedCount: 0,
           items: resultItems,

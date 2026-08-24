@@ -211,6 +211,12 @@ export function RecurrencesPage() {
   const previewIsValid = previewFingerprintMatches && !preview.isPending && !preview.isError;
   const validPreview = previewIsValid ? successfulPreview.data : null;
   const previewIsStale = successfulPreview !== null && !previewFingerprintMatches;
+  const previewCancelledCount = validPreview?.items.filter(
+    (item) => item.reason === 'TIME_SLOT_CONFLICT',
+  ).length ?? 0;
+  const previewSkippedCount = validPreview
+    ? validPreview.conflictCount - previewCancelledCount
+    : 0;
 
   function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -454,7 +460,7 @@ export function RecurrencesPage() {
           {create.isError ? <div className="inline-error full-span" role="alert">{errorMessage(create.error)}</div> : null}
           {completedCreate ? (
             <div className="success-box full-span" role="status">
-              ‘{completedCreate.purpose}’ 등록 완료: 등록 {completedCreate.result.createdCount}건, 건너뜀 {completedCreate.result.skippedCount}건, 실패 {completedCreate.result.failedCount}건
+              ‘{completedCreate.purpose}’ 등록 완료: 등록 {completedCreate.result.createdCount}건, 충돌 취소 {completedCreate.result.cancelledCount}건, 건너뜀 {completedCreate.result.skippedCount}건, 실패 {completedCreate.result.failedCount}건
             </div>
           ) : null}
           <div className="button-row full-span">
@@ -498,8 +504,15 @@ export function RecurrencesPage() {
             <>
               <div className="summary-cards" data-testid="recurrence-preview-summary">
                 <div><strong>{validPreview.totalCandidates}</strong><span>전체 후보</span></div>
-                <div><strong>{validPreview.availableCount}</strong><span>가능</span></div>
-                <div><strong>{validPreview.conflictCount}</strong><span>충돌</span></div>
+                <div><strong>{validPreview.availableCount}</strong><span>등록 가능</span></div>
+                {validPreview.conflictPolicy === 'SKIP_CONFLICTS' ? (
+                  <>
+                    <div><strong>{previewCancelledCount}</strong><span>충돌 취소</span></div>
+                    <div><strong>{previewSkippedCount}</strong><span>건너뜀</span></div>
+                  </>
+                ) : (
+                  <div><strong>{validPreview.conflictCount}</strong><span>충돌</span></div>
+                )}
                 <div><strong>{validPreview.createAllowed ? '가능' : '불가능'}</strong><span>생성 여부</span></div>
               </div>
               <div className="table-wrap compact">
@@ -523,7 +536,13 @@ export function RecurrencesPage() {
                           </span>
                         </td>
                         <td className="table-description-cell">
-                          {item.available ? '가능' : `충돌${item.reason ? `: ${item.reason}` : ''}`}
+                          {item.available
+                            ? '등록 예정'
+                            : validPreview.conflictPolicy === 'SKIP_CONFLICTS' && item.reason === 'TIME_SLOT_CONFLICT'
+                              ? '충돌 취소 예정'
+                              : validPreview.conflictPolicy === 'SKIP_CONFLICTS'
+                                ? `건너뜀${item.reason ? `: ${item.reason}` : ''}`
+                                : `충돌${item.reason ? `: ${item.reason}` : ''}`}
                           {item.message ? <div className="muted">{item.message}</div> : null}
                         </td>
                       </tr>
@@ -643,6 +662,7 @@ export function RecurrencesPage() {
                             </span>
                           ) : null}
                           {item.purpose}
+                          <div className="muted">{conflictPolicyLabels[item.conflictPolicy]}</div>
                         </td>
                         <td className="nowrap-cell">
                           <Link

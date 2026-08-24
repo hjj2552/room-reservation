@@ -467,7 +467,7 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
   }
 });
 
-test('recurrence SKIP_CONFLICTS creates only available candidates when one slot conflicts', async ({ page, request, e2eData }) => {
+test('recurrence SKIP_CONFLICTS records a conflicting candidate as cancelled', async ({ page, request, e2eData }) => {
   await loginByApi(request);
   const room = await e2eData.createTestRoom('recurrence-skip-room');
   const purpose = e2eData.name('recurring-skip-conflicts');
@@ -492,6 +492,8 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     await page.getByTestId('recurrence-end-time-input').selectOption(recurrenceTime.endTime);
     await page.getByTestId(`recurrence-day-${recurrenceTime.dayOfWeek}`).check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('SKIP_CONFLICTS');
+    await expect(page.getByTestId('recurrence-conflict-policy-select').locator('option:checked'))
+      .toHaveText('충돌 건은 취소로 기록');
 
     const previewResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/recurrences/preview') &&
@@ -509,6 +511,8 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     expect(preview.totalCandidates, previewBody).toBe(2);
     expect(preview.availableCount, previewBody).toBe(1);
     expect(preview.conflictCount, previewBody).toBe(1);
+    await expect(page.getByTestId('recurrence-preview-summary')).toContainText('충돌 취소');
+    await expect(page.getByTestId('recurrence-preview-table')).toContainText('충돌 취소 예정');
 
     const createResponsePromise = page.waitForResponse((response) => {
       const url = new URL(response.url());
@@ -522,19 +526,44 @@ test('recurrence SKIP_CONFLICTS creates only available candidates when one slot 
     const created = JSON.parse(createBody) as {
       recurrenceId: string;
       createdCount: number;
+      cancelledCount: number;
       skippedCount: number;
+      failedCount: number;
       items: Array<{ status: string; reason: string | null }>;
     };
     recurrenceId = created.recurrenceId;
     e2eData.registerRecurrence(recurrenceId);
     expect(created.createdCount, createBody).toBe(1);
-    expect(created.skippedCount, createBody).toBe(1);
-    expect(created.items.map((item) => item.status)).toEqual(['SKIPPED', 'CREATED']);
+    expect(created.cancelledCount, createBody).toBe(1);
+    expect(created.skippedCount, createBody).toBe(0);
+    expect(created.items.map((item) => item.status)).toEqual(['CANCELLED', 'CREATED']);
     expect(created.items[0].reason).toBe('TIME_SLOT_CONFLICT');
+    await expect(page.locator('.success-box')).toHaveText(
+      `‘${purpose}’ 등록 완료: 등록 1건, 충돌 취소 1건, 건너뜀 0건, 실패 ${created.failedCount}건`,
+    );
 
+    await page.goto(`/admin/recurrences?keyword=${encodeURIComponent(purpose)}&page=0`);
+    const recurrenceRow = page.getByTestId('recurrences-table').locator('tbody tr').filter({ hasText: purpose });
+    await expect(recurrenceRow).toContainText('충돌 건은 취소로 기록');
     await page.goto(`/admin/recurrences/${recurrenceId}`);
     await expect(page.getByTestId('recurrence-detail-purpose')).toHaveText(purpose);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText(dayLabel(recurrenceTime.dayOfWeek));
+    await expect(page.getByText('충돌 건은 취소로 기록', { exact: true })).toBeVisible();
+    const recurrenceReservations = page.getByTestId('recurrence-reservations-table').locator('tbody tr');
+    await expect(recurrenceReservations).toHaveCount(2);
+    await expect(recurrenceReservations.filter({ hasText: '취소' })).toHaveCount(1);
+    await expect(recurrenceReservations.filter({ hasText: '승인' })).toHaveCount(1);
+
+    const detailResponse = await request.get(`/api/admin/recurrences/${recurrenceId}`);
+    expect(detailResponse.ok()).toBe(true);
+    const detail = await detailResponse.json() as {
+      reservations: Array<{ id: string; status: string; source?: string; recurrenceId?: string }>;
+    };
+    expect(detail.reservations.map((reservation) => reservation.status)).toEqual(['CANCELLED', 'CONFIRMED']);
+
+    await page.goto(`/admin/reservations?status=CANCELLED&keyword=${encodeURIComponent(purpose)}&page=0`);
+    await expect(page.getByTestId('reservations-table')).toContainText(purpose);
+    await expect(page.getByTestId('reservations-table')).toContainText('취소');
   } finally {
     if (recurrenceId) {
       await deleteRecurrenceByApi(request, recurrenceId, 'testing-cleanup');
@@ -657,6 +686,7 @@ test('recurrence form loads every tag page and surfaces later page failures', as
         conflictPolicy: 'FAIL_ALL',
         totalCandidates: 1,
         createdCount: 1,
+        cancelledCount: 0,
         skippedCount: 0,
         failedCount: 0,
         items: [{ date: recurrenceTime.startDate, status: 'CREATED', reason: null }],
@@ -986,6 +1016,7 @@ test('a pending recurrence create keeps its payload snapshot and the next draft 
   const created = JSON.parse(createBody) as {
     recurrenceId: string;
     createdCount: number;
+    cancelledCount: number;
     skippedCount: number;
     failedCount: number;
   };
@@ -1014,7 +1045,7 @@ test('a pending recurrence create keeps its payload snapshot and the next draft 
   await expect(page.getByTestId('recurrence-preview-summary')).toBeVisible();
   await expect(createButton).toBeEnabled();
   await expect(page.locator('.success-box')).toHaveText(
-    `‘${submittedPurpose}’ 등록 완료: 등록 ${created.createdCount}건, 건너뜀 ${created.skippedCount}건, 실패 ${created.failedCount}건`,
+    `‘${submittedPurpose}’ 등록 완료: 등록 ${created.createdCount}건, 충돌 취소 ${created.cancelledCount}건, 건너뜀 ${created.skippedCount}건, 실패 ${created.failedCount}건`,
   );
 });
 
