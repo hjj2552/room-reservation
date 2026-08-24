@@ -382,11 +382,12 @@ export interface RecurrenceCreateResult {
   conflictPolicy: ConflictPolicy;
   totalCandidates: number;
   createdCount: number;
+  cancelledCount: number;
   skippedCount: number;
   failedCount: number;
   items: Array<{
     date: string;
-    status: string;
+    status: 'CREATED' | 'CANCELLED' | 'SKIPPED';
     reason: string | null;
   }>;
 }

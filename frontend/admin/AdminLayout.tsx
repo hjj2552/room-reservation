@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
+import { usePendingReservationCount } from '../shared/hooks/useReservations';
 import {
   adminListContextForPath,
   adminListContexts,
@@ -79,6 +80,8 @@ export function AdminLayout() {
   const logout = useLogout();
   const navigate = useNavigate();
   const location = useLocation();
+  const pendingReservations = usePendingReservationCount();
+  const pendingReservationCount = pendingReservations.isSuccess ? pendingReservations.data : 0;
   const [savedTimetableSearch, setSavedTimetableSearch] = useState(readTimetableSearch);
   const [savedListSearches, setSavedListSearches] = useState(readAdminListSearches);
   const normalizedSearch = location.pathname === timetablePath
@@ -112,12 +115,29 @@ export function AdminLayout() {
           <span>관리자</span>
         </div>
         <nav className="nav-list">
-          <NavLink to={{
-            pathname: adminListContexts.reservations.path,
-            search: savedListSearches.reservations,
-          }} end>
-            예약 목록
-          </NavLink>
+          <div className="nav-item-with-badge">
+            <NavLink
+              className="nav-item-label"
+              to={{
+                pathname: adminListContexts.reservations.path,
+                search: savedListSearches.reservations,
+              }}
+              end
+            >
+              예약 목록
+            </NavLink>
+            {pendingReservationCount > 0 ? (
+              <Link
+                className="pending-reservation-link"
+                to="/admin/reservations?status=REQUESTED&page=0"
+                aria-label={`승인 대기 예약 ${pendingReservationCount.toLocaleString('ko-KR')}건 보기`}
+              >
+                <span className="pending-reservation-badge" aria-hidden="true">
+                  {pendingReservationCount >= 100 ? '99+' : pendingReservationCount}
+                </span>
+              </Link>
+            ) : null}
+          </div>
           <NavLink to={{ pathname: timetablePath, search: savedTimetableSearch }}>
             시간표
           </NavLink>

@@ -4,6 +4,7 @@ import { SessionService } from "../../src/services/session-service";
 import { createHttpApp } from "../../src/http/app";
 import { parseRuntimeConfig } from "../../src/core/config";
 import { AppError } from "../../src/core/errors";
+import type { Database } from "../../src/infra/database";
 import {
   parseAdminReservation,
   parsePublicPassword,
@@ -2085,8 +2086,19 @@ describe("direct Worker contracts", () => {
       body: JSON.stringify(recurrencePayload),
     });
     expect(recurrenceCreate.status).toBe(201);
-    const recurrence = await recurrenceCreate.json() as { recurrenceId: string; createdCount: number };
-    expect(recurrence.createdCount).toBe(1);
+    const recurrence = await recurrenceCreate.json() as {
+      recurrenceId: string;
+      createdCount: number;
+      cancelledCount: number;
+      skippedCount: number;
+      failedCount: number;
+    };
+    expect(recurrence).toMatchObject({
+      createdCount: 1,
+      cancelledCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+    });
     const storedContacts = await database.query(
       `SELECT
          (SELECT applicant_email FROM reservation_recurrences WHERE id=$1) AS recurrence_email,
@@ -2378,13 +2390,13 @@ describe("direct Worker contracts", () => {
     expect((await database.query("SELECT 1 FROM reservation_histories WHERE reservation_purpose=$1", [body.purpose])).rows).toHaveLength(0);
   });
 
-  it("batches recurrence conflicts while preserving cancelled and half-open boundaries", async () => {
+  it("records time conflicts as cancelled while skipping policy violations", async () => {
     await resetProductData();
     const roomId = await insertRoom("testing-room-recurrence-batch");
     const firstDate = new Date();
     firstDate.setUTCDate(firstDate.getUTCDate() + 35);
     while (firstDate.getUTCDay() !== 1) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
-    const dates = Array.from({ length: 4 }, (_, index) => {
+    const dates = Array.from({ length: 7 }, (_, index) => {
       const date = new Date(firstDate);
       date.setUTCDate(date.getUTCDate() + index);
       return date.toISOString().slice(0, 10);
@@ -2410,8 +2422,8 @@ describe("direct Worker contracts", () => {
       roomId,
       applicantPhone: null,
       startDate: dates[0]!,
-      endDate: dates[3]!,
-      daysOfWeek: ["MON", "TUE", "WED", "THU"],
+      endDate: dates[6]!,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
       startTime: "10:00",
       endTime: "11:00",
       conflictPolicy: "SKIP_CONFLICTS",
@@ -2423,8 +2435,242 @@ describe("direct Worker contracts", () => {
       "TIME_SLOT_CONFLICT",
       null,
       null,
+      null,
+      "OUTSIDE_OPERATING_DAYS",
+      "OUTSIDE_OPERATING_DAYS",
     ]);
-    expect(preview).toMatchObject({ totalCandidates: 4, availableCount: 2, conflictCount: 2, createAllowed: true });
+    expect(preview).toMatchObject({ totalCandidates: 7, availableCount: 3, conflictCount: 4, createAllowed: true });
+
+    const purpose = "testing-recurring-cancelled-conflicts";
+    const result = await products.createRecurrence(parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-recurrence-admin",
+      applicantEmail: "testing-recurrence-admin@example.test",
+      applicantPhone: "010-1111-2222",
+      purpose,
+      tagId: null,
+      startDate: dates[0]!,
+      endDate: dates[6]!,
+      daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "SKIP_CONFLICTS",
+      showApplicantName: true,
+    }), "admin");
+
+    expect(result).toMatchObject({
+      totalCandidates: 7,
+      createdCount: 3,
+      cancelledCount: 2,
+      skippedCount: 2,
+      failedCount: 0,
+    });
+    expect(result.items.map((item) => [item.status, item.reason])).toEqual([
+      ["CANCELLED", "TIME_SLOT_CONFLICT"],
+      ["CANCELLED", "TIME_SLOT_CONFLICT"],
+      ["CREATED", null],
+      ["CREATED", null],
+      ["CREATED", null],
+      ["SKIPPED", "OUTSIDE_OPERATING_DAYS"],
+      ["SKIPPED", "OUTSIDE_OPERATING_DAYS"],
+    ]);
+
+    const generated = await database.query(
+      `SELECT id,recurrence_id,status,source,(start_at AT TIME ZONE 'Asia/Seoul')::date::text AS date,
+         (start_at AT TIME ZONE 'Asia/Seoul')::time::text AS start_time,
+         (end_at AT TIME ZONE 'Asia/Seoul')::time::text AS end_time,
+         applicant_name,applicant_email,applicant_phone,purpose,show_applicant_name
+       FROM reservations WHERE recurrence_id=$1 ORDER BY start_at`,
+      [result.recurrenceId],
+    );
+    expect(generated.rows).toHaveLength(5);
+    expect(generated.rows.map((row) => row.status)).toEqual([
+      "CANCELLED", "CANCELLED", "CONFIRMED", "CONFIRMED", "CONFIRMED",
+    ]);
+    expect(generated.rows.map((row) => row.date)).toEqual(dates.slice(0, 5));
+    expect(generated.rows.every((row) => (
+      row.recurrence_id === result.recurrenceId
+      && row.source === "RECURRING_GENERATED"
+      && row.start_time === "10:00:00"
+      && row.end_time === "11:00:00"
+      && row.applicant_name === "testing-recurrence-admin"
+      && row.applicant_email === "testing-recurrence-admin@example.test"
+      && row.applicant_phone === "010-1111-2222"
+      && row.purpose === purpose
+      && row.show_applicant_name === true
+    ))).toBe(true);
+
+    const blockers = await database.query(
+      "SELECT purpose,status FROM reservations WHERE purpose LIKE 'testing-%' AND recurrence_id IS NULL ORDER BY purpose",
+    );
+    expect(blockers.rows).toEqual(expect.arrayContaining([
+      { purpose: "testing-requested", status: "REQUESTED" },
+      { purpose: "testing-confirmed", status: "CONFIRMED" },
+      { purpose: "testing-cancelled", status: "CANCELLED" },
+      { purpose: "testing-touching", status: "CONFIRMED" },
+    ]));
+
+    const cancelledHistories = await database.query(
+      `SELECT action,after_status,memo,actor_type,actor_id
+       FROM reservation_histories
+       WHERE reservation_id=ANY($1::uuid[]) ORDER BY reservation_start_at`,
+      [generated.rows.filter((row) => row.status === "CANCELLED").map((row) => row.id)],
+    );
+    expect(cancelledHistories.rows).toEqual([
+      {
+        action: "RECURRENCE_GENERATED",
+        after_status: "CANCELLED",
+        memo: "반복 예약 생성 시 시간 충돌로 취소 상태 기록",
+        actor_type: "ADMIN",
+        actor_id: "admin",
+      },
+      {
+        action: "RECURRENCE_GENERATED",
+        after_status: "CANCELLED",
+        memo: "반복 예약 생성 시 시간 충돌로 취소 상태 기록",
+        actor_type: "ADMIN",
+        actor_id: "admin",
+      },
+    ]);
+
+    const detail = await products.getRecurrence(result.recurrenceId);
+    expect(detail.reservations.map((reservation) => reservation.status)).toEqual([
+      "CANCELLED", "CANCELLED", "CONFIRMED", "CONFIRMED", "CONFIRMED",
+    ]);
+    const allReservations = await products.listReservations({
+      page: 0, size: 20, offset: 0, keyword: purpose, excludeCancelled: false,
+    });
+    expect(allReservations.items).toHaveLength(5);
+    const timetableReservations = await products.listReservations({
+      page: 0, size: 20, offset: 0, keyword: purpose, excludeCancelled: true,
+    });
+    expect(timetableReservations.items).toHaveLength(3);
+    const publicWeek = await products.getWeeklyReservations(roomId, weekStartFor(dates[0]!));
+    expect(publicWeek.reservations.filter((reservation) => reservation.purpose === purpose)).toHaveLength(3);
+    const csv = await products.exportReservationsCsv({ keyword: purpose, excludeCancelled: false });
+    expect(csv.match(/,CANCELLED,RECURRING_GENERATED,/g)).toHaveLength(2);
+    expect(csv.match(/,CONFIRMED,RECURRING_GENERATED,/g)).toHaveLength(3);
+
+    await database.query("UPDATE reservations SET status='CANCELLED' WHERE purpose='testing-requested'");
+    await expect(database.query(
+      `INSERT INTO reservations(
+         room_id,applicant_name,applicant_email,purpose,start_at,end_at,status,source,created_by_actor_type
+       ) VALUES($1,'testing-replacement','testing-replacement@example.test','testing-replacement',$2,$3,
+         'CONFIRMED','ADMIN_MANUAL','ADMIN')`,
+      [roomId, `${dates[0]}T10:00:00+09:00`, `${dates[0]}T11:00:00+09:00`],
+    )).resolves.toMatchObject({ rowCount: 1 });
+
+    await products.deleteRecurrence(result.recurrenceId, "testing-cleanup", "admin");
+    expect((await database.query("SELECT 1 FROM reservations WHERE recurrence_id=$1", [result.recurrenceId])).rows).toHaveLength(0);
+    expect((await database.query("SELECT status FROM reservations WHERE purpose='testing-confirmed'")).rows).toEqual([
+      { status: "CONFIRMED" },
+    ]);
+  });
+
+  it("creates a recurrence with only cancelled reservations when every slot conflicts", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurrence-all-conflicts");
+    const firstDate = new Date();
+    firstDate.setUTCDate(firstDate.getUTCDate() + 35);
+    while (firstDate.getUTCDay() !== 1) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
+    const dates = [0, 1].map((offset) => {
+      const date = new Date(firstDate);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date.toISOString().slice(0, 10);
+    });
+    for (const date of dates) {
+      await database.query(
+        `INSERT INTO reservations(room_id,applicant_name,applicant_email,purpose,start_at,end_at,status,source,created_by_actor_type)
+         VALUES($1,'testing-blocker','testing-blocker@example.test','testing-all-conflict-blocker',$2,$3,
+           'CONFIRMED','ADMIN_MANUAL','ADMIN')`,
+        [roomId, `${date}T10:00:00+09:00`, `${date}T11:00:00+09:00`],
+      );
+    }
+
+    const command = parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-all-conflict-admin",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-recurring-all-conflicts",
+      tagId: null,
+      startDate: dates[0],
+      endDate: dates[1],
+      daysOfWeek: ["MON", "TUE"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "SKIP_CONFLICTS",
+    });
+    const preview = await products.previewRecurrence(command);
+    expect(preview).toMatchObject({ availableCount: 0, conflictCount: 2, createAllowed: true });
+    const result = await products.createRecurrence(command, "admin");
+    expect(result).toMatchObject({ createdCount: 0, cancelledCount: 2, skippedCount: 0, failedCount: 0 });
+    expect(result.items.map((item) => item.status)).toEqual(["CANCELLED", "CANCELLED"]);
+    expect((await database.query(
+      "SELECT status FROM reservations WHERE recurrence_id=$1 ORDER BY start_at",
+      [result.recurrenceId],
+    )).rows).toEqual([{ status: "CANCELLED" }, { status: "CANCELLED" }]);
+  });
+
+  it("records an insert-time exclusion conflict as cancelled and continues", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-recurrence-race");
+    const firstDate = new Date();
+    firstDate.setUTCDate(firstDate.getUTCDate() + 35);
+    while (firstDate.getUTCDay() !== 1) firstDate.setUTCDate(firstDate.getUTCDate() + 1);
+    const dates = [0, 1].map((offset) => {
+      const date = new Date(firstDate);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date.toISOString().slice(0, 10);
+    });
+    let injectConflict = true;
+    const racingDatabase: Database = {
+      query: (text, values) => database.query(text, values),
+      transaction: async (work) => {
+        if (injectConflict) {
+          injectConflict = false;
+          await database.query(
+            `INSERT INTO reservations(room_id,applicant_name,applicant_email,purpose,start_at,end_at,status,source,created_by_actor_type)
+             VALUES($1,'testing-race-blocker','testing-race-blocker@example.test','testing-race-blocker',$2,$3,
+               'CONFIRMED','ADMIN_MANUAL','ADMIN')`,
+            [roomId, `${dates[0]}T10:00:00+09:00`, `${dates[0]}T11:00:00+09:00`],
+          );
+        }
+        return database.transaction(work);
+      },
+    };
+    const racingProducts = new ProductService(racingDatabase, () => new Date());
+    const result = await racingProducts.createRecurrence(parseRecurrenceCreate({
+      roomId,
+      applicantName: "testing-race-admin",
+      applicantEmail: null,
+      applicantPhone: null,
+      purpose: "testing-recurring-race",
+      tagId: null,
+      startDate: dates[0],
+      endDate: dates[1],
+      daysOfWeek: ["MON", "TUE"],
+      startTime: "10:00",
+      endTime: "11:00",
+      conflictPolicy: "SKIP_CONFLICTS",
+    }), "admin");
+
+    expect(result).toMatchObject({ createdCount: 1, cancelledCount: 1, skippedCount: 0, failedCount: 0 });
+    expect(result.items.map((item) => item.status)).toEqual(["CANCELLED", "CREATED"]);
+    expect((await database.query(
+      `SELECT r.status,h.action,h.after_status,h.memo
+       FROM reservations r JOIN reservation_histories h ON h.reservation_id=r.id
+       WHERE r.recurrence_id=$1 ORDER BY r.start_at`,
+      [result.recurrenceId],
+    )).rows).toEqual([
+      {
+        status: "CANCELLED",
+        action: "RECURRENCE_GENERATED",
+        after_status: "CANCELLED",
+        memo: "반복 예약 생성 시 시간 충돌로 취소 상태 기록",
+      },
+      { status: "CONFIRMED", action: "RECURRENCE_GENERATED", after_status: "CONFIRMED", memo: null },
+    ]);
   });
 });
 

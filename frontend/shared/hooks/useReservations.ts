@@ -19,6 +19,8 @@ export const reservationKeys = {
   histories: (id: string) => ['reservations', 'histories', id] as const,
 };
 
+const pendingReservationFilters = { status: 'REQUESTED', page: 0, size: 1 } as const;
+
 export function useReservations(
   filters: ReservationFilters,
   options: { enabled?: boolean; keepPreviousData?: boolean } = {},
@@ -28,6 +30,15 @@ export function useReservations(
     queryFn: () => listReservations(filters),
     enabled: options.enabled ?? true,
     placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
+  });
+}
+
+export function usePendingReservationCount() {
+  return useQuery({
+    queryKey: reservationKeys.list(pendingReservationFilters),
+    queryFn: () => listReservations(pendingReservationFilters),
+    select: (response) => response.totalItems,
+    refetchOnWindowFocus: 'always',
   });
 }
 

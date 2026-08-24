@@ -130,6 +130,42 @@ textarea[aria-invalid='true']:focus-visible {
   gap: 6px;
 }
 
+.nav-item-with-badge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.nav-item-with-badge .nav-item-label {
+  min-width: 0;
+}
+
+.nav-list .pending-reservation-link {
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border: 0;
+  padding: 0;
+}
+
+.pending-reservation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 5px;
+  background: #8a6100;
+  color: #ffffff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .nav-list a,
 .ghost-button,
 .secondary-button,
@@ -2552,6 +2588,10 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
+  .nav-item-with-badge {
+    grid-column: span 2;
+  }
+
   .pagination {
     display: block;
     width: 100%;

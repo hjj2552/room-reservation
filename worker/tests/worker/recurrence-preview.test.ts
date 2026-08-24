@@ -156,6 +156,22 @@ describe("batched recurrence conflicts", () => {
     expect(conflictQuery[0]?.text).toContain("reservation.status IN ('REQUESTED','CONFIRMED')");
     expect(conflictQuery[0]?.text).toContain("reservation.start_at < candidate.end_at");
     expect(conflictQuery[0]?.text).toContain("reservation.end_at > candidate.start_at");
+    expect(preview.createAllowed).toBe(true);
+  });
+
+  it("allows SKIP_CONFLICTS when every candidate is a time-slot conflict", async () => {
+    const database = new PreviewDatabase(["1"]);
+    const products = new ProductService(database, () => new Date("2024-01-01T00:00:00Z"));
+
+    const preview = await products.previewRecurrence(previewCommand({ conflictPolicy: "SKIP_CONFLICTS" }));
+
+    expect(preview).toMatchObject({
+      totalCandidates: 1,
+      availableCount: 0,
+      conflictCount: 1,
+      createAllowed: true,
+      items: [expect.objectContaining({ available: false, reason: "TIME_SLOT_CONFLICT" })],
+    });
   });
 
   it("uses one conflict query regardless of candidate count and preserves conflict policy totals", async () => {

@@ -15,7 +15,7 @@ export const sourceLabels: Record<ReservationSource, string> = {
 
 export const conflictPolicyLabels: Record<ConflictPolicy, string> = {
   FAIL_ALL: '충돌 시 전체 중단',
-  SKIP_CONFLICTS: '충돌 건은 건너뛰기',
+  SKIP_CONFLICTS: '충돌 건은 취소로 기록',
 };
 
 export const dayLabels: Record<string, string> = {

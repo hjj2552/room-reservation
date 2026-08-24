@@ -29,6 +29,7 @@ export interface E2ePublicReservation extends E2eReservation {
 export interface E2eRecurrence {
   recurrenceId: string;
   createdCount: number;
+  cancelledCount: number;
   skippedCount?: number;
 }
 
