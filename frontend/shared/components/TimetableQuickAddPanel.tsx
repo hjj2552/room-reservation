@@ -226,18 +226,9 @@ export function ReservationRequestPanel({
   }
 
   const submitErrorMessage = submitError ? errorMessage(submitError) : '';
-  const panelDescription = (
-    <>
-      {selection.source === 'slot'
-        ? `${selection.date} · 선택한 빈칸`
-        : selection.date
-          ? `${selection.date} 새 신청`
-          : '예약 가능한 미래 시간 없음'}
-      {isAdmin
-        ? ' · 관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.'
-        : ' · 신청은 승인 대기 상태로 저장됩니다.'}
-    </>
-  );
+  const panelDescription = isAdmin
+    ? '관리자는 예약을 승인 상태로 저장할 수 있으며, 과거 시간대의 예약도 등록할 수 있습니다.'
+    : '신청은 승인 대기 상태로 저장됩니다.';
 
   return (
     <SidePanel
