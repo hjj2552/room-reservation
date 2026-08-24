@@ -59,8 +59,8 @@ for (const scenario of scenarios) {
         await route.continue();
         return;
       }
-      listRequestCount += 1;
       const url = new URL(route.request().url());
+      if (url.searchParams.get('size') !== '1') listRequestCount += 1;
       if (url.searchParams.get('keyword') === 'testing-no-results') {
         markEmptyRequestStarted?.();
         await emptyResponseGate;
@@ -194,7 +194,8 @@ for (const scenario of scenarios) {
     await loginByApi(request);
     let listRequestCount = 0;
     await page.route(`**${scenario.apiPath}?**`, async (route) => {
-      if (route.request().method() === 'GET') listRequestCount += 1;
+      const url = new URL(route.request().url());
+      if (route.request().method() === 'GET' && url.searchParams.get('size') !== '1') listRequestCount += 1;
       await route.fulfill({ json: { items: [], page: 0, size: 20, totalItems: 0, totalPages: 0 } });
     });
 
