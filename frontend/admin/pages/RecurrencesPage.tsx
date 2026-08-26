@@ -340,6 +340,15 @@ export function RecurrencesPage() {
             </label>
           </div>
           <label>
+            전화번호 (선택)
+            <input
+              data-testid="recurrence-phone-input"
+              name="applicantPhone"
+              value={form.applicantPhone}
+              onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
+            />
+          </label>
+          <label>
             이메일 (선택)
             <input
               data-testid="recurrence-email-input"
@@ -347,15 +356,6 @@ export function RecurrencesPage() {
               type="email"
               value={form.applicantEmail}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantEmail: event.target.value }))}
-            />
-          </label>
-          <label>
-            전화번호 (선택)
-            <input
-              data-testid="recurrence-phone-input"
-              name="applicantPhone"
-              value={form.applicantPhone}
-              onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
             />
           </label>
           <label className="full-span">

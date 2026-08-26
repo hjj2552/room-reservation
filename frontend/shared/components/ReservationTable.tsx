@@ -49,15 +49,7 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               <td>
                 <StatusBadge status={reservation.status} />
               </td>
-              <td className="table-applicant-cell">
-                {reservation.applicantName}
-                {reservation.applicantEmail ? (
-                  <>
-                    <br />
-                    <span className="muted table-break-anywhere">{reservation.applicantEmail}</span>
-                  </>
-                ) : null}
-              </td>
+              <td className="table-applicant-cell">{reservation.applicantName}</td>
               <td className="purpose-cell">{reservation.purpose}</td>
               <td className="nowrap-cell">{sourceLabels[reservation.source]}</td>
               <td className="nowrap-cell">

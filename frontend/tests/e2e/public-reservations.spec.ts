@@ -157,15 +157,15 @@ test('public toolbar request opens the shared panel without slot room context', 
       'public-request-start-input',
       'public-request-end-input',
       'public-request-applicant-name-input',
-      'public-request-email-input',
       'public-request-phone-input',
+      'public-request-email-input',
       'public-request-cancel-password-input',
     ]);
     await expectTestIdPairsOnSameRow(page, [
       ['public-request-room-select', 'public-request-start-input-date'],
       ['public-request-start-input', 'public-request-end-input'],
-      ['public-request-applicant-name-input', 'public-request-email-input'],
-      ['public-request-phone-input', 'public-request-cancel-password-input'],
+      ['public-request-applicant-name-input', 'public-request-phone-input'],
+      ['public-request-email-input', 'public-request-cancel-password-input'],
     ]);
     await expect(page.getByTestId('public-request-purpose-input').locator('..')).toContainText('신청 목적');
     await expect(page.getByTestId('public-request-room-select').locator('..')).toContainText('예약 공간');
@@ -396,8 +396,16 @@ test('public timetable supports slot-based request, masked detail page, and pass
       .locator('xpath=following-sibling::dd').innerText();
     expect(publicDateTime.match(/\([월화수목금토일]\)/g)).toHaveLength(2);
     await expect(detailPanel).toContainText('신청자 이름');
-    await expect(detailPanel).toContainText('이메일');
     await expect(detailPanel).toContainText('전화번호');
+    await expect(detailPanel).toContainText('이메일');
+    await expect(detailPanel.locator('dt')).toHaveText([
+      '신청 목적',
+      '공간',
+      '날짜/시간',
+      '신청자 이름',
+      '전화번호',
+      '이메일',
+    ]);
     await expect(detailPanel).toContainText(purpose);
     await expect(detailPanel).toContainText(maskName(applicantName));
     await expect(detailPanel).toContainText(maskEmail(email));
@@ -611,15 +619,15 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
       'public-edit-start-input',
       'public-edit-end-input',
       'public-edit-applicant-name-input',
-      'public-edit-email-input',
       'public-edit-phone-input',
+      'public-edit-email-input',
       'public-edit-status-input',
     ]);
     await expectTestIdPairsOnSameRow(page, [
       ['public-edit-room-select', 'public-edit-date-input'],
       ['public-edit-start-input', 'public-edit-end-input'],
-      ['public-edit-applicant-name-input', 'public-edit-email-input'],
-      ['public-edit-phone-input', 'public-edit-status-input'],
+      ['public-edit-applicant-name-input', 'public-edit-phone-input'],
+      ['public-edit-email-input', 'public-edit-status-input'],
     ]);
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);

@@ -113,22 +113,22 @@ export function RecurrenceDetailPage() {
               </dd>
             </div>
             <div>
-              <dt>이메일</dt>
-              <dd>
-                <PublicVisibilityValue
-                  value={detail.applicantEmail}
-                  isPublic={false}
-                  testId="recurrence-detail-applicant-email"
-                />
-              </dd>
-            </div>
-            <div>
               <dt>전화번호</dt>
               <dd>
                 <PublicVisibilityValue
                   value={detail.applicantPhone}
                   isPublic={false}
                   testId="recurrence-detail-applicant-phone"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>이메일</dt>
+              <dd>
+                <PublicVisibilityValue
+                  value={detail.applicantEmail}
+                  isPublic={false}
+                  testId="recurrence-detail-applicant-email"
                 />
               </dd>
             </div>

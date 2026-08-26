@@ -321,17 +321,6 @@ export function ReservationRequestPanel({
           ) : null}
         </div>
         <label>
-          이메일{isAdmin ? ' (선택)' : ''}
-          <input
-            data-testid={ids.email}
-            type="email"
-            value={values.applicantEmail}
-            onChange={(event) => updateField('applicantEmail', event.target.value)}
-            {...inputErrorProps('applicantEmail')}
-          />
-          {fieldError('applicantEmail')}
-        </label>
-        <label>
           전화번호{isAdmin ? ' (선택)' : ''}
           <input
             data-testid={ids.phone}
@@ -341,6 +330,17 @@ export function ReservationRequestPanel({
             {...inputErrorProps('applicantPhone')}
           />
           {fieldError('applicantPhone')}
+        </label>
+        <label>
+          이메일{isAdmin ? ' (선택)' : ''}
+          <input
+            data-testid={ids.email}
+            type="email"
+            value={values.applicantEmail}
+            onChange={(event) => updateField('applicantEmail', event.target.value)}
+            {...inputErrorProps('applicantEmail')}
+          />
+          {fieldError('applicantEmail')}
         </label>
         {isAdmin ? (
           <label>

@@ -84,8 +84,8 @@ export function reservationCoreSections(detail: {
         { label: '공간', value: roomLabel },
         { label: '날짜/시간', value: `${formatDateTime(detail.startAt)} - ${formatDateTime(detail.endAt)}` },
         { label: '신청자 이름', value: applicantName },
-        { label: '이메일', value: applicantEmail },
         { label: '전화번호', value: applicantPhone },
+        { label: '이메일', value: applicantEmail },
       ],
     },
   ];

@@ -291,16 +291,16 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
       'reservation-end-input',
       'reservation-applicant-name-input',
       'reservation-show-applicant-name-input',
-      'reservation-email-input',
       'reservation-phone-input',
+      'reservation-email-input',
       'reservation-status-select',
       'reservation-memo-input',
     ]);
     await expectTestIdPairsOnSameRow(page, [
       ['reservation-room-select', 'reservation-date-input'],
       ['reservation-start-input', 'reservation-end-input'],
-      ['reservation-applicant-name-input', 'reservation-email-input'],
-      ['reservation-phone-input', 'reservation-status-select'],
+      ['reservation-applicant-name-input', 'reservation-phone-input'],
+      ['reservation-email-input', 'reservation-status-select'],
     ]);
     await expectTestIdBelow(page, 'reservation-applicant-name-input', 'reservation-show-applicant-name-input');
     await expect(page.getByTestId('reservation-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
@@ -581,16 +581,16 @@ test('admin can request a reservation from the timetable and see it on detail an
       'quick-add-end-input',
       'quick-add-applicant-name-input',
       'quick-add-show-applicant-name-input',
-      'quick-add-email-input',
       'quick-add-phone-input',
+      'quick-add-email-input',
       'quick-add-status-select',
       'quick-add-memo-input',
     ]);
     await expectTestIdPairsOnSameRow(page, [
       ['quick-add-room-select', 'quick-add-start-input-date'],
       ['quick-add-start-input', 'quick-add-end-input'],
-      ['quick-add-applicant-name-input', 'quick-add-email-input'],
-      ['quick-add-phone-input', 'quick-add-status-select'],
+      ['quick-add-applicant-name-input', 'quick-add-phone-input'],
+      ['quick-add-email-input', 'quick-add-status-select'],
     ]);
     await expectTestIdBelow(page, 'quick-add-applicant-name-input', 'quick-add-show-applicant-name-input');
     await expect(page.getByTestId('quick-add-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
@@ -636,8 +636,13 @@ test('admin can request a reservation from the timetable and see it on detail an
     await expect(page.locator('.reservation-detail-main dt')).toHaveCount(6);
     await expect(page.locator('.reservation-detail-main .status-badge')).toBeVisible();
     await expect(page.getByTestId('reservation-detail-applicant-name')).toContainText('(공개)');
-    await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
     await expect(page.getByTestId('reservation-detail-applicant-phone')).toContainText('(비공개)');
+    await expect(page.getByTestId('reservation-detail-applicant-email')).toContainText('(비공개)');
+    await expectTestIdsInDomOrder(page, [
+      'reservation-detail-applicant-name',
+      'reservation-detail-applicant-phone',
+      'reservation-detail-applicant-email',
+    ]);
     await expect(page.getByRole('heading', { name: '감사 이력' })).toBeVisible();
     await expect(page.locator('.timeline')).toContainText('testing-create-verification');
 

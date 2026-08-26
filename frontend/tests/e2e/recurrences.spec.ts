@@ -8,6 +8,7 @@ import {
   deleteRecurrenceByApi,
   deleteRoomByApi,
   expectTestIdBelow,
+  expectTestIdsInDomOrder,
   getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
@@ -152,6 +153,12 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
   try {
     await page.goto(`/admin/recurrences?keyword=${encodeURIComponent(purpose)}&page=0`);
     await expect(page.getByTestId('recurrence-form')).toBeVisible();
+    await expectTestIdsInDomOrder(page, [
+      'recurrence-applicant-name-input',
+      'recurrence-show-applicant-name-input',
+      'recurrence-phone-input',
+      'recurrence-email-input',
+    ]);
     await expect(
       page.getByTestId('recurrence-conflict-policy-select').locator('xpath=ancestor::label'),
     ).toContainText('충돌 정책');
@@ -303,10 +310,15 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await expect(page.getByTestId('recurrence-detail-room')).toContainText(room.name);
     await expect(page.getByTestId('recurrence-detail-schedule')).toContainText('화, 수, 목');
     await expect(page.getByTestId('recurrence-detail-applicant-name')).toContainText('(공개)');
-    await expect(page.getByTestId('recurrence-detail-applicant-email').locator('span').first()).toHaveText('-');
-    await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
     await expect(page.getByTestId('recurrence-detail-applicant-phone').locator('span').first()).toHaveText('-');
     await expect(page.getByTestId('recurrence-detail-applicant-phone')).toContainText('(비공개)');
+    await expect(page.getByTestId('recurrence-detail-applicant-email').locator('span').first()).toHaveText('-');
+    await expect(page.getByTestId('recurrence-detail-applicant-email')).toContainText('(비공개)');
+    await expectTestIdsInDomOrder(page, [
+      'recurrence-detail-applicant-name',
+      'recurrence-detail-applicant-phone',
+      'recurrence-detail-applicant-email',
+    ]);
     await expect(page.getByTestId('recurrence-detail-status')).toHaveCount(0);
     await expect(page.getByText('충돌 정책', { exact: true })).toBeVisible();
 

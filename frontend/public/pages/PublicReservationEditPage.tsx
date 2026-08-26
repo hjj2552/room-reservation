@@ -301,15 +301,6 @@ export function PublicReservationEditPage() {
             {errors.applicantName ? <span className="field-error">{errors.applicantName.message}</span> : null}
           </label>
           <label>
-            이메일
-            <input
-              data-testid="public-edit-email-input"
-              type="email"
-              {...register('applicantEmail', { required: '이메일을 입력해 주세요.' })}
-            />
-            {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
-          </label>
-          <label>
             전화번호
             <input
               data-testid="public-edit-phone-input"
@@ -317,6 +308,15 @@ export function PublicReservationEditPage() {
               {...register('applicantPhone', { required: '전화번호를 입력해 주세요.' })}
             />
             {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
+          </label>
+          <label>
+            이메일
+            <input
+              data-testid="public-edit-email-input"
+              type="email"
+              {...register('applicantEmail', { required: '이메일을 입력해 주세요.' })}
+            />
+            {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
           </label>
           <label>
             예약 상태
