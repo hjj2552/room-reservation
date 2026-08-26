@@ -286,6 +286,7 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     items: [{
       ...reservationItem('geometry', 'testing-room-geometry', longRoomName),
       applicantEmail: 'testing-applicant-with-a-long-address@example.invalid',
+      applicantPhone: '010-1234-5678',
       purpose: longPurpose,
       startAt: '2026-09-14T13:00:00+09:00',
       endAt: '2026-09-14T20:00:00+09:00',
@@ -312,6 +313,10 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     const table = page.getByTestId('reservations-table');
     await expect(table).toBeVisible();
     await expectTableUsesNativeCells(table);
+    const applicantCell = table.locator('tbody tr').first().locator('td').nth(3);
+    await expect(applicantCell).toHaveText('테스트 신청자');
+    await expect(applicantCell).not.toContainText('testing-applicant-with-a-long-address@example.invalid');
+    await expect(applicantCell).not.toContainText('010-1234-5678');
     await expectTableFillsContainer(table);
     await expectWrapperHasNoOverflow(table);
     await expectAdjacentCellsDoNotOverlap(table);

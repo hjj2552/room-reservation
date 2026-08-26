@@ -291,8 +291,8 @@ function updatedHistoryDiffs(history: ReservationHistory): TimelineDiffItem[] {
   const items: TimelineDiffItem[] = [];
   appendDiff(items, '공간', history.beforeReservationRoomName, history.reservationRoomName);
   appendDiff(items, '신청자 이름', history.beforeReservationApplicantName, history.reservationApplicantName);
-  appendDiff(items, '이메일', history.beforeReservationApplicantEmail, history.reservationApplicantEmail);
   appendDiff(items, '전화번호', history.beforeReservationApplicantPhone, history.reservationApplicantPhone);
+  appendDiff(items, '이메일', history.beforeReservationApplicantEmail, history.reservationApplicantEmail);
   appendDiff(
     items,
     '신청자 이름 보이기',

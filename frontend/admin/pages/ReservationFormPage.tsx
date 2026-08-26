@@ -224,15 +224,6 @@ export function ReservationFormPage() {
           ) : null}
         </div>
         <label>
-          이메일 (선택)
-          <input
-            data-testid="reservation-email-input"
-            type="email"
-            {...register('applicantEmail')}
-          />
-          {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
-        </label>
-        <label>
           전화번호 (선택)
           <input
             data-testid="reservation-phone-input"
@@ -240,6 +231,15 @@ export function ReservationFormPage() {
             {...register('applicantPhone')}
           />
           {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
+        </label>
+        <label>
+          이메일 (선택)
+          <input
+            data-testid="reservation-email-input"
+            type="email"
+            {...register('applicantEmail')}
+          />
+          {errors.applicantEmail ? <span className="field-error">{errors.applicantEmail.message}</span> : null}
         </label>
         <label>
           예약 상태

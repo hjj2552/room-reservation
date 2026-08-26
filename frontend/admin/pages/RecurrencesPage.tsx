@@ -340,6 +340,15 @@ export function RecurrencesPage() {
             </label>
           </div>
           <label>
+            전화번호 (선택)
+            <input
+              data-testid="recurrence-phone-input"
+              name="applicantPhone"
+              value={form.applicantPhone}
+              onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
+            />
+          </label>
+          <label>
             이메일 (선택)
             <input
               data-testid="recurrence-email-input"
@@ -347,15 +356,6 @@ export function RecurrencesPage() {
               type="email"
               value={form.applicantEmail}
               onChange={(event) => setForm((prev) => ({ ...prev, applicantEmail: event.target.value }))}
-            />
-          </label>
-          <label>
-            전화번호 (선택)
-            <input
-              data-testid="recurrence-phone-input"
-              name="applicantPhone"
-              value={form.applicantPhone}
-              onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
             />
           </label>
           <label className="full-span">
@@ -539,7 +539,7 @@ export function RecurrencesPage() {
                           {item.available
                             ? '등록 예정'
                             : validPreview.conflictPolicy === 'SKIP_CONFLICTS' && item.reason === 'TIME_SLOT_CONFLICT'
-                              ? '충돌 취소 예정'
+                              ? '충돌 → 취소로 기록 예정'
                               : validPreview.conflictPolicy === 'SKIP_CONFLICTS'
                                 ? `건너뜀${item.reason ? `: ${item.reason}` : ''}`
                                 : `충돌${item.reason ? `: ${item.reason}` : ''}`}
@@ -662,7 +662,6 @@ export function RecurrencesPage() {
                             </span>
                           ) : null}
                           {item.purpose}
-                          <div className="muted">{conflictPolicyLabels[item.conflictPolicy]}</div>
                         </td>
                         <td className="nowrap-cell">
                           <Link

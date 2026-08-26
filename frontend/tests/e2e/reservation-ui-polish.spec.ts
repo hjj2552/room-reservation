@@ -244,7 +244,7 @@ test('reservation edit toggle has a contained mobile touch target', async ({ pag
   await expectMobileVisibilityToggle(page, {
     checkboxTestId: 'reservation-show-applicant-name-input',
     previousInputTestId: 'reservation-applicant-name-input',
-    nextInputTestId: 'reservation-email-input',
+    nextInputTestId: 'reservation-phone-input',
   });
 });
 
@@ -255,6 +255,8 @@ test('reservation audit labels stay on one line without mobile overflow', async 
 
   await page.goto(`/admin/reservations/${reservation.id}`);
   await page.getByTestId('reservation-edit-link').click();
+  await page.getByTestId('reservation-phone-input').fill('010-9876-5432');
+  await page.getByTestId('reservation-email-input').fill('testing-contact-order@example.test');
   await page.getByText('신청자 이름 보이기', { exact: true }).click();
   const updateResponse = page.waitForResponse((response) =>
     response.url().includes(`/api/admin/reservations/${reservation.id}`)
@@ -265,6 +267,8 @@ test('reservation audit labels stay on one line without mobile overflow', async 
 
   const row = page.locator('.timeline-diff-row').filter({ hasText: '신청자 이름 보이기' });
   await expect(row).toBeVisible();
+  const changedLabels = await page.locator('.timeline-diff-row dt').allTextContents();
+  expect(changedLabels.indexOf('전화번호')).toBeLessThan(changedLabels.indexOf('이메일'));
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await expectSingleLineTimelineLabel(page, row);
@@ -281,7 +285,7 @@ test('quick reservation toggle has a contained mobile touch target', async ({ pa
   await expectMobileVisibilityToggle(page, {
     checkboxTestId: 'quick-add-show-applicant-name-input',
     previousInputTestId: 'quick-add-applicant-name-input',
-    nextInputTestId: 'quick-add-email-input',
+    nextInputTestId: 'quick-add-phone-input',
   });
 });
 
@@ -291,7 +295,7 @@ test('recurrence toggle has a contained mobile touch target', async ({ page, req
   await expectMobileVisibilityToggle(page, {
     checkboxTestId: 'recurrence-show-applicant-name-input',
     previousInputTestId: 'recurrence-applicant-name-input',
-    nextInputTestId: 'recurrence-email-input',
+    nextInputTestId: 'recurrence-phone-input',
   });
 });
 

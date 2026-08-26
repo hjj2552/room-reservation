@@ -353,7 +353,7 @@ document scrolling when all content fits in one viewport.
   replacements for labels.
 - Place related date/time fields together and make their relationship visible.
 - Reservation creation and edit forms follow a stable task sequence: purpose,
-  room, date/time, applicant identity, contact information, then any
+  room, date/time, applicant identity, phone, email, then any
   context-specific status, security, or administration fields, followed by the
   form actions.
 - Public and administrator variants preserve this shared core sequence while
