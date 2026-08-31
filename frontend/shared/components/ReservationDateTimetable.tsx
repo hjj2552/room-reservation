@@ -11,7 +11,7 @@ import { StatusBadge } from './StatusBadge';
 
 export const TIMETABLE_MINUTE_HEIGHT = 1.6;
 export { TIMETABLE_GRID_MINUTES } from '../utils/reservationTime';
-export const TIMETABLE_TIME_COLUMN_WIDTH = 76;
+export const TIMETABLE_TIME_COLUMN_WIDTH = 64;
 export const TIMETABLE_MIN_COLUMN_WIDTH = 164;
 export const TIMETABLE_COMPACT_BLOCK_HEIGHT = 72;
 const fallbackOpenTime = '09:00';

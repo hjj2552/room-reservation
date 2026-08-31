@@ -264,6 +264,54 @@ test('public and admin timetable summaries use stable mobile rows without changi
   }
 });
 
+test('date and room timetables keep the 64px time column labels contained', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31');
+  const cases = [
+    { url: '/timetable?view=date&date=2026-07-13', testId: 'reservation-date-timetable' },
+    { url: `/timetable?view=room&roomViewRoomId=${room.id}&weekStart=2026-07-13`, testId: 'reservation-room-timetable' },
+  ];
+
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    for (const scenario of cases) {
+      await page.goto(scenario.url);
+      const timetable = page.getByTestId(scenario.testId);
+      const grid = timetable.locator('.timetable-grid');
+      const corner = grid.locator('.timetable-corner');
+      const timeColumn = grid.locator('.timetable-time-column');
+      const firstContentHeader = grid.locator('.timetable-room-header, .timetable-day-header').first();
+      const labels = timeColumn.locator('.timetable-time-label');
+
+      await expect(corner).toHaveCSS('width', '64px');
+      await expect(labels.first()).toHaveCSS('right', '8px');
+      const [columnBox, headerBox, labelMetrics] = await Promise.all([
+        timeColumn.boundingBox(),
+        firstContentHeader.boundingBox(),
+        labels.evaluateAll((elements) => elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return {
+            left: box.left,
+            right: box.right,
+            textFits: element.scrollWidth <= element.clientWidth + 1,
+          };
+        })),
+      ]);
+      if (!columnBox || !headerBox) throw new Error('Could not measure timetable time column.');
+      expect(columnBox.width).toBe(64);
+      expect(Math.abs(columnBox.x + columnBox.width - headerBox.x)).toBeLessThanOrEqual(1);
+      expect(labelMetrics.every((label) => (
+        label.left >= columnBox.x - 1
+        && label.right <= columnBox.x + columnBox.width + 1
+        && label.right <= headerBox.x + 1
+        && label.textFits
+      ))).toBe(true);
+      if (viewport.width === 390) {
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      }
+    }
+  }
+});
+
 test('public blocks unavailable future suggestions while admin allows manual past input', async ({ page }) => {
   await mockReservationApis(page, '2026-07-13');
 
