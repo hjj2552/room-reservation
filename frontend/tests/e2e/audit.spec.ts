@@ -2,6 +2,7 @@ import { expect, test } from './fixtures';
 import {
   cancelReservationByApi,
   deleteRoomByApi,
+  expectTextContentWithinCell,
   loginByApi,
 } from './helpers';
 
@@ -44,7 +45,8 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await loginByApi(request);
   await page.setViewportSize({ width: 1440, height: 900 });
   const longPurpose = 'testing-deleted-snapshot-purpose-that-should-not-be-rendered';
-  const longActorId = 'testing-audit-actor-id-without-breakpoints-0123456789';
+  const longActorId = `testing-${'actor'.repeat(30)}@example.invalid`;
+  const longRoomName = `testing-${'room'.repeat(45)}`;
   const processingMemo = '첫 번째 처리 내용\n두 번째 처리 내용';
   const longMemo = `${processingMemo}\ntesting-${'unbroken'.repeat(20)}`;
 
@@ -59,7 +61,7 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
       memo: requestedPage === 0 ? longMemo : 'testing-short-memo',
       reservationRoomId: '20000000-0000-0000-0000-000000000000',
       reservationPurpose: 'testing-live-purpose',
-      reservationRoomName: 'testing-live-room',
+      reservationRoomName: longRoomName,
       reservationStartAt: '2026-06-03T10:00:00+09:00',
       reservationEndAt: '2026-06-03T11:00:00+09:00',
       actorType: 'ADMIN',
@@ -167,7 +169,7 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await expect(rows.nth(0).locator('td').nth(0)).toContainText('2026. 5. 28. (목)');
   const liveSummaryLink = rows.nth(0).locator('.audit-reservation-link');
   await expect(liveSummaryLink).toHaveAttribute('href', '/admin/reservations/10000000-0000-0000-0000-000000000000');
-  await expect(liveSummaryLink.locator('.audit-snapshot-room')).toHaveText('testing-live-room');
+  await expect(liveSummaryLink.locator('.audit-snapshot-room')).toHaveText(longRoomName);
   await expect(liveSummaryLink.locator('.audit-snapshot-time')).toContainText('2026. 6. 3.');
   await expect(liveSummaryLink.locator('.audit-snapshot-time')).toContainText('(수)');
   expect((await liveSummaryLink.locator('.audit-snapshot-time').innerText()).match(/2026\. 6\. 3\./g)).toHaveLength(1);
@@ -183,11 +185,11 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await expect(table.locator('.audit-reservation-link')).toHaveCount(1);
   await expect(table.getByText('상세 보기', { exact: true })).toHaveCount(0);
 
-  expect(await rows.nth(0).locator('.audit-actor-cell .table-break-anywhere').evaluate((element) => ({
+  expect(await rows.nth(0).locator('.audit-actor-cell .table-text-cell').evaluate((element) => ({
     overflowWrap: getComputedStyle(element).overflowWrap,
     fitsColumn: element.scrollWidth <= element.clientWidth,
   }))).toEqual({ overflowWrap: 'anywhere', fitsColumn: true });
-  expect(await rows.nth(0).locator('.table-description-cell').evaluate((element) => ({
+  expect(await rows.nth(0).locator('.processing-memo').evaluate((element) => ({
     wordBreak: getComputedStyle(element).wordBreak,
     fitsColumn: element.scrollWidth <= element.clientWidth,
   }))).toEqual({ wordBreak: 'keep-all', fitsColumn: true });
@@ -200,6 +202,9 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   const actionCell = rows.nth(0).locator('td').nth(1);
   const targetCell = rows.nth(0).locator('td').nth(2);
   const statusCell = rows.nth(0).locator('td').nth(3);
+  const actorCell = rows.nth(0).locator('td').nth(4);
+  const actorId = actorCell.locator('.table-text-cell');
+  const memoTableCell = rows.nth(0).locator('td').nth(5);
   expect(await processingTimeCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   expect(await targetCell.locator('.audit-snapshot-time').evaluate(
     (element) => element.scrollWidth <= element.clientWidth + 1,
@@ -215,6 +220,9 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   }
   expect(processingBox.x + processingBox.width).toBeLessThanOrEqual(actionBox.x + 1);
   expect(targetBox.x + targetBox.width).toBeLessThanOrEqual(statusBox.x + 1);
+  await expectTextContentWithinCell(liveSummaryLink.locator('.audit-snapshot-room'), targetCell, statusCell);
+  await expectTextContentWithinCell(actorId, actorCell, memoTableCell);
+  await expectTextContentWithinCell(memoCell, memoTableCell);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.locator('.pagination-desktop-controls').getByRole('button', { name: '다음', exact: true }).click();

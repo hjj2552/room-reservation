@@ -164,7 +164,7 @@ export function TagSettingsPage() {
                 <tbody>
                   {tags.data.items.map((tag) => (
                     <tr key={tag.id}>
-                      <td>{tag.name}</td>
+                      <td className="table-text-cell">{tag.name}</td>
                       <td>
                         <span className="tag-color-swatch" style={{ backgroundColor: tag.color }} aria-hidden="true" />
                         <span className="muted">{tag.color}</span>

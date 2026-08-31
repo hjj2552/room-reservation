@@ -1,9 +1,9 @@
 import { expect, test } from './fixtures';
-import { loginByApi } from './helpers';
+import { expectTextContentWithinCell, loginByApi } from './helpers';
 
 test('tag settings smoke: create, update, and delete tag', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  const tagName = e2eData.name('tag-settings');
+  const tagName = `testing-${'t'.repeat(92)}`;
   const updatedTagName = e2eData.name('tag-settings-updated');
   let tagId: string | undefined;
 
@@ -36,6 +36,8 @@ test('tag settings smoke: create, update, and delete tag', async ({ page, reques
   const createdRow = page.getByRole('row').filter({ hasText: tagName });
   await expect(createdRow).toBeVisible();
   await expect(createdRow).toContainText('#2563eb');
+  const createdCells = createdRow.locator('td');
+  await expectTextContentWithinCell(createdCells.nth(0), createdCells.nth(0), createdCells.nth(1));
 
   await createdRow.getByRole('button', { name: '수정' }).click();
   await expect(page.getByTestId('tag-form-panel')).toBeVisible();

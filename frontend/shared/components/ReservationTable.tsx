@@ -40,17 +40,17 @@ export function ReservationTable({ reservations }: ReservationTableProps) {
               }}
             >
               <td className="reservation-time-cell">
-                <span className="table-cell-stack">
+                <span className="table-cell-stack nowrap-cell">
                   <strong>{formatDateTime(reservation.startAt)}</strong>
                   <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
                 </span>
               </td>
-              <td className="reservation-room-cell"><strong>{reservation.roomName}</strong></td>
+              <td className="reservation-room-cell table-text-cell"><strong>{reservation.roomName}</strong></td>
               <td>
                 <StatusBadge status={reservation.status} />
               </td>
-              <td className="table-applicant-cell">{reservation.applicantName}</td>
-              <td className="purpose-cell">{reservation.purpose}</td>
+              <td className="table-text-cell">{reservation.applicantName}</td>
+              <td className="table-text-cell">{reservation.purpose}</td>
               <td className="nowrap-cell">{sourceLabels[reservation.source]}</td>
               <td className="nowrap-cell">
                 <Link

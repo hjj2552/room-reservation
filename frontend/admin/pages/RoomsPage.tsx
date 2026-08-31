@@ -282,7 +282,7 @@ export function RoomsPage() {
                 <tbody>
                   {rooms.data.items.map((room) => (
                     <tr key={room.id}>
-                      <td className="table-room-cell">
+                      <td className="table-text-cell">
                         <strong>{room.name}</strong>
                         <br />
                         <span className="muted">{room.location || '-'}</span>

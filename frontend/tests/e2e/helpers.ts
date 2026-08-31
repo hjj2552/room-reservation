@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type APIResponse, type Locator, type Page } from '@playwright/test';
 
 export interface E2eRoom {
   id: string;
@@ -97,6 +97,27 @@ export async function expectTestIdBelow(page: Page, upperTestId: string, lowerTe
     lowerBox.y - (upperBox.y + upperBox.height),
     `${lowerTestId} should stay visually attached to ${upperTestId}`,
   ).toBeLessThanOrEqual(12);
+}
+
+export async function expectTextContentWithinCell(
+  textContainer: Locator,
+  cell: Locator,
+  nextCell?: Locator,
+) {
+  const [textBox, cellBox, nextCellBox] = await Promise.all([
+    textContainer.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const box = range.getBoundingClientRect();
+      return { left: box.left, right: box.right };
+    }),
+    cell.boundingBox(),
+    nextCell?.boundingBox(),
+  ]);
+  if (!cellBox) throw new Error('Could not measure table cell text bounds.');
+  expect(textBox.left).toBeGreaterThanOrEqual(cellBox.x - 1);
+  expect(textBox.right).toBeLessThanOrEqual(cellBox.x + cellBox.width + 1);
+  if (nextCellBox) expect(textBox.right).toBeLessThanOrEqual(nextCellBox.x + 1);
 }
 
 export interface E2eSettings {

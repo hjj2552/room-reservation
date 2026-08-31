@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { loginByApi } from './helpers';
+import { expectTextContentWithinCell, loginByApi } from './helpers';
 
 interface ListScenario {
   name: string;
@@ -279,15 +279,19 @@ test('reservation list keeps 12px between its table and result controls', async 
 
 test('administrator reservation and recurrence tables keep native cell geometry', async ({ page, request }) => {
   await loginByApi(request);
-  const longRoomName = 'testing 아주 긴 공간 이름이 인접한 열을 침범하지 않아야 합니다';
-  const longPurpose = 'testing 긴 예약 목적은 지정된 목적 열 안에서 자연스럽게 줄바꿈되고 뒤쪽 열을 밀어내지 않습니다.';
+  const longRoomName = `testing-${'room'.repeat(35)}`;
+  const longApplicantName = `testing-${'applicant'.repeat(25)}`;
+  const longPurpose = `testing-${'purpose'.repeat(35)}`;
+  const longTagName = `testing-${'t'.repeat(92)}`;
 
   await page.route('**/api/admin/reservations?**', (route) => route.fulfill({ json: {
     items: [{
       ...reservationItem('geometry', 'testing-room-geometry', longRoomName),
       applicantEmail: 'testing-applicant-with-a-long-address@example.invalid',
       applicantPhone: '010-1234-5678',
+      applicantName: longApplicantName,
       purpose: longPurpose,
+      status: 'REQUESTED',
       startAt: '2026-09-14T13:00:00+09:00',
       endAt: '2026-09-14T20:00:00+09:00',
     }],
@@ -300,6 +304,8 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     items: [{
       ...recurrenceItem('geometry', 'testing-room-geometry', longRoomName),
       purpose: longPurpose,
+      tagName: longTagName,
+      tagColor: '#2563eb',
     }],
     page: 0,
     size: 20,
@@ -313,8 +319,9 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     const table = page.getByTestId('reservations-table');
     await expect(table).toBeVisible();
     await expectTableUsesNativeCells(table);
-    const applicantCell = table.locator('tbody tr').first().locator('td').nth(3);
-    await expect(applicantCell).toHaveText('테스트 신청자');
+    const rowCells = table.locator('tbody tr').first().locator('td');
+    const applicantCell = rowCells.nth(3);
+    await expect(applicantCell).toHaveText(longApplicantName);
     await expect(applicantCell).not.toContainText('testing-applicant-with-a-long-address@example.invalid');
     await expect(applicantCell).not.toContainText('010-1234-5678');
     await expectTableFillsContainer(table);
@@ -323,10 +330,18 @@ test('administrator reservation and recurrence tables keep native cell geometry'
     const timeStack = table.locator('tbody tr').first().locator('.table-cell-stack');
     await expect(timeStack).toContainText('2026. 9. 14. (월) 오후 1:00');
     await expect(timeStack).toContainText('~ 2026. 9. 14. (월) 오후 8:00');
-    const roomCell = table.locator('tbody tr').first().locator('td').nth(1);
+    const roomCell = rowCells.nth(1);
+    const statusCell = rowCells.nth(2);
+    const purposeCell = rowCells.nth(4);
+    const sourceCell = rowCells.nth(5);
     const [timeBox, roomBox] = await Promise.all([timeStack.boundingBox(), roomCell.boundingBox()]);
     if (!timeBox || !roomBox) throw new Error('Could not measure reservation time and room cells.');
     expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(roomBox.x + 1);
+    await expectTextContentWithinCell(roomCell.locator('strong'), roomCell, statusCell);
+    await expectTextContentWithinCell(applicantCell, applicantCell, purposeCell);
+    await expectTextContentWithinCell(purposeCell, purposeCell, sourceCell);
+    await expectTextContentWithinCell(statusCell.locator('.status-badge'), statusCell, applicantCell);
+    await expect(timeStack).toHaveCSS('white-space', 'nowrap');
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -344,6 +359,19 @@ test('administrator reservation and recurrence tables keep native cell geometry'
   await expectTableFillsContainer(recurrenceTable);
   await expectWrapperHasNoOverflow(recurrenceTable);
   await expectAdjacentCellsDoNotOverlap(recurrenceTable);
+
+  const recurrenceCells = recurrenceTable.locator('tbody tr').first().locator('td');
+  const recurrenceRoomCell = recurrenceCells.nth(2);
+  const recurrencePurposeCell = recurrenceCells.nth(3);
+  const recurrenceDetailCell = recurrenceCells.nth(4);
+  const seriesChip = recurrencePurposeCell.locator('.series-chip');
+  await expect(seriesChip).toHaveText(longTagName);
+  await expect(seriesChip).toHaveCSS('white-space', 'normal');
+  await expectTextContentWithinCell(recurrenceRoomCell, recurrenceRoomCell, recurrencePurposeCell);
+  await expectTextContentWithinCell(seriesChip, recurrencePurposeCell, recurrenceDetailCell);
+  await expectTextContentWithinCell(recurrencePurposeCell, recurrencePurposeCell, recurrenceDetailCell);
+  await expect(recurrenceCells.nth(0).locator('.table-cell-stack')).toHaveCSS('white-space', 'nowrap');
+  await expect(recurrenceCells.nth(1).locator('.table-cell-stack')).toHaveCSS('white-space', 'nowrap');
 
   const recurrenceRow = recurrenceTable.locator('tbody tr').first();
   const initialBackground = await recurrenceRow.locator('td').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
