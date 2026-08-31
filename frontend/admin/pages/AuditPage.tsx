@@ -207,7 +207,7 @@ export function AuditPage() {
                   const snapshot = reservationSnapshot(history);
                   const summary = (
                     <span className="audit-reservation-snapshot">
-                      <span className="audit-snapshot-room">{snapshot.roomName}</span>
+                      <span className="audit-snapshot-room table-text-cell">{snapshot.roomName}</span>
                       <span className="audit-snapshot-time">{snapshot.time}</span>
                     </span>
                   );
@@ -232,11 +232,11 @@ export function AuditPage() {
                       </td>
                       <td>
                         <span className="table-cell-stack audit-actor-cell">
-                          <span className="table-break-anywhere">{history.actorId}</span>
+                          <span className="table-text-cell">{history.actorId}</span>
                           <span className="muted">{history.actorType}</span>
                         </span>
                       </td>
-                      <td className="table-description-cell processing-memo">{history.memo || '-'}</td>
+                      <td className="table-text-cell processing-memo">{history.memo || '-'}</td>
                     </tr>
                   );
                 })}

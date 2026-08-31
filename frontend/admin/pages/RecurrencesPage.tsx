@@ -530,12 +530,12 @@ export function RecurrencesPage() {
                       <tr key={`${item.date}-${item.startAt}`}>
                         <td className="nowrap-cell">{formatDate(item.date)}</td>
                         <td>
-                          <span className="table-cell-stack">
+                          <span className="table-cell-stack nowrap-cell">
                             <span>{formatInstantTime(item.startAt)}</span>
                             <span className="muted">~ {formatInstantTime(item.endAt)}</span>
                           </span>
                         </td>
-                        <td className="table-description-cell">
+                        <td className="table-text-cell">
                           {item.available
                             ? '등록 예정'
                             : validPreview.conflictPolicy === 'SKIP_CONFLICTS' && item.reason === 'TIME_SLOT_CONFLICT'
@@ -640,19 +640,19 @@ export function RecurrencesPage() {
                         }}
                       >
                         <td>
-                          <span className="table-cell-stack">
+                          <span className="table-cell-stack nowrap-cell">
                             <span>{formatDate(item.startDate)}</span>
                             <span className="muted">~ {formatDate(item.endDate)}</span>
                           </span>
                         </td>
                         <td>
-                          <span className="table-cell-stack">
+                          <span className="table-cell-stack nowrap-cell">
                             <span>{formatDayCodes(item.daysOfWeek)}</span>
                             <span className="muted">{formatTime(item.startTime)}~{formatTime(item.endTime)}</span>
                           </span>
                         </td>
-                        <td className="table-room-cell">{item.roomName}</td>
-                        <td className="purpose-cell table-description-cell">
+                        <td className="table-text-cell">{item.roomName}</td>
+                        <td className="table-text-cell">
                           {item.tagName ? (
                             <span
                               className="series-chip"

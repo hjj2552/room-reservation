@@ -9,6 +9,7 @@ import {
   deleteRoomByApi,
   expectTestIdBelow,
   expectTestIdsInDomOrder,
+  expectTextContentWithinCell,
   getSettingsByApi,
   loginByApi,
   nextWeekdayRecurrenceInputs,
@@ -215,6 +216,9 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     expect(previewDate).toMatch(/\d{4}/);
     expect(previewTime).toMatch(/오전|오후/);
     expect(previewTime).not.toContain(previewDate);
+    await expect(previewCells.nth(1).locator('.table-cell-stack')).toHaveCSS('white-space', 'nowrap');
+    await expect(previewCells.nth(2)).toHaveClass(/table-text-cell/);
+    await expect(previewCells.nth(2)).toHaveCSS('overflow-wrap', 'anywhere');
     expect(await previewCells.evaluateAll((cells) => cells.map((cell) => getComputedStyle(cell).display)))
       .toEqual(['table-cell', 'table-cell', 'table-cell']);
     const previewCellBoxes = await previewCells.evaluateAll((cells) => cells.map((cell) => {
@@ -397,6 +401,9 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
       await expect(timeLines).toHaveCount(2);
       await expect(timeLines.nth(0)).toContainText(/\([월화수목금토일]\)/);
       await expect(timeLines.nth(1)).toContainText(/^~ .*\([월화수목금토일]\)/);
+      await expect(firstRowCells.nth(0).locator('.table-cell-stack')).toHaveCSS('white-space', 'nowrap');
+      await expectTextContentWithinCell(firstRowCells.nth(1), firstRowCells.nth(1), firstRowCells.nth(2));
+      await expectTextContentWithinCell(firstRowCells.nth(3), firstRowCells.nth(3), firstRowCells.nth(4));
       if (!timeBox || !roomBox) throw new Error('Could not measure recurrence reservation cells.');
       expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(roomBox.x + 1);
     }

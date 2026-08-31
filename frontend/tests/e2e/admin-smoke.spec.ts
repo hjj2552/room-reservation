@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
 import {
   deleteRoomByApi,
+  expectTextContentWithinCell,
   getSettingsByApi,
   loginByApi,
   moveFocusOutsidePanel,
@@ -47,7 +48,9 @@ test('rooms smoke: list renders and an existing room can be updated', async ({ p
 
 test('rooms layout uses the page width and registration panel closes on Escape outside focus', async ({ page, request, e2eData }) => {
   await loginByApi(request);
-  await e2eData.createTestRoom('rooms-drawer-layout');
+  const layoutRoom = await e2eData.createTestRoom(`rooms-drawer-${'x'.repeat(35)}`, {
+    location: `testing-${'location'.repeat(15)}`,
+  });
   const createdRoomName = e2eData.name('room-drawer-create');
   const createdLocation = e2eData.name('room-drawer-location');
 
@@ -71,6 +74,10 @@ test('rooms layout uses the page width and registration panel closes on Escape o
   expect(await tableWrap.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const firstRowCells = table.locator('tbody tr').first().locator('td');
+  const layoutRow = table.getByRole('row').filter({ hasText: layoutRoom.name });
+  const layoutCells = layoutRow.locator('td');
+  await expectTextContentWithinCell(layoutCells.nth(0).locator('strong'), layoutCells.nth(0), layoutCells.nth(1));
+  await expectTextContentWithinCell(layoutCells.nth(0).locator('.muted'), layoutCells.nth(0), layoutCells.nth(1));
   const updatedAtCell = firstRowCells.nth(3);
   const manageCell = firstRowCells.nth(4);
   await expect(updatedAtCell).toContainText(/\([월화수목금토일]\)/);

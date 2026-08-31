@@ -167,14 +167,14 @@ export function RecurrenceDetailPage() {
                   }}
                 >
                   <td>
-                    <span className="table-cell-stack">
+                    <span className="table-cell-stack nowrap-cell">
                       <span>{formatDateTime(reservation.startAt)}</span>
                       <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
                     </span>
                   </td>
-                  <td className="table-room-cell">{reservation.roomName}</td>
+                  <td className="table-text-cell">{reservation.roomName}</td>
                   <td><StatusBadge status={reservation.status} /></td>
-                  <td className="purpose-cell table-description-cell">
+                  <td className="table-text-cell">
                     {reservation.purpose}
                     {reservation.exception ? <div className="muted">개별 수정됨</div> : null}
                   </td>

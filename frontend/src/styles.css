@@ -585,7 +585,7 @@ button:disabled {
 .reservations-table { min-width: 1110px; }
 .reservations-table th:nth-child(1) { width: 240px; }
 .reservations-table th:nth-child(2) { width: 15%; }
-.reservations-table th:nth-child(3) { width: 88px; }
+.reservations-table th:nth-child(3) { width: 104px; }
 .reservations-table th:nth-child(4) { width: 13%; }
 .reservations-table th:nth-child(6) { width: 110px; }
 .reservations-table th:nth-child(7) { width: 125px; }
@@ -603,30 +603,22 @@ button:disabled {
 .recurrence-reservations-table { min-width: 950px; }
 .recurrence-reservations-table th:nth-child(1) { width: 240px; }
 .recurrence-reservations-table th:nth-child(2) { width: 18%; }
-.recurrence-reservations-table th:nth-child(3) { width: 88px; }
+.recurrence-reservations-table th:nth-child(3) { width: 104px; }
 .recurrence-reservations-table th:nth-child(5) { width: 125px; }
 
-.table-cell-stack,
-.audit-actor-cell {
+.table-cell-stack {
   display: grid;
+  min-width: 0;
   gap: 2px;
 }
 
-.table-cell-stack > span,
-.table-cell-stack > strong,
 .audit-snapshot-time {
   white-space: nowrap;
 }
 
-.table-room-cell,
-.reservation-room-cell,
-.table-applicant-cell,
-.table-description-cell {
+.table-text-cell {
+  min-width: 0;
   word-break: keep-all;
-  overflow-wrap: break-word;
-}
-
-.table-break-anywhere {
   overflow-wrap: anywhere;
 }
 
@@ -643,7 +635,6 @@ button:disabled {
 .audit-snapshot-room,
 .audit-snapshot-time {
   display: block;
-  word-break: keep-all;
 }
 
 .audit-snapshot-time {
@@ -675,10 +666,6 @@ button:disabled {
   background: #efeee7;
 }
 
-.purpose-cell {
-  word-break: keep-all;
-}
-
 .reservation-time-cell,
 .reservation-room-cell {
   color: var(--ink);
@@ -690,9 +677,8 @@ button:disabled {
 }
 
 .series-chip {
-  display: inline-flex;
-  align-items: center;
-  max-width: 180px;
+  display: inline-block;
+  max-width: 100%;
   margin-right: 6px;
   border: 1px solid #7b8794;
   border-radius: 3px;
@@ -701,9 +687,9 @@ button:disabled {
   font-weight: 600;
   line-height: 1.2;
   vertical-align: middle;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .tag-table-wrap {
@@ -729,16 +715,10 @@ button:disabled {
 .audit-table th:nth-child(2) { width: 112px; }
 .audit-table th:nth-child(3) { width: 280px; }
 .audit-table th:nth-child(4) { width: 140px; }
-.audit-table th:nth-child(5) { width: 150px; }
+.audit-table th:nth-child(5) { width: 190px; }
 
 .audit-reservation-link {
   display: block;
-}
-
-.recurrences-table .series-chip {
-  max-width: none;
-  overflow: visible;
-  text-overflow: clip;
 }
 
 .tag-color-swatch {
