@@ -12,6 +12,7 @@ import {
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { statusLabels } from '../../shared/utils/labels';
+import { applicantPhoneError } from '../../shared/utils/applicantPhone';
 import { hasReservationValueChanges } from '../../shared/utils/reservationChanges';
 import { fromServiceDateTimeLocal, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 import { optionalContact } from '../utils/optionalContact';
@@ -227,8 +228,13 @@ export function ReservationFormPage() {
           전화번호 (선택)
           <input
             data-testid="reservation-phone-input"
+            type="tel"
+            inputMode="tel"
+            maxLength={50}
             placeholder="- 제외하고 입력"
-            {...register('applicantPhone')}
+            {...register('applicantPhone', {
+              validate: (value) => applicantPhoneError(value, false) || true,
+            })}
           />
           {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
         </label>

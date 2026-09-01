@@ -310,11 +310,17 @@ test('reservation edit: saved changes are visible on detail and list', async ({ 
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(page.getByTestId('reservation-start-input').locator('option[value="09:05"]')).toHaveCount(1);
+    const phoneInput = page.getByTestId('reservation-phone-input');
+    await expect(phoneInput).toHaveAttribute('type', 'tel');
+    await expect(phoneInput).toHaveAttribute('inputmode', 'tel');
+    await phoneInput.fill('010.1234.5678');
+    await page.getByTestId('reservation-save-button').click();
+    await expect(phoneInput.locator('..')).toContainText('전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.');
     await page.getByTestId('reservation-room-select').selectOption({ label: room.name });
     await expect(page.getByTestId('reservation-room-select')).toHaveValue(room.id);
     await page.getByTestId('reservation-purpose-input').fill(updatedPurpose);
     await page.getByTestId('reservation-email-input').fill('');
-    await page.getByTestId('reservation-phone-input').fill('');
+    await phoneInput.fill('');
     await page.getByTestId('reservation-memo-input').fill(processingMemo);
     const updateResponsePromise = page.waitForResponse((response) =>
       response.url().includes(`/api/admin/reservations/${reservation.id}`) &&

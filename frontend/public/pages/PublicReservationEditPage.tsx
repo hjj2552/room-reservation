@@ -15,6 +15,7 @@ import {
   useVerifyPublicReservationForEdit,
 } from '../../shared/hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
+import { applicantPhoneError, normalizeApplicantPhoneInput } from '../../shared/utils/applicantPhone';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 import { hasReservationPlacementChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
@@ -180,7 +181,7 @@ export function PublicReservationEditPage() {
             room: updated.room,
             applicantName: values.applicantName,
             applicantEmail: values.applicantEmail,
-            applicantPhone: values.applicantPhone,
+            applicantPhone: normalizeApplicantPhoneInput(values.applicantPhone),
             purpose: values.purpose,
             startAt: updated.startAt,
             endAt: updated.endAt,
@@ -304,8 +305,13 @@ export function PublicReservationEditPage() {
             전화번호
             <input
               data-testid="public-edit-phone-input"
+              type="tel"
+              inputMode="tel"
+              maxLength={50}
               placeholder="- 제외하고 입력"
-              {...register('applicantPhone', { required: '전화번호를 입력해 주세요.' })}
+              {...register('applicantPhone', {
+                validate: (value) => applicantPhoneError(value, true) || true,
+              })}
             />
             {errors.applicantPhone ? <span className="field-error">{errors.applicantPhone.message}</span> : null}
           </label>

@@ -19,8 +19,8 @@ import type {
 } from "../application/product-contracts";
 import {
   normalizeDays,
+  normalizeApplicantPhone,
   optionalEmail,
-  optionalTrimmedString,
   parseBooleanParameter,
   parseDate,
   parseEnumParameter,
@@ -125,7 +125,7 @@ function recurrence(
     daysOfWeek: normalizeDays(object.daysOfWeek),
     startTime: parseTime(requireString(object, "startTime"), "startTime"),
     endTime: parseTime(requireString(object, "endTime"), "endTime"),
-    applicantPhone: optionalTrimmedString(object, "applicantPhone", 50),
+    applicantPhone: normalizeApplicantPhone(object, false),
     conflictPolicy,
   };
   if (!requireApplicant) return common;

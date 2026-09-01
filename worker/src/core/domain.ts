@@ -46,6 +46,7 @@ export interface AdminReservationInput extends ReservationInput {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const applicantPhonePattern = /^[0-9 -]+$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 const instantPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
@@ -177,6 +178,23 @@ export function optionalEmail(object: Record<string, unknown>, field: string): s
   return value;
 }
 
+export function normalizeApplicantPhone(
+  object: Record<string, unknown>,
+  required: boolean,
+): string | null {
+  const field = "applicantPhone";
+  const value = object[field];
+  if (!required && (value === undefined || value === null || value === "")) return null;
+  if (typeof value !== "string" || value.length === 0) validation("전화번호를 입력해 주세요.", field);
+  if (value.length > 50) validation("size must be between 0 and 50", field);
+  if (!applicantPhonePattern.test(value)) {
+    validation("전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.", field);
+  }
+  const normalized = value.replaceAll("-", "").replaceAll(" ", "");
+  if (!normalized) validation("전화번호를 입력해 주세요.", field);
+  return normalized;
+}
+
 function parseReservationFields(object: Record<string, unknown>) {
   const input = {
     roomId: requireUuid(object, "roomId"),
@@ -194,7 +212,7 @@ export function parsePublicReservationInput(object: Record<string, unknown>): Pu
   return {
     ...parseReservationFields(object),
     applicantEmail: requireEmail(object, "applicantEmail"),
-    applicantPhone: requireString(object, "applicantPhone", { max: 50 }),
+    applicantPhone: normalizeApplicantPhone(object, true)!,
   };
 }
 
@@ -202,7 +220,7 @@ export function parseAdminReservationInput(object: Record<string, unknown>): Adm
   return {
     ...parseReservationFields(object),
     applicantEmail: optionalEmail(object, "applicantEmail"),
-    applicantPhone: optionalTrimmedString(object, "applicantPhone", 50),
+    applicantPhone: normalizeApplicantPhone(object, false),
     showApplicantName: object.showApplicantName === undefined
       ? false
       : requireBoolean(object, "showApplicantName"),
