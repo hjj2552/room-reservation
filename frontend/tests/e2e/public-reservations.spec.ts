@@ -180,7 +180,16 @@ test('public toolbar request opens the shared panel without slot room context', 
     await expect(page.getByTestId('public-request-end-input')).not.toHaveValue('');
     await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue('');
     await expect(page.getByTestId('public-request-email-input')).toHaveValue('');
-    await expect(page.getByTestId('public-request-phone-input')).toHaveAttribute('placeholder', '- 제외하고 입력');
+    const phoneInput = page.getByTestId('public-request-phone-input');
+    await expect(phoneInput).toHaveAttribute('placeholder', '- 제외하고 입력');
+    await expect(phoneInput).toHaveAttribute('type', 'tel');
+    await expect(phoneInput).toHaveAttribute('inputmode', 'tel');
+    await expect(phoneInput).toHaveAttribute('maxlength', '50');
+    await phoneInput.fill('010-12ab-5678');
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(phoneInput.locator('..')).toContainText('전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.');
+    await phoneInput.fill('010-1234 5678');
+    await expect(phoneInput).toHaveValue('010-1234 5678');
     await expect(page.getByTestId('public-request-cancel-password-input')).toHaveAttribute(
       'placeholder',
       '4자리 이상, 수정 및 취소 시 사용',
@@ -519,6 +528,8 @@ test('public edit re-requires contacts after an administrator clears them', asyn
 
   const emailInput = page.getByTestId('public-edit-email-input');
   const phoneInput = page.getByTestId('public-edit-phone-input');
+  await expect(phoneInput).toHaveAttribute('type', 'tel');
+  await expect(phoneInput).toHaveAttribute('inputmode', 'tel');
   await expect(emailInput).toHaveValue('');
   await expect(phoneInput).toHaveValue('');
   await page.getByTestId('public-edit-save-button').click();
@@ -637,6 +648,8 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await expect(page.getByTestId('public-edit-start-input').locator('option[value="09:05"]')).toHaveCount(1);
     await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(reservation.purpose || '');
     await expect(page.getByTestId('public-edit-email-input')).toHaveValue(reservation.applicantEmail);
+    await expect(page.getByTestId('public-edit-phone-input')).toHaveAttribute('type', 'tel');
+    await expect(page.getByTestId('public-edit-phone-input')).toHaveAttribute('inputmode', 'tel');
 
     const statusTransitionResponse = page.waitForResponse((response) =>
       response.url().includes(`/api/public/reservations/${reservation.id}`)
@@ -657,6 +670,7 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-save-button').click();
 
     await expect(page.getByRole('status')).toContainText('승인 대기 상태를 유지합니다');
+    await expect(page.getByTestId('public-edit-phone-input')).toHaveValue('01055556666');
     await page.getByRole('button', { name: '취소', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
     await expect(page.locator('.status-badge')).toContainText('승인 대기');

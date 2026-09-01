@@ -22,6 +22,7 @@ import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import { useAllTags } from '../../shared/hooks/useTags';
 import { formatDate, formatInstantTime, formatTime } from '../../shared/utils/date';
+import { applicantPhoneError } from '../../shared/utils/applicantPhone';
 import { conflictPolicyLabels, dayLabels } from '../../shared/utils/labels';
 import { lastPageIndex, parsePageParam } from '../../shared/utils/page';
 import { defaultOperatingTimeRange } from '../../shared/utils/reservationTime';
@@ -132,6 +133,7 @@ export function RecurrencesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const [form, setForm] = useState<RecurrenceForm>(initialForm);
+  const [phoneError, setPhoneError] = useState<string>();
   const [successfulPreview, setSuccessfulPreview] = useState<SuccessfulPreview | null>(null);
   const [completedCreate, setCompletedCreate] = useState<CompletedCreate | null>(null);
   const endDateMax = useMemo(() => {
@@ -221,6 +223,9 @@ export function RecurrencesPage() {
   function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (preview.isPending) return;
+    const nextPhoneError = applicantPhoneError(form.applicantPhone, false);
+    setPhoneError(nextPhoneError);
+    if (nextPhoneError) return;
     const payload = previewPayload(form);
     const fingerprint = recurrencePreviewFingerprint(payload);
     const requestId = previewRequestIdRef.current + 1;
@@ -344,9 +349,18 @@ export function RecurrencesPage() {
             <input
               data-testid="recurrence-phone-input"
               name="applicantPhone"
+              type="tel"
+              inputMode="tel"
+              maxLength={50}
               value={form.applicantPhone}
-              onChange={(event) => setForm((prev) => ({ ...prev, applicantPhone: event.target.value }))}
+              aria-invalid={Boolean(phoneError) || undefined}
+              aria-describedby={phoneError ? 'recurrence-phone-error' : undefined}
+              onChange={(event) => {
+                setPhoneError(undefined);
+                setForm((prev) => ({ ...prev, applicantPhone: event.target.value }));
+              }}
             />
+            {phoneError ? <span id="recurrence-phone-error" className="field-error">{phoneError}</span> : null}
           </label>
           <label>
             이메일 (선택)

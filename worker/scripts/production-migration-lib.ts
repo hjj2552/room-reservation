@@ -13,6 +13,7 @@ const V3_MIGRATION = "003_admin_optional_contact_v3";
 const V4_MIGRATION = "004_applicant_name_visibility_v4";
 const V5_MIGRATION = "005_recurrence_hard_delete_v5";
 const V6_MIGRATION = "006_public_reservation_schedule_v6";
+const V7_MIGRATION = "007_applicant_phone_normalization_v7";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -645,8 +646,9 @@ export async function verifyProductionV5Schema(
 export async function verifyProductionV6Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  expectedLatestMigration = V6_MIGRATION,
 ): Promise<void> {
-  await verifyProductionV5Schema(client, config, V6_MIGRATION);
+  await verifyProductionV5Schema(client, config, expectedLatestMigration);
 
   try {
     const migration = await client.query(
@@ -699,6 +701,58 @@ export async function verifyProductionV6Schema(
   }
 }
 
+export async function verifyProductionV7Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV6Schema(client, config, V7_MIGRATION);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V7_MIGRATION],
+    );
+    const schema = await client.query(
+      `SELECT count(*)::integer AS required_constraints
+       FROM pg_constraint
+       WHERE conname = ANY($1::text[])`,
+      [[
+        "chk_reservations_applicant_phone_digits",
+        "chk_recurrences_applicant_phone_digits",
+        "chk_histories_reservation_applicant_phone_digits",
+        "chk_histories_before_reservation_applicant_phone_digits",
+      ]],
+    );
+    const values = await client.query(
+      `SELECT count(*)::integer AS invalid_count
+       FROM (
+         SELECT applicant_phone AS phone FROM reservations WHERE applicant_phone IS NOT NULL
+         UNION ALL
+         SELECT applicant_phone FROM reservation_recurrences WHERE applicant_phone IS NOT NULL
+         UNION ALL
+         SELECT reservation_applicant_phone FROM reservation_histories
+           WHERE reservation_applicant_phone IS NOT NULL
+         UNION ALL
+         SELECT before_reservation_applicant_phone FROM reservation_histories
+           WHERE before_reservation_applicant_phone IS NOT NULL
+       ) applicant_phones
+       WHERE phone !~ '^[0-9]+$'`,
+    );
+    if (
+      migration.rows[0]?.count !== 1
+      || schema.rows[0]?.required_constraints !== 4
+      || values.rows[0]?.invalid_count !== 0
+    ) {
+      throw new ProductionMigrationError("schema", "Production V7 applicant phone schema is incomplete.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V7 applicant phone schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -706,6 +760,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV6Schema(client, config);
+    await verifyProductionV7Schema(client, config);
   });
 }

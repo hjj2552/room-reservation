@@ -140,7 +140,7 @@ describe("Worker migrations", () => {
     expect(sentinel.rows).toEqual([{ name: "삭제된 공간" }]);
   });
 
-  it("keeps the V5 recurrence cleanup and adds the V6 public reservation schedule", async () => {
+  it("keeps the V5 recurrence cleanup and applies the V6 and V7 schema contracts", async () => {
     const schema = await database.query(
       `SELECT
          EXISTS (
@@ -169,6 +169,7 @@ describe("Worker migrations", () => {
       "004_applicant_name_visibility_v4",
       "005_recurrence_hard_delete_v5",
       "006_public_reservation_schedule_v6",
+      "007_applicant_phone_normalization_v7",
     ]);
     const settings = await database.query(
       `SELECT open_time::text, close_time::text, available_days_of_week,
@@ -183,6 +184,16 @@ describe("Worker migrations", () => {
       public_close_time: "18:00:00",
       public_available_days_of_week: "MON,TUE,WED,THU,FRI",
     });
+    const phoneConstraints = await database.query(
+      `SELECT conname FROM pg_constraint
+       WHERE conname IN (
+         'chk_reservations_applicant_phone_digits',
+         'chk_recurrences_applicant_phone_digits',
+         'chk_histories_reservation_applicant_phone_digits',
+         'chk_histories_before_reservation_applicant_phone_digits'
+       ) ORDER BY conname`,
+    );
+    expect(phoneConstraints.rows).toHaveLength(4);
   });
 
   it("rolls transactions back", async () => {
@@ -263,7 +274,7 @@ describe("Worker migrations", () => {
       `INSERT INTO reservations(
          room_id,applicant_name,applicant_email,applicant_phone,purpose,start_at,end_at,
          status,source,created_by_actor_type,show_applicant_name
-       ) VALUES($1,'testing-v4-public','testing-v4@example.test','010-0000-0000',
+       ) VALUES($1,'testing-v4-public','testing-v4@example.test','01000000000',
          'testing-v4-public',$2,$3,'REQUESTED','PUBLIC_FORM','PUBLIC_USER',true)`,
       [roomId, startAt, addHour(startAt)],
     )).rejects.toMatchObject({ code: "23514" });
@@ -1110,7 +1121,7 @@ async function insertRecurrence(input: {
     `INSERT INTO reservation_recurrences(
        room_id,applicant_name,applicant_email,applicant_phone,purpose,start_date,end_date,
        days_of_week,start_time,end_time,conflict_policy,tag_id,created_by,created_at
-     ) VALUES($1,$2,$3,'010-0000-0000',$4,$5,$5,'MON','10:00','11:00','FAIL_ALL',$6,'admin',$7)
+     ) VALUES($1,$2,$3,'01000000000',$4,$5,$5,'MON','10:00','11:00','FAIL_ALL',$6,'admin',$7)
      RETURNING id`,
     [input.roomId, input.applicantName ?? "ordinary applicant", input.applicantEmail ?? "ordinary@example.test",
       input.purpose, date, input.tagId ?? null, input.createdAt ?? new Date().toISOString()],
@@ -1135,7 +1146,7 @@ async function insertReservation(input: {
     `INSERT INTO reservations(
        room_id,recurrence_id,applicant_name,applicant_email,applicant_phone,purpose,
        start_at,end_at,status,source,created_by_actor_type,created_at,recurrence_exception
-     ) VALUES($1,$2,$3,$4,'010-0000-0000',$5,$6,$7,$8,$9,'ADMIN',$10,$11) RETURNING id`,
+     ) VALUES($1,$2,$3,$4,'01000000000',$5,$6,$7,$8,$9,'ADMIN',$10,$11) RETURNING id`,
     [input.roomId, input.recurrenceId ?? null, input.applicantName ?? "ordinary applicant",
       input.applicantEmail ?? "ordinary@example.test", input.purpose, startAt, addHour(startAt),
       input.status ?? "CONFIRMED", input.source ?? "ADMIN_MANUAL", input.createdAt ?? new Date().toISOString(),
@@ -1167,6 +1178,175 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
   expect(login.status).toBe(200);
   return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
 }
+
+describe("applicant phone normalization HTTP contract", () => {
+  it("normalizes public, admin, recurrence, history, detail and CSV phone values", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-phone-normalization");
+    const { app, cookie, writeHeaders } = await authenticatedApp();
+    const publicPassword = "Phone1!";
+    const publicInput = {
+      ...publicPayload(roomId, publicPassword, "testing-phone-public", 10),
+      applicantPhone: "010-1234 5678",
+    };
+    const publicCreate = await app.request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(publicInput),
+    });
+    expect(publicCreate.status).toBe(201);
+    const publicReservation = await publicCreate.json() as { id: string };
+    expect((await database.query(
+      "SELECT applicant_phone FROM reservations WHERE id=$1",
+      [publicReservation.id],
+    )).rows).toEqual([{ applicant_phone: "01012345678" }]);
+    expect((await products.verifyPublicReservationForEdit(publicReservation.id, publicPassword)).applicantPhone)
+      .toBe("01012345678");
+
+    const publicUpdate = await app.request(
+      `http://worker.test/api/public/reservations/${publicReservation.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({
+          ...publicInput,
+          applicantPhone: "010 9999-8888",
+          purpose: "testing-phone-public-updated",
+        }),
+      },
+    );
+    expect(publicUpdate.status).toBe(200);
+    expect((await products.verifyPublicReservationForEdit(publicReservation.id, publicPassword)).applicantPhone)
+      .toBe("01099998888");
+    expect(await (await app.request(
+      `http://worker.test/api/public/reservations/${publicReservation.id}`,
+    )).json()).toMatchObject({ applicantPhone: "0109******8" });
+
+    const invalidPublic = await app.request("http://worker.test/api/public/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({ ...publicInput, applicantPhone: "010.1234.5678" }),
+    });
+    expect(invalidPublic.status).toBe(400);
+    expect(await invalidPublic.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      fieldErrors: [expect.objectContaining({ field: "applicantPhone" })],
+    });
+
+    const adminInput = {
+      roomId,
+      applicantName: "testing-phone-admin",
+      applicantEmail: null,
+      applicantPhone: "010 2222-3333",
+      purpose: "testing-phone-admin",
+      startAt: futureWeekday(21, 12),
+      endAt: futureWeekday(21, 13),
+      status: "CONFIRMED",
+      showApplicantName: false,
+    };
+    const adminCreate = await app.request("http://worker.test/api/admin/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify(adminInput),
+    });
+    expect(adminCreate.status).toBe(201);
+    const adminReservation = await adminCreate.json() as { id: string; applicantPhone: string };
+    expect(adminReservation.applicantPhone).toBe("01022223333");
+    const adminUpdate = await app.request(
+      `http://worker.test/api/admin/reservations/${adminReservation.id}`,
+      {
+        method: "PUT",
+        headers: writeHeaders,
+        body: JSON.stringify({ ...adminInput, applicantPhone: "010-4444 5555" }),
+      },
+    );
+    expect(adminUpdate.status).toBe(200);
+    expect(await adminUpdate.json()).toMatchObject({ applicantPhone: "01044445555" });
+
+    const emptyAdminCreate = await app.request("http://worker.test/api/admin/reservations", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        ...adminInput,
+        applicantName: "testing-phone-admin-empty",
+        applicantPhone: "",
+        purpose: "testing-phone-admin-empty",
+        startAt: futureWeekday(21, 14),
+        endAt: futureWeekday(21, 15),
+      }),
+    });
+    expect(emptyAdminCreate.status).toBe(201);
+    expect(await emptyAdminCreate.json()).toMatchObject({ applicantPhone: null });
+
+    const recurrenceDate = futureWeekday(42, 16).slice(0, 10);
+    const recurrenceCreate = await app.request("http://worker.test/api/admin/recurrences", {
+      method: "POST",
+      headers: writeHeaders,
+      body: JSON.stringify({
+        roomId,
+        applicantName: "testing-phone-recurrence",
+        applicantEmail: null,
+        applicantPhone: "010-6666 7777",
+        purpose: "testing-phone-recurrence",
+        tagId: null,
+        startDate: recurrenceDate,
+        endDate: recurrenceDate,
+        daysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
+        startTime: "16:00",
+        endTime: "17:00",
+        conflictPolicy: "FAIL_ALL",
+        showApplicantName: false,
+      }),
+    });
+    expect(recurrenceCreate.status).toBe(201);
+    const recurrence = await recurrenceCreate.json() as { recurrenceId: string };
+    const recurrencePhones = await database.query(
+      `SELECT
+         (SELECT applicant_phone FROM reservation_recurrences WHERE id=$1) AS recurrence_phone,
+         (SELECT applicant_phone FROM reservations WHERE recurrence_id=$1) AS reservation_phone,
+         (SELECT reservation_applicant_phone FROM reservation_histories
+          WHERE reservation_id=(SELECT id FROM reservations WHERE recurrence_id=$1)) AS history_phone`,
+      [recurrence.recurrenceId],
+    );
+    expect(recurrencePhones.rows[0]).toEqual({
+      recurrence_phone: "01066667777",
+      reservation_phone: "01066667777",
+      history_phone: "01066667777",
+    });
+    expect(await (await app.request(
+      `http://worker.test/api/admin/recurrences/${recurrence.recurrenceId}`,
+      { headers: { cookie } },
+    )).json()).toMatchObject({ applicantPhone: "01066667777" });
+
+    const csv = await (await app.request(
+      "http://worker.test/api/admin/exports/reservations.csv?keyword=testing-phone-admin",
+      { headers: { cookie } },
+    )).text();
+    expect(csv).toContain("01044445555");
+    expect(csv).not.toContain("010-4444 5555");
+
+    const historyId = String((await database.query(
+      "SELECT id FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at DESC LIMIT 1",
+      [adminReservation.id],
+    )).rows[0]?.id);
+    await expect(database.query(
+      "UPDATE reservations SET applicant_phone='010-1234' WHERE id=$1",
+      [adminReservation.id],
+    )).rejects.toMatchObject({ code: "23514" });
+    await expect(database.query(
+      "UPDATE reservation_recurrences SET applicant_phone='phone' WHERE id=$1",
+      [recurrence.recurrenceId],
+    )).rejects.toMatchObject({ code: "23514" });
+    await expect(database.query(
+      "UPDATE reservation_histories SET reservation_applicant_phone='010 1234' WHERE id=$1",
+      [historyId],
+    )).rejects.toMatchObject({ code: "23514" });
+    await expect(database.query(
+      "UPDATE reservation_histories SET before_reservation_applicant_phone='-' WHERE id=$1",
+      [historyId],
+    )).rejects.toMatchObject({ code: "23514" });
+  });
+});
 
 describe("room name normalization HTTP contract", () => {
   it("normalizes create and update names, preserves duplicate handling, and records normalized snapshots", async () => {
@@ -2495,7 +2675,7 @@ describe("direct Worker contracts", () => {
       && row.end_time === "11:00:00"
       && row.applicant_name === "testing-recurrence-admin"
       && row.applicant_email === "testing-recurrence-admin@example.test"
-      && row.applicant_phone === "010-1111-2222"
+      && row.applicant_phone === "01011112222"
       && row.purpose === purpose
       && row.show_applicant_name === true
     ))).toBe(true);

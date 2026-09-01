@@ -71,7 +71,7 @@ describe("typed HTTP product input", () => {
         roomId: ROOM_ID,
         applicantName: "Applicant",
         applicantEmail: "applicant@example.test",
-        applicantPhone: "010-0000-0000",
+        applicantPhone: "01000000000",
         purpose: "Purpose",
         startAt: "2026-08-03T10:00:00+09:00",
         endAt: "2026-08-03T11:00:00+09:00",
@@ -127,7 +127,7 @@ describe("typed HTTP product input", () => {
   );
 
   it("normalizes optional admin contacts and preserves validation for supplied values", () => {
-    for (const value of [undefined, null, "", "   "]) {
+    for (const value of [undefined, null, ""]) {
       const command = parseAdminReservation(publicBody({
         applicantEmail: value,
         applicantPhone: value,
@@ -142,13 +142,55 @@ describe("typed HTTP product input", () => {
       status: "CONFIRMED",
     })).reservation).toMatchObject({
       applicantEmail: "admin@example.test",
-      applicantPhone: "010-1234-5678",
+      applicantPhone: "01012345678",
     });
     expect(() => parseAdminReservation(publicBody({
       applicantEmail: "invalid-email",
       status: "CONFIRMED",
     }))).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
+
+  it("normalizes applicant phones for every reservation input path", () => {
+    expect(parsePublicReservation(publicBody({ applicantPhone: "010 1234-5678" })).reservation.applicantPhone)
+      .toBe("01012345678");
+    expect(parseAdminReservation({
+      ...publicBody({ applicantPhone: "010-1234 5678" }),
+      status: "CONFIRMED",
+    }).reservation.applicantPhone).toBe("01012345678");
+
+    const recurrence = {
+      roomId: ROOM_ID,
+      startDate: "2026-08-03",
+      endDate: "2026-08-10",
+      daysOfWeek: ["MON"],
+      startTime: "10:00",
+      endTime: "11:00",
+      applicantPhone: "010-1234 5678",
+      conflictPolicy: "FAIL_ALL",
+    };
+    expect(parseRecurrencePreview(recurrence).applicantPhone).toBe("01012345678");
+    expect(parseRecurrenceCreate({
+      ...recurrence,
+      applicantName: "Applicant",
+      purpose: "Purpose",
+    }).applicantPhone).toBe("01012345678");
+  });
+
+  it.each(["010-12ab-5678", "010.1234.5678", "010+12345678", "---", "   "])(
+    "rejects invalid applicant phone %j at the HTTP input boundary",
+    (applicantPhone) => {
+      expect(() => parsePublicReservation(publicBody({ applicantPhone }))).toThrowError(
+        expect.objectContaining({
+          code: "VALIDATION_ERROR",
+          fieldErrors: [expect.objectContaining({ field: "applicantPhone" })],
+        }),
+      );
+      expect(() => parseAdminReservation({
+        ...publicBody({ applicantPhone }),
+        status: "CONFIRMED",
+      })).toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+    },
+  );
 
   it("parses and validates pagination and booleans", () => {
     expect(parseRoomList(new URLSearchParams("page=2&size=1000&enabled=true"))).toMatchObject({

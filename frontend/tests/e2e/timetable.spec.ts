@@ -336,6 +336,13 @@ test('date view can create a reservation from an empty slot', async ({ page, req
     await expect(page.getByTestId('quick-add-start-input-date')).toHaveValue(reservationDay);
     await expect(page.getByTestId('quick-add-start-input')).toHaveValue('12:00');
     await expect(page.getByTestId('quick-add-end-input')).toHaveValue('12:30');
+    const phoneInput = page.getByTestId('quick-add-phone-input');
+    await expect(phoneInput).toHaveAttribute('type', 'tel');
+    await expect(phoneInput).toHaveAttribute('inputmode', 'tel');
+    await phoneInput.fill('010+12345678');
+    await page.getByTestId('quick-add-save-button').click();
+    await expect(phoneInput.locator('..')).toContainText('전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.');
+    await phoneInput.fill('');
 
     const applicantName = 'testing-admin-visible';
     await page.getByTestId('quick-add-applicant-name-input').fill(applicantName);

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
+import { applicantPhoneError } from '../utils/applicantPhone';
 import { statusLabels } from '../utils/labels';
 import {
   acceptsPublicPasswordInput,
@@ -188,7 +189,8 @@ export function ReservationRequestPanel({
     if (!values.roomId) nextErrors.roomId = '예약 공간을 선택해 주세요.';
     if (!values.applicantName) nextErrors.applicantName = '신청자 이름을 입력해 주세요.';
     if (!isAdmin && !values.applicantEmail) nextErrors.applicantEmail = '이메일을 입력해 주세요.';
-    if (!isAdmin && !values.applicantPhone) nextErrors.applicantPhone = '전화번호를 입력해 주세요.';
+    const phoneError = applicantPhoneError(values.applicantPhone, !isAdmin);
+    if (phoneError) nextErrors.applicantPhone = phoneError;
     if (!values.purpose) nextErrors.purpose = '신청 목적을 입력해 주세요.';
     if (!values.startAt) nextErrors.startAt = '시작 시간을 입력해 주세요.';
     if (!values.endAt) nextErrors.endAt = '종료 시간을 입력해 주세요.';
@@ -324,6 +326,9 @@ export function ReservationRequestPanel({
           전화번호{isAdmin ? ' (선택)' : ''}
           <input
             data-testid={ids.phone}
+            type="tel"
+            inputMode="tel"
+            maxLength={50}
             value={values.applicantPhone}
             placeholder="- 제외하고 입력"
             onChange={(event) => updateField('applicantPhone', event.target.value)}

@@ -171,6 +171,9 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await expect(page.getByTestId('recurrences-table').or(page.getByText('조건에 맞는 반복 예약이 없습니다.'))).toBeVisible();
     await expectTestIdBelow(page, 'recurrence-applicant-name-input', 'recurrence-show-applicant-name-input');
     await expect(page.getByTestId('recurrence-show-applicant-name-input').locator('xpath=ancestor::fieldset')).toHaveCount(0);
+    const phoneInput = page.getByTestId('recurrence-phone-input');
+    await expect(phoneInput).toHaveAttribute('type', 'tel');
+    await expect(phoneInput).toHaveAttribute('inputmode', 'tel');
 
     await page.getByTestId('recurrence-room-select').selectOption(room.id);
     await page.getByTestId('recurrence-applicant-name-input').fill('testing-recurrence-admin');
@@ -184,6 +187,11 @@ test('recurrence smoke: list, preview, create, detail, and hard delete', async (
     await page.getByTestId('recurrence-day-WED').check();
     await page.getByTestId('recurrence-conflict-policy-select').selectOption('FAIL_ALL');
     await page.getByTestId('recurrence-show-applicant-name-input').check();
+
+    await phoneInput.fill('010/1234/5678');
+    await page.getByTestId('recurrence-preview-button').click();
+    await expect(phoneInput.locator('..')).toContainText('전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.');
+    await phoneInput.fill('');
 
     const previewResponsePromise = page.waitForResponse((response) =>
       response.url().includes('/api/admin/recurrences/preview') &&
