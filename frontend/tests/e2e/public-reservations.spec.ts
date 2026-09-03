@@ -303,7 +303,7 @@ test('public timetables reuse recurrence tag colors without exposing private app
       publicOpenTime: '11:00',
     });
     await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
-    await expect(page.locator('.timetable-unavailable-slot.availability-public-unavailable').first()).toBeVisible();
+    await expect(page.locator('.timetable-empty-slot.availability-public-unavailable').first()).toBeVisible();
     const unavailablePublicBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
     expect(await computedTimetableColors(unavailablePublicBlock.locator('.reservation-block-card')))
       .toEqual(publicDateColors);
