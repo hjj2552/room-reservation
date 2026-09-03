@@ -17,9 +17,8 @@
   --action-soft: #e7f0eb;
   --focus: #285ea8;
   --danger: #a13d38;
-  --public-unavailable: #8b4f49;
-  --public-unavailable-soft: #fdf7f6;
-  --operating-unavailable: #9a9d96;
+  --special-approval-soft: #fff9ea;
+  --operating-unavailable-soft: #f7e7e5;
   --space-3: 12px;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -845,22 +844,14 @@ button:disabled {
   border: 1px solid var(--rule);
 }
 
-.timetable-availability-legend i.public-unavailable {
-  border-color: #d9bdb8;
-  background: var(--public-unavailable-soft);
+.timetable-availability-legend i.special-approval {
+  border-color: #d9c47e;
+  background: var(--special-approval-soft);
 }
 
 .timetable-availability-legend i.operating-unavailable {
-  display: grid;
-  place-items: center;
-  color: var(--operating-unavailable);
-  font-style: normal;
-}
-
-.timetable-availability-legend i.operating-unavailable::before {
-  font-size: 11px;
-  line-height: 1;
-  content: '×';
+  border-color: #d9aaa6;
+  background: var(--operating-unavailable-soft);
 }
 
 .timetable-summary-separator {
@@ -968,14 +959,26 @@ button:disabled {
   background: #f1f5f8;
 }
 
+.timetable-day-header.availability-special-approval {
+  background: var(--special-approval-soft);
+}
+
+.timetable-day-header.availability-operating-unavailable {
+  background: var(--operating-unavailable-soft);
+}
+
 .timetable-time-column,
 .timetable-room-column {
   position: relative;
   min-height: 100%;
 }
 
-.timetable-room-column.availability-public-unavailable {
-  background: var(--public-unavailable-soft);
+.timetable-room-column.availability-special-approval {
+  background: var(--special-approval-soft);
+}
+
+.timetable-room-column.availability-operating-unavailable {
+  background: var(--operating-unavailable-soft);
 }
 
 .timetable-time-column {
@@ -1035,21 +1038,13 @@ button:disabled {
   cursor: copy;
 }
 
-.timetable-empty-slot.availability-public-unavailable,
-.timetable-unavailable-slot.availability-public-unavailable {
-  background: var(--public-unavailable-soft);
+.timetable-empty-slot.availability-special-approval,
+.timetable-unavailable-slot.availability-special-approval {
+  background: var(--special-approval-soft);
 }
 
 .timetable-unavailable-slot.availability-operating-unavailable {
-  display: grid;
-  place-items: center;
-  color: var(--operating-unavailable);
-}
-
-.timetable-unavailable-slot.availability-operating-unavailable::after {
-  font-size: 12px;
-  line-height: 1;
-  content: '×';
+  background: var(--operating-unavailable-soft);
 }
 
 .timetable-empty-slot::before {

@@ -10,6 +10,7 @@ import {
   verifyProductionV5Schema,
   verifyProductionV6Schema,
   verifyProductionV7Schema,
+  verifyProductionV8Schema,
   type ProductionMigrationConfig,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
@@ -149,15 +150,18 @@ describe("production migration schema verification", () => {
     contactValues?: Record<string, unknown>;
     visibilitySchema?: Record<string, unknown>;
     visibilityValues?: Record<string, unknown>;
-    version?: 2 | 3 | 4 | 5 | 6 | 7;
+    version?: 2 | 3 | 4 | 5 | 6 | 7 | 8;
     v5?: boolean;
     v6?: boolean;
     v7?: boolean;
+    v8?: boolean;
     v5Migrations?: Array<Record<string, unknown>>;
     publicScheduleSchema?: Record<string, unknown>;
     publicScheduleValues?: Record<string, unknown>;
     phoneSchema?: Record<string, unknown>;
     phoneValues?: Record<string, unknown>;
+    specialApprovalSchema?: Record<string, unknown>;
+    specialApprovalValues?: Record<string, unknown>;
   } = {}): SqlClient {
     const commonRows: Array<Array<Record<string, unknown>>> = [
       [{ database_name: "production_db", role_name: "migration_role", schema_name: "public" }],
@@ -170,7 +174,8 @@ describe("production migration schema verification", () => {
         { name: "005_recurrence_hard_delete_v5" },
         { name: "006_public_reservation_schedule_v6" },
         { name: "007_applicant_phone_normalization_v7" },
-      ].slice(0, overrides.v7 ? 7 : overrides.v6 ? 6 : overrides.v5 ? 5 : (overrides.version ?? 4)),
+        { name: "008_special_approval_schedule_v8" },
+      ].slice(0, overrides.v8 ? 8 : overrides.v7 ? 7 : overrides.v6 ? 6 : overrides.v5 ? 5 : (overrides.version ?? 4)),
       [{ count: 1 }],
       [{
         state_table_exists: true,
@@ -209,8 +214,8 @@ describe("production migration schema verification", () => {
         visibility_columns: 2,
         history_columns: 2,
         public_constraint_exists: true,
-        recurrence_deleted_at_columns: overrides.v5 || overrides.v6 || overrides.v7 ? 0 : 1,
-        recurrence_deleted_at_index_exists: !(overrides.v5 || overrides.v6 || overrides.v7),
+        recurrence_deleted_at_columns: overrides.v5 || overrides.v6 || overrides.v7 || overrides.v8 ? 0 : 1,
+        recurrence_deleted_at_index_exists: !(overrides.v5 || overrides.v6 || overrides.v7 || overrides.v8),
         ...overrides.visibilitySchema,
       }],
       [{
@@ -220,7 +225,7 @@ describe("production migration schema verification", () => {
         ...overrides.visibilityValues,
       }],
     ];
-    if (overrides.v5 || overrides.v6 || overrides.v7) {
+    if (overrides.v5 || overrides.v6 || overrides.v7 || overrides.v8) {
       const rows = [
         ...commonRows,
         overrides.v5Migrations ?? [
@@ -229,18 +234,31 @@ describe("production migration schema verification", () => {
         ],
         ...visibilityRows,
       ];
-      if (overrides.v6 || overrides.v7) {
+      if (overrides.v6 || overrides.v7 || overrides.v8) {
         rows.push(
           [{ count: 1 }],
           [{ required_columns: 3, required_constraints: 5, ...overrides.publicScheduleSchema }],
           [{ invalid_count: 0, ...overrides.publicScheduleValues }],
         );
       }
-      if (overrides.v7) {
+      if (overrides.v7 || overrides.v8) {
         rows.push(
           [{ count: 1 }],
           [{ required_constraints: 4, ...overrides.phoneSchema }],
           [{ invalid_count: 0, ...overrides.phoneValues }],
+        );
+      }
+      if (overrides.v8) {
+        rows.push(
+          [{ count: 1 }],
+          [{
+            special_columns: 3,
+            legacy_columns: 3,
+            special_constraints: 3,
+            legacy_constraints: 0,
+            ...overrides.specialApprovalSchema,
+          }],
+          [{ invalid_count: 0, ...overrides.specialApprovalValues }],
         );
       }
       return clientForRows(rows);
@@ -270,6 +288,21 @@ describe("production migration schema verification", () => {
 
   it("accepts V7 applicant phone constraints and normalized values", async () => {
     await expect(verifyProductionV7Schema(validSchemaClient({ v7: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("accepts V8 special approval fields while retaining legacy public columns", async () => {
+    await expect(verifyProductionV8Schema(validSchemaClient({ v8: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("rejects incomplete V8 special approval schema and values", async () => {
+    await expect(verifyProductionV8Schema(validSchemaClient({
+      v8: true,
+      specialApprovalSchema: { special_constraints: 2 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
+    await expect(verifyProductionV8Schema(validSchemaClient({
+      v8: true,
+      specialApprovalValues: { invalid_count: 1 },
+    }), config)).rejects.toMatchObject({ stage: "schema" });
   });
 
   it("rejects incomplete V7 applicant phone schema and values", async () => {

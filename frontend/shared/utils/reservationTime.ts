@@ -32,15 +32,15 @@ export interface ReservationTimeSettings {
   maxReservationMinutes: number;
 }
 
-export interface PublicReservationScheduleSettings extends ReservationTimeSettings {
-  publicOpenTime: string;
-  publicCloseTime: string;
-  publicAvailableDaysOfWeek: string[];
+export interface SpecialApprovalScheduleSettings extends ReservationTimeSettings {
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
+  specialApprovalDaysOfWeek: string[];
 }
 
-export type PublicReservationScheduleState =
+export type ReservationScheduleState =
   | 'general'
-  | 'separate-confirmation'
+  | 'special-approval'
   | 'operating-unavailable';
 
 export interface ReservationTimeSelection {
@@ -82,7 +82,7 @@ export function slotToReservationSelection(
 }
 
 export function newRequestSelection(
-  settings: ReservationTimeSettings,
+  settings: SpecialApprovalScheduleSettings,
   now = new Date(),
 ): NewReservationSelectionResult {
   const emptySelection: ReservationTimeSelection = {
@@ -116,6 +116,7 @@ export function newRequestSelection(
     return { selection: emptySelection, unavailableMessage: noFutureReservationTimeMessage };
   }
 
+  let specialApprovalFallback: ReservationTimeSelection | undefined;
   for (
     let candidateDate = firstCandidateDate;
     candidateDate <= semesterEndDate;
@@ -135,38 +136,42 @@ export function newRequestSelection(
       }
     }
 
-    const endMinutes = startMinutes + durationMinutes;
-    if (startMinutes < openMinutes || endMinutes > closeMinutes) continue;
-
-    return {
-      selection: {
+    for (; startMinutes + durationMinutes <= closeMinutes; startMinutes += INTERACTION_INTERVAL_MINUTES) {
+      const endMinutes = startMinutes + durationMinutes;
+      if (startMinutes < openMinutes) continue;
+      const selection: ReservationTimeSelection = {
         source: 'toolbar',
         roomId: '',
         date: candidateDate,
         startAt: `${candidateDate}T${minutesToTimeInput(startMinutes)}`,
         endAt: `${candidateDate}T${minutesToTimeInput(endMinutes)}`,
-      },
-    };
+      };
+      if (reservationScheduleState(selection.startAt, selection.endAt, settings) === 'general') {
+        return { selection };
+      }
+      specialApprovalFallback ||= selection;
+    }
   }
 
+  if (specialApprovalFallback) return { selection: specialApprovalFallback };
   return { selection: emptySelection, unavailableMessage: noFutureReservationTimeMessage };
 }
 
-export function publicReservationScheduleState(
+export function reservationScheduleState(
   startAt: string,
   endAt: string,
-  settings: PublicReservationScheduleSettings,
-): PublicReservationScheduleState {
+  settings: SpecialApprovalScheduleSettings,
+): ReservationScheduleState {
   const date = normalizeDateInput(startAt.slice(0, 10));
   const endDate = normalizeDateInput(endAt.slice(0, 10));
   const startMinutes = timeValueToMinutes(startAt.slice(11));
   const endMinutes = timeValueToMinutes(endAt.slice(11));
   const operatingOpenMinutes = timeValueToMinutes(settings.openTime);
   const operatingCloseMinutes = timeValueToMinutes(settings.closeTime);
-  const publicOpenMinutes = timeValueToMinutes(settings.publicOpenTime);
-  const publicCloseMinutes = timeValueToMinutes(settings.publicCloseTime);
+  const specialApprovalStartMinutes = timeValueToMinutes(settings.specialApprovalStartTime);
+  const specialApprovalEndMinutes = timeValueToMinutes(settings.specialApprovalEndTime);
   const operatingDays = new Set(settings.availableDaysOfWeek.map(normalizeWeekday));
-  const publicDays = new Set(settings.publicAvailableDaysOfWeek.map(normalizeWeekday));
+  const specialApprovalDays = new Set(settings.specialApprovalDaysOfWeek.map(normalizeWeekday));
   const day = date ? weekdayCode(date) : undefined;
 
   if (
@@ -180,8 +185,8 @@ export function publicReservationScheduleState(
     || endMinutes === undefined
     || operatingOpenMinutes === undefined
     || operatingCloseMinutes === undefined
-    || publicOpenMinutes === undefined
-    || publicCloseMinutes === undefined
+    || specialApprovalStartMinutes === undefined
+    || specialApprovalEndMinutes === undefined
     || startMinutes >= endMinutes
     || startMinutes < operatingOpenMinutes
     || endMinutes > operatingCloseMinutes
@@ -189,11 +194,10 @@ export function publicReservationScheduleState(
     return 'operating-unavailable';
   }
 
-  return publicDays.has(day)
-    && startMinutes >= publicOpenMinutes
-    && endMinutes <= publicCloseMinutes
-    ? 'general'
-    : 'separate-confirmation';
+  return specialApprovalDays.has(day)
+    || (startMinutes < specialApprovalEndMinutes && endMinutes > specialApprovalStartMinutes)
+    ? 'special-approval'
+    : 'general';
 }
 
 // Reservation form values represent service-local wall time, not browser-local time.

@@ -42,12 +42,12 @@ export interface TimetableReservation {
 export interface TimetableAvailability {
   context: 'PUBLIC' | 'ADMIN';
   availableDaysOfWeek: string[];
-  publicAvailableDaysOfWeek: string[];
-  publicOpenTime: string;
-  publicCloseTime: string;
+  specialApprovalDaysOfWeek: string[];
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
 }
 
-export type TimetableAvailabilityState = 'available' | 'public-unavailable' | 'operating-unavailable';
+export type TimetableAvailabilityState = 'available' | 'special-approval' | 'operating-unavailable';
 
 interface ReservationDateTimetableProps {
   rooms: TimetableRoom[];
@@ -90,18 +90,11 @@ export function formatClock(totalMinutes: number) {
 export function timetableHoursSummary(
   openTime: string,
   closeTime: string,
-  availability?: TimetableAvailability,
+  _availability?: TimetableAvailability,
 ) {
   const normalizedOpenTime = openTime.slice(0, 5);
   const normalizedCloseTime = closeTime.slice(0, 5);
-  const publicOpenTime = availability?.publicOpenTime.slice(0, 5);
-  const publicCloseTime = availability?.publicCloseTime.slice(0, 5);
-  const operatingHours = `운영 시간 ${normalizedOpenTime}–${normalizedCloseTime}`;
-
-  return publicOpenTime && publicCloseTime
-    && (publicOpenTime !== normalizedOpenTime || publicCloseTime !== normalizedCloseTime)
-    ? `${operatingHours} · 신청 가능 시간 ${publicOpenTime}–${publicCloseTime}`
-    : operatingHours;
+  return `운영 시간 ${normalizedOpenTime}–${normalizedCloseTime}`;
 }
 
 export function buildSlots(openMinutes: number, closeMinutes: number, incrementMinutes: number) {
@@ -126,7 +119,10 @@ export function timetableDayAvailability(
   if (!availability) return 'available';
   const day = weekdayCode(date);
   if (!availability.availableDaysOfWeek.some((value) => value.slice(0, 3).toUpperCase() === day)) return 'operating-unavailable';
-  if (!availability.publicAvailableDaysOfWeek.some((value) => value.slice(0, 3).toUpperCase() === day)) return 'public-unavailable';
+  if (
+    availability.context === 'ADMIN'
+    && availability.specialApprovalDaysOfWeek.some((value) => value.slice(0, 3).toUpperCase() === day)
+  ) return 'special-approval';
   return 'available';
 }
 
@@ -139,9 +135,10 @@ export function timetableSlotAvailability(
   const dayState = timetableDayAvailability(date, availability);
   if (dayState !== 'available' || !availability) return dayState;
   if (
-    startMinutes < clockToMinutes(availability.publicOpenTime)
-    || endMinutes > clockToMinutes(availability.publicCloseTime)
-  ) return 'public-unavailable';
+    availability.context === 'ADMIN'
+    && startMinutes < clockToMinutes(availability.specialApprovalEndTime)
+    && endMinutes > clockToMinutes(availability.specialApprovalStartTime)
+  ) return 'special-approval';
   return 'available';
 }
 
@@ -152,10 +149,10 @@ export function isTimetableSlotSelectable(
   return state !== 'operating-unavailable';
 }
 
-export function TimetableAvailabilityLegend() {
+export function TimetableAvailabilityLegend({ context }: { context: TimetableAvailability['context'] }) {
   return (
     <span className="timetable-availability-legend" aria-label="시간표 이용 가능 상태 범례">
-      <span><i className="public-unavailable" aria-hidden="true" />별도 확인 필요</span>
+      {context === 'ADMIN' ? <span><i className="special-approval" aria-hidden="true" />특별 허가 필요</span> : null}
       <span><i className="operating-unavailable" aria-hidden="true" />운영하지 않음</span>
     </span>
   );
@@ -230,7 +227,7 @@ export function ReservationDateTimetable({
       <div className="timetable-summary" aria-live="polite">
         <strong>{selectedDate}</strong>
         <span className="timetable-summary-details">
-          {availability ? <TimetableAvailabilityLegend /> : null}
+          {availability ? <TimetableAvailabilityLegend context={availability.context} /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
           <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
         </span>
@@ -283,7 +280,7 @@ export function ReservationDateTimetable({
               key={room.id}
               className={`timetable-room-column availability-${dayState}`}
               style={{ height: bodyHeight }}
-              aria-label={`${room.name} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '별도 확인 필요' : '일반 예약 가능'}`}
+              aria-label={`${room.name} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'special-approval' ? '특별 허가 필요' : '예약 가능'}`}
             >
               {emptySlots.slice(0, -1).map((slot) => {
                 const endMinutes = slot + suggestedDurationMinutes;

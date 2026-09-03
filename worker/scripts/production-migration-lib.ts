@@ -14,6 +14,7 @@ const V4_MIGRATION = "004_applicant_name_visibility_v4";
 const V5_MIGRATION = "005_recurrence_hard_delete_v5";
 const V6_MIGRATION = "006_public_reservation_schedule_v6";
 const V7_MIGRATION = "007_applicant_phone_normalization_v7";
+const V8_MIGRATION = "008_special_approval_schedule_v8";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -647,6 +648,7 @@ export async function verifyProductionV6Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
   expectedLatestMigration = V6_MIGRATION,
+  requireLegacyConstraints = true,
 ): Promise<void> {
   await verifyProductionV5Schema(client, config, expectedLatestMigration);
 
@@ -690,8 +692,8 @@ export async function verifyProductionV6Schema(
     if (
       migration.rows[0]?.count !== 1
       || schema.rows[0]?.required_columns !== 3
-      || schema.rows[0]?.required_constraints !== 5
-      || values.rows[0]?.invalid_count !== 0
+      || (requireLegacyConstraints && schema.rows[0]?.required_constraints !== 5)
+      || (requireLegacyConstraints && values.rows[0]?.invalid_count !== 0)
     ) {
       throw new ProductionMigrationError("schema", "Production V6 public reservation schedule schema is incomplete.");
     }
@@ -704,8 +706,10 @@ export async function verifyProductionV6Schema(
 export async function verifyProductionV7Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  expectedLatestMigration = V7_MIGRATION,
+  requireLegacyPublicConstraints = true,
 ): Promise<void> {
-  await verifyProductionV6Schema(client, config, V7_MIGRATION);
+  await verifyProductionV6Schema(client, config, expectedLatestMigration, requireLegacyPublicConstraints);
 
   try {
     const migration = await client.query(
@@ -753,6 +757,75 @@ export async function verifyProductionV7Schema(
   }
 }
 
+export async function verifyProductionV8Schema(
+  client: SqlClient,
+  config: ProductionMigrationConfig,
+): Promise<void> {
+  await verifyProductionV7Schema(client, config, V8_MIGRATION, false);
+
+  try {
+    const migration = await client.query(
+      `SELECT count(*)::integer AS count
+       FROM ${EXPECTED_SCHEMA}.${MIGRATIONS_TABLE}
+       WHERE name=$1`,
+      [V8_MIGRATION],
+    );
+    const schema = await client.query(
+      `SELECT
+         count(*) FILTER (
+           WHERE table_name='operation_settings'
+             AND column_name = ANY($1::text[])
+             AND is_nullable='NO'
+         )::integer AS special_columns,
+         count(*) FILTER (
+           WHERE table_name='operation_settings'
+             AND column_name = ANY($2::text[])
+         )::integer AS legacy_columns,
+         (SELECT count(*)::integer
+          FROM pg_constraint
+          WHERE conrelid='public.operation_settings'::regclass
+            AND conname = ANY($3::text[])) AS special_constraints,
+         (SELECT count(*)::integer
+          FROM pg_constraint
+          WHERE conrelid='public.operation_settings'::regclass
+            AND conname LIKE 'chk_operation_settings_public_%') AS legacy_constraints
+       FROM information_schema.columns
+       WHERE table_schema='public'`,
+      [["special_approval_start_time", "special_approval_end_time", "special_approval_days_of_week"],
+        ["public_open_time", "public_close_time", "public_available_days_of_week"],
+        [
+          "chk_operation_settings_special_approval_time_range",
+          "chk_operation_settings_special_approval_grid",
+          "chk_operation_settings_special_approval_days_subset",
+        ]],
+    );
+    const values = await client.query(
+      `SELECT count(*)::integer AS invalid_count
+       FROM operation_settings
+       WHERE special_approval_start_time IS NULL
+          OR special_approval_end_time IS NULL
+          OR special_approval_days_of_week IS NULL
+          OR NOT (open_time <= special_approval_start_time
+            AND special_approval_start_time < special_approval_end_time
+            AND special_approval_end_time <= close_time)
+          OR NOT (string_to_array(special_approval_days_of_week, ',') <@ string_to_array(available_days_of_week, ','))`,
+    );
+    if (
+      migration.rows[0]?.count !== 1
+      || schema.rows[0]?.special_columns !== 3
+      || schema.rows[0]?.legacy_columns !== 3
+      || schema.rows[0]?.special_constraints !== 3
+      || schema.rows[0]?.legacy_constraints !== 0
+      || values.rows[0]?.invalid_count !== 0
+    ) {
+      throw new ProductionMigrationError("schema", "Production V8 special approval schedule schema is incomplete.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V8 special approval schedule schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -760,6 +833,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV7Schema(client, config);
+    await verifyProductionV8Schema(client, config);
   });
 }

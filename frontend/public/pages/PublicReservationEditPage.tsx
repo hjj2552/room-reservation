@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail, PublicReservationUpdatePayload } from '../../shared/api/types';
-import { ModalDialog } from '../../shared/components/ModalDialog';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
 import { ReservationTimeRangeInput } from '../../shared/components/ReservationTimeRangeInput';
@@ -21,14 +20,12 @@ import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 import {
   hasReservationPlacementChanges,
-  hasReservationTimeChanges,
   hasReservationValueChanges,
 } from '../../shared/utils/reservationChanges';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
   publicPastReservationMessage,
-  publicReservationScheduleState,
   toServiceDateTimeLocal,
 } from '../../shared/utils/reservationTime';
 
@@ -76,11 +73,6 @@ export function PublicReservationEditPage() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(!routeState?.verifiedReservation);
   const [successMessage, setSuccessMessage] = useState('');
   const [submissionPolicyError, setSubmissionPolicyError] = useState('');
-  const [pendingUpdate, setPendingUpdate] = useState<{
-    values: PublicReservationEditValues;
-    payload: PublicReservationUpdatePayload;
-    previousStatus: PublicReservationEditDetail['status'];
-  } | null>(null);
   const {
     register,
     handleSubmit,
@@ -147,7 +139,6 @@ export function PublicReservationEditPage() {
       payload,
       {
         onSuccess: (updated) => {
-          setPendingUpdate(null);
           setSuccessMessage(
             previousStatus === 'CONFIRMED'
               ? '수정 완료. 다시 승인 대기로 변경되었습니다.'
@@ -208,13 +199,6 @@ export function PublicReservationEditPage() {
       )
     ) {
       navigate(`/reservations/${verifiedReservation.id}`);
-      return;
-    }
-    if (
-      hasReservationTimeChanges(currentPlacement, payload)
-      && publicReservationScheduleState(values.startAt, values.endAt, settings.data) === 'separate-confirmation'
-    ) {
-      setPendingUpdate({ values, payload, previousStatus });
       return;
     }
     performUpdate(values, payload, previousStatus);
@@ -376,40 +360,6 @@ export function PublicReservationEditPage() {
             </button>
           </div>
         </form>
-      ) : null}
-      {pendingUpdate ? (
-        <ModalDialog
-          title="별도 확인 필요"
-          titleId="public-edit-exception-title"
-          ariaDescribedBy="public-edit-exception-description"
-          onClose={() => setPendingUpdate(null)}
-          closeDisabled={update.isPending}
-          testId="public-edit-exception-dialog"
-        >
-          <p id="public-edit-exception-description">
-            일반 예약 가능 시간 외입니다. 신청 후 담당자가 이용 가능 여부를 확인하기 위해 연락드리며, 확인 후 승인 여부가 결정됩니다.
-          </p>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setPendingUpdate(null)}
-              disabled={update.isPending}
-              autoFocus
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => performUpdate(pendingUpdate.values, pendingUpdate.payload, pendingUpdate.previousStatus)}
-              disabled={update.isPending}
-              data-testid="public-edit-exception-confirm"
-            >
-              {update.isPending ? '저장 중...' : '확인'}
-            </button>
-          </div>
-        </ModalDialog>
       ) : null}
     </main>
   );

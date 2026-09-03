@@ -16,7 +16,7 @@ import { useSettings } from '../../shared/hooks/useSettings';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
 import { timetableDuplicateReservationUrl, timetableReservationUrl } from '../../shared/utils/timetable';
-import { publicReservationScheduleState, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
+import { reservationScheduleState, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 
 export function ReservationDetailPage() {
   const { reservationId = '' } = useParams();
@@ -67,11 +67,11 @@ export function ReservationDetailPage() {
       setApprovalPolicyError('최신 운영 설정을 불러오지 못했습니다. 다시 시도해 주세요.');
       return;
     }
-    if (publicReservationScheduleState(
+    if (reservationScheduleState(
       toServiceDateTimeLocal(detail.startAt),
       toServiceDateTimeLocal(detail.endAt),
       latestSettings.data,
-    ) === 'separate-confirmation') {
+    ) === 'special-approval') {
       setShowApproveModal(true);
       return;
     }
@@ -305,7 +305,7 @@ export function ReservationDetailPage() {
           testId="reservation-approve-modal"
         >
           <p id="reservation-approve-modal-description">
-            일반 예약 가능 시간 외입니다. 정말로 승인하시겠습니까?
+            이 예약은 특별 허가 시간 또는 요일에 해당합니다. 이용 가능 여부를 확인한 뒤 승인해 주세요. 정말 승인하시겠습니까?
           </p>
           <div className="modal-actions">
             <button

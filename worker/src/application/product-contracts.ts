@@ -21,11 +21,11 @@ export interface UpdateSettingsCommand {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
-  publicOpenTime: string;
-  publicCloseTime: string;
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
   slotMinutes: number;
   availableDaysOfWeek: string[];
-  publicAvailableDaysOfWeek: string[];
+  specialApprovalDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
   adminContactEmail: string | null;

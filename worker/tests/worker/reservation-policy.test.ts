@@ -11,11 +11,11 @@ const settings: OperationSettings = {
   semesterEndDate: "2026-07-31",
   openTime: "09:00",
   closeTime: "18:00",
-  publicOpenTime: "10:00",
-  publicCloseTime: "17:00",
+  specialApprovalStartTime: "10:00",
+  specialApprovalEndTime: "17:00",
   slotMinutes: 5,
   availableDaysOfWeek: ["MON", "TUE", "WED", "THU", "FRI"],
-  publicAvailableDaysOfWeek: ["TUE", "WED", "THU"],
+  specialApprovalDaysOfWeek: ["TUE", "WED", "THU"],
   minReservationMinutes: 30,
   maxReservationMinutes: 240,
   adminContactEmail: null,
@@ -37,7 +37,7 @@ function reservation(startAt: string, endAt: string): ReservationInput {
 }
 
 describe("public reservation operating policy", () => {
-  it("allows general and separate-confirmation times inside the operating schedule", () => {
+  it("allows general and special-approval times inside the operating schedule", () => {
     const now = new Date("2026-07-01T00:00:00Z");
 
     expect(() => validateReservationPolicy(true, settings, reservation(

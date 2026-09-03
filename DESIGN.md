@@ -296,25 +296,27 @@ document scrolling when all content fits in one viewport.
   selected period is unavailable for reservation. Availability changes cell
   interaction and presentation, not the user's ability to inspect the
   timetable.
-- Use the public-unavailable text and soft-surface roles for operating periods
-  outside the general reservation schedule. Public users may select those cells,
-  but must confirm that staff will contact them before approval is decided.
-- Use the neutral timetable background with a muted `×` marker in each
-  30-minute cell for days or times outside the operating schedule. Do not use a
-  gray surface fill. Those cells are unavailable to both public users and
-  administrators. Operating unavailability takes visual precedence when both
-  restrictions apply.
+- Public timetables present every selectable period inside the operating
+  schedule with the same neutral treatment. Special-approval configuration is
+  an administrator approval concern and must not be exposed there.
+- Administrator timetables use a flat, pale orange surface for periods that
+  require special approval. Keep this visually distinct from requested
+  reservation cards, which retain their existing border and content hierarchy.
+- Use a pale danger surface for days or times outside the operating schedule.
+  Do not place an `×` marker in each cell. Those cells are unavailable to both
+  public users and administrators, and operating unavailability takes visual
+  precedence when both restrictions apply.
 - Existing reservation blocks remain visible and keep their normal status
   treatment over unavailable backgrounds.
 - Show timetable availability legends on both public and administrator
-  surfaces. Pair the public-unavailable swatch and operating-unavailable `×`
-  marker with literal labels such as `별도 확인 필요` or `운영하지 않음`;
-  color alone must not carry the meaning.
+  surfaces. Pair each swatch with a literal label: `특별 허가 필요` on
+  administrator surfaces and `운영하지 않음` wherever operating availability
+  is shown. Color alone must not carry the meaning.
 - Place the availability legend immediately before the timetable's time, room,
   and reservation-count summary. Separate the legend from those statistics
   with a visibly spaced `|`, not the same middle-dot separator used between
-  related statistics. For example: `별도 확인 필요   |   09:00-20:00 · 활성
-  공간 10개 · 예약 7건`.
+  related statistics. For example: `특별 허가 필요   |   운영 시간
+  09:00-21:00`.
 
 ### Public reservation flow
 

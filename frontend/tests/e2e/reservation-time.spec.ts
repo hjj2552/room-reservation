@@ -9,12 +9,12 @@ import {
   isPastServiceReservationTime,
   newRequestSelection,
   noFutureReservationTimeMessage,
-  publicReservationScheduleState,
+  reservationScheduleState,
   slotToReservationSelection,
   toServiceEndOfDayOffset,
   toServiceDateTimeLocal,
   toServiceStartOfDayOffset,
-  type ReservationTimeSettings,
+  type SpecialApprovalScheduleSettings,
 } from '../../shared/utils/reservationTime';
 import {
   hasReservationPlacementChanges,
@@ -35,12 +35,15 @@ import {
 } from '../../shared/utils/timeOptions';
 import { publicPasswordHelp } from '../../shared/utils/publicPassword';
 
-const settings: ReservationTimeSettings = {
+const settings: SpecialApprovalScheduleSettings = {
   semesterStartDate: '2026-07-01',
   semesterEndDate: '2026-07-31',
   openTime: '09:00',
   closeTime: '18:00',
   availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+  specialApprovalStartTime: '12:00',
+  specialApprovalEndTime: '13:00',
+  specialApprovalDaysOfWeek: ['SATURDAY', 'SUNDAY'],
   minReservationMinutes: 30,
   maxReservationMinutes: 240,
 };
@@ -48,9 +51,9 @@ const settings: ReservationTimeSettings = {
 const availability: TimetableAvailability = {
   context: 'PUBLIC',
   availableDaysOfWeek: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-  publicAvailableDaysOfWeek: ['TUE', 'WED', 'THU'],
-  publicOpenTime: '10:00',
-  publicCloseTime: '17:00',
+  specialApprovalDaysOfWeek: ['TUE', 'WED', 'THU'],
+  specialApprovalStartTime: '10:00',
+  specialApprovalEndTime: '17:00',
 };
 
 test('uses a fixed 30-minute timetable interaction interval', () => {
@@ -63,43 +66,54 @@ test('uses a fixed 30-minute timetable interaction interval', () => {
   expect(defaultSuggestedDurationMinutes(120)).toBe(120);
 });
 
-test('distinguishes operating and public availability without changing admin access', () => {
-  expect(timetableDayAvailability('2026-07-13', availability)).toBe('public-unavailable');
-  expect(timetableDayAvailability('2026-07-14', availability)).toBe('available');
+test('shows special approval only to administrators and keeps operating limits unavailable', () => {
+  expect(timetableDayAvailability('2026-07-13', availability)).toBe('available');
+  expect(timetableSlotAvailability('2026-07-14', 9 * 60 + 30, 10 * 60, availability)).toBe('available');
+  const adminAvailability = { ...availability, context: 'ADMIN' as const };
+  expect(timetableDayAvailability('2026-07-14', adminAvailability)).toBe('special-approval');
+  expect(timetableDayAvailability('2026-07-13', adminAvailability)).toBe('available');
   expect(timetableDayAvailability('2026-07-12', availability)).toBe('operating-unavailable');
-  expect(timetableSlotAvailability('2026-07-14', 9 * 60 + 30, 10 * 60, availability)).toBe('public-unavailable');
-  expect(timetableSlotAvailability('2026-07-14', 10 * 60, 10 * 60 + 30, availability)).toBe('available');
-  expect(timetableSlotAvailability('2026-07-14', 16 * 60 + 30, 17 * 60 + 30, availability)).toBe('public-unavailable');
-  expect(isTimetableSlotSelectable('public-unavailable', 'PUBLIC')).toBe(true);
-  expect(isTimetableSlotSelectable('public-unavailable', 'ADMIN')).toBe(true);
+  expect(timetableSlotAvailability('2026-07-13', 9 * 60 + 30, 10 * 60, adminAvailability)).toBe('available');
+  expect(timetableSlotAvailability('2026-07-13', 9 * 60 + 30, 10 * 60 + 30, adminAvailability)).toBe('special-approval');
+  expect(timetableSlotAvailability('2026-07-13', 17 * 60, 17 * 60 + 30, adminAvailability)).toBe('available');
+  expect(isTimetableSlotSelectable('special-approval', 'ADMIN')).toBe(true);
   expect(isTimetableSlotSelectable('operating-unavailable', 'PUBLIC')).toBe(false);
   expect(isTimetableSlotSelectable('operating-unavailable', 'ADMIN')).toBe(false);
 });
 
-test('classifies general, separate-confirmation and operating-unavailable reservation times', () => {
+test('classifies general, special approval and operating-unavailable reservation times', () => {
   const schedule = {
     ...settings,
-    publicOpenTime: availability.publicOpenTime,
-    publicCloseTime: availability.publicCloseTime,
-    publicAvailableDaysOfWeek: availability.publicAvailableDaysOfWeek,
+    specialApprovalStartTime: availability.specialApprovalStartTime,
+    specialApprovalEndTime: availability.specialApprovalEndTime,
+    specialApprovalDaysOfWeek: availability.specialApprovalDaysOfWeek,
   };
 
-  expect(publicReservationScheduleState('2026-07-14T10:00', '2026-07-14T10:30', schedule)).toBe('general');
-  expect(publicReservationScheduleState('2026-07-14T09:30', '2026-07-14T10:00', schedule)).toBe('separate-confirmation');
-  expect(publicReservationScheduleState('2026-07-14T16:30', '2026-07-14T17:30', schedule)).toBe('separate-confirmation');
-  expect(publicReservationScheduleState('2026-07-13T10:00', '2026-07-13T10:30', schedule)).toBe('separate-confirmation');
-  expect(publicReservationScheduleState('2026-07-12T10:00', '2026-07-12T10:30', schedule)).toBe('operating-unavailable');
+  expect(reservationScheduleState('2026-07-13T09:00', '2026-07-13T10:00', schedule)).toBe('general');
+  expect(reservationScheduleState('2026-07-13T09:30', '2026-07-13T10:00', schedule)).toBe('general');
+  expect(reservationScheduleState('2026-07-13T09:30', '2026-07-13T10:30', schedule)).toBe('special-approval');
+  expect(reservationScheduleState('2026-07-13T17:00', '2026-07-13T17:30', schedule)).toBe('general');
+  expect(reservationScheduleState('2026-07-13T16:30', '2026-07-13T17:30', schedule)).toBe('special-approval');
+  expect(reservationScheduleState('2026-07-16T09:00', '2026-07-16T09:30', schedule)).toBe('special-approval');
+  expect(reservationScheduleState('2026-07-12T10:00', '2026-07-12T10:30', schedule)).toBe('operating-unavailable');
 });
 
-test('public toolbar suggestions use the public schedule passed by the caller', () => {
+test('toolbar suggestions prefer general time and fall back to special approval time', () => {
   const result = newRequestSelection({
     ...settings,
-    openTime: availability.publicOpenTime,
-    closeTime: availability.publicCloseTime,
-    availableDaysOfWeek: availability.publicAvailableDaysOfWeek,
+    specialApprovalStartTime: '09:00',
+    specialApprovalEndTime: '10:00',
   }, new Date('2026-07-13T00:00:00Z'));
-  expect(result.selection.startAt).toBe('2026-07-14T10:00');
-  expect(result.selection.endAt).toBe('2026-07-14T10:30');
+  expect(result.selection.startAt).toBe('2026-07-13T10:00');
+  expect(result.selection.endAt).toBe('2026-07-13T10:30');
+
+  const fallback = newRequestSelection({
+    ...settings,
+    availableDaysOfWeek: ['MONDAY'],
+    specialApprovalDaysOfWeek: ['MONDAY'],
+    semesterEndDate: '2026-07-13',
+  }, new Date('2026-07-13T00:00:00Z'));
+  expect(fallback.selection.startAt).toBe('2026-07-13T09:30');
 });
 
 test('uses the operating start before opening time', () => {
@@ -299,7 +313,7 @@ function expectSelection(
   now: string,
   startAt: string,
   endAt: string,
-  overrides: Partial<ReservationTimeSettings> = {},
+  overrides: Partial<SpecialApprovalScheduleSettings> = {},
 ) {
   const result = newRequestSelection({ ...settings, ...overrides }, new Date(now));
   expect(result.unavailableMessage).toBeUndefined();

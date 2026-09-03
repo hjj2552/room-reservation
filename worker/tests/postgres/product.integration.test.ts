@@ -115,8 +115,8 @@ beforeAll(async () => {
       semester_start_date=(current_date - interval '1 day')::date,
       semester_end_date=(current_date + interval '180 days')::date,
       open_time='09:00', close_time='18:00', available_days_of_week='MON,TUE,WED,THU,FRI',
-      public_open_time='09:00', public_close_time='18:00',
-      public_available_days_of_week='MON,TUE,WED,THU,FRI', version=0`,
+      special_approval_start_time='16:00', special_approval_end_time='18:00',
+      special_approval_days_of_week='THU,FRI', version=0`,
   );
 });
 
@@ -140,7 +140,7 @@ describe("Worker migrations", () => {
     expect(sentinel.rows).toEqual([{ name: "삭제된 공간" }]);
   });
 
-  it("keeps the V5 recurrence cleanup and applies the V6 and V7 schema contracts", async () => {
+  it("keeps legacy public columns and applies the V8 special approval schema", async () => {
     const schema = await database.query(
       `SELECT
          EXISTS (
@@ -170,10 +170,13 @@ describe("Worker migrations", () => {
       "005_recurrence_hard_delete_v5",
       "006_public_reservation_schedule_v6",
       "007_applicant_phone_normalization_v7",
+      "008_special_approval_schedule_v8",
     ]);
     const settings = await database.query(
       `SELECT open_time::text, close_time::text, available_days_of_week,
-        public_open_time::text, public_close_time::text, public_available_days_of_week
+        public_open_time::text, public_close_time::text, public_available_days_of_week,
+        special_approval_start_time::text, special_approval_end_time::text,
+        special_approval_days_of_week
        FROM operation_settings WHERE id=1`,
     );
     expect(settings.rows[0]).toEqual({
@@ -181,8 +184,11 @@ describe("Worker migrations", () => {
       close_time: "18:00:00",
       available_days_of_week: "MON,TUE,WED,THU,FRI",
       public_open_time: "09:00:00",
-      public_close_time: "18:00:00",
-      public_available_days_of_week: "MON,TUE,WED,THU,FRI",
+      public_close_time: "21:00:00",
+      public_available_days_of_week: "MON,TUE,WED,THU,FRI,SAT,SUN",
+      special_approval_start_time: "16:00:00",
+      special_approval_end_time: "18:00:00",
+      special_approval_days_of_week: "THU,FRI",
     });
     const phoneConstraints = await database.query(
       `SELECT conname FROM pg_constraint
@@ -194,6 +200,18 @@ describe("Worker migrations", () => {
        ) ORDER BY conname`,
     );
     expect(phoneConstraints.rows).toHaveLength(4);
+  });
+
+  it("enforces special approval alignment, operating range and weekday subset constraints", async () => {
+    await expect(database.query(
+      "UPDATE operation_settings SET special_approval_start_time='16:15' WHERE id=1",
+    )).rejects.toThrow();
+    await expect(database.query(
+      "UPDATE operation_settings SET special_approval_start_time='08:30' WHERE id=1",
+    )).rejects.toThrow();
+    await expect(database.query(
+      "UPDATE operation_settings SET special_approval_days_of_week='SUN' WHERE id=1",
+    )).rejects.toThrow();
   });
 
   it("rolls transactions back", async () => {
@@ -1082,8 +1100,8 @@ async function resetProductData() {
       semester_start_date=(current_date - interval '1 day')::date,
       semester_end_date=(current_date + interval '180 days')::date,
       open_time='09:00', close_time='18:00', available_days_of_week='MON,TUE,WED,THU,FRI',
-      public_open_time='09:00', public_close_time='18:00',
-      public_available_days_of_week='MON,TUE,WED,THU,FRI',
+      special_approval_start_time='16:00', special_approval_end_time='18:00',
+      special_approval_days_of_week='THU,FRI',
       min_reservation_minutes=30, max_reservation_minutes=240,
       admin_contact_email='admin@example.test', admin_contact_phone=NULL,
       completion_message=NULL, updated_by=NULL, version=0`,
@@ -2362,13 +2380,13 @@ describe("direct Worker contracts", () => {
     const updatedSettings = await products.updateSettings(parseUpdateSettings({
       ...settingsBefore,
       availableDaysOfWeek: ["THU", "TUE", "WED"],
-      publicAvailableDaysOfWeek: ["THU", "TUE", "WED"],
+      specialApprovalDaysOfWeek: ["THU", "TUE", "WED"],
     }), "admin");
     expect(updatedSettings.availableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
-    expect(updatedSettings.publicAvailableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
+    expect(updatedSettings.specialApprovalDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
     expect((await database.query(
-      "SELECT available_days_of_week, public_available_days_of_week FROM operation_settings WHERE id=1",
-    )).rows).toEqual([{ available_days_of_week: "TUE,WED,THU", public_available_days_of_week: "TUE,WED,THU" }]);
+      "SELECT available_days_of_week, special_approval_days_of_week FROM operation_settings WHERE id=1",
+    )).rows).toEqual([{ available_days_of_week: "TUE,WED,THU", special_approval_days_of_week: "TUE,WED,THU" }]);
 
     const recurrence = await products.createRecurrence(parseRecurrenceCreate({
       roomId,
@@ -2406,7 +2424,7 @@ describe("direct Worker contracts", () => {
     expect((await products.getRecurrence(recurrence.recurrenceId)).daysOfWeek).toBe("TUE,WED,THU");
 
     await database.query(
-      "UPDATE operation_settings SET available_days_of_week='THU,TUE,WED', public_available_days_of_week='THU,TUE,WED' WHERE id=1",
+      "UPDATE operation_settings SET available_days_of_week='THU,TUE,WED', special_approval_days_of_week='THU,TUE,WED' WHERE id=1",
     );
     const { app, cookie } = await authenticatedApp();
     const publicSettingsResponse = await app.request("http://worker.test/api/public/settings");
@@ -2415,10 +2433,17 @@ describe("direct Worker contracts", () => {
     });
     expect(publicSettingsResponse.status).toBe(200);
     expect(adminSettingsResponse.status).toBe(200);
-    expect((await publicSettingsResponse.json() as { availableDaysOfWeek: string[] }).availableDaysOfWeek)
-      .toEqual(["TUE", "WED", "THU"]);
-    expect((await adminSettingsResponse.json() as { availableDaysOfWeek: string[] }).availableDaysOfWeek)
-      .toEqual(["TUE", "WED", "THU"]);
+    const publicSettings = await publicSettingsResponse.json() as Record<string, unknown>;
+    const adminSettings = await adminSettingsResponse.json() as Record<string, unknown>;
+    for (const responseSettings of [publicSettings, adminSettings]) {
+      expect(responseSettings.availableDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
+      expect(responseSettings.specialApprovalDaysOfWeek).toEqual(["TUE", "WED", "THU"]);
+      expect(responseSettings.specialApprovalStartTime).toBe("16:00:00");
+      expect(responseSettings.specialApprovalEndTime).toBe("18:00:00");
+      expect(responseSettings).not.toHaveProperty("publicOpenTime");
+      expect(responseSettings).not.toHaveProperty("publicCloseTime");
+      expect(responseSettings).not.toHaveProperty("publicAvailableDaysOfWeek");
+    }
 
     expect(await products.checkAvailability({
       roomId,
@@ -2455,7 +2480,7 @@ describe("direct Worker contracts", () => {
     await expect(products.updateSettings(command, "admin")).rejects.toMatchObject({ kind: "CONFLICT", code: "VERSION_CONFLICT" });
   });
 
-  it("allows public reservations throughout the operating schedule while preserving general schedule settings", async () => {
+  it("allows public reservations throughout the operating schedule while preserving special approval settings", async () => {
     await resetProductData();
     const existingRoomId = await insertRoom("testing-room-public-schedule-existing");
     const publicRoomId = await insertRoom("testing-room-public-schedule-create");
@@ -2468,11 +2493,11 @@ describe("direct Worker contracts", () => {
 
     const settings = await products.updateSettings(parseUpdateSettings({
       ...before,
-      publicOpenTime: "10:00",
-      publicCloseTime: "17:00",
-      publicAvailableDaysOfWeek: ["FRI", "MON", "WED", "TUE", "THU"],
+      specialApprovalStartTime: "10:00",
+      specialApprovalEndTime: "17:00",
+      specialApprovalDaysOfWeek: ["FRI", "MON", "WED", "TUE", "THU"],
     }), "admin");
-    expect(settings.publicAvailableDaysOfWeek).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
+    expect(settings.specialApprovalDaysOfWeek).toEqual(["MON", "TUE", "WED", "THU", "FRI"]);
 
     await expect(products.createPublicReservation(parsePublicReservation(
       publicPayload(publicRoomId, password, "testing-public-before-open", 9),
@@ -2536,18 +2561,17 @@ describe("direct Worker contracts", () => {
 
     await expect(products.updateSettings(parseUpdateSettings({
       ...settings,
-      publicAvailableDaysOfWeek: ["SUN"],
-    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicAvailableDaysOfWeek" }] });
+      specialApprovalDaysOfWeek: ["SUN"],
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "specialApprovalDaysOfWeek" }] });
     await expect(products.updateSettings(parseUpdateSettings({
       ...settings,
-      publicOpenTime: "08:30",
-    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicOpenTime" }] });
+      specialApprovalStartTime: "08:30",
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "specialApprovalStartTime" }] });
     await expect(products.updateSettings(parseUpdateSettings({
       ...settings,
-      publicOpenTime: "16:30",
-      publicCloseTime: "17:00",
-      minReservationMinutes: 60,
-    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "publicCloseTime" }] });
+      specialApprovalStartTime: "17:00",
+      specialApprovalEndTime: "17:00",
+    }), "admin")).rejects.toMatchObject({ fieldErrors: [{ field: "specialApprovalStartTime" }] });
   });
 
   it("leaves no recurrence, child reservation or history when FAIL_ALL sees one conflict", async () => {

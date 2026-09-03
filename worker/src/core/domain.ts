@@ -13,11 +13,11 @@ export interface OperationSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
-  publicOpenTime: string;
-  publicCloseTime: string;
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
   slotMinutes: 5;
   availableDaysOfWeek: string[];
-  publicAvailableDaysOfWeek: string[];
+  specialApprovalDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
   adminContactEmail: string | null;
@@ -328,8 +328,8 @@ export function validateReservationPolicy(
   }
 }
 
-export function normalizeDays(value: unknown, field = "daysOfWeek"): string[] {
-  if (!Array.isArray(value) || value.length === 0) validation("must not be empty", field);
+export function normalizeDays(value: unknown, field = "daysOfWeek", allowEmpty = false): string[] {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)) validation("must not be empty", field);
   const normalizedDays = [...new Set(value.map((item) => {
     if (typeof item !== "string") validation("Invalid day of week", field);
     const normalized = item.trim().toUpperCase().slice(0, 3);

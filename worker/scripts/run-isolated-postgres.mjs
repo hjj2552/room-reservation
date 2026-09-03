@@ -136,7 +136,7 @@ try {
     "testing-room-middle|2",
     "testing-room-zulu|3",
   ])) {
-    throw new Error(`V1 to V7 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
+    throw new Error(`V1 to V8 room order migration failed: ${JSON.stringify(upgradedOrder)}`);
   }
   const sentinelDisplayOrder = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
@@ -163,7 +163,7 @@ try {
               'chk_recurrences_applicant_email_optional'
             )) = 2`,
   ]).trim();
-  if (upgradedContactSchema !== "t") throw new Error("V1 to V7 contact migration failed");
+  if (upgradedContactSchema !== "t") throw new Error("V1 to V8 contact migration failed");
   const upgradedVisibilitySchema = run("docker", [
     "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_upgrade",
     "--tuples-only", "--no-align",
@@ -201,7 +201,7 @@ try {
            AND indexname='idx_recurrences_deleted_at'
        )`,
   ]).trim();
-  if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V7 schema migration failed");
+  if (upgradedVisibilitySchema !== "t") throw new Error("V1 to V8 schema migration failed");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v4_upgrade"]);
   const v4UpgradeUrl = `${baseUrl}/worker_v4_upgrade`;
@@ -308,9 +308,9 @@ try {
        AND (SELECT count(*) FROM reservations WHERE recurrence_id IS NOT NULL) = 2
        AND (SELECT count(*) FROM reservation_histories) = 2`,
   ]).trim();
-  if (v4UpgradeState !== "t") throw new Error("V4 to V7 standalone migration contract failed");
+  if (v4UpgradeState !== "t") throw new Error("V4 to V8 standalone migration contract failed");
   const afterV5 = preservationSnapshot("worker_v4_upgrade");
-  if (beforeV5 !== afterV5) throw new Error("V4 to V7 migration changed non-phone recurrence product data");
+  if (beforeV5 !== afterV5) throw new Error("V4 to V8 migration changed recurrence product data");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v5_upgrade"]);
   const v5UpgradeUrl = `${baseUrl}/worker_v5_upgrade`;
@@ -335,17 +335,22 @@ try {
               AND public_close_time=close_time
               AND public_available_days_of_week=available_days_of_week
             FROM operation_settings WHERE id=1)
+       AND (SELECT special_approval_start_time='18:00'
+              AND special_approval_end_time='21:00'
+              AND special_approval_days_of_week='SAT,SUN'
+            FROM operation_settings WHERE id=1)
        AND (SELECT count(*) FROM pg_constraint
             WHERE conrelid='operation_settings'::regclass
               AND conname IN (
-                'chk_operation_settings_public_time_range',
-                'chk_operation_settings_public_grid',
-                'chk_operation_settings_public_min_minutes',
-                'chk_operation_settings_public_days_not_blank',
-                'chk_operation_settings_public_days_subset'
-              )) = 5`,
+                'chk_operation_settings_special_approval_time_range',
+                'chk_operation_settings_special_approval_grid',
+                'chk_operation_settings_special_approval_days_subset'
+              )) = 3
+       AND (SELECT count(*) FROM pg_constraint
+            WHERE conrelid='operation_settings'::regclass
+              AND conname LIKE 'chk_operation_settings_public_%') = 0`,
   ]).trim();
-  if (v5UpgradeState !== "t") throw new Error("V5 to V7 standalone migration contract failed");
+  if (v5UpgradeState !== "t") throw new Error("V5 to V8 standalone migration contract failed");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v6_upgrade"]);
   const v6UpgradeUrl = `${baseUrl}/worker_v6_upgrade`;
@@ -410,7 +415,7 @@ try {
               'chk_histories_before_reservation_applicant_phone_digits'
             )) = 4`,
   ]).trim();
-  if (v6UpgradeState !== "t") throw new Error("V6 to V7 phone normalization contract failed");
+  if (v6UpgradeState !== "t") throw new Error("V6 to V8 phone normalization contract failed");
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v6_invalid"]);
   const v6InvalidUrl = `${baseUrl}/worker_v6_invalid`;
@@ -449,6 +454,63 @@ try {
   ]).trim();
   if (invalidState !== "t") throw new Error("V7 fail-closed migration contract failed");
 
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v7_upgrade"]);
+  const v7UpgradeUrl = `${baseUrl}/worker_v7_upgrade`;
+  runMigration("scripts/migrate-v7-for-test.ts", v7UpgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v7_upgrade",
+    "-v", "ON_ERROR_STOP=1",
+    "-c",
+    `UPDATE operation_settings
+     SET open_time='08:00', close_time='20:00', available_days_of_week='MON,TUE,WED,THU,FRI,SAT',
+         public_open_time='09:00', public_close_time='18:00',
+         public_available_days_of_week='MON,TUE,WED,THU,FRI';
+     INSERT INTO rooms(name,capacity,enabled,display_order)
+       VALUES ('testing-room-v8-existing',10,true,1);
+     INSERT INTO reservation_recurrences(
+       room_id,applicant_name,purpose,start_date,end_date,days_of_week,start_time,end_time,
+       conflict_policy,created_by,show_applicant_name
+     ) SELECT id,'testing-v8-recurrence','testing-v8-recurrence',DATE '2035-01-08',DATE '2035-01-08',
+       'MON','10:00','11:00','FAIL_ALL','admin',false
+       FROM rooms WHERE name='testing-room-v8-existing';
+     INSERT INTO reservations(
+       room_id,recurrence_id,applicant_name,purpose,start_at,end_at,status,source,
+       created_by_actor_type,show_applicant_name
+     ) SELECT room_id,id,'testing-v8-reservation','testing-v8-reservation',
+       TIMESTAMPTZ '2035-01-08 01:00:00+00',TIMESTAMPTZ '2035-01-08 02:00:00+00',
+       'CONFIRMED','RECURRING_GENERATED','ADMIN',false
+       FROM reservation_recurrences WHERE purpose='testing-v8-recurrence';
+     INSERT INTO reservation_histories(
+       reservation_id,action,after_status,actor_type,reservation_room_id,reservation_purpose,
+       reservation_applicant_name,reservation_show_applicant_name
+     ) SELECT id,'RECURRENCE_GENERATED',status,'ADMIN',room_id,purpose,applicant_name,show_applicant_name
+       FROM reservations WHERE purpose='testing-v8-reservation'`,
+  ]);
+  runMigration("scripts/migrate.ts", v7UpgradeUrl);
+  runMigration("scripts/migrate.ts", v7UpgradeUrl);
+  const v7UpgradeState = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v7_upgrade",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT
+       (SELECT count(*) FROM worker_migrations
+        WHERE name='008_special_approval_schedule_v8') = 1
+       AND (SELECT open_time='09:00' AND close_time='21:00'
+              AND available_days_of_week='MON,TUE,WED,THU,FRI,SAT,SUN'
+              AND special_approval_start_time='18:00' AND special_approval_end_time='21:00'
+              AND special_approval_days_of_week='SAT,SUN'
+              AND public_open_time=open_time AND public_close_time=close_time
+              AND public_available_days_of_week=available_days_of_week
+            FROM operation_settings WHERE id=1)
+       AND (SELECT count(*) FROM reservations) = 1
+       AND (SELECT count(*) FROM reservation_recurrences) = 1
+       AND (SELECT count(*) FROM reservation_histories) = 1
+       AND (SELECT count(*) FROM pg_constraint
+            WHERE conrelid='operation_settings'::regclass
+              AND conname LIKE 'chk_operation_settings_public_%') = 0`,
+  ]).trim();
+  if (v7UpgradeState !== "t") throw new Error("V7 to V8 standalone migration contract failed");
+
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
     "-U", "worker_test", database,
@@ -461,7 +523,9 @@ try {
   const v5UpgradeSchema = dump("worker_v5_upgrade");
   if (primarySchema !== v5UpgradeSchema) throw new Error("V5 to V7 standalone upgrade schema differs");
   const v6UpgradeSchema = dump("worker_v6_upgrade");
-  if (primarySchema !== v6UpgradeSchema) throw new Error("V6 to V7 standalone upgrade schema differs");
+  if (primarySchema !== v6UpgradeSchema) throw new Error("V6 to V8 standalone upgrade schema differs");
+  const v7UpgradeSchema = dump("worker_v7_upgrade");
+  if (primarySchema !== v7UpgradeSchema) throw new Error("V7 to V8 standalone upgrade schema differs");
   const schemaSha256 = createHash("sha256").update(primarySchema).digest("hex");
   process.stdout.write(`isolated_postgres=passed schema_sha256=${schemaSha256}\n`);
 } finally {

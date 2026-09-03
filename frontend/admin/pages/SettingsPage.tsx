@@ -7,11 +7,6 @@ import { dayLabels } from '../../shared/utils/labels';
 import { operatingTimeOptions } from '../../shared/utils/timeOptions';
 import { canonicalizeWeekdayCodes, toggleWeekday, WEEKDAY_ORDER } from '../../shared/utils/weekdays';
 
-function timeMinutes(value: string) {
-  const [hour, minute] = value.split(':').map(Number);
-  return hour * 60 + minute;
-}
-
 export function SettingsPage() {
   const settings = useSettings();
   const updateSettings = useUpdateSettings();
@@ -23,12 +18,12 @@ export function SettingsPage() {
       setForm({
         ...settings.data,
         availableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.availableDaysOfWeek),
-        publicAvailableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.publicAvailableDaysOfWeek),
+        specialApprovalDaysOfWeek: canonicalizeWeekdayCodes(settings.data.specialApprovalDaysOfWeek),
         slotMinutes: 5,
         openTime: settings.data.openTime.slice(0, 5),
         closeTime: settings.data.closeTime.slice(0, 5),
-        publicOpenTime: settings.data.publicOpenTime.slice(0, 5),
-        publicCloseTime: settings.data.publicCloseTime.slice(0, 5),
+        specialApprovalStartTime: settings.data.specialApprovalStartTime.slice(0, 5),
+        specialApprovalEndTime: settings.data.specialApprovalEndTime.slice(0, 5),
       });
     }
   }, [settings.data]);
@@ -49,11 +44,11 @@ export function SettingsPage() {
     });
   }
 
-  function togglePublicDay(day: string) {
+  function toggleSpecialApprovalDay(day: string) {
     setValidationErrors({});
     setForm((prev) => prev ? {
       ...prev,
-      publicAvailableDaysOfWeek: toggleWeekday(prev.publicAvailableDaysOfWeek, day),
+      specialApprovalDaysOfWeek: toggleWeekday(prev.specialApprovalDaysOfWeek, day),
     } : prev);
   }
 
@@ -61,18 +56,14 @@ export function SettingsPage() {
     event.preventDefault();
     if (!form) return;
     const errors: Record<string, string> = {};
-    if (form.publicOpenTime < form.openTime || form.publicCloseTime > form.closeTime || form.publicOpenTime >= form.publicCloseTime) {
-      errors.publicTime = '일반 예약 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
-    } else if (timeMinutes(form.publicCloseTime) - timeMinutes(form.publicOpenTime) < form.minReservationMinutes) {
-      errors.publicTime = '일반 예약 시간 범위에 최소 예약 시간이 들어가야 합니다.';
+    if (form.specialApprovalStartTime < form.openTime || form.specialApprovalEndTime > form.closeTime || form.specialApprovalStartTime >= form.specialApprovalEndTime) {
+      errors.specialApprovalTime = '특별 허가 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
     }
     if (form.availableDaysOfWeek.length === 0) {
       errors.operatingDays = '운영 요일을 하나 이상 선택해 주세요.';
     }
-    if (form.publicAvailableDaysOfWeek.length === 0) {
-      errors.publicDays = '일반 예약 가능 요일을 하나 이상 선택해 주세요.';
-    } else if (form.publicAvailableDaysOfWeek.some((day) => !form.availableDaysOfWeek.includes(day))) {
-      errors.publicDays = '일반 예약 가능 요일은 운영 요일에 포함되어야 합니다.';
+    if (form.specialApprovalDaysOfWeek.some((day) => !form.availableDaysOfWeek.includes(day))) {
+      errors.specialApprovalDays = '특별 허가 요일은 운영 요일에 포함되어야 합니다.';
     }
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -82,7 +73,7 @@ export function SettingsPage() {
     updateSettings.mutate({
       ...form,
       availableDaysOfWeek: canonicalizeWeekdayCodes(form.availableDaysOfWeek),
-      publicAvailableDaysOfWeek: canonicalizeWeekdayCodes(form.publicAvailableDaysOfWeek),
+      specialApprovalDaysOfWeek: canonicalizeWeekdayCodes(form.specialApprovalDaysOfWeek),
       slotMinutes: 5,
       publicNotice: form.publicNotice || null,
       reservationDisabledMessage: form.reservationDisabledMessage || null,
@@ -188,37 +179,40 @@ export function SettingsPage() {
             </select>
           </label>
         </div>
-        <div className="settings-field-pair full-span" data-testid="settings-public-hours-pair">
+        <div className="settings-field-pair full-span" data-testid="settings-special-approval-hours-pair">
           <label>
-            일반 예약 시작 시간
+            특별 허가 시작 시간
             <select
-              data-testid="settings-public-open-time-input"
-              value={form.publicOpenTime}
-              onChange={(event) => updateField('publicOpenTime', event.target.value)}
+              data-testid="settings-special-approval-start-time-input"
+              value={form.specialApprovalStartTime}
+              onChange={(event) => updateField('specialApprovalStartTime', event.target.value)}
               required
             >
-              {operatingTimeOptions().map((option) => (
+              {operatingTimeOptions().filter((option) => option.value >= form.openTime && option.value < form.closeTime).map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
           <label>
-            일반 예약 종료 시간
+            특별 허가 종료 시간
             <select
-              data-testid="settings-public-close-time-input"
-              value={form.publicCloseTime}
-              onChange={(event) => updateField('publicCloseTime', event.target.value)}
+              data-testid="settings-special-approval-end-time-input"
+              value={form.specialApprovalEndTime}
+              onChange={(event) => updateField('specialApprovalEndTime', event.target.value)}
               required
             >
-              {operatingTimeOptions().map((option) => (
+              {operatingTimeOptions().filter((option) => option.value > form.openTime && option.value <= form.closeTime).map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </label>
         </div>
-        {validationErrors.publicTime ? (
-          <div className="field-error full-span" role="alert">{validationErrors.publicTime}</div>
+        {validationErrors.specialApprovalTime ? (
+          <div className="field-error full-span" role="alert">{validationErrors.specialApprovalTime}</div>
         ) : null}
+        <p className="compact-note muted full-span">
+          특별 허가 시간 또는 요일과 겹치는 예약은 관리자가 승인할 때 확인 안내가 표시됩니다. 공개 사용자는 전체 운영시간에 예약을 신청할 수 있습니다.
+        </p>
         <div className="settings-field-pair full-span" data-testid="settings-duration-pair">
           <label>
             최소 예약 시간(분)
@@ -266,21 +260,21 @@ export function SettingsPage() {
           <div className="field-error full-span" role="alert">{validationErrors.operatingDays}</div>
         ) : null}
         <fieldset className="full-span checkbox-group">
-          <legend>일반 예약 가능 요일</legend>
+          <legend>특별 허가 요일</legend>
           {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input
-                data-testid={`settings-public-day-${day}`}
+                data-testid={`settings-special-approval-day-${day}`}
                 type="checkbox"
-                checked={form.publicAvailableDaysOfWeek.includes(day)}
-                onChange={() => togglePublicDay(day)}
+                checked={form.specialApprovalDaysOfWeek.includes(day)}
+                onChange={() => toggleSpecialApprovalDay(day)}
               />
               {dayLabels[day]}
             </label>
           ))}
         </fieldset>
-        {validationErrors.publicDays ? (
-          <div className="field-error full-span" role="alert">{validationErrors.publicDays}</div>
+        {validationErrors.specialApprovalDays ? (
+          <div className="field-error full-span" role="alert">{validationErrors.specialApprovalDays}</div>
         ) : null}
         <label>
           문의 이메일
