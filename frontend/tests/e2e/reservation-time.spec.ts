@@ -9,6 +9,7 @@ import {
   isPastServiceReservationTime,
   newRequestSelection,
   noFutureReservationTimeMessage,
+  publicReservationScheduleState,
   slotToReservationSelection,
   toServiceEndOfDayOffset,
   toServiceDateTimeLocal,
@@ -69,10 +70,25 @@ test('distinguishes operating and public availability without changing admin acc
   expect(timetableSlotAvailability('2026-07-14', 9 * 60 + 30, 10 * 60, availability)).toBe('public-unavailable');
   expect(timetableSlotAvailability('2026-07-14', 10 * 60, 10 * 60 + 30, availability)).toBe('available');
   expect(timetableSlotAvailability('2026-07-14', 16 * 60 + 30, 17 * 60 + 30, availability)).toBe('public-unavailable');
-  expect(isTimetableSlotSelectable('public-unavailable', 'PUBLIC')).toBe(false);
+  expect(isTimetableSlotSelectable('public-unavailable', 'PUBLIC')).toBe(true);
   expect(isTimetableSlotSelectable('public-unavailable', 'ADMIN')).toBe(true);
   expect(isTimetableSlotSelectable('operating-unavailable', 'PUBLIC')).toBe(false);
   expect(isTimetableSlotSelectable('operating-unavailable', 'ADMIN')).toBe(false);
+});
+
+test('classifies general, separate-confirmation and operating-unavailable reservation times', () => {
+  const schedule = {
+    ...settings,
+    publicOpenTime: availability.publicOpenTime,
+    publicCloseTime: availability.publicCloseTime,
+    publicAvailableDaysOfWeek: availability.publicAvailableDaysOfWeek,
+  };
+
+  expect(publicReservationScheduleState('2026-07-14T10:00', '2026-07-14T10:30', schedule)).toBe('general');
+  expect(publicReservationScheduleState('2026-07-14T09:30', '2026-07-14T10:00', schedule)).toBe('separate-confirmation');
+  expect(publicReservationScheduleState('2026-07-14T16:30', '2026-07-14T17:30', schedule)).toBe('separate-confirmation');
+  expect(publicReservationScheduleState('2026-07-13T10:00', '2026-07-13T10:30', schedule)).toBe('separate-confirmation');
+  expect(publicReservationScheduleState('2026-07-12T10:00', '2026-07-12T10:30', schedule)).toBe('operating-unavailable');
 });
 
 test('public toolbar suggestions use the public schedule passed by the caller', () => {

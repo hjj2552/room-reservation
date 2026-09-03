@@ -172,8 +172,8 @@ visual implementation, but their roles must remain stable.
 | Status requested | `#8a6100` | Reservations awaiting approval |
 | Status confirmed | `#2f6b4f` | Confirmed reservation state |
 | Status cancelled | `#73766f` | Cancelled historical state |
-| Public unavailable | `#8b4f49` | Text and markers for times or days unavailable to public reservation |
-| Public unavailable soft | `#fdf7f6` | Very pale timetable background for cells unavailable to public reservation but still available to administrators |
+| Public unavailable | `#8b4f49` | Text and markers for times or days that require separate confirmation |
+| Public unavailable soft | `#fdf7f6` | Very pale timetable background for cells that require separate confirmation |
 | Operating unavailable | `#9a9d96` | Muted `×` marker for timetable cells outside the operating days or hours for every user |
 | Danger | `#a13d38` | Destructive action and failure |
 | Warning | `#8a6100` | Pending or caution |
@@ -297,8 +297,8 @@ document scrolling when all content fits in one viewport.
   interaction and presentation, not the user's ability to inspect the
   timetable.
 - Use the public-unavailable text and soft-surface roles for operating periods
-  that administrators may reserve but public users may not. Public users cannot
-  select those cells; administrators retain their normal reservation actions.
+  outside the general reservation schedule. Public users may select those cells,
+  but must confirm that staff will contact them before approval is decided.
 - Use the neutral timetable background with a muted `×` marker in each
   30-minute cell for days or times outside the operating schedule. Do not use a
   gray surface fill. Those cells are unavailable to both public users and
@@ -308,12 +308,12 @@ document scrolling when all content fits in one viewport.
   treatment over unavailable backgrounds.
 - Show timetable availability legends on both public and administrator
   surfaces. Pair the public-unavailable swatch and operating-unavailable `×`
-  marker with literal labels such as `공개 예약 불가` or `운영하지 않음`;
+  marker with literal labels such as `별도 확인 필요` or `운영하지 않음`;
   color alone must not carry the meaning.
 - Place the availability legend immediately before the timetable's time, room,
   and reservation-count summary. Separate the legend from those statistics
   with a visibly spaced `|`, not the same middle-dot separator used between
-  related statistics. For example: `공개 예약 불가   |   09:00-20:00 · 활성
+  related statistics. For example: `별도 확인 필요   |   09:00-20:00 · 활성
   공간 10개 · 예약 7건`.
 
 ### Public reservation flow

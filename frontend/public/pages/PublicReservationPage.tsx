@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
 import type { PublicReservationBlock } from '../../shared/api/types';
 import { ReservationDateTimetable, type TimetableReservation, type TimetableRoom } from '../../shared/components/ReservationDateTimetable';
+import { ModalDialog } from '../../shared/components/ModalDialog';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
 import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
 import {
@@ -27,6 +28,7 @@ import {
   isPastServiceReservationTime,
   newRequestSelection,
   publicPastReservationMessage,
+  publicReservationScheduleState,
   serviceDateInputValue,
   slotToReservationSelection,
 } from '../../shared/utils/reservationTime';
@@ -103,6 +105,7 @@ export function PublicReservationPage() {
   const [quickSelection, setQuickSelection] = useState<TimetableSlotSelection | null>(null);
   const [quickSelectionUnavailableMessage, setQuickSelectionUnavailableMessage] = useState<string>();
   const [submissionPolicyError, setSubmissionPolicyError] = useState<Error | null>(null);
+  const [pendingPublicRequest, setPendingPublicRequest] = useState<ReservationRequestValues | null>(null);
   const [completionToast, setCompletionToast] = useState<{ message: string } | null>(null);
   const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoDialogState | null>(null);
 
@@ -221,11 +224,7 @@ export function PublicReservationPage() {
     setRoomInfoDialog({ room });
   }
 
-  function handlePublicRequest(values: ReservationRequestValues) {
-    if (isPastServiceReservationTime(values.startAt)) {
-      setSubmissionPolicyError(new Error(publicPastReservationMessage));
-      return;
-    }
+  function submitPublicRequest(values: ReservationRequestValues) {
     setSubmissionPolicyError(null);
     create.mutate(
       {
@@ -240,6 +239,7 @@ export function PublicReservationPage() {
       },
       {
         onSuccess: () => {
+          setPendingPublicRequest(null);
           setQuickSelection(null);
           setQuickSelectionUnavailableMessage(undefined);
           setSubmissionPolicyError(null);
@@ -249,6 +249,21 @@ export function PublicReservationPage() {
         },
       },
     );
+  }
+
+  function handlePublicRequest(values: ReservationRequestValues) {
+    if (isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(new Error(publicPastReservationMessage));
+      return;
+    }
+    if (
+      settings.data
+      && publicReservationScheduleState(values.startAt, values.endAt, settings.data) === 'separate-confirmation'
+    ) {
+      setPendingPublicRequest(values);
+      return;
+    }
+    submitPublicRequest(values);
   }
 
   return (
@@ -413,13 +428,14 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          openTime={settings.data?.publicOpenTime || '09:00'}
-          closeTime={settings.data?.publicCloseTime || '18:00'}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
           minReservationMinutes={settings.data?.minReservationMinutes || 30}
           maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
           unavailableMessage={quickSelectionUnavailableMessage}
           onClose={() => {
             setQuickSelection(null);
+            setPendingPublicRequest(null);
             setQuickSelectionUnavailableMessage(undefined);
             setSubmissionPolicyError(null);
           }}
@@ -427,6 +443,41 @@ export function PublicReservationPage() {
           submitError={submissionPolicyError || create.error}
           isPending={create.isPending}
         />
+      ) : null}
+
+      {pendingPublicRequest ? (
+        <ModalDialog
+          title="별도 확인 필요"
+          titleId="public-reservation-exception-title"
+          ariaDescribedBy="public-reservation-exception-description"
+          onClose={() => setPendingPublicRequest(null)}
+          closeDisabled={create.isPending}
+          testId="public-reservation-exception-dialog"
+        >
+          <p id="public-reservation-exception-description">
+            일반 예약 가능 시간 외입니다. 신청 후 담당자가 이용 가능 여부를 확인하기 위해 연락드리며, 확인 후 승인 여부가 결정됩니다.
+          </p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setPendingPublicRequest(null)}
+              disabled={create.isPending}
+              autoFocus
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => submitPublicRequest(pendingPublicRequest)}
+              disabled={create.isPending}
+              data-testid="public-reservation-exception-confirm"
+            >
+              {create.isPending ? '신청 중...' : '확인'}
+            </button>
+          </div>
+        </ModalDialog>
       ) : null}
 
       <RoomInfoModal

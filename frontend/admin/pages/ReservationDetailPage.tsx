@@ -12,9 +12,11 @@ import {
   useReservationAction,
   useReservationHistories,
 } from '../../shared/hooks/useReservations';
+import { useSettings } from '../../shared/hooks/useSettings';
 import { formatDateTime } from '../../shared/utils/date';
 import { historyActionLabel, statusLabels } from '../../shared/utils/labels';
 import { timetableDuplicateReservationUrl, timetableReservationUrl } from '../../shared/utils/timetable';
+import { publicReservationScheduleState, toServiceDateTimeLocal } from '../../shared/utils/reservationTime';
 
 export function ReservationDetailPage() {
   const { reservationId = '' } = useParams();
@@ -24,13 +26,19 @@ export function ReservationDetailPage() {
   const approve = useReservationAction(reservationId, 'approve');
   const cancel = useReservationAction(reservationId, 'cancel');
   const deleteReservation = useDeleteReservation(reservationId);
+  const settings = useSettings();
   const [memo, setMemo] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approvalPolicyError, setApprovalPolicyError] = useState('');
 
   function performAction(action: 'approve' | 'cancel') {
     const mutation = action === 'approve' ? approve : cancel;
     mutation.mutate(memo || undefined, {
-      onSuccess: () => setMemo(''),
+      onSuccess: () => {
+        setMemo('');
+        if (action === 'approve') setShowApproveModal(false);
+      },
     });
   }
 
@@ -52,6 +60,23 @@ export function ReservationDetailPage() {
 
   const detail = reservation.data;
   const isCancelled = detail.status === 'CANCELLED';
+  async function requestApproval() {
+    setApprovalPolicyError('');
+    const latestSettings = await settings.refetch();
+    if (!latestSettings.data || latestSettings.error) {
+      setApprovalPolicyError('최신 운영 설정을 불러오지 못했습니다. 다시 시도해 주세요.');
+      return;
+    }
+    if (publicReservationScheduleState(
+      toServiceDateTimeLocal(detail.startAt),
+      toServiceDateTimeLocal(detail.endAt),
+      latestSettings.data,
+    ) === 'separate-confirmation') {
+      setShowApproveModal(true);
+      return;
+    }
+    performAction('approve');
+  }
   const coreSections = reservationCoreSections({
     room: detail.room,
     startAt: detail.startAt,
@@ -125,7 +150,7 @@ export function ReservationDetailPage() {
             className="form-stack"
             onSubmit={(event) => {
               event.preventDefault();
-              performAction('approve');
+              void requestApproval();
             }}
           >
             <label>
@@ -142,7 +167,7 @@ export function ReservationDetailPage() {
                 <button
                   type="submit"
                   className="primary-button"
-                  disabled={approve.isPending || detail.status === 'CONFIRMED' || isCancelled}
+                  disabled={approve.isPending || settings.isFetching || detail.status === 'CONFIRMED' || isCancelled}
                 >
                   <Check size={16} aria-hidden="true" />
                   승인
@@ -177,6 +202,7 @@ export function ReservationDetailPage() {
               </div>
             </div>
             {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
+            {approvalPolicyError ? <div className="inline-error" role="alert">{approvalPolicyError}</div> : null}
             {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
           </form>
         </section>
@@ -265,6 +291,40 @@ export function ReservationDetailPage() {
             >
               <Trash2 size={16} aria-hidden="true" />
               {deleteReservation.isPending ? '삭제 중...' : '예약 삭제'}
+            </button>
+          </div>
+        </ModalDialog>
+      ) : null}
+      {showApproveModal ? (
+        <ModalDialog
+          title="승인 확인"
+          titleId="reservation-approve-modal-title"
+          ariaDescribedBy="reservation-approve-modal-description"
+          onClose={() => setShowApproveModal(false)}
+          closeDisabled={approve.isPending}
+          testId="reservation-approve-modal"
+        >
+          <p id="reservation-approve-modal-description">
+            일반 예약 가능 시간 외입니다. 정말로 승인하시겠습니까?
+          </p>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowApproveModal(false)}
+              disabled={approve.isPending}
+              autoFocus
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => performAction('approve')}
+              disabled={approve.isPending}
+              data-testid="reservation-approve-confirm-button"
+            >
+              {approve.isPending ? '승인 중...' : '확인'}
             </button>
           </div>
         </ModalDialog>

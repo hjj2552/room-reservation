@@ -305,17 +305,11 @@ export function validateReservationPolicy(
   if (startDate < settings.semesterStartDate || startDate > settings.semesterEndDate) {
     policy("OUTSIDE_SEMESTER_PERIOD", "The requested date is outside the semester period.");
   }
-  const schedule = context === "PUBLIC"
-    ? {
-        openTime: settings.publicOpenTime,
-        closeTime: settings.publicCloseTime,
-        daysOfWeek: settings.publicAvailableDaysOfWeek,
-      }
-    : {
-        openTime: settings.openTime,
-        closeTime: settings.closeTime,
-        daysOfWeek: settings.availableDaysOfWeek,
-      };
+  const schedule = {
+    openTime: settings.openTime,
+    closeTime: settings.closeTime,
+    daysOfWeek: settings.availableDaysOfWeek,
+  };
   const weekday = startParts.weekday?.slice(0, 3).toUpperCase();
   if (!weekday || !schedule.daysOfWeek.includes(weekday)) {
     policy("OUTSIDE_OPERATING_DAYS", "The requested day is not available for reservations.");

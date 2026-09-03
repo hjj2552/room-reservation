@@ -147,15 +147,15 @@ export function timetableSlotAvailability(
 
 export function isTimetableSlotSelectable(
   state: TimetableAvailabilityState,
-  context?: TimetableAvailability['context'],
+  _context?: TimetableAvailability['context'],
 ) {
-  return state !== 'operating-unavailable' && (state === 'available' || context === 'ADMIN');
+  return state !== 'operating-unavailable';
 }
 
 export function TimetableAvailabilityLegend() {
   return (
     <span className="timetable-availability-legend" aria-label="시간표 이용 가능 상태 범례">
-      <span><i className="public-unavailable" aria-hidden="true" />공개 예약 불가</span>
+      <span><i className="public-unavailable" aria-hidden="true" />별도 확인 필요</span>
       <span><i className="operating-unavailable" aria-hidden="true" />운영하지 않음</span>
     </span>
   );
@@ -283,7 +283,7 @@ export function ReservationDateTimetable({
               key={room.id}
               className={`timetable-room-column availability-${dayState}`}
               style={{ height: bodyHeight }}
-              aria-label={`${room.name} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '공개 예약 불가' : '공개 예약 가능'}`}
+              aria-label={`${room.name} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '별도 확인 필요' : '일반 예약 가능'}`}
             >
               {emptySlots.slice(0, -1).map((slot) => {
                 const endMinutes = slot + suggestedDurationMinutes;

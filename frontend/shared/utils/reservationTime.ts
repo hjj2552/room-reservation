@@ -32,6 +32,17 @@ export interface ReservationTimeSettings {
   maxReservationMinutes: number;
 }
 
+export interface PublicReservationScheduleSettings extends ReservationTimeSettings {
+  publicOpenTime: string;
+  publicCloseTime: string;
+  publicAvailableDaysOfWeek: string[];
+}
+
+export type PublicReservationScheduleState =
+  | 'general'
+  | 'separate-confirmation'
+  | 'operating-unavailable';
+
 export interface ReservationTimeSelection {
   source: 'slot' | 'toolbar';
   roomId: string;
@@ -139,6 +150,50 @@ export function newRequestSelection(
   }
 
   return { selection: emptySelection, unavailableMessage: noFutureReservationTimeMessage };
+}
+
+export function publicReservationScheduleState(
+  startAt: string,
+  endAt: string,
+  settings: PublicReservationScheduleSettings,
+): PublicReservationScheduleState {
+  const date = normalizeDateInput(startAt.slice(0, 10));
+  const endDate = normalizeDateInput(endAt.slice(0, 10));
+  const startMinutes = timeValueToMinutes(startAt.slice(11));
+  const endMinutes = timeValueToMinutes(endAt.slice(11));
+  const operatingOpenMinutes = timeValueToMinutes(settings.openTime);
+  const operatingCloseMinutes = timeValueToMinutes(settings.closeTime);
+  const publicOpenMinutes = timeValueToMinutes(settings.publicOpenTime);
+  const publicCloseMinutes = timeValueToMinutes(settings.publicCloseTime);
+  const operatingDays = new Set(settings.availableDaysOfWeek.map(normalizeWeekday));
+  const publicDays = new Set(settings.publicAvailableDaysOfWeek.map(normalizeWeekday));
+  const day = date ? weekdayCode(date) : undefined;
+
+  if (
+    !date
+    || date !== endDate
+    || date < settings.semesterStartDate
+    || date > settings.semesterEndDate
+    || !day
+    || !operatingDays.has(day)
+    || startMinutes === undefined
+    || endMinutes === undefined
+    || operatingOpenMinutes === undefined
+    || operatingCloseMinutes === undefined
+    || publicOpenMinutes === undefined
+    || publicCloseMinutes === undefined
+    || startMinutes >= endMinutes
+    || startMinutes < operatingOpenMinutes
+    || endMinutes > operatingCloseMinutes
+  ) {
+    return 'operating-unavailable';
+  }
+
+  return publicDays.has(day)
+    && startMinutes >= publicOpenMinutes
+    && endMinutes <= publicCloseMinutes
+    ? 'general'
+    : 'separate-confirmation';
 }
 
 // Reservation form values represent service-local wall time, not browser-local time.

@@ -2455,11 +2455,12 @@ describe("direct Worker contracts", () => {
     await expect(products.updateSettings(command, "admin")).rejects.toMatchObject({ kind: "CONFLICT", code: "VERSION_CONFLICT" });
   });
 
-  it("separates public reservation hours and days from admin operating policy", async () => {
+  it("allows public reservations throughout the operating schedule while preserving general schedule settings", async () => {
     await resetProductData();
     const existingRoomId = await insertRoom("testing-room-public-schedule-existing");
     const publicRoomId = await insertRoom("testing-room-public-schedule-create");
     const adminRoomId = await insertRoom("testing-room-public-schedule-admin");
+    const updateRoomId = await insertRoom("testing-room-public-schedule-update");
     const password = "Schedule1!";
     const existingPayload = publicPayload(existingRoomId, password, "testing-public-schedule-existing", 9);
     const existing = await products.createPublicReservation(parsePublicReservation(existingPayload));
@@ -2475,14 +2476,14 @@ describe("direct Worker contracts", () => {
 
     await expect(products.createPublicReservation(parsePublicReservation(
       publicPayload(publicRoomId, password, "testing-public-before-open", 9),
-    ))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+    ))).resolves.toMatchObject({ status: "REQUESTED" });
 
     const crossingStart = futureWeekday(21, 16).replace("16:00:00", "16:30:00");
     expect(await products.checkAvailability({
       roomId: publicRoomId,
       startAt: crossingStart,
       endAt: new Date(new Date(crossingStart).getTime() + 60 * 60_000).toISOString(),
-    })).toMatchObject({ available: false, reason: "OUTSIDE_OPERATING_HOURS" });
+    })).toMatchObject({ available: true, reason: null });
 
     const publicBoundary = publicPayload(publicRoomId, password, "testing-public-boundary", 16);
     await expect(products.createPublicReservation(parsePublicReservation(publicBoundary))).resolves.toMatchObject({
@@ -2502,6 +2503,11 @@ describe("direct Worker contracts", () => {
     }), "admin")).resolves.toMatchObject({ status: "CONFIRMED" });
 
     const outsideOperating = futureWeekday(21, 8);
+    await expect(products.createPublicReservation(parsePublicReservation({
+      ...publicPayload(updateRoomId, password, "testing-public-outside-operating", 8),
+      startAt: outsideOperating,
+      endAt: addHour(outsideOperating),
+    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
     await expect(products.createAdminReservation(parseAdminReservation({
       roomId: adminRoomId,
       applicantName: "testing-admin-outside-operating",
@@ -2519,14 +2525,14 @@ describe("direct Worker contracts", () => {
     }))).resolves.toMatchObject({ purpose: "testing-public-schedule-text-only" });
     await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
       ...existingPayload,
-      roomId: publicRoomId,
-    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+      roomId: updateRoomId,
+    }))).resolves.toMatchObject({ room: { id: updateRoomId } });
     const changedStart = existingPayload.startAt.replace("09:00:00", "09:30:00");
     await expect(products.updatePublicReservation(existing.id, parsePublicReservation({
       ...existingPayload,
       startAt: changedStart,
       endAt: addHour(changedStart),
-    }))).rejects.toMatchObject({ kind: "POLICY_VIOLATION", code: "OUTSIDE_OPERATING_HOURS" });
+    }))).resolves.toMatchObject({ startAt: new Date(changedStart).toISOString() });
 
     await expect(products.updateSettings(parseUpdateSettings({
       ...settings,

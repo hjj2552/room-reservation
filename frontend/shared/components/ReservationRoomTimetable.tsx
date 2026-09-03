@@ -158,7 +158,7 @@ export function ReservationRoomTimetable({
               key={day.date}
               className={`timetable-room-column availability-${dayState}`}
               style={{ height: bodyHeight }}
-              aria-label={`${day.label} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '공개 예약 불가' : '공개 예약 가능'}`}
+              aria-label={`${day.label} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '별도 확인 필요' : '일반 예약 가능'}`}
             >
               {emptySlots.slice(0, -1).map((slot) => {
                 const endMinutes = slot + suggestedDurationMinutes;

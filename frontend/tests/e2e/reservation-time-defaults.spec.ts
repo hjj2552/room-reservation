@@ -498,7 +498,7 @@ test('public and admin timetables share availability colors but keep different i
   await expect(publicDateSummary).not.toContainText('활성 공간');
   await expect(publicDateSummary).not.toContainText(/예약 \d+건/);
   await expect(page.getByText('선택한 날짜의 공간 예약 현황을 시간순으로 보여줍니다.')).toHaveCount(0);
-  await expect(page.getByText('공개 예약 불가', { exact: true })).toBeVisible();
+  await expect(page.getByText('별도 확인 필요', { exact: true })).toBeVisible();
   await expect(page.getByText('운영하지 않음', { exact: true })).toBeVisible();
   await expect(page.locator('.timetable-availability-legend i.public-unavailable')).toHaveCSS(
     'background-color',
@@ -508,7 +508,11 @@ test('public and admin timetables share availability colors but keep different i
     await page.locator('.timetable-availability-legend i.operating-unavailable')
       .evaluate((element) => getComputedStyle(element, '::before').content.replace(/["']/g, '')),
   ).toBe('×');
-  await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
+  const publicExceptionSlot = page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` });
+  await expect(publicExceptionSlot).toBeEnabled();
+  await publicExceptionSlot.click();
+  await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
+  await page.getByTestId('public-quick-request-close').click();
   const publicUnavailableColumn = page.locator('.timetable-room-column.availability-public-unavailable');
   await expect(publicUnavailableColumn).toHaveCount(1);
   await expect(publicUnavailableColumn).toHaveCSS('background-color', 'rgb(253, 247, 246)');
@@ -532,6 +536,13 @@ test('public and admin timetables share availability colors but keep different i
     await availableHeader.evaluate((element) => getComputedStyle(element).backgroundColor),
   );
   await expect(weeklyPublicUnavailableColumn).toHaveCSS('background-color', 'rgb(253, 247, 246)');
+  const weeklyExceptionSlot = weeklyPublicUnavailableColumn.getByRole('button', {
+    name: /10:00-10:30 예약 신청/,
+  }).first();
+  await expect(weeklyExceptionSlot).toBeEnabled();
+  await weeklyExceptionSlot.click();
+  await expect(page.getByTestId('public-quick-request-panel')).toBeVisible();
+  await page.getByTestId('public-quick-request-close').click();
   const operatingUnavailableHeader = page.locator('.timetable-day-header.availability-operating-unavailable').first();
   const weeklyOperatingUnavailableColumn = page.locator('.timetable-room-column.availability-operating-unavailable').first();
   await expect(operatingUnavailableHeader).toHaveCSS(
@@ -550,10 +561,10 @@ test('public and admin timetables share availability colors but keep different i
   ).toBe(true);
 
   await page.goto('/timetable?view=date&date=2026-07-14');
-  await expect(page.getByRole('button', { name: `${room.name} 09:30-10:00 예약 신청` })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `${room.name} 09:30-10:00 예약 신청` })).toBeEnabled();
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toBeEnabled();
   await expect(page.getByRole('button', { name: `${room.name} 16:30-17:00 예약 신청` })).toBeEnabled();
-  await expect(page.getByRole('button', { name: `${room.name} 17:00-17:30 예약 신청` })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `${room.name} 17:00-17:30 예약 신청` })).toBeEnabled();
 
   await page.goto('/timetable?view=date&date=2026-07-12');
   await expect(page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` })).toHaveCount(0);
@@ -590,6 +601,198 @@ test('public and admin timetables share availability colors but keep different i
         (element) => getComputedStyle(element, '::after').content.replace(/["']/g, '') === '×',
       )),
   ).toBe(true);
+});
+
+test('public separate-confirmation submission preserves values on cancel and creates once on confirm', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-07-13T00:00:00Z')); // 09:00 Asia/Seoul
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '10:00',
+    publicCloseTime: '17:00',
+    publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+  });
+  let createRequests = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/public/reservations' && request.method() === 'POST') {
+      createRequests += 1;
+    }
+  });
+
+  await page.goto('/timetable?view=date&date=2026-07-13');
+  await page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` }).click();
+  await fillPublicRequestPanel(page, 'exception');
+  await page.getByTestId('public-request-submit-button').click();
+
+  const dialog = page.getByTestId('public-reservation-exception-dialog');
+  await expect(dialog).toContainText(
+    '일반 예약 가능 시간 외입니다. 신청 후 담당자가 이용 가능 여부를 확인하기 위해 연락드리며, 확인 후 승인 여부가 결정됩니다.',
+  );
+  expect(createRequests).toBe(0);
+  await dialog.getByRole('button', { name: '취소' }).click();
+  await expect(page.getByTestId('public-request-purpose-input')).toHaveValue('testing-reservation-exception');
+  await expect(page.getByTestId('public-request-room-select')).toHaveValue(room.id);
+  await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-13');
+  await expect(page.getByTestId('public-request-start-input')).toHaveValue('10:00');
+  await expect(page.getByTestId('public-request-end-input')).toHaveValue('10:30');
+  await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue('testing-applicant-exception');
+  await expect(page.getByTestId('public-request-email-input')).toHaveValue('testing-exception@example.test');
+  await expect(page.getByTestId('public-request-phone-input')).toHaveValue('010-1234-5678');
+  await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('Aa1!');
+
+  await page.getByTestId('public-request-submit-button').click();
+  const responsePromise = page.waitForResponse((response) => (
+    new URL(response.url()).pathname === '/api/public/reservations'
+    && response.request().method() === 'POST'
+  ));
+  await page.getByTestId('public-reservation-exception-confirm').click();
+  const response = await responsePromise;
+  expect((await response.json() as { status: string }).status).toBe('REQUESTED');
+  expect(createRequests).toBe(1);
+  await expect(page.getByTestId('public-quick-request-panel')).toHaveCount(0);
+});
+
+test('public general reservation submission does not show an extra confirmation', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-07-13T00:00:00Z')); // 09:00 Asia/Seoul
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '10:00',
+    publicCloseTime: '17:00',
+    publicAvailableDaysOfWeek: ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+  });
+
+  await page.goto('/timetable?view=date&date=2026-07-14');
+  await page.getByRole('button', { name: `${room.name} 10:00-10:30 예약 신청` }).click();
+  await fillPublicRequestPanel(page, 'general');
+  const responsePromise = page.waitForResponse((response) => (
+    new URL(response.url()).pathname === '/api/public/reservations'
+    && response.request().method() === 'POST'
+  ));
+  await page.getByTestId('public-request-submit-button').click();
+  await responsePromise;
+  await expect(page.getByTestId('public-reservation-exception-dialog')).toHaveCount(0);
+});
+
+test('public edit confirms only when changed times require separate confirmation', async ({ page }) => {
+  const reservationId = '00000000-0000-4000-8000-000000000302';
+  await page.clock.setFixedTime(new Date('2026-07-13T00:00:00Z')); // 09:00 Asia/Seoul
+  await mockReservationApis(page, '2026-07-31', {
+    publicOpenTime: '10:00',
+    publicCloseTime: '17:00',
+  });
+  let currentReservation = mockedPublicReservation(reservationId);
+  let updateRequests = 0;
+  await page.route(`**/api/public/reservations/${reservationId}**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === `/api/public/reservations/${reservationId}/edit`) {
+      return route.fulfill({ json: currentReservation });
+    }
+    if (url.pathname === `/api/public/reservations/${reservationId}` && route.request().method() === 'PUT') {
+      updateRequests += 1;
+      const payload = route.request().postDataJSON() as {
+        applicantName: string;
+        applicantEmail: string;
+        applicantPhone: string;
+        purpose: string;
+        startAt: string;
+        endAt: string;
+      };
+      currentReservation = { ...currentReservation, ...payload };
+      return route.fulfill({ json: currentReservation });
+    }
+    return route.fulfill({ json: currentReservation });
+  });
+
+  await page.goto(`/reservations/${reservationId}/edit`);
+  await page.getByTestId('public-edit-password-input').fill('Aa1!');
+  await page.getByTestId('public-edit-verify-button').click();
+  await page.getByTestId('public-edit-start-input').selectOption('09:00');
+  await page.getByTestId('public-edit-end-input').selectOption('09:30');
+  await page.getByTestId('public-edit-save-button').click();
+
+  const dialog = page.getByTestId('public-edit-exception-dialog');
+  await expect(dialog).toBeVisible();
+  expect(updateRequests).toBe(0);
+  await dialog.getByRole('button', { name: '취소' }).click();
+  await expect(page.getByTestId('public-edit-start-input')).toHaveValue('09:00');
+  await expect(page.getByTestId('public-edit-end-input')).toHaveValue('09:30');
+
+  await page.getByTestId('public-edit-save-button').click();
+  await page.getByTestId('public-edit-exception-confirm').click();
+  await expect.poll(() => updateRequests).toBe(1);
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByTestId('public-edit-purpose-input').fill('testing-reservation-edit-purpose-only');
+  await page.getByTestId('public-edit-save-button').click();
+  await expect.poll(() => updateRequests).toBe(2);
+  await expect(dialog).toHaveCount(0);
+});
+
+test('admin approval rechecks the latest settings before confirming an exceptional reservation', async ({ page }) => {
+  const reservationId = '00000000-0000-4000-8000-000000000301';
+  await mockReservationApis(page, '2026-07-31');
+  let settingsRequests = 0;
+  let approveRequests = 0;
+  let reservationStatus = 'REQUESTED';
+  await page.unroute('**/api/admin/settings');
+  await page.route('**/api/admin/settings', (route) => {
+    settingsRequests += 1;
+    return route.fulfill({ json: mockedSettings({
+      publicAvailableDaysOfWeek: settingsRequests === 1
+        ? ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']
+        : ['TUESDAY', 'WEDNESDAY', 'THURSDAY'],
+    }) });
+  });
+  await page.unroute('**/api/admin/reservations**');
+  await page.route('**/api/admin/reservations**', (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === `/api/admin/reservations/${reservationId}/histories`) return route.fulfill({ json: [] });
+    if (url.pathname === `/api/admin/reservations/${reservationId}/approve`) {
+      approveRequests += 1;
+      reservationStatus = 'CONFIRMED';
+      return route.fulfill({ json: { ...mockedAdminReservation(reservationId), status: reservationStatus } });
+    }
+    if (url.pathname === `/api/admin/reservations/${reservationId}`) {
+      return route.fulfill({ json: { ...mockedAdminReservation(reservationId), status: reservationStatus } });
+    }
+    return route.fulfill({ json: { items: [], page: 0, size: 1, totalItems: 0, totalPages: 0 } });
+  });
+
+  await page.goto(`/admin/reservations/${reservationId}`);
+  await page.getByRole('button', { name: '승인', exact: true }).click();
+  const dialog = page.getByTestId('reservation-approve-modal');
+  await expect(dialog).toContainText('일반 예약 가능 시간 외입니다. 정말로 승인하시겠습니까?');
+  expect(settingsRequests).toBeGreaterThanOrEqual(2);
+  expect(approveRequests).toBe(0);
+  await dialog.getByRole('button', { name: '취소' }).click();
+  await expect(page.getByText('승인 대기', { exact: true }).first()).toBeVisible();
+  expect(approveRequests).toBe(0);
+
+  await page.getByRole('button', { name: '승인', exact: true }).click();
+  await page.getByTestId('reservation-approve-confirm-button').click();
+  await expect.poll(() => approveRequests).toBe(1);
+  await expect(page.locator('.status-badge').first()).toContainText('승인');
+});
+
+test('admin approval inside the general reservation schedule proceeds without confirmation', async ({ page }) => {
+  const reservationId = '00000000-0000-4000-8000-000000000303';
+  await mockReservationApis(page, '2026-07-31');
+  let approveRequests = 0;
+  await page.unroute('**/api/admin/reservations**');
+  await page.route('**/api/admin/reservations**', (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === `/api/admin/reservations/${reservationId}/histories`) return route.fulfill({ json: [] });
+    if (url.pathname === `/api/admin/reservations/${reservationId}/approve`) {
+      approveRequests += 1;
+      return route.fulfill({ json: { ...mockedAdminReservation(reservationId), status: 'CONFIRMED' } });
+    }
+    if (url.pathname === `/api/admin/reservations/${reservationId}`) {
+      return route.fulfill({ json: mockedAdminReservation(reservationId) });
+    }
+    return route.fulfill({ json: { items: [], page: 0, size: 1, totalItems: 0, totalPages: 0 } });
+  });
+
+  await page.goto(`/admin/reservations/${reservationId}`);
+  await page.getByRole('button', { name: '승인', exact: true }).click();
+  await expect.poll(() => approveRequests).toBe(1);
+  await expect(page.getByTestId('reservation-approve-modal')).toHaveCount(0);
 });
 
 async function mockReservationApis(
@@ -632,6 +835,9 @@ async function mockReservationApis(
   };
   const emptyPage = { items: [], page: 0, size: 500, totalItems: 0, totalPages: 0 };
 
+  await page.route('**/api/auth/admin/me', (route) => route.fulfill({
+    json: { id: '00000000-0000-4000-8000-000000000001', username: 'admin', role: 'ADMIN' },
+  }));
   await page.route('**/api/admin/settings', (route) => route.fulfill({ json: settings }));
   await page.route('**/api/public/settings', (route) => {
     const { version: _version, ...publicSettings } = settings;
@@ -665,4 +871,74 @@ async function mockReservationApis(
     status: 201,
     json: { id: '00000000-0000-0000-0000-000000000201', status: 'REQUESTED', message: null },
   }));
+}
+
+async function fillPublicRequestPanel(page: Page, suffix: string) {
+  await page.getByTestId('public-request-purpose-input').fill(`testing-reservation-${suffix}`);
+  await page.getByTestId('public-request-applicant-name-input').fill(`testing-applicant-${suffix}`);
+  await page.getByTestId('public-request-phone-input').fill('010-1234-5678');
+  await page.getByTestId('public-request-email-input').fill(`testing-${suffix}@example.test`);
+  await page.getByTestId('public-request-cancel-password-input').fill('Aa1!');
+}
+
+function mockedSettings(overrides: Record<string, unknown> = {}) {
+  return {
+    organizationName: 'testing-organization',
+    publicNotice: null,
+    reservationEnabled: true,
+    reservationDisabledMessage: null,
+    semesterStartDate: '2026-07-01',
+    semesterEndDate: '2026-07-31',
+    openTime: '09:00',
+    closeTime: '18:00',
+    publicOpenTime: '09:00',
+    publicCloseTime: '18:00',
+    slotMinutes: 5,
+    availableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+    publicAvailableDaysOfWeek: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
+    minReservationMinutes: 30,
+    maxReservationMinutes: 240,
+    adminContactEmail: null,
+    adminContactPhone: null,
+    completionMessage: null,
+    version: 1,
+    ...overrides,
+  };
+}
+
+function mockedAdminReservation(id: string) {
+  return {
+    id,
+    room: { id: room.id, name: room.name, location: room.location },
+    recurrenceId: null,
+    series: null,
+    recurrenceException: false,
+    applicantName: 'testing-applicant-approval',
+    applicantEmail: 'testing-approval@example.test',
+    applicantPhone: '01012345678',
+    showApplicantName: false,
+    purpose: 'testing-reservation-approval',
+    startAt: '2026-07-13T01:00:00Z',
+    endAt: '2026-07-13T01:30:00Z',
+    status: 'REQUESTED',
+    source: 'PUBLIC_FORM',
+    createdAt: '2026-07-01T00:00:00Z',
+    updatedAt: '2026-07-01T00:00:00Z',
+  };
+}
+
+function mockedPublicReservation(id: string) {
+  return {
+    id,
+    room: { id: room.id, name: room.name, location: room.location },
+    applicantName: 'testing-applicant-edit',
+    applicantEmail: 'testing-edit@example.test',
+    applicantPhone: '01012345678',
+    purpose: 'testing-reservation-edit',
+    startAt: '2026-07-13T01:00:00Z',
+    endAt: '2026-07-13T01:30:00Z',
+    status: 'REQUESTED',
+    cancellable: true,
+    editable: true,
+  };
 }

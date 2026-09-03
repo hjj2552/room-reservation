@@ -62,17 +62,17 @@ export function SettingsPage() {
     if (!form) return;
     const errors: Record<string, string> = {};
     if (form.publicOpenTime < form.openTime || form.publicCloseTime > form.closeTime || form.publicOpenTime >= form.publicCloseTime) {
-      errors.publicTime = '공개 예약 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
+      errors.publicTime = '일반 예약 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
     } else if (timeMinutes(form.publicCloseTime) - timeMinutes(form.publicOpenTime) < form.minReservationMinutes) {
-      errors.publicTime = '공개 예약 시간 범위에 최소 예약 시간이 들어가야 합니다.';
+      errors.publicTime = '일반 예약 시간 범위에 최소 예약 시간이 들어가야 합니다.';
     }
     if (form.availableDaysOfWeek.length === 0) {
       errors.operatingDays = '운영 요일을 하나 이상 선택해 주세요.';
     }
     if (form.publicAvailableDaysOfWeek.length === 0) {
-      errors.publicDays = '공개 예약 가능 요일을 하나 이상 선택해 주세요.';
+      errors.publicDays = '일반 예약 가능 요일을 하나 이상 선택해 주세요.';
     } else if (form.publicAvailableDaysOfWeek.some((day) => !form.availableDaysOfWeek.includes(day))) {
-      errors.publicDays = '공개 예약 가능 요일은 운영 요일에 포함되어야 합니다.';
+      errors.publicDays = '일반 예약 가능 요일은 운영 요일에 포함되어야 합니다.';
     }
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
@@ -190,7 +190,7 @@ export function SettingsPage() {
         </div>
         <div className="settings-field-pair full-span" data-testid="settings-public-hours-pair">
           <label>
-            공개 예약 시작 시간
+            일반 예약 시작 시간
             <select
               data-testid="settings-public-open-time-input"
               value={form.publicOpenTime}
@@ -203,7 +203,7 @@ export function SettingsPage() {
             </select>
           </label>
           <label>
-            공개 예약 종료 시간
+            일반 예약 종료 시간
             <select
               data-testid="settings-public-close-time-input"
               value={form.publicCloseTime}
@@ -266,7 +266,7 @@ export function SettingsPage() {
           <div className="field-error full-span" role="alert">{validationErrors.operatingDays}</div>
         ) : null}
         <fieldset className="full-span checkbox-group">
-          <legend>공개 예약 가능 요일</legend>
+          <legend>일반 예약 가능 요일</legend>
           {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input

@@ -296,11 +296,11 @@ test('settings canonicalize weekday selection and mixed API order before saving'
     expect(fieldPairOrder[0]).toBeLessThan(fieldPairOrder[1]);
     expect(fieldPairOrder[1]).toBeLessThan(fieldPairOrder[2]);
     await expect(page.getByRole('group', { name: '운영 요일' })).toBeVisible();
-    await expect(page.getByRole('group', { name: '공개 예약 가능 요일' })).toBeVisible();
+    await expect(page.getByRole('group', { name: '일반 예약 가능 요일' })).toBeVisible();
 
     await page.getByTestId('settings-day-THU').uncheck();
     await page.getByTestId('settings-save-button').click();
-    await expect(page.getByRole('alert')).toContainText('공개 예약 가능 요일은 운영 요일에 포함되어야 합니다.');
+    await expect(page.getByRole('alert')).toContainText('일반 예약 가능 요일은 운영 요일에 포함되어야 합니다.');
     await page.getByTestId('settings-day-THU').check();
 
     for (const day of ['TUE', 'WED', 'THU']) {
