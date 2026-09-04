@@ -17,7 +17,7 @@ export const adminListContexts = {
   audit: {
     path: '/admin/audit',
     storageKey: 'admin-audit-context',
-    params: ['reservationId', 'roomId', 'action', 'fromDate', 'toDate', 'page'],
+    params: ['reservationId', 'roomId', 'action', 'fromDate', 'toDate', 'keyword', 'page'],
   },
 } as const;
 

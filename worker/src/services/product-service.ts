@@ -1169,6 +1169,31 @@ export class ProductService {
     if (query.action) add("action=?", query.action);
     if (query.from) add("created_at>=?::timestamptz", query.from);
     if (query.to) add("created_at<=?::timestamptz", query.to);
+    if (query.keyword) {
+      values.push(`%${query.keyword}%`);
+      const pattern = `$${values.length}`;
+      const keywordConditions = [
+        `lower(coalesce(reservation_room_name,'')) LIKE ${pattern}`,
+        `lower(coalesce(before_reservation_room_name,'')) LIKE ${pattern}`,
+        `lower(coalesce(reservation_applicant_name,'')) LIKE ${pattern}`,
+        `lower(coalesce(before_reservation_applicant_name,'')) LIKE ${pattern}`,
+        `lower(coalesce(reservation_applicant_email,'')) LIKE ${pattern}`,
+        `lower(coalesce(before_reservation_applicant_email,'')) LIKE ${pattern}`,
+        `lower(coalesce(reservation_purpose,'')) LIKE ${pattern}`,
+        `lower(coalesce(before_reservation_purpose,'')) LIKE ${pattern}`,
+        `lower(coalesce(actor_id,'')) LIKE ${pattern}`,
+        `lower(coalesce(memo,'')) LIKE ${pattern}`,
+      ];
+      if (query.phoneKeyword) {
+        values.push(`%${query.phoneKeyword}%`);
+        const phonePattern = `$${values.length}`;
+        keywordConditions.push(
+          `coalesce(reservation_applicant_phone,'') LIKE ${phonePattern}`,
+          `coalesce(before_reservation_applicant_phone,'') LIKE ${phonePattern}`,
+        );
+      }
+      conditions.push(`(${keywordConditions.join(" OR ")})`);
+    }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const count = await this.database.query(`SELECT count(*) AS total FROM reservation_histories ${where}`, values);
     const result = await this.database.query(

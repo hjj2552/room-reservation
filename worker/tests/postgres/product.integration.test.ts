@@ -7,6 +7,7 @@ import { AppError } from "../../src/core/errors";
 import type { Database } from "../../src/infra/database";
 import {
   parseAdminReservation,
+  parseHistoryList,
   parsePublicPassword,
   parsePublicReservation,
   parseRecurrenceCreate,
@@ -1440,6 +1441,102 @@ describe("reservation search contract", () => {
       status: "CONFIRMED",
       source: "ADMIN_MANUAL",
     }))).ids).toEqual([phoneId]);
+  });
+});
+
+describe("audit history search contract", () => {
+  it("searches before and after snapshots, actors and memos while preserving exact filters", async () => {
+    await resetProductData();
+    const beforeRoomId = await insertRoom("testing-audit-before-room");
+    const afterRoomId = await insertRoom("testing-audit-after-room");
+    const otherRoomId = await insertRoom("testing-audit-other-room");
+    const reservationId = await insertReservation({
+      roomId: beforeRoomId,
+      purpose: "testing-audit-before-purpose",
+      applicantName: "testing-audit-before-applicant",
+      applicantEmail: "testing-audit-before@example.test",
+      applicantPhone: "01012345678",
+    });
+    const before = await products.getReservationDetail(reservationId);
+    await products.updateAdminReservation(reservationId, {
+      reservation: {
+        roomId: afterRoomId,
+        applicantName: "testing-audit-after-applicant",
+        applicantEmail: "testing-audit-after@example.test",
+        applicantPhone: "01098765432",
+        purpose: "testing-audit-after-purpose",
+        startAt: before.startAt,
+        endAt: before.endAt,
+        showApplicantName: false,
+      },
+      status: "CONFIRMED",
+      memo: "testing-audit-processing-memo",
+    }, "testing-admin-actor");
+    const updatedHistoryId = String((await database.query(
+      "SELECT id FROM reservation_histories WHERE reservation_id=$1 AND action='UPDATED'",
+      [reservationId],
+    )).rows[0]?.id);
+
+    const publicInput = {
+      ...publicPayload(afterRoomId, "Audit1!", "testing-audit-public-purpose", 15),
+      applicantName: "testing-audit-external-applicant",
+      applicantEmail: "testing-audit-external-actor@example.test",
+    };
+    const publicReservation = await products.createPublicReservation(parsePublicReservation(publicInput));
+    const publicHistoryId = String((await database.query(
+      "SELECT id FROM reservation_histories WHERE reservation_id=$1 AND action='CREATED'",
+      [publicReservation.id],
+    )).rows[0]?.id);
+    const deletedReservationId = await insertReservation({
+      roomId: otherRoomId,
+      purpose: "testing-audit-deleted-purpose",
+      hour: 16,
+    });
+    await products.deleteReservation(deletedReservationId, "testing-audit-delete-memo", "testing-delete-actor");
+
+    const historyIds = async (params: Record<string, string>) => {
+      const result = await products.listHistories(parseHistoryList(new URLSearchParams(params)));
+      return result.items.map((item) => item.id);
+    };
+
+    for (const keyword of [
+      "testing-audit-before-room",
+      "testing-audit-after-room",
+      "testing-audit-before-applicant",
+      "testing-audit-after-applicant",
+      "TESTING-AUDIT-BEFORE@EXAMPLE.TEST",
+      "testing-audit-after@example.test",
+      "testing-audit-before-purpose",
+      "testing-audit-after-purpose",
+      "TESTING-ADMIN-ACTOR",
+      "testing-audit-processing-memo",
+    ]) {
+      expect(await historyIds({ keyword, action: "UPDATED" })).toEqual([updatedHistoryId]);
+    }
+
+    for (const keyword of ["0101234", "010-1234", "010 9876"]) {
+      expect(await historyIds({ keyword, action: "UPDATED" })).toEqual([updatedHistoryId]);
+    }
+
+    expect(await historyIds({ keyword: publicInput.applicantEmail, action: "CREATED" })).toEqual([publicHistoryId]);
+    expect(await historyIds({ keyword: "PUBLIC_USER" })).toEqual([]);
+    expect(await historyIds({ keyword: "testing-audit-no-match" })).toEqual([]);
+    expect(await historyIds({
+      keyword: "testing-audit-after-applicant",
+      action: "UPDATED",
+      roomId: beforeRoomId,
+      from: "2020-01-01T00:00:00+09:00",
+      to: "2100-01-01T00:00:00+09:00",
+    })).toEqual([updatedHistoryId]);
+    expect(await historyIds({
+      keyword: "testing-audit-after-applicant",
+      action: "UPDATED",
+      roomId: otherRoomId,
+    })).toEqual([]);
+
+    expect(await historyIds({ reservationId, action: "UPDATED" })).toEqual([updatedHistoryId]);
+    expect(await historyIds({ reservationId: deletedReservationId, action: "DELETED" })).toHaveLength(1);
+    expect(await historyIds({ keyword: reservationId })).toEqual([]);
   });
 });
 

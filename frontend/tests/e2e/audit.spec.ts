@@ -10,20 +10,41 @@ test('audit filters are reflected in URL query and render server results', async
   await loginByApi(request);
   const room = await e2eData.createTestRoom('audit-room');
   const reservation = await e2eData.createTestReservation(room.id, 'audit-reservation');
+  let auditRequestCount = 0;
+  page.on('request', (auditRequest) => {
+    if (new URL(auditRequest.url()).pathname === '/api/admin/audit/reservation-histories') {
+      auditRequestCount += 1;
+    }
+  });
 
   try {
     await page.goto('/admin/audit');
+    await expect(page.getByTestId('audit-table')).toBeVisible();
+    const initialRequestCount = auditRequestCount;
     await page.getByTestId('audit-reservation-id-input').fill(reservation.id);
-    await expect(page).toHaveURL(new RegExp(`reservationId=${reservation.id}`));
     await page.getByTestId('audit-room-select').selectOption(room.id);
-    await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
     await page.getByTestId('audit-action-select').selectOption('CREATED_BY_ADMIN');
-    await expect(page).toHaveURL(/action=CREATED_BY_ADMIN/);
+    await page.getByTestId('audit-from-date-input').fill('2020-01-01');
+    await page.getByTestId('audit-to-date-input').fill('2100-01-01');
+    await page.getByTestId('audit-keyword-input').fill('  testing-audit-seed  ');
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    expect(auditRequestCount).toBe(initialRequestCount);
+    expect(new URL(page.url()).search).toBe('');
+
+    const submittedRequest = page.waitForRequest((auditRequest) => {
+      const url = new URL(auditRequest.url());
+      return url.pathname === '/api/admin/audit/reservation-histories'
+        && url.searchParams.get('keyword') === 'testing-audit-seed';
+    });
     await page.getByTestId('audit-search-button').click();
+    await submittedRequest;
 
     await expect(page).toHaveURL(new RegExp(`reservationId=${reservation.id}`));
     await expect(page).toHaveURL(new RegExp(`roomId=${room.id}`));
     await expect(page).toHaveURL(/action=CREATED_BY_ADMIN/);
+    await expect(page).toHaveURL(/keyword=testing-audit-seed/);
     await expect(page).toHaveURL(/page=0/);
 
     const table = page.getByTestId('audit-table');
@@ -34,7 +55,46 @@ test('audit filters are reflected in URL query and render server results', async
     await expect(page.getByTestId('audit-reservation-id-input')).toHaveValue(reservation.id);
     await expect(page.getByTestId('audit-room-select')).toHaveValue(room.id);
     await expect(page.getByTestId('audit-action-select')).toHaveValue('CREATED_BY_ADMIN');
+    await expect(page.getByTestId('audit-keyword-input')).toHaveValue('testing-audit-seed');
     await expect(table).toContainText('testing-audit-seed');
+
+    const keywordInput = page.getByTestId('audit-keyword-input');
+    const requestCountBeforeComposition = auditRequestCount;
+    await keywordInput.evaluate((element) => {
+      const input = element as HTMLInputElement;
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      valueSetter?.call(input, '감사');
+      input.dispatchEvent(new InputEvent('input', {
+        bubbles: true,
+        data: '감사',
+        inputType: 'insertCompositionText',
+        isComposing: true,
+      }));
+      input.dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Enter',
+        code: 'Enter',
+        isComposing: true,
+      }));
+      input.form?.requestSubmit();
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '감사' }));
+    });
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    }));
+    expect(auditRequestCount).toBe(requestCountBeforeComposition);
+    expect(new URL(page.url()).searchParams.get('keyword')).toBe('testing-audit-seed');
+
+    const completedRequest = page.waitForRequest((auditRequest) => {
+      const url = new URL(auditRequest.url());
+      return url.pathname === '/api/admin/audit/reservation-histories'
+        && url.searchParams.get('keyword') === '감사';
+    });
+    await keywordInput.press('Enter');
+    await completedRequest;
+    await expect(page).toHaveURL(/keyword=%EA%B0%90%EC%82%AC/);
   } finally {
     await cancelReservationByApi(request, reservation.id, 'testing-cleanup');
     await deleteRoomByApi(request, room.id);
@@ -147,7 +207,34 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
     });
   });
 
-  await page.goto('/admin/audit?action=DELETED');
+  await page.goto('/admin/audit?action=DELETED&keyword=testing-audit-layout&page=0');
+
+  const auditFilter = page.locator('.audit-filter');
+  const filterControls = auditFilter.locator(':scope > label > select, :scope > label > input, :scope > button');
+  await expect(filterControls).toHaveCount(7);
+  expect(await filterControls.evaluateAll((controls) => controls.map((control) => control.getAttribute('data-testid'))))
+    .toEqual([
+      'audit-action-select',
+      'audit-room-select',
+      'audit-from-date-input',
+      'audit-to-date-input',
+      'audit-keyword-input',
+      'audit-reservation-id-input',
+      'audit-search-button',
+    ]);
+  await expect(page.getByTestId('audit-keyword-input'))
+    .toHaveAttribute('placeholder', '공간, 신청자, 연락처, 목적, 처리자, 메모');
+  expect(await page.getByTestId('audit-reservation-id-input').getAttribute('placeholder')).toBeNull();
+  const desktopFilterBoxes = await filterControls.evaluateAll((controls) => controls.map((control) => {
+    const box = control.getBoundingClientRect();
+    return { x: box.x, y: box.y, right: box.right };
+  }));
+  expect(Math.max(...desktopFilterBoxes.slice(0, 4).map((box) => box.y))
+    - Math.min(...desktopFilterBoxes.slice(0, 4).map((box) => box.y))).toBeLessThanOrEqual(1);
+  expect(Math.max(...desktopFilterBoxes.slice(4).map((box) => box.y))
+    - Math.min(...desktopFilterBoxes.slice(4).map((box) => box.y))).toBeLessThanOrEqual(1);
+  expect(desktopFilterBoxes[4].y).toBeGreaterThan(desktopFilterBoxes[0].y);
+  expect(await auditFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 
   const table = page.getByTestId('audit-table');
   await expect(table.getByRole('columnheader')).toHaveText([
@@ -227,6 +314,7 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
 
   await page.locator('.pagination-desktop-controls').getByRole('button', { name: '다음', exact: true }).click();
   await expect(page).toHaveURL(/page=1/);
+  await expect(page).toHaveURL(/keyword=testing-audit-layout/);
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table.locator('tbody tr')).toContainText('testing-short-memo');
   const nextHeaderGeometry = await table.getByRole('columnheader').evaluateAll((headers) =>
@@ -242,8 +330,16 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/admin/audit?action=DELETED&page=0');
+  await page.goto('/admin/audit?action=DELETED&keyword=testing-audit-layout&page=0');
   const tableWrap = table.locator('xpath=..');
+  const mobileFilterBoxes = await filterControls.evaluateAll((controls) => controls.map((control) => {
+    const box = control.getBoundingClientRect();
+    return { y: box.y, width: box.width };
+  }));
+  for (let index = 1; index < mobileFilterBoxes.length; index += 1) {
+    expect(mobileFilterBoxes[index].y).toBeGreaterThan(mobileFilterBoxes[index - 1].y);
+  }
+  expect(await auditFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(await tableWrap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
 });

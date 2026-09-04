@@ -3,6 +3,7 @@ import { normalizeDays } from "../../src/core/domain";
 import {
   parseAdminReservation,
   parseAvailability,
+  parseHistoryList,
   parsePublicReservation,
   parseRecurrenceCreate,
   parseRecurrencePreview,
@@ -343,5 +344,19 @@ describe("typed HTTP product input", () => {
       keyword: "memo needle",
       phoneKeyword: undefined,
     });
+  });
+
+  it("parses audit keyword and phone search without casting keyword text as a UUID", () => {
+    expect(parseHistoryList(new URLSearchParams("keyword=%20Memo%20Needle%20"))).toMatchObject({
+      keyword: "memo needle",
+      phoneKeyword: undefined,
+      reservationId: undefined,
+    });
+    for (const value of ["0101234", "010-1234", "010 1234"]) {
+      expect(parseHistoryList(new URLSearchParams({ keyword: value }))).toMatchObject({
+        keyword: value.toLowerCase(),
+        phoneKeyword: "0101234",
+      });
+    }
   });
 });

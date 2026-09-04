@@ -292,6 +292,7 @@ export function parseHistoryList(params: URLSearchParams): HistoryListQuery {
   const roomId = params.get("roomId") || undefined;
   const from = params.get("from") || undefined;
   const to = params.get("to") || undefined;
+  const search = keyword(params);
   if (from) parseInstant(from, "from");
   if (to) parseInstant(to, "to");
   return {
@@ -301,6 +302,8 @@ export function parseHistoryList(params: URLSearchParams): HistoryListQuery {
     action: parseEnumParameter(params.get("action"), "action", historyActions) as HistoryAction | undefined,
     from,
     to,
+    keyword: search.keyword,
+    phoneKeyword: search.phoneKeyword,
   };
 }
 

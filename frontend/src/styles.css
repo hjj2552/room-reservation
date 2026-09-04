@@ -2023,7 +2023,11 @@ button:disabled {
 }
 
 .audit-filter {
-  grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.9fr) minmax(150px, 0.9fr) minmax(130px, 0.7fr) minmax(130px, 0.7fr) auto;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.audit-keyword-filter {
+  grid-column: span 2;
 }
 
 .pagination {
@@ -2550,6 +2554,10 @@ button:disabled {
   .public-layout,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .audit-keyword-filter {
+    grid-column: auto;
   }
 
   .timetable-scroll {
