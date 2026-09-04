@@ -550,6 +550,8 @@ test('deleted reservation audit row is read-only and detail URL shows domain gui
     await page.getByTestId('reservation-delete-confirm-button').click();
 
     await expect(page).toHaveURL(new RegExp(`/admin/audit\\?reservationId=${reservation.id}&action=DELETED`));
+    await expect(page.getByTestId('audit-reservation-id-input')).toHaveValue(reservation.id);
+    await expect(page.getByTestId('audit-action-select')).toHaveValue('DELETED');
     const table = page.getByTestId('audit-table');
     await expect(table.locator('.audit-snapshot-room')).toHaveText(room.name);
     await expect(table.locator('.audit-snapshot-time')).not.toHaveText('-');
@@ -560,6 +562,8 @@ test('deleted reservation audit row is read-only and detail URL shows domain gui
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${reservation.id}$`));
     await expect(page.getByRole('heading', { name: '삭제된 예약입니다' })).toBeVisible();
     await expect(page.getByText('이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다.')).toBeVisible();
+    await expect(page.getByRole('link', { name: '감사 로그로 이동' }))
+      .toHaveAttribute('href', `/admin/audit?reservationId=${reservation.id}`);
 
     await page.getByRole('link', { name: '예약 목록으로 돌아가기' }).click();
     await expect(page).toHaveURL(/\/admin\/reservations$/);

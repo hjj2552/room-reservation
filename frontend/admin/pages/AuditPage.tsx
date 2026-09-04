@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Pagination } from '../../shared/components/Pagination';
 import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -13,6 +13,7 @@ import {
   toServiceEndOfDayOffset,
   toServiceStartOfDayOffset,
 } from '../../shared/utils/reservationTime';
+import { useImeSafeSubmit } from '../hooks/useImeSafeSubmit';
 
 const pageSize = 20;
 const snapshotDateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -36,6 +37,35 @@ const actions = [
   'DELETED',
   'RECURRENCE_CANCELLED',
 ];
+
+interface AuditFilterDraft {
+  action: string;
+  roomId: string;
+  fromDate: string;
+  toDate: string;
+  keyword: string;
+  reservationId: string;
+}
+
+function filterDraftFromParams(searchParams: URLSearchParams): AuditFilterDraft {
+  return {
+    action: searchParams.get('action') || '',
+    roomId: searchParams.get('roomId') || '',
+    fromDate: searchParams.get('fromDate') || '',
+    toDate: searchParams.get('toDate') || '',
+    keyword: searchParams.get('keyword') || '',
+    reservationId: searchParams.get('reservationId') || '',
+  };
+}
+
+function sameFilterDraft(first: AuditFilterDraft, second: AuditFilterDraft) {
+  return first.action === second.action
+    && first.roomId === second.roomId
+    && first.fromDate === second.fromDate
+    && first.toDate === second.toDate
+    && first.keyword === second.keyword
+    && first.reservationId === second.reservationId;
+}
 
 function cleanSnapshotValue(value?: string | null) {
   const trimmed = value?.trim();
@@ -72,15 +102,23 @@ export function AuditPage() {
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   const rooms = useRoomOptions();
 
+  const appliedFilters = useMemo(() => filterDraftFromParams(searchParams), [searchParams]);
+  const previousAppliedFiltersRef = useRef(appliedFilters);
+  const [draftFilters, setDraftFilters] = useState(appliedFilters);
+
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(window.location.search);
   }, [searchParams]);
 
-  const reservationId = searchParams.get('reservationId') || '';
-  const roomId = searchParams.get('roomId') || '';
-  const action = searchParams.get('action') || '';
-  const fromDate = searchParams.get('fromDate') || '';
-  const toDate = searchParams.get('toDate') || '';
+  useEffect(() => {
+    const previousAppliedFilters = previousAppliedFiltersRef.current;
+    previousAppliedFiltersRef.current = appliedFilters;
+    if (!sameFilterDraft(previousAppliedFilters, appliedFilters)) {
+      setDraftFilters(appliedFilters);
+    }
+  }, [appliedFilters]);
+
+  const { action, roomId, fromDate, toDate, keyword, reservationId } = appliedFilters;
   const pageParam = searchParams.get('page');
   const page = parsePageParam(pageParam);
 
@@ -91,10 +129,11 @@ export function AuditPage() {
       action,
       from: toServiceStartOfDayOffset(fromDate),
       to: toServiceEndOfDayOffset(toDate),
+      keyword,
       page,
       size: pageSize,
     }),
-    [reservationId, roomId, action, fromDate, toDate, page],
+    [reservationId, roomId, action, fromDate, toDate, keyword, page],
   );
   const audit = useReservationHistoryAudit(filters);
 
@@ -109,19 +148,36 @@ export function AuditPage() {
     setSearchParams(next, { replace: true });
   }, [audit.data, page, pageParam, searchParams, setSearchParams]);
 
-  function setParam(name: string, value: string, options: { resetPage?: boolean } = { resetPage: true }) {
+  function updateSearchParams(updater: (next: URLSearchParams) => void) {
     const next = new URLSearchParams(searchParamsRef.current);
-    if (value) next.set(name, value);
-    else next.delete(name);
-    if (options.resetPage !== false) next.set('page', '0');
+    updater(next);
     searchParamsRef.current = next;
     setSearchParams(new URLSearchParams(next));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setParam('page', '0', { resetPage: false });
+  function setPage(nextPage: number) {
+    updateSearchParams((next) => {
+      next.set('page', String(nextPage));
+    });
   }
+
+  function applyFilters() {
+    const normalizedDraft = {
+      ...draftFilters,
+      keyword: draftFilters.keyword.trim(),
+      reservationId: draftFilters.reservationId.trim(),
+    };
+    setDraftFilters(normalizedDraft);
+    updateSearchParams((next) => {
+      for (const [name, value] of Object.entries(normalizedDraft)) {
+        if (value) next.set(name, value);
+        else next.delete(name);
+      }
+      next.set('page', '0');
+    });
+  }
+
+  const filterSubmission = useImeSafeSubmit(applyFilters);
 
   return (
     <section className="page-section" aria-labelledby="audit-title">
@@ -132,37 +188,13 @@ export function AuditPage() {
         </div>
       </div>
 
-      <form className="filter-bar audit-filter" onSubmit={handleSubmit}>
-        <label>
-          예약 ID
-          <input
-            data-testid="audit-reservation-id-input"
-            value={reservationId}
-            placeholder="특정 예약 ID"
-            onChange={(event) => setParam('reservationId', event.target.value)}
-          />
-        </label>
-        <label>
-          공간
-          <select
-            data-testid="audit-room-select"
-            value={roomId}
-            onChange={(event) => setParam('roomId', event.target.value)}
-          >
-            <option value="">전체</option>
-            {rooms.data?.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <form className="filter-bar audit-filter" onSubmit={filterSubmission.handleSubmit}>
         <label>
           처리 유형
           <select
             data-testid="audit-action-select"
-            value={action}
-            onChange={(event) => setParam('action', event.target.value)}
+            value={draftFilters.action}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, action: event.target.value }))}
           >
             <option value="">전체</option>
             {actions.map((item) => (
@@ -173,12 +205,56 @@ export function AuditPage() {
           </select>
         </label>
         <label>
+          공간
+          <select
+            data-testid="audit-room-select"
+            value={draftFilters.roomId}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, roomId: event.target.value }))}
+          >
+            <option value="">전체</option>
+            {rooms.data?.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           시작일
-          <input type="date" value={fromDate} onChange={(event) => setParam('fromDate', event.target.value)} />
+          <input
+            data-testid="audit-from-date-input"
+            type="date"
+            value={draftFilters.fromDate}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, fromDate: event.target.value }))}
+          />
         </label>
         <label>
           종료일
-          <input type="date" value={toDate} onChange={(event) => setParam('toDate', event.target.value)} />
+          <input
+            data-testid="audit-to-date-input"
+            type="date"
+            value={draftFilters.toDate}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
+          />
+        </label>
+        <label className="audit-keyword-filter">
+          검색어
+          <input
+            data-testid="audit-keyword-input"
+            type="search"
+            placeholder="공간, 신청자, 연락처, 목적, 처리자, 메모"
+            value={draftFilters.keyword}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
+            {...filterSubmission.searchInputProps}
+          />
+        </label>
+        <label>
+          예약 ID
+          <input
+            data-testid="audit-reservation-id-input"
+            value={draftFilters.reservationId}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, reservationId: event.target.value }))}
+          />
         </label>
         <button type="submit" className="secondary-button" data-testid="audit-search-button">조회</button>
       </form>
@@ -248,7 +324,7 @@ export function AuditPage() {
             totalPages={audit.data.totalPages}
             totalItems={audit.data.totalItems}
             size={audit.data.size}
-            onPageChange={(nextPage) => setParam('page', String(nextPage), { resetPage: false })}
+            onPageChange={setPage}
           />
         </>
       ) : null}

@@ -7,6 +7,7 @@ export interface AuditFilters {
   action?: string;
   from?: string;
   to?: string;
+  keyword?: string;
   page?: number;
   size?: number;
 }
@@ -19,6 +20,7 @@ export function listReservationHistories(filters: AuditFilters = {}) {
       action: filters.action,
       from: filters.from,
       to: filters.to,
+      keyword: filters.keyword,
       page: filters.page ?? 0,
       size: filters.size ?? 20,
     })}`,

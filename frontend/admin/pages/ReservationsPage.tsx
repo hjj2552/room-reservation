@@ -206,7 +206,7 @@ export function ReservationsPage() {
           <input
             data-testid="reservation-keyword-filter"
             type="search"
-            placeholder="신청자, 목적"
+            placeholder="이름, 연락처, 목적, 메모"
             value={draftFilters.keyword}
             onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
             {...filterSubmission.searchInputProps}

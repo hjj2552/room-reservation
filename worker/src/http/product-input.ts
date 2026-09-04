@@ -19,6 +19,8 @@ import type {
 } from "../application/product-contracts";
 import {
   normalizeDays,
+  applicantPhonePattern,
+  normalizeApplicantPhoneDigits,
   normalizeApplicantPhone,
   optionalEmail,
   parseBooleanParameter,
@@ -76,8 +78,13 @@ function pageQuery(params: URLSearchParams): PageQuery {
   return { page, size, offset: page * size };
 }
 
-function keyword(params: URLSearchParams): string | undefined {
-  return params.get("keyword")?.trim().toLowerCase() || undefined;
+function keyword(params: URLSearchParams): { keyword?: string | undefined; phoneKeyword?: string | undefined } {
+  const raw = params.get("keyword")?.trim();
+  if (!raw) return {};
+  const normalizedPhone = applicantPhonePattern.test(raw) && /[0-9]/.test(raw)
+    ? normalizeApplicantPhoneDigits(raw)
+    : undefined;
+  return { keyword: raw.toLowerCase(), phoneKeyword: normalizedPhone };
 }
 
 function publicPassword(object: Record<string, unknown>): string {
@@ -177,7 +184,7 @@ export function parseRoomList(params: URLSearchParams): RoomListQuery {
     enabled: params.has("enabled")
       ? parseBooleanParameter(params.get("enabled"), "enabled", false)
       : undefined,
-    keyword: keyword(params),
+    keyword: keyword(params).keyword,
   };
 }
 
@@ -213,7 +220,7 @@ export function parseSaveRoomOrder(body: unknown): SaveRoomOrderCommand {
 }
 
 export function parseTagList(params: URLSearchParams): TagListQuery {
-  return { ...pageQuery(params), keyword: keyword(params) };
+  return { ...pageQuery(params), keyword: keyword(params).keyword };
 }
 
 export function parseSaveTag(body: unknown): SaveTagCommand {
@@ -251,6 +258,7 @@ export function parseReservationFilter(params: URLSearchParams): ReservationFilt
   const from = params.get("from") || undefined;
   const to = params.get("to") || undefined;
   const roomId = params.get("roomId") || undefined;
+  const search = keyword(params);
   if (from) parseInstant(from, "from");
   if (to) parseInstant(to, "to");
   return {
@@ -260,7 +268,8 @@ export function parseReservationFilter(params: URLSearchParams): ReservationFilt
     status: parseEnumParameter(params.get("status"), "status", reservationStatuses),
     source: parseEnumParameter(params.get("source"), "source", reservationSources),
     excludeCancelled: parseBooleanParameter(params.get("excludeCancelled"), "excludeCancelled", false),
-    keyword: keyword(params),
+    keyword: search.keyword,
+    phoneKeyword: search.phoneKeyword,
   };
 }
 
@@ -283,6 +292,7 @@ export function parseHistoryList(params: URLSearchParams): HistoryListQuery {
   const roomId = params.get("roomId") || undefined;
   const from = params.get("from") || undefined;
   const to = params.get("to") || undefined;
+  const search = keyword(params);
   if (from) parseInstant(from, "from");
   if (to) parseInstant(to, "to");
   return {
@@ -292,6 +302,8 @@ export function parseHistoryList(params: URLSearchParams): HistoryListQuery {
     action: parseEnumParameter(params.get("action"), "action", historyActions) as HistoryAction | undefined,
     from,
     to,
+    keyword: search.keyword,
+    phoneKeyword: search.phoneKeyword,
   };
 }
 
@@ -312,7 +324,7 @@ export function parseRecurrenceList(params: URLSearchParams): RecurrenceListQuer
     roomId: roomId ? parseUuid(roomId, "roomId") : undefined,
     fromDate: fromDate ? parseDate(fromDate, "fromDate") : undefined,
     toDate: toDate ? parseDate(toDate, "toDate") : undefined,
-    keyword: keyword(params),
+    keyword: keyword(params).keyword,
   };
 }
 

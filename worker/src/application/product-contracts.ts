@@ -81,6 +81,7 @@ export interface ReservationFilterQuery {
   source?: ReservationSource | undefined;
   excludeCancelled: boolean;
   keyword?: string | undefined;
+  phoneKeyword?: string | undefined;
 }
 
 export interface ReservationListQuery extends ReservationFilterQuery, PageQuery {}
@@ -107,6 +108,8 @@ export interface HistoryListQuery extends PageQuery {
   action?: HistoryAction | undefined;
   from?: string | undefined;
   to?: string | undefined;
+  keyword?: string | undefined;
+  phoneKeyword?: string | undefined;
 }
 
 export interface RecurrencePreviewCommand {

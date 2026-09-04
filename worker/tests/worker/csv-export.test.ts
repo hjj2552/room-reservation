@@ -62,7 +62,7 @@ describe("reservation CSV export bounds", () => {
     expect(database.calls[0]?.text).toContain("WHERE r.status = $1::reservation_status");
     expect(database.calls[0]?.text).toContain("lower(r.applicant_name) LIKE $2");
     expect(database.calls[0]?.text).toContain("ORDER BY r.start_at ASC LIMIT 10001");
-    expect(database.calls[0]?.values).toEqual(["CONFIRMED", "%needle%", "%needle%", "%needle%"]);
+    expect(database.calls[0]?.values).toEqual(["CONFIRMED", "%needle%", "%needle%", "%needle%", "%needle%"]);
   });
 
   it("rejects 10,001 rows before touching a row or serializing CSV", async () => {

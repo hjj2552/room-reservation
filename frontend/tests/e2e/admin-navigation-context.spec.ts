@@ -96,11 +96,14 @@ test('administrator list menus restore only applied URL context', async ({ page,
 
   await page.goto(
     `/admin/audit?reservationId=testing-reservation-id&roomId=${room.id}`
-      + '&action=UPDATED&fromDate=2026-11-01&toDate=2026-11-30&page=1',
+      + '&action=UPDATED&fromDate=2026-11-01&toDate=2026-11-30&keyword=testing-audit-applied&page=1',
   );
   await expect(page.getByTestId('audit-reservation-id-input')).toHaveValue('testing-reservation-id');
+  await expect(page.getByTestId('audit-keyword-input')).toHaveValue('testing-audit-applied');
+  await page.getByTestId('audit-keyword-input').fill('testing-audit-unapplied');
   await visitSettings(page);
   await page.getByRole('link', { name: '감사 이력', exact: true }).click();
+  await expect(page.getByTestId('audit-keyword-input')).toHaveValue('testing-audit-applied');
   await expect(page).toHaveURL((url) => (
     url.pathname === '/admin/audit'
     && url.searchParams.get('reservationId') === 'testing-reservation-id'
@@ -108,6 +111,7 @@ test('administrator list menus restore only applied URL context', async ({ page,
     && url.searchParams.get('action') === 'UPDATED'
     && url.searchParams.get('fromDate') === '2026-11-01'
     && url.searchParams.get('toDate') === '2026-11-30'
+    && url.searchParams.get('keyword') === 'testing-audit-applied'
     && url.searchParams.get('page') === '1'
   ));
 
