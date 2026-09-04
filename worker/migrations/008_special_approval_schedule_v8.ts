@@ -13,15 +13,23 @@ export function up(pgm: MigrationBuilder): void {
       ADD COLUMN special_approval_days_of_week varchar(50) NOT NULL DEFAULT 'SAT,SUN';
 
     UPDATE operation_settings
-    SET open_time = '09:00',
-        close_time = '21:00',
-        available_days_of_week = 'MON,TUE,WED,THU,FRI,SAT,SUN',
-        public_open_time = '09:00',
-        public_close_time = '21:00',
-        public_available_days_of_week = 'MON,TUE,WED,THU,FRI,SAT,SUN',
+    SET open_time = LEAST(open_time, time '18:00'),
+        close_time = GREATEST(close_time, time '21:00'),
+        available_days_of_week = concat_ws(
+          ',',
+          available_days_of_week,
+          CASE WHEN NOT ('SAT' = ANY(string_to_array(available_days_of_week, ','))) THEN 'SAT' END,
+          CASE WHEN NOT ('SUN' = ANY(string_to_array(available_days_of_week, ','))) THEN 'SUN' END
+        ),
         special_approval_start_time = '18:00',
         special_approval_end_time = '21:00',
         special_approval_days_of_week = 'SAT,SUN'
+    WHERE id = 1;
+
+    UPDATE operation_settings
+    SET public_open_time = open_time,
+        public_close_time = close_time,
+        public_available_days_of_week = available_days_of_week
     WHERE id = 1;
 
     ALTER TABLE operation_settings

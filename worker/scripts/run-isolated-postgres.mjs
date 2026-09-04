@@ -97,6 +97,17 @@ try {
   const primaryUrl = `${baseUrl}/worker_primary`;
   runMigration("scripts/migrate.ts", primaryUrl);
   runMigration("scripts/migrate.ts", primaryUrl);
+  const freshInstallSettings = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_primary",
+    "--tuples-only", "--no-align",
+    "-c",
+    `SELECT open_time='09:00' AND close_time='21:00'
+       AND available_days_of_week='MON,TUE,WED,THU,FRI,SAT,SUN'
+       AND special_approval_start_time='18:00' AND special_approval_end_time='21:00'
+       AND special_approval_days_of_week='SAT,SUN'
+     FROM operation_settings WHERE id=1`,
+  ]).trim();
+  if (freshInstallSettings !== "t") throw new Error("Fresh install operation settings defaults are invalid");
   runProject(["node_modules/vitest/vitest.mjs", "run", "--config", "vitest.postgres.config.ts"], primaryUrl);
 
   run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_replay"]);
@@ -320,7 +331,7 @@ try {
     "-v", "ON_ERROR_STOP=1",
     "-c",
     `UPDATE operation_settings
-     SET open_time='08:00', close_time='20:00', available_days_of_week='MON,TUE,WED,THU,FRI,SAT'`,
+     SET open_time='19:00', close_time='20:00', available_days_of_week='MON,TUE,WED,THU,FRI'`,
   ]);
   runMigration("scripts/migrate.ts", v5UpgradeUrl);
   runMigration("scripts/migrate.ts", v5UpgradeUrl);
@@ -334,6 +345,9 @@ try {
        AND (SELECT public_open_time=open_time
               AND public_close_time=close_time
               AND public_available_days_of_week=available_days_of_week
+            FROM operation_settings WHERE id=1)
+       AND (SELECT open_time='18:00' AND close_time='21:00'
+              AND available_days_of_week='MON,TUE,WED,THU,FRI,SAT,SUN'
             FROM operation_settings WHERE id=1)
        AND (SELECT special_approval_start_time='18:00'
               AND special_approval_end_time='21:00'
@@ -462,7 +476,7 @@ try {
     "-v", "ON_ERROR_STOP=1",
     "-c",
     `UPDATE operation_settings
-     SET open_time='08:00', close_time='20:00', available_days_of_week='MON,TUE,WED,THU,FRI,SAT',
+     SET open_time='08:00', close_time='22:00', available_days_of_week='MON,TUE,WED,THU,FRI,SAT,SUN',
          public_open_time='09:00', public_close_time='18:00',
          public_available_days_of_week='MON,TUE,WED,THU,FRI';
      INSERT INTO rooms(name,capacity,enabled,display_order)
@@ -495,7 +509,7 @@ try {
     `SELECT
        (SELECT count(*) FROM worker_migrations
         WHERE name='008_special_approval_schedule_v8') = 1
-       AND (SELECT open_time='09:00' AND close_time='21:00'
+       AND (SELECT open_time='08:00' AND close_time='22:00'
               AND available_days_of_week='MON,TUE,WED,THU,FRI,SAT,SUN'
               AND special_approval_start_time='18:00' AND special_approval_end_time='21:00'
               AND special_approval_days_of_week='SAT,SUN'
