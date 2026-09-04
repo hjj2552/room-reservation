@@ -956,9 +956,22 @@ export class ProductService {
       add("r.source = ?::reservation_source", query.source);
     }
     if (query.keyword) {
-      values.push(`%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`);
-      const base = values.length - 2;
-      conditions.push(`(lower(r.applicant_name) LIKE $${base} OR lower(coalesce(r.applicant_email,'')) LIKE $${base + 1} OR lower(r.purpose) LIKE $${base + 2})`);
+      values.push(`%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`);
+      const base = values.length - 3;
+      const keywordConditions = [
+        `lower(r.applicant_name) LIKE $${base}`,
+        `lower(coalesce(r.applicant_email,'')) LIKE $${base + 1}`,
+        `lower(r.purpose) LIKE $${base + 2}`,
+        `EXISTS (
+          SELECT 1 FROM reservation_histories h
+          WHERE h.reservation_id = r.id AND lower(coalesce(h.memo,'')) LIKE $${base + 3}
+        )`,
+      ];
+      if (query.phoneKeyword) {
+        values.push(`%${query.phoneKeyword}%`);
+        keywordConditions.push(`coalesce(r.applicant_phone,'') LIKE $${values.length}`);
+      }
+      conditions.push(`(${keywordConditions.join(" OR ")})`);
     }
     return { where: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "", values };
   }

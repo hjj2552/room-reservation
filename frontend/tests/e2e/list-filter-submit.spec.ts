@@ -76,6 +76,9 @@ for (const scenario of scenarios) {
     const results = page.getByTestId(scenario.resultsTestId);
     const table = page.getByTestId(scenario.tableTestId);
     const form = page.locator(`${scenario.route === '/admin/recurrences' ? '.recurrence-list-panel ' : ''}.filter-bar`);
+    if (scenario.route === '/admin/reservations') {
+      await expect(page.getByTestId(scenario.keywordFilterTestId)).toHaveAttribute('placeholder', '이름, 연락처, 목적, 메모');
+    }
     await expect(table).toBeVisible();
     await expect(results).toHaveAttribute('aria-busy', 'false');
     expect(listRequestCount).toBe(1);

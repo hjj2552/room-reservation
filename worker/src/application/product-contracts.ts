@@ -81,6 +81,7 @@ export interface ReservationFilterQuery {
   source?: ReservationSource | undefined;
   excludeCancelled: boolean;
   keyword?: string | undefined;
+  phoneKeyword?: string | undefined;
 }
 
 export interface ReservationListQuery extends ReservationFilterQuery, PageQuery {}

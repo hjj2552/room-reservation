@@ -46,7 +46,7 @@ export interface AdminReservationInput extends ReservationInput {
 }
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const applicantPhonePattern = /^[0-9 -]+$/;
+export const applicantPhonePattern = /^[0-9 -]+$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 const instantPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/;
@@ -190,9 +190,13 @@ export function normalizeApplicantPhone(
   if (!applicantPhonePattern.test(value)) {
     validation("전화번호는 숫자, 하이픈(-), 공백만 입력해 주세요.", field);
   }
-  const normalized = value.replaceAll("-", "").replaceAll(" ", "");
+  const normalized = normalizeApplicantPhoneDigits(value);
   if (!normalized) validation("전화번호를 입력해 주세요.", field);
   return normalized;
+}
+
+export function normalizeApplicantPhoneDigits(value: string): string {
+  return value.replaceAll("-", "").replaceAll(" ", "");
 }
 
 function parseReservationFields(object: Record<string, unknown>) {

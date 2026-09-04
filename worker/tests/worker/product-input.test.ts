@@ -317,8 +317,31 @@ describe("typed HTTP product input", () => {
       source: "ADMIN_MANUAL",
       excludeCancelled: true,
       keyword: "needle",
+      phoneKeyword: undefined,
       from: undefined,
       to: undefined,
+    });
+  });
+
+  it("normalizes phone-like reservation keywords without rejecting text search", () => {
+    for (const value of ["0101234", "010-1234", "010 1234"]) {
+      expect(parseReservationFilter(new URLSearchParams(`keyword=${encodeURIComponent(value)}`))).toMatchObject({
+        keyword: value.toLowerCase(),
+        phoneKeyword: "0101234",
+      });
+    }
+
+    expect(parseReservationFilter(new URLSearchParams("keyword=010%2B1234"))).toMatchObject({
+      keyword: "010+1234",
+      phoneKeyword: undefined,
+    });
+    expect(parseReservationFilter(new URLSearchParams("keyword=---"))).toMatchObject({
+      keyword: "---",
+      phoneKeyword: undefined,
+    });
+    expect(parseReservationFilter(new URLSearchParams("keyword=Memo%20Needle"))).toMatchObject({
+      keyword: "memo needle",
+      phoneKeyword: undefined,
     });
   });
 });
