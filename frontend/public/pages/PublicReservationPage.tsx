@@ -202,12 +202,7 @@ export function PublicReservationPage() {
 
   function handleNewRequestClick() {
     if (isUnavailable || !settings.data) return;
-    const nextSelection = newRequestSelection({
-      ...settings.data,
-      openTime: settings.data.publicOpenTime,
-      closeTime: settings.data.publicCloseTime,
-      availableDaysOfWeek: settings.data.publicAvailableDaysOfWeek,
-    });
+    const nextSelection = newRequestSelection(settings.data);
     setSubmissionPolicyError(null);
     setQuickSelection(nextSelection.selection);
     setQuickSelectionUnavailableMessage(nextSelection.unavailableMessage);
@@ -221,11 +216,7 @@ export function PublicReservationPage() {
     setRoomInfoDialog({ room });
   }
 
-  function handlePublicRequest(values: ReservationRequestValues) {
-    if (isPastServiceReservationTime(values.startAt)) {
-      setSubmissionPolicyError(new Error(publicPastReservationMessage));
-      return;
-    }
+  function submitPublicRequest(values: ReservationRequestValues) {
     setSubmissionPolicyError(null);
     create.mutate(
       {
@@ -249,6 +240,14 @@ export function PublicReservationPage() {
         },
       },
     );
+  }
+
+  function handlePublicRequest(values: ReservationRequestValues) {
+    if (isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(new Error(publicPastReservationMessage));
+      return;
+    }
+    submitPublicRequest(values);
   }
 
   return (
@@ -413,8 +412,8 @@ export function PublicReservationPage() {
           variant="public"
           rooms={activeRooms}
           selection={quickSelection}
-          openTime={settings.data?.publicOpenTime || '09:00'}
-          closeTime={settings.data?.publicCloseTime || '18:00'}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
           minReservationMinutes={settings.data?.minReservationMinutes || 30}
           maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
           unavailableMessage={quickSelectionUnavailableMessage}

@@ -124,7 +124,7 @@ export function ReservationRoomTimetable({
           ) : null}
         </div>
         <span className="timetable-summary-details">
-          {availability ? <TimetableAvailabilityLegend /> : null}
+          {availability ? <TimetableAvailabilityLegend context={availability.context} /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
           <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
         </span>
@@ -158,7 +158,7 @@ export function ReservationRoomTimetable({
               key={day.date}
               className={`timetable-room-column availability-${dayState}`}
               style={{ height: bodyHeight }}
-              aria-label={`${day.label} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'public-unavailable' ? '공개 예약 불가' : '공개 예약 가능'}`}
+              aria-label={`${day.label} ${dayState === 'operating-unavailable' ? '운영하지 않음' : dayState === 'special-approval' ? '특별 허가 필요' : '예약 가능'}`}
             >
               {emptySlots.slice(0, -1).map((slot) => {
                 const endMinutes = slot + suggestedDurationMinutes;

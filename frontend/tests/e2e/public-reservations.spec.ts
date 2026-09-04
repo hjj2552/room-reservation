@@ -300,16 +300,16 @@ test('public timetables reuse recurrence tag colors without exposing private app
 
     await updateSettingsByApi(request, {
       ...originalSettings,
-      publicOpenTime: '11:00',
+      specialApprovalStartTime: '11:00',
     });
     await page.goto(`/timetable?view=date&date=${recurrenceTime.startDate}`);
-    await expect(page.locator('.timetable-unavailable-slot.availability-public-unavailable').first()).toBeVisible();
+    await expect(page.locator('.timetable-empty-slot.availability-available').first()).toBeVisible();
     const unavailablePublicBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
     expect(await computedTimetableColors(unavailablePublicBlock.locator('.reservation-block-card')))
       .toEqual(publicDateColors);
 
     await page.goto(`/admin/timetable?view=date&date=${recurrenceTime.startDate}&roomId=${room.id}`);
-    await expect(page.locator('.timetable-empty-slot.availability-public-unavailable').first()).toBeVisible();
+    await expect(page.locator('.timetable-empty-slot.availability-special-approval').first()).toBeVisible();
     const adminDateBlock = page.getByTestId('reservation-timetable-block').filter({ hasText: tag.name });
     const adminDateCard = adminDateBlock.locator('.reservation-block-card');
     await expect(adminDateBlock).toBeVisible();

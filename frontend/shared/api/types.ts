@@ -118,12 +118,12 @@ export interface OperationSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
-  publicOpenTime: string;
-  publicCloseTime: string;
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
   /** @deprecated Compatibility field. Reservation inputs always use 5-minute increments. */
   slotMinutes: number;
   availableDaysOfWeek: string[];
-  publicAvailableDaysOfWeek: string[];
+  specialApprovalDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
   adminContactEmail: string | null;

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
-import type { PublicReservationEditDetail } from '../../shared/api/types';
+import type { PublicReservationEditDetail, PublicReservationUpdatePayload } from '../../shared/api/types';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
 import { ReservationTimeRangeInput } from '../../shared/components/ReservationTimeRangeInput';
@@ -18,7 +18,10 @@ import { formatDateTime } from '../../shared/utils/date';
 import { applicantPhoneError, normalizeApplicantPhoneInput } from '../../shared/utils/applicantPhone';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
-import { hasReservationPlacementChanges, hasReservationValueChanges } from '../../shared/utils/reservationChanges';
+import {
+  hasReservationPlacementChanges,
+  hasReservationValueChanges,
+} from '../../shared/utils/reservationChanges';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -127,46 +130,11 @@ export function PublicReservationEditPage() {
     });
   }
 
-  function onSubmit(values: PublicReservationEditValues) {
-    if (!verifiedReservation) return;
-    const previousStatus = verifiedReservation.status;
-    const payload = {
-      roomId: values.roomId,
-      applicantName: values.applicantName,
-      applicantEmail: values.applicantEmail,
-      applicantPhone: values.applicantPhone,
-      purpose: values.purpose,
-      startAt: fromServiceDateTimeLocal(values.startAt),
-      endAt: fromServiceDateTimeLocal(values.endAt),
-      cancelPassword: reservationPassword,
-    };
-    if (hasReservationPlacementChanges({
-      roomId: verifiedReservation.room.id,
-      startAt: verifiedReservation.startAt,
-      endAt: verifiedReservation.endAt,
-    }, payload) && isPastServiceReservationTime(values.startAt)) {
-      setSubmissionPolicyError(publicPastReservationMessage);
-      return;
-    }
-    setSubmissionPolicyError('');
-    if (
-      previousStatus === 'REQUESTED'
-      && !hasReservationValueChanges(
-        {
-          roomId: verifiedReservation.room.id,
-          applicantName: verifiedReservation.applicantName,
-          applicantEmail: verifiedReservation.applicantEmail,
-          applicantPhone: verifiedReservation.applicantPhone,
-          purpose: verifiedReservation.purpose,
-          startAt: verifiedReservation.startAt,
-          endAt: verifiedReservation.endAt,
-        },
-        payload,
-      )
-    ) {
-      navigate(`/reservations/${verifiedReservation.id}`);
-      return;
-    }
+  function performUpdate(
+    values: PublicReservationEditValues,
+    payload: PublicReservationUpdatePayload,
+    previousStatus: PublicReservationEditDetail['status'],
+  ) {
     update.mutate(
       payload,
       {
@@ -190,6 +158,50 @@ export function PublicReservationEditPage() {
         },
       },
     );
+  }
+
+  function onSubmit(values: PublicReservationEditValues) {
+    if (!verifiedReservation || !settings.data) return;
+    const previousStatus = verifiedReservation.status;
+    const payload: PublicReservationUpdatePayload = {
+      roomId: values.roomId,
+      applicantName: values.applicantName,
+      applicantEmail: values.applicantEmail,
+      applicantPhone: values.applicantPhone,
+      purpose: values.purpose,
+      startAt: fromServiceDateTimeLocal(values.startAt),
+      endAt: fromServiceDateTimeLocal(values.endAt),
+      cancelPassword: reservationPassword,
+    };
+    const currentPlacement = {
+      roomId: verifiedReservation.room.id,
+      startAt: verifiedReservation.startAt,
+      endAt: verifiedReservation.endAt,
+    };
+    if (hasReservationPlacementChanges(currentPlacement, payload) && isPastServiceReservationTime(values.startAt)) {
+      setSubmissionPolicyError(publicPastReservationMessage);
+      return;
+    }
+    setSubmissionPolicyError('');
+    if (
+      previousStatus === 'REQUESTED'
+      && !hasReservationValueChanges(
+        {
+          roomId: verifiedReservation.room.id,
+          applicantName: verifiedReservation.applicantName,
+          applicantEmail: verifiedReservation.applicantEmail,
+          applicantPhone: verifiedReservation.applicantPhone,
+          purpose: verifiedReservation.purpose,
+          startAt: verifiedReservation.startAt,
+          endAt: verifiedReservation.endAt,
+        },
+        payload,
+      )
+    ) {
+      navigate(`/reservations/${verifiedReservation.id}`);
+      return;
+    }
+    performUpdate(values, payload, previousStatus);
   }
 
   if (detail.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
@@ -279,8 +291,8 @@ export function PublicReservationEditPage() {
           <ReservationTimeRangeInput
             startAt={startAt}
             endAt={endAt}
-            openTime={settings.data?.publicOpenTime || '09:00'}
-            closeTime={settings.data?.publicCloseTime || '18:00'}
+            openTime={settings.data?.openTime || '09:00'}
+            closeTime={settings.data?.closeTime || '18:00'}
             minReservationMinutes={settings.data?.minReservationMinutes || 30}
             maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
             onStartAtChange={(value) => setValue('startAt', value, { shouldDirty: true, shouldValidate: true })}

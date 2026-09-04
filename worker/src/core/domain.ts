@@ -13,11 +13,11 @@ export interface OperationSettings {
   semesterEndDate: string;
   openTime: string;
   closeTime: string;
-  publicOpenTime: string;
-  publicCloseTime: string;
+  specialApprovalStartTime: string;
+  specialApprovalEndTime: string;
   slotMinutes: 5;
   availableDaysOfWeek: string[];
-  publicAvailableDaysOfWeek: string[];
+  specialApprovalDaysOfWeek: string[];
   minReservationMinutes: number;
   maxReservationMinutes: number;
   adminContactEmail: string | null;
@@ -305,17 +305,11 @@ export function validateReservationPolicy(
   if (startDate < settings.semesterStartDate || startDate > settings.semesterEndDate) {
     policy("OUTSIDE_SEMESTER_PERIOD", "The requested date is outside the semester period.");
   }
-  const schedule = context === "PUBLIC"
-    ? {
-        openTime: settings.publicOpenTime,
-        closeTime: settings.publicCloseTime,
-        daysOfWeek: settings.publicAvailableDaysOfWeek,
-      }
-    : {
-        openTime: settings.openTime,
-        closeTime: settings.closeTime,
-        daysOfWeek: settings.availableDaysOfWeek,
-      };
+  const schedule = {
+    openTime: settings.openTime,
+    closeTime: settings.closeTime,
+    daysOfWeek: settings.availableDaysOfWeek,
+  };
   const weekday = startParts.weekday?.slice(0, 3).toUpperCase();
   if (!weekday || !schedule.daysOfWeek.includes(weekday)) {
     policy("OUTSIDE_OPERATING_DAYS", "The requested day is not available for reservations.");
@@ -334,8 +328,8 @@ export function validateReservationPolicy(
   }
 }
 
-export function normalizeDays(value: unknown, field = "daysOfWeek"): string[] {
-  if (!Array.isArray(value) || value.length === 0) validation("must not be empty", field);
+export function normalizeDays(value: unknown, field = "daysOfWeek", allowEmpty = false): string[] {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)) validation("must not be empty", field);
   const normalizedDays = [...new Set(value.map((item) => {
     if (typeof item !== "string") validation("Invalid day of week", field);
     const normalized = item.trim().toUpperCase().slice(0, 3);

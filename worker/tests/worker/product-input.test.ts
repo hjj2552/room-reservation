@@ -291,11 +291,11 @@ describe("typed HTTP product input", () => {
       semesterEndDate: "2026-12-31",
       openTime: "09:00:01",
       closeTime: "18:00",
-      publicOpenTime: "09:00",
-      publicCloseTime: "18:00",
+      specialApprovalStartTime: "09:00",
+      specialApprovalEndTime: "18:00",
       slotMinutes: 5,
       availableDaysOfWeek: ["MON"],
-      publicAvailableDaysOfWeek: ["MON"],
+      specialApprovalDaysOfWeek: ["MON"],
       minReservationMinutes: 30,
       maxReservationMinutes: 240,
       adminContactEmail: "admin@example.test",
@@ -306,6 +306,30 @@ describe("typed HTTP product input", () => {
     expect(() => parseUpdateSettings(settings)).toThrowError(
       expect.objectContaining({ code: "VALIDATION_ERROR" }),
     );
+  });
+
+  it("allows special approval to be configured by time without a special weekday", () => {
+    expect(parseUpdateSettings({
+      organizationName: "Organization",
+      publicNotice: "",
+      reservationEnabled: true,
+      reservationDisabledMessage: "",
+      semesterStartDate: "2026-08-01",
+      semesterEndDate: "2026-12-31",
+      openTime: "09:00",
+      closeTime: "21:00",
+      specialApprovalStartTime: "18:00",
+      specialApprovalEndTime: "21:00",
+      slotMinutes: 5,
+      availableDaysOfWeek: ["MON"],
+      specialApprovalDaysOfWeek: [],
+      minReservationMinutes: 30,
+      maxReservationMinutes: 240,
+      adminContactEmail: "admin@example.test",
+      adminContactPhone: "",
+      completionMessage: "",
+      version: 0,
+    }).specialApprovalDaysOfWeek).toEqual([]);
   });
 
   it("normalizes CSV/list filters without pagination coupling", () => {

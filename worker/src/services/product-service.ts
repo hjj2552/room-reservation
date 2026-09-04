@@ -106,6 +106,7 @@ function mapDatabaseError(error: unknown): never {
 }
 
 function mapSettings(row: Row): OperationSettings {
+  const specialApprovalDays = text(row, "special_approval_days_of_week");
   return {
     organizationName: text(row, "organization_name"),
     publicNotice: nullableText(row, "public_notice"),
@@ -115,11 +116,11 @@ function mapSettings(row: Row): OperationSettings {
     semesterEndDate: dateText(value(row, "semester_end_date")),
     openTime: timeText(value(row, "open_time")),
     closeTime: timeText(value(row, "close_time")),
-    publicOpenTime: timeText(value(row, "public_open_time")),
-    publicCloseTime: timeText(value(row, "public_close_time")),
+    specialApprovalStartTime: timeText(value(row, "special_approval_start_time")),
+    specialApprovalEndTime: timeText(value(row, "special_approval_end_time")),
     slotMinutes: 5,
     availableDaysOfWeek: normalizeDays(text(row, "available_days_of_week").split(",")),
-    publicAvailableDaysOfWeek: normalizeDays(text(row, "public_available_days_of_week").split(",")),
+    specialApprovalDaysOfWeek: specialApprovalDays === "" ? [] : normalizeDays(specialApprovalDays.split(",")),
     minReservationMinutes: number(row, "min_reservation_minutes"),
     maxReservationMinutes: number(row, "max_reservation_minutes"),
     adminContactEmail: nullableText(row, "admin_contact_email"),
@@ -187,10 +188,10 @@ export class ProductService {
       semesterEndDate,
       openTime,
       closeTime,
-      publicOpenTime,
-      publicCloseTime,
+      specialApprovalStartTime,
+      specialApprovalEndTime,
       availableDaysOfWeek,
-      publicAvailableDaysOfWeek,
+      specialApprovalDaysOfWeek,
       minReservationMinutes,
       maxReservationMinutes,
       adminContactEmail,
@@ -205,24 +206,21 @@ export class ProductService {
     if (
       minutes(openTime) % 30 !== 0
       || minutes(closeTime) % 30 !== 0
-      || minutes(publicOpenTime) % 30 !== 0
-      || minutes(publicCloseTime) % 30 !== 0
+      || minutes(specialApprovalStartTime) % 30 !== 0
+      || minutes(specialApprovalEndTime) % 30 !== 0
     ) {
-      validation("Operating and public reservation times must align to 30-minute timetable boundaries.");
+      validation("Operating and special approval times must align to 30-minute timetable boundaries.");
     }
     if (minReservationMinutes % 5 !== 0 || maxReservationMinutes % 5 !== 0) {
       validation("Min and max reservation minutes must be multiples of 5.");
     }
     if (maxReservationMinutes < minReservationMinutes) validation("Max reservation minutes must be greater than or equal to min.");
     if (minutes(closeTime) - minutes(openTime) < minReservationMinutes) validation("Min reservation minutes must fit within operating hours.");
-    if (publicOpenTime < openTime || publicCloseTime > closeTime || publicOpenTime >= publicCloseTime) {
-      validation("Public reservation time must be within operating hours.", "publicOpenTime");
+    if (specialApprovalStartTime < openTime || specialApprovalEndTime > closeTime || specialApprovalStartTime >= specialApprovalEndTime) {
+      validation("Special approval time must be within operating hours.", "specialApprovalStartTime");
     }
-    if (minutes(publicCloseTime) - minutes(publicOpenTime) < minReservationMinutes) {
-      validation("Min reservation minutes must fit within public reservation hours.", "publicCloseTime");
-    }
-    if (publicAvailableDaysOfWeek.some((day) => !availableDaysOfWeek.includes(day))) {
-      validation("Public reservation days must be included in operating days.", "publicAvailableDaysOfWeek");
+    if (specialApprovalDaysOfWeek.some((day) => !availableDaysOfWeek.includes(day))) {
+      validation("Special approval days must be included in operating days.", "specialApprovalDaysOfWeek");
     }
 
     const result = await this.database.query(
@@ -230,14 +228,14 @@ export class ProductService {
         organization_name = $1, public_notice = $2, reservation_enabled = $3,
         reservation_disabled_message = $4, semester_start_date = $5, semester_end_date = $6,
         open_time = $7, close_time = $8, available_days_of_week = $9,
-        public_open_time = $10, public_close_time = $11, public_available_days_of_week = $12,
+        special_approval_start_time = $10, special_approval_end_time = $11, special_approval_days_of_week = $12,
         min_reservation_minutes = $13, max_reservation_minutes = $14,
         admin_contact_email = $15, admin_contact_phone = $16, completion_message = $17,
         updated_by = $18, updated_at = now(), version = version + 1
        WHERE id = 1 AND version = $19 RETURNING *`,
       [organizationName, publicNotice, reservationEnabled, reservationDisabledMessage,
         semesterStartDate, semesterEndDate, openTime, closeTime, availableDaysOfWeek.join(","),
-        publicOpenTime, publicCloseTime, publicAvailableDaysOfWeek.join(","),
+        specialApprovalStartTime, specialApprovalEndTime, specialApprovalDaysOfWeek.join(","),
         minReservationMinutes, maxReservationMinutes, adminContactEmail, adminContactPhone,
         completionMessage, adminUsername, version],
     );

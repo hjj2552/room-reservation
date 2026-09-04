@@ -277,7 +277,7 @@ test('settings canonicalize weekday selection and mixed API order before saving'
         json: {
           ...originalSettings,
           availableDaysOfWeek: ['THU', 'TUE', 'WED'],
-          publicAvailableDaysOfWeek: ['THU', 'TUE', 'WED'],
+          specialApprovalDaysOfWeek: ['THU', 'TUE', 'WED'],
         },
       });
       return;
@@ -290,32 +290,32 @@ test('settings canonicalize weekday selection and mixed API order before saving'
     await expect(page.getByTestId('settings-form')).toBeVisible();
     const fieldPairOrder = await Promise.all([
       page.getByTestId('settings-hours-pair'),
-      page.getByTestId('settings-public-hours-pair'),
+      page.getByTestId('settings-special-approval-hours-pair'),
       page.getByTestId('settings-duration-pair'),
     ].map(async (locator) => (await locator.boundingBox())?.y || 0));
     expect(fieldPairOrder[0]).toBeLessThan(fieldPairOrder[1]);
     expect(fieldPairOrder[1]).toBeLessThan(fieldPairOrder[2]);
     await expect(page.getByRole('group', { name: '운영 요일' })).toBeVisible();
-    await expect(page.getByRole('group', { name: '공개 예약 가능 요일' })).toBeVisible();
+    await expect(page.getByRole('group', { name: '특별 허가 요일' })).toBeVisible();
 
     await page.getByTestId('settings-day-THU').uncheck();
     await page.getByTestId('settings-save-button').click();
-    await expect(page.getByRole('alert')).toContainText('공개 예약 가능 요일은 운영 요일에 포함되어야 합니다.');
+    await expect(page.getByRole('alert')).toContainText('특별 허가 요일은 운영 요일에 포함되어야 합니다.');
     await page.getByTestId('settings-day-THU').check();
 
     for (const day of ['TUE', 'WED', 'THU']) {
       await expect(page.getByTestId(`settings-day-${day}`)).toBeChecked();
       await page.getByTestId(`settings-day-${day}`).uncheck();
-      await expect(page.getByTestId(`settings-public-day-${day}`)).toBeChecked();
-      await page.getByTestId(`settings-public-day-${day}`).uncheck();
+      await expect(page.getByTestId(`settings-special-approval-day-${day}`)).toBeChecked();
+      await page.getByTestId(`settings-special-approval-day-${day}`).uncheck();
     }
 
     await page.getByTestId('settings-day-THU').check();
     await page.getByTestId('settings-day-TUE').check();
     await page.getByTestId('settings-day-WED').check();
-    await page.getByTestId('settings-public-day-THU').check();
-    await page.getByTestId('settings-public-day-TUE').check();
-    await page.getByTestId('settings-public-day-WED').check();
+    await page.getByTestId('settings-special-approval-day-THU').check();
+    await page.getByTestId('settings-special-approval-day-TUE').check();
+    await page.getByTestId('settings-special-approval-day-WED').check();
     const saveRequestPromise = page.waitForRequest((request) =>
       new URL(request.url()).pathname === '/api/admin/settings' && request.method() === 'PUT',
     );
@@ -323,19 +323,19 @@ test('settings canonicalize weekday selection and mixed API order before saving'
     const saveRequest = await saveRequestPromise;
     const payload = JSON.parse(saveRequest.postData() || '{}') as {
       availableDaysOfWeek?: string[];
-      publicAvailableDaysOfWeek?: string[];
+      specialApprovalDaysOfWeek?: string[];
     };
     expect(payload.availableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
-    expect(payload.publicAvailableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
+    expect(payload.specialApprovalDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
     await expect(page.getByRole('status')).toBeVisible();
 
     const savedSettings = await getSettingsByApi(request);
     expect(savedSettings.availableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
-    expect(savedSettings.publicAvailableDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
+    expect(savedSettings.specialApprovalDaysOfWeek).toEqual(['TUE', 'WED', 'THU']);
     await page.reload();
     for (const day of ['TUE', 'WED', 'THU']) {
       await expect(page.getByTestId(`settings-day-${day}`)).toBeChecked();
-      await expect(page.getByTestId(`settings-public-day-${day}`)).toBeChecked();
+      await expect(page.getByTestId(`settings-special-approval-day-${day}`)).toBeChecked();
     }
   } finally {
     const latestSettings = await getSettingsByApi(request);
