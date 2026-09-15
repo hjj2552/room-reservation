@@ -713,7 +713,7 @@ button:disabled {
 .audit-table th:nth-child(1) { width: 240px; }
 .audit-table th:nth-child(2) { width: 112px; }
 .audit-table th:nth-child(3) { width: 280px; }
-.audit-table th:nth-child(4) { width: 140px; }
+.audit-table th:nth-child(4) { width: 180px; }
 .audit-table th:nth-child(5) { width: 190px; }
 
 .audit-reservation-link {

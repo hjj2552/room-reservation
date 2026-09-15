@@ -101,7 +101,7 @@ test('audit filters are reflected in URL query and render server results', async
   }
 });
 
-test('audit rows keep a stable target summary and column geometry', async ({ page, request }) => {
+test('audit rows keep a stable target summary and column geometry', async ({ page, request }, testInfo) => {
   await loginByApi(request);
   await page.setViewportSize({ width: 1440, height: 900 });
   const longPurpose = 'testing-deleted-snapshot-purpose-that-should-not-be-rendered';
@@ -117,7 +117,7 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
       reservationId: '10000000-0000-0000-0000-000000000000',
       action: 'UPDATED',
       beforeStatus: 'REQUESTED',
-      afterStatus: 'CONFIRMED',
+      afterStatus: requestedPage === 0 ? 'REQUESTED' : 'CONFIRMED',
       memo: requestedPage === 0 ? longMemo : 'testing-short-memo',
       reservationRoomId: '20000000-0000-0000-0000-000000000000',
       reservationPurpose: 'testing-live-purpose',
@@ -317,6 +317,8 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await expect(page).toHaveURL(/keyword=testing-audit-layout/);
   await expect(table.locator('tbody tr')).toHaveCount(1);
   await expect(table.locator('tbody tr')).toContainText('testing-short-memo');
+  await expect(statusCell).toHaveText('승인 대기 → 승인');
+  await expectTextContentWithinCell(statusCell, statusCell, actorCell);
   const nextHeaderGeometry = await table.getByRole('columnheader').evaluateAll((headers) =>
     headers.map((header) => {
       const box = header.getBoundingClientRect();
@@ -342,4 +344,54 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   expect(await auditFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(await tableWrap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+
+  for (const width of [390, 1280, 1440, 1920]) {
+    await test.step(`status transition fits its content area at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await expect(statusCell).toHaveText('승인 대기 → 승인 대기');
+      await page.evaluate(() => document.fonts.ready);
+      await expect(statusCell).toHaveCSS('white-space', 'nowrap');
+      await expectTextContentWithinCell(statusCell, statusCell, actorCell);
+      const geometry = await statusCell.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const text = range.getBoundingClientRect();
+        const cell = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return {
+          cellWidth: cell.width,
+          textWidth: text.width,
+          leftSpace: text.left - cell.left,
+          rightSpace: cell.right - text.right,
+          paddingLeft: parseFloat(style.paddingLeft),
+          paddingRight: parseFloat(style.paddingRight),
+          lineCount: new Set(Array.from(range.getClientRects(), (rect) => rect.top)).size,
+        };
+      });
+      expect(geometry.leftSpace).toBeGreaterThanOrEqual(geometry.paddingLeft);
+      expect(geometry.rightSpace).toBeGreaterThanOrEqual(geometry.paddingRight);
+      expect(geometry.lineCount).toBe(1);
+      await expectTextContentWithinCell(memoCell, memoTableCell);
+      await expect(memoCell).toHaveCSS('white-space', 'pre-wrap');
+      await expect(memoCell).toHaveCSS('overflow-wrap', 'anywhere');
+      expect(await memoCell.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      const scrollGeometry = await tableWrap.evaluate((element) => ({
+        wrapperWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        scrollRange: element.scrollWidth - element.clientWidth,
+        columnWidths: Array.from(element.querySelectorAll('th'), (cell) => cell.getBoundingClientRect().width),
+      }));
+      if (width === 390) {
+        await tableWrap.evaluate((element) => { element.scrollLeft = 620; });
+        expect(await tableWrap.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      }
+      await testInfo.attach(`audit-status-${width}-geometry`, {
+        body: JSON.stringify({ ...geometry, ...scrollGeometry }, null, 2), contentType: 'application/json',
+      });
+      await testInfo.attach(`audit-status-${width}`, {
+        body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+      });
+    });
+  }
 });
