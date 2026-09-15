@@ -22,6 +22,7 @@ import {
   usePublicWeeklyReservations,
 } from '../../shared/hooks/usePublicReservation';
 import { statusLabels } from '../../shared/utils/labels';
+import { savePublicRequestInput } from '../../shared/utils/publicRequestInput';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -230,7 +231,8 @@ export function PublicReservationPage() {
         cancelPassword: values.cancelPassword,
       },
       {
-        onSuccess: () => {
+        onSuccess: (_reservation, submittedValues) => {
+          savePublicRequestInput(submittedValues);
           setQuickSelection(null);
           setQuickSelectionUnavailableMessage(undefined);
           setSubmissionPolicyError(null);
