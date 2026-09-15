@@ -1459,6 +1459,12 @@ button:disabled {
   padding-top: 2px;
 }
 
+.public-request-clear-input {
+  justify-self: end;
+  min-height: 44px;
+  font-size: 13px;
+}
+
 .quick-add-submit-error {
   min-height: 48px;
 }

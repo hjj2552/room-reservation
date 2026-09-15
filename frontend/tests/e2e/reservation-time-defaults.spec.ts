@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { publicRequestInputStorageKey } from '../../shared/utils/publicRequestInput';
 
 const fixedInstant = new Date('2026-07-13T15:45:00Z'); // 2026-07-14 00:45 Asia/Seoul
 const expectedStart = '2026-07-14T09:00';
@@ -117,6 +118,241 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
     });
   });
 }
+
+for (const width of [1440, 390]) {
+  test(`public saved request input survives consecutive requests while clearing only current form fields at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+    await page.clock.setFixedTime(fixedInstant);
+    await mockReservationApis(page, '2026-07-31');
+    const secondRoom = { ...room, id: '00000000-0000-0000-0000-000000000102', name: 'testing-room-reuse-next' };
+    await page.route('**/api/public/rooms', (route) => route.fulfill({ json: [room, secondRoom] }));
+    await page.goto('/timetable?view=date&date=2026-07-15');
+    const panel = page.getByTestId('public-quick-request-panel');
+    const clearButton = page.getByTestId('public-request-clear-input-button');
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(clearButton).toBeVisible();
+    await expect(clearButton).toHaveText('입력 정보 비우기');
+    await clearButton.click();
+    await expect(clearButton).toBeVisible();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    expect(await storedPublicRequestInput(page)).toBeNull();
+
+    await fillPublicRequestPanel(page, 'reuse-first');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    expect(await storedPublicRequestInput(page)).toBeNull();
+    let releaseFirstResponse!: () => void;
+    const firstResponseGate = new Promise<void>((resolve) => { releaseFirstResponse = resolve; });
+    await page.route('**/api/public/reservations', async (route) => {
+      await firstResponseGate;
+      await route.fulfill({ status: 201, json: { id: '00000000-0000-0000-0000-000000000201', status: 'REQUESTED', message: null } });
+    }, { times: 1 });
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(page.getByTestId('public-request-submit-button')).toBeDisabled();
+    expect(await storedPublicRequestInput(page)).toBeNull();
+    releaseFirstResponse();
+    await expect(panel).toBeHidden();
+    const firstInput = publicRequestInputForTest('reuse-first');
+    expect(await storedPublicRequestInput(page)).toEqual(firstInput);
+
+    await page.getByTestId('public-timetable-date-input').fill('2026-07-16');
+    await page.getByRole('button', { name: `${secondRoom.name} 11:00-11:30 예약 신청`, exact: true }).click();
+    await expectPublicRequestInput(page, firstInput);
+    await expect(page.getByTestId('public-request-room-select')).toHaveValue(secondRoom.id);
+    await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-16');
+    await expect(page.getByTestId('public-request-start-input')).toHaveValue('11:00');
+    await expect(page.getByTestId('public-request-end-input')).toHaveValue('11:30');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+
+    await expect(clearButton).toHaveAttribute('type', 'button');
+    await page.evaluate(() => document.fonts.ready);
+    const [headerBox, buttonBox, purposeBox, formBox] = await Promise.all([
+      panel.locator('.side-panel-header').boundingBox(), clearButton.boundingBox(),
+      page.getByTestId('public-request-purpose-input').boundingBox(), panel.locator('form').boundingBox(),
+    ]);
+    expect(buttonBox!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height);
+    expect(buttonBox!.y + buttonBox!.height).toBeLessThanOrEqual(purposeBox!.y);
+    expect(Math.abs(buttonBox!.x + buttonBox!.width - formBox!.x - formBox!.width)).toBeLessThanOrEqual(1);
+    expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await testInfo.attach(`public-form-clear-${width}`, {
+      body: await page.screenshot(), contentType: 'image/png',
+    });
+
+    await fillPublicRequestPanel(page, 'reuse-unsent');
+    // Refetch stale timetable data while a user is editing the already-open form.
+    await refetchPublicTimetable(page, new Date(fixedInstant.getTime() + 35_000));
+    await expectPublicRequestInput(page, publicRequestInputForTest('reuse-unsent'));
+    expect(await storedPublicRequestInput(page)).toEqual(firstInput);
+    await page.getByTestId('public-quick-request-close').click();
+    expect(await storedPublicRequestInput(page)).toEqual(firstInput);
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, firstInput);
+    await expect(page.getByTestId('public-request-room-select')).toHaveValue('');
+    await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-14');
+    await expect(page.getByTestId('public-request-start-input')).toHaveValue('09:00');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+
+    await fillPublicRequestPanel(page, 'reuse-failed');
+    await page.getByTestId('public-request-room-select').selectOption(secondRoom.id);
+    await page.route('**/api/public/reservations', (route) => route.fulfill({
+      status: 409, json: { code: 'RESERVATION_CONFLICT', message: 'testing-request-rejected' },
+    }), { times: 1 });
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(panel.locator('.quick-add-submit-error')).toHaveAttribute('role', 'alert');
+    await expect(page.getByTestId('public-request-submit-button')).toBeEnabled();
+    expect(await storedPublicRequestInput(page)).toEqual(firstInput);
+    await expectPublicRequestInput(page, publicRequestInputForTest('reuse-failed'));
+
+    await fillPublicRequestPanel(page, 'reuse-updated');
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(panel).toBeHidden();
+    const updatedInput = publicRequestInputForTest('reuse-updated');
+    expect(await storedPublicRequestInput(page)).toEqual(updatedInput);
+    await page.getByTestId('public-timetable-view-room').click();
+    await page.getByTestId('public-timetable-room-select').selectOption(secondRoom.id);
+    const timetableUrl = page.url();
+    await page.reload();
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, updatedInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await page.getByTestId('public-quick-request-close').click();
+    expect(page.url()).toBe(timetableUrl);
+
+    await page.goto('/');
+    await page.goBack();
+    await expect(page).toHaveURL(timetableUrl);
+    await expect(page.getByTestId('public-timetable-room-select')).toHaveValue(secondRoom.id);
+
+    await page.goto('/admin/timetable');
+    await page.getByTestId('timetable-new-request-button').click();
+    for (const id of ['quick-add-purpose-input', 'quick-add-applicant-name-input', 'quick-add-email-input', 'quick-add-phone-input']) {
+      await expect(page.getByTestId(id)).toHaveValue('');
+    }
+    await expect(clearButton).toHaveCount(0);
+    await page.getByTestId('timetable-quick-add-close').click();
+    await page.goto(timetableUrl);
+    await expect(page).toHaveURL(timetableUrl);
+    await expect(page.getByTestId('public-timetable-room-select')).toHaveValue(secondRoom.id);
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, updatedInput);
+    await page.getByTestId('public-request-room-select').selectOption(secondRoom.id);
+    await page.getByTestId('public-request-start-input-date').fill('2026-07-17');
+    await page.getByTestId('public-request-start-input').selectOption('14:00');
+    await page.getByTestId('public-request-end-input').selectOption('15:00');
+    await page.getByTestId('public-request-cancel-password-input').fill('Keep1!');
+    await page.evaluate(() => sessionStorage.setItem('testing-unrelated-state', 'keep'));
+    const storedBeforeClear = await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey);
+    await clearButton.click();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(clearButton).toBeVisible();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey)).toBe(storedBeforeClear);
+    expect(await page.evaluate(() => sessionStorage.getItem('testing-unrelated-state'))).toBe('keep');
+    await expect(page.getByTestId('public-request-room-select')).toHaveValue(secondRoom.id);
+    await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-17');
+    await expect(page.getByTestId('public-request-start-input')).toHaveValue('14:00');
+    await expect(page.getByTestId('public-request-end-input')).toHaveValue('15:00');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(panel).toBeVisible();
+    await clearButton.click();
+    await refetchPublicTimetable(page, new Date(fixedInstant.getTime() + 70_000));
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(clearButton).toBeVisible();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey)).toBe(storedBeforeClear);
+    await page.getByTestId('public-quick-request-close').click();
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, updatedInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await page.reload();
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, updatedInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(clearButton).toBeVisible();
+    await clearButton.click();
+    await fillPublicRequestPanel(page, 'reuse-after-clear');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(panel).toBeHidden();
+    expect(await storedPublicRequestInput(page)).toEqual(publicRequestInputForTest('reuse-after-clear'));
+  });
+}
+
+for (const storedValue of ['{broken', 'null', '[]', '42', '{"purpose":"testing-only"}', '{"purpose":17,"applicantName":[],"applicantEmail":false,"applicantPhone":null}']) {
+  test(`public saved request input ignores invalid storage: ${storedValue}`, async ({ page }) => {
+    await mockReservationApis(page, '2026-07-31');
+    await page.clock.setFixedTime(fixedInstant);
+    await page.goto('/timetable');
+    await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), { key: publicRequestInputStorageKey, value: storedValue });
+    await page.getByTestId('public-new-request-button').click();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-clear-input-button')).toBeVisible();
+    await fillPublicRequestPanel(page, 'invalid-storage');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+    expect(await storedPublicRequestInput(page)).toEqual(publicRequestInputForTest('invalid-storage'));
+  });
+}
+
+for (const blockedOperation of ['access', 'getItem', 'setItem', 'removeItem']) {
+  test(`public saved request input tolerates blocked storage ${blockedOperation}`, async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await mockReservationApis(page, '2026-07-31');
+    await page.clock.setFixedTime(fixedInstant);
+    await page.goto('/timetable');
+    await page.evaluate(({ key, value, operation }) => {
+      sessionStorage.setItem(key, JSON.stringify(value));
+      let blockedCalls = 0;
+      Reflect.set(window, 'testingBlockedStorageCalls', () => blockedCalls);
+      const blocked = () => {
+        blockedCalls += 1;
+        throw new DOMException('testing-storage-blocked', 'SecurityError');
+      };
+      if (operation === 'access') Object.defineProperty(window, 'sessionStorage', { configurable: true, get: blocked });
+      else Object.defineProperty(Storage.prototype, operation, { configurable: true, value: blocked });
+    }, { key: publicRequestInputStorageKey, value: publicRequestInputForTest('blocked'), operation: blockedOperation });
+    await page.getByTestId('public-new-request-button').click();
+    if (blockedOperation === 'access' || blockedOperation === 'getItem') {
+      await expectPublicRequestInput(page, emptyPublicRequestInput);
+    } else {
+      await expectPublicRequestInput(page, publicRequestInputForTest('blocked'));
+    }
+    await fillPublicRequestPanel(page, 'blocked-storage-unsent');
+    const blockedCallsBeforeClear = await page.evaluate(() => Reflect.get(window, 'testingBlockedStorageCalls')());
+    await page.getByTestId('public-request-clear-input-button').click();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(page.getByTestId('public-request-clear-input-button')).toBeVisible();
+    expect(await page.evaluate(() => Reflect.get(window, 'testingBlockedStorageCalls')())).toBe(blockedCallsBeforeClear);
+    await fillPublicRequestPanel(page, 'blocked-storage-success');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(page.getByTestId('public-quick-request-panel')).toBeHidden();
+    await expect(page.getByTestId('public-reservation-success-toast')).toBeVisible();
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+test('public saved request input never restores extra form fields from storage', async ({ page }) => {
+  await mockReservationApis(page, '2026-07-31');
+  await page.clock.setFixedTime(fixedInstant);
+  await page.goto('/timetable');
+  const saved = publicRequestInputForTest('extra-fields');
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), {
+    key: publicRequestInputStorageKey,
+    value: { ...saved, roomId: room.id, startAt: '2026-07-31T16:00', endAt: '2026-07-31T17:00', cancelPassword: 'NeverRestore1!', status: 'CONFIRMED', memo: 'testing-memo' },
+  });
+  await page.getByTestId('public-new-request-button').click();
+  await expectPublicRequestInput(page, saved);
+  await expect(page.getByTestId('public-request-room-select')).toHaveValue('');
+  await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-14');
+  await expect(page.getByTestId('public-request-start-input')).toHaveValue('09:00');
+  await expect(page.getByTestId('public-request-end-input')).toHaveValue('09:30');
+  await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+});
 
 test('public completion toast stays within mobile viewport and restarts its timeout', async ({ page }) => {
   const completionMessage = `testing-toast-first-line\n${'testing-toast-unbroken-'.repeat(12)}`;
@@ -673,8 +909,12 @@ test('public edit saves special approval times without an extra confirmation', a
   });
 
   await page.goto(`/reservations/${reservationId}/edit`);
+  const savedInput = publicRequestInputForTest('separate-from-edit');
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, JSON.stringify(value)), { key: publicRequestInputStorageKey, value: savedInput });
   await page.getByTestId('public-edit-password-input').fill('Aa1!');
   await page.getByTestId('public-edit-verify-button').click();
+  await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue(currentReservation.purpose);
+  await expect(page.getByTestId('public-request-clear-input-button')).toHaveCount(0);
   await page.getByTestId('public-edit-start-input').selectOption('09:00');
   await page.getByTestId('public-edit-end-input').selectOption('09:30');
   await page.getByTestId('public-edit-save-button').click();
@@ -685,6 +925,7 @@ test('public edit saves special approval times without an extra confirmation', a
   await page.getByTestId('public-edit-save-button').click();
   await expect.poll(() => updateRequests).toBe(2);
   await expect(page.getByTestId('public-edit-exception-dialog')).toHaveCount(0);
+  expect(await storedPublicRequestInput(page)).toEqual(savedInput);
 });
 
 test('admin approval rechecks the latest settings before confirming an exceptional reservation', async ({ page }) => {
@@ -843,6 +1084,39 @@ async function fillPublicRequestPanel(page: Page, suffix: string) {
   await page.getByTestId('public-request-phone-input').fill('010-1234-5678');
   await page.getByTestId('public-request-email-input').fill(`testing-${suffix}@example.test`);
   await page.getByTestId('public-request-cancel-password-input').fill('Aa1!');
+}
+
+const emptyPublicRequestInput = { purpose: '', applicantName: '', applicantEmail: '', applicantPhone: '' };
+
+function publicRequestInputForTest(suffix: string) {
+  return {
+    purpose: `testing-reservation-${suffix}`,
+    applicantName: `testing-applicant-${suffix}`,
+    applicantEmail: `testing-${suffix}@example.test`,
+    applicantPhone: '010-1234-5678',
+  };
+}
+
+async function expectPublicRequestInput(page: Page, values: typeof emptyPublicRequestInput) {
+  await expect(page.getByTestId('public-request-purpose-input')).toHaveValue(values.purpose);
+  await expect(page.getByTestId('public-request-applicant-name-input')).toHaveValue(values.applicantName);
+  await expect(page.getByTestId('public-request-email-input')).toHaveValue(values.applicantEmail);
+  await expect(page.getByTestId('public-request-phone-input')).toHaveValue(values.applicantPhone);
+}
+
+async function storedPublicRequestInput(page: Page) {
+  return page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) || 'null'), publicRequestInputStorageKey);
+}
+
+async function refetchPublicTimetable(page: Page, now: Date) {
+  await page.clock.setFixedTime(now);
+  const refresh = page.waitForResponse((response) => response.url().includes('/weekly-reservations'));
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('offline'));
+    window.dispatchEvent(new Event('online'));
+  });
+  await (await refresh).finished();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
 }
 
 function mockedSettings(overrides: Record<string, unknown> = {}) {
