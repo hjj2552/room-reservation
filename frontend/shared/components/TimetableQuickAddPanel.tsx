@@ -3,7 +3,7 @@ import type { ReservationDetail, ReservationStatus } from '../api/types';
 import { errorMessage } from '../api/http';
 import { applicantPhoneError } from '../utils/applicantPhone';
 import { statusLabels } from '../utils/labels';
-import { clearPublicRequestInput, readPublicRequestInput } from '../utils/publicRequestInput';
+import { readPublicRequestInput } from '../utils/publicRequestInput';
 import {
   acceptsPublicPasswordInput,
   publicPasswordBlockedMessage,
@@ -169,7 +169,6 @@ export function ReservationRequestPanel({
       ...(variant === 'public' ? readPublicRequestInput() : null),
     },
   );
-  const [hasSavedPublicInput, setHasSavedPublicInput] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof ReservationRequestValues, string>>>({});
   const ids = testIds[variant];
   const isAdmin = variant === 'admin';
@@ -177,7 +176,6 @@ export function ReservationRequestPanel({
   useEffect(() => {
     const savedInput = variant === 'public' ? readPublicRequestInput() : null;
     setValues(initialValues ?? { ...initialReservationRequestValues(selection, variant), ...savedInput });
-    setHasSavedPublicInput(Boolean(savedInput));
     setErrors({});
   }, [initialValues, selection.date, selection.endAt, selection.roomId, selection.startAt, variant]);
 
@@ -208,13 +206,12 @@ export function ReservationRequestPanel({
     return Object.keys(nextErrors).length === 0;
   }
 
-  function clearSavedPublicInput() {
-    clearPublicRequestInput();
-    setHasSavedPublicInput(false);
+  function clearPublicInput() {
     updateField('purpose', '');
     updateField('applicantName', '');
     updateField('applicantEmail', '');
     updateField('applicantPhone', '');
+    updateField('cancelPassword', '');
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -267,15 +264,15 @@ export function ReservationRequestPanel({
       ) : null}
 
       <form className="quick-add-form compact-request-form" onSubmit={handleSubmit}>
-        {!isAdmin && hasSavedPublicInput ? (
+        {!isAdmin ? (
           <button
             type="button"
             className="ghost-button full-span public-request-clear-input"
-            onClick={clearSavedPublicInput}
+            onClick={clearPublicInput}
             disabled={isPending}
             data-testid="public-request-clear-input-button"
           >
-            저장한 입력 정보 지우기
+            입력 정보 비우기
           </button>
         ) : null}
         <label className="full-span request-title-field">

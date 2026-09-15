@@ -120,7 +120,7 @@ for (const timezoneId of ['Asia/Seoul', 'UTC']) {
 }
 
 for (const width of [1440, 390]) {
-  test(`public saved request input survives consecutive requests and clears only allowed fields at ${width}px`, async ({ page }, testInfo) => {
+  test(`public saved request input survives consecutive requests while clearing only current form fields at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
     await page.clock.setFixedTime(fixedInstant);
     await mockReservationApis(page, '2026-07-31');
@@ -131,7 +131,12 @@ for (const width of [1440, 390]) {
     const clearButton = page.getByTestId('public-request-clear-input-button');
     await page.getByTestId('public-new-request-button').click();
     await expectPublicRequestInput(page, emptyPublicRequestInput);
-    await expect(clearButton).toHaveCount(0);
+    await expect(clearButton).toBeVisible();
+    await expect(clearButton).toHaveText('입력 정보 비우기');
+    await clearButton.click();
+    await expect(clearButton).toBeVisible();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
     expect(await storedPublicRequestInput(page)).toBeNull();
 
     await fillPublicRequestPanel(page, 'reuse-first');
@@ -171,20 +176,13 @@ for (const width of [1440, 390]) {
     expect(Math.abs(buttonBox!.x + buttonBox!.width - formBox!.x - formBox!.width)).toBeLessThanOrEqual(1);
     expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await testInfo.attach(`public-saved-input-${width}`, {
-      body: await page.screenshot({ fullPage: true }), contentType: 'image/png',
+    await testInfo.attach(`public-form-clear-${width}`, {
+      body: await page.screenshot(), contentType: 'image/png',
     });
 
     await fillPublicRequestPanel(page, 'reuse-unsent');
     // Refetch stale timetable data while a user is editing the already-open form.
-    await page.clock.setFixedTime(new Date(fixedInstant.getTime() + 35_000));
-    const refresh = page.waitForResponse((response) => response.url().includes('/weekly-reservations'));
-    await page.evaluate(() => {
-      window.dispatchEvent(new Event('offline'));
-      window.dispatchEvent(new Event('online'));
-    });
-    await (await refresh).finished();
-    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await refetchPublicTimetable(page, new Date(fixedInstant.getTime() + 35_000));
     await expectPublicRequestInput(page, publicRequestInputForTest('reuse-unsent'));
     expect(await storedPublicRequestInput(page)).toEqual(firstInput);
     await page.getByTestId('public-quick-request-close').click();
@@ -245,25 +243,39 @@ for (const width of [1440, 390]) {
     await page.getByTestId('public-request-end-input').selectOption('15:00');
     await page.getByTestId('public-request-cancel-password-input').fill('Keep1!');
     await page.evaluate(() => sessionStorage.setItem('testing-unrelated-state', 'keep'));
+    const storedBeforeClear = await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey);
     await clearButton.click();
     await expectPublicRequestInput(page, emptyPublicRequestInput);
-    await expect(clearButton).toHaveCount(0);
-    expect(await storedPublicRequestInput(page)).toBeNull();
+    await expect(clearButton).toBeVisible();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey)).toBe(storedBeforeClear);
     expect(await page.evaluate(() => sessionStorage.getItem('testing-unrelated-state'))).toBe('keep');
     await expect(page.getByTestId('public-request-room-select')).toHaveValue(secondRoom.id);
     await expect(page.getByTestId('public-request-start-input-date')).toHaveValue('2026-07-17');
     await expect(page.getByTestId('public-request-start-input')).toHaveValue('14:00');
     await expect(page.getByTestId('public-request-end-input')).toHaveValue('15:00');
-    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('Keep1!');
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
     await expect(panel).toBeVisible();
+    await clearButton.click();
+    await refetchPublicTimetable(page, new Date(fixedInstant.getTime() + 70_000));
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(clearButton).toBeVisible();
+    expect(await page.evaluate((key) => sessionStorage.getItem(key), publicRequestInputStorageKey)).toBe(storedBeforeClear);
     await page.getByTestId('public-quick-request-close').click();
     await page.getByTestId('public-new-request-button').click();
-    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expectPublicRequestInput(page, updatedInput);
     await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
     await page.reload();
     await page.getByTestId('public-new-request-button').click();
-    await expectPublicRequestInput(page, emptyPublicRequestInput);
-    await expect(clearButton).toHaveCount(0);
+    await expectPublicRequestInput(page, updatedInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(clearButton).toBeVisible();
+    await clearButton.click();
+    await fillPublicRequestPanel(page, 'reuse-after-clear');
+    await page.getByTestId('public-request-room-select').selectOption(room.id);
+    await page.getByTestId('public-request-submit-button').click();
+    await expect(panel).toBeHidden();
+    expect(await storedPublicRequestInput(page)).toEqual(publicRequestInputForTest('reuse-after-clear'));
   });
 }
 
@@ -275,7 +287,7 @@ for (const storedValue of ['{broken', 'null', '[]', '42', '{"purpose":"testing-o
     await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), { key: publicRequestInputStorageKey, value: storedValue });
     await page.getByTestId('public-new-request-button').click();
     await expectPublicRequestInput(page, emptyPublicRequestInput);
-    await expect(page.getByTestId('public-request-clear-input-button')).toHaveCount(0);
+    await expect(page.getByTestId('public-request-clear-input-button')).toBeVisible();
     await fillPublicRequestPanel(page, 'invalid-storage');
     await page.getByTestId('public-request-room-select').selectOption(room.id);
     await page.getByTestId('public-request-submit-button').click();
@@ -293,19 +305,28 @@ for (const blockedOperation of ['access', 'getItem', 'setItem', 'removeItem']) {
     await page.goto('/timetable');
     await page.evaluate(({ key, value, operation }) => {
       sessionStorage.setItem(key, JSON.stringify(value));
-      const blocked = () => { throw new DOMException('testing-storage-blocked', 'SecurityError'); };
+      let blockedCalls = 0;
+      Reflect.set(window, 'testingBlockedStorageCalls', () => blockedCalls);
+      const blocked = () => {
+        blockedCalls += 1;
+        throw new DOMException('testing-storage-blocked', 'SecurityError');
+      };
       if (operation === 'access') Object.defineProperty(window, 'sessionStorage', { configurable: true, get: blocked });
       else Object.defineProperty(Storage.prototype, operation, { configurable: true, value: blocked });
     }, { key: publicRequestInputStorageKey, value: publicRequestInputForTest('blocked'), operation: blockedOperation });
     await page.getByTestId('public-new-request-button').click();
     if (blockedOperation === 'access' || blockedOperation === 'getItem') {
       await expectPublicRequestInput(page, emptyPublicRequestInput);
-      await expect(page.getByTestId('public-request-clear-input-button')).toHaveCount(0);
     } else {
       await expectPublicRequestInput(page, publicRequestInputForTest('blocked'));
-      await page.getByTestId('public-request-clear-input-button').click();
-      await expectPublicRequestInput(page, emptyPublicRequestInput);
     }
+    await fillPublicRequestPanel(page, 'blocked-storage-unsent');
+    const blockedCallsBeforeClear = await page.evaluate(() => Reflect.get(window, 'testingBlockedStorageCalls')());
+    await page.getByTestId('public-request-clear-input-button').click();
+    await expectPublicRequestInput(page, emptyPublicRequestInput);
+    await expect(page.getByTestId('public-request-cancel-password-input')).toHaveValue('');
+    await expect(page.getByTestId('public-request-clear-input-button')).toBeVisible();
+    expect(await page.evaluate(() => Reflect.get(window, 'testingBlockedStorageCalls')())).toBe(blockedCallsBeforeClear);
     await fillPublicRequestPanel(page, 'blocked-storage-success');
     await page.getByTestId('public-request-room-select').selectOption(room.id);
     await page.getByTestId('public-request-submit-button').click();
@@ -1085,6 +1106,17 @@ async function expectPublicRequestInput(page: Page, values: typeof emptyPublicRe
 
 async function storedPublicRequestInput(page: Page) {
   return page.evaluate((key) => JSON.parse(sessionStorage.getItem(key) || 'null'), publicRequestInputStorageKey);
+}
+
+async function refetchPublicTimetable(page: Page, now: Date) {
+  await page.clock.setFixedTime(now);
+  const refresh = page.waitForResponse((response) => response.url().includes('/weekly-reservations'));
+  await page.evaluate(() => {
+    window.dispatchEvent(new Event('offline'));
+    window.dispatchEvent(new Event('online'));
+  });
+  await (await refresh).finished();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
 }
 
 function mockedSettings(overrides: Record<string, unknown> = {}) {

@@ -38,11 +38,3 @@ export function savePublicRequestInput(value: PublicRequestInput) {
     // A successful reservation must remain successful when storage is unavailable.
   }
 }
-
-export function clearPublicRequestInput() {
-  try {
-    window.sessionStorage.removeItem(publicRequestInputStorageKey);
-  } catch {
-    // The current form can still be cleared when storage is unavailable.
-  }
-}
