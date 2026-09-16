@@ -583,9 +583,10 @@ test('public edit replaces an inactive current room without getting stuck loadin
   await expect(page.getByTestId('public-edit-save-button')).toBeEnabled();
   await page.getByTestId('public-edit-save-button').click();
 
-  await expect(roomSelect).toHaveValue(replacementRoom.id);
+  await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+  await expect(page.locator('.reservation-detail-main')).toContainText(replacementRoom.name);
   await expect(page.getByText('현재 공간은 예약 대상에서 제외되었습니다. 수정하려면 다른 공간을 선택해 주세요.')).toHaveCount(0);
-  await expect(page.locator('.success-box')).toContainText('승인 대기');
+  await expect(page.getByTestId('public-edit-success-toast')).toContainText('승인 대기');
 });
 
 test('public can edit a CONFIRMED status reservation and it returns to REQUESTED status', async ({ page, request, e2eData }) => {
@@ -658,7 +659,12 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-save-button').click();
     await statusTransitionResponse;
     await expect(page.getByRole('status')).toContainText('다시 승인 대기로 변경되었습니다');
-    await expect(page.getByTestId('public-edit-status-input')).toHaveValue('승인 대기');
+    await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
+    await expect(page.locator('.status-badge')).toHaveText('승인 대기');
+
+    await page.getByTestId('public-reservation-edit-link').click();
+    await page.getByTestId('public-edit-password-input').fill(reservation.cancelPassword);
+    await page.getByTestId('public-edit-verify-button').click();
 
     await page.getByTestId('public-edit-purpose-input').fill(editedPurpose);
     await page.getByTestId('public-edit-applicant-name-input').fill(editedName);
@@ -670,8 +676,6 @@ test('public can edit a CONFIRMED status reservation and it returns to REQUESTED
     await page.getByTestId('public-edit-save-button').click();
 
     await expect(page.getByRole('status')).toContainText('승인 대기 상태를 유지합니다');
-    await expect(page.getByTestId('public-edit-phone-input')).toHaveValue('01055556666');
-    await page.getByRole('button', { name: '취소', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/reservations/${reservation.id}$`));
     await expect(page.locator('.status-badge')).toContainText('승인 대기');
     await expect(page.locator('.reservation-detail-main')).toContainText(editedPurpose);

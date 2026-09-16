@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { getPublicWeeklyReservations } from '../../shared/api/public';
@@ -23,6 +23,8 @@ import {
 } from '../../shared/hooks/usePublicReservation';
 import { statusLabels } from '../../shared/utils/labels';
 import { savePublicRequestInput } from '../../shared/utils/publicRequestInput';
+import { publicTimetableReturn } from '../../shared/utils/publicReservationNavigation';
+import { PublicReservationToast } from '../../shared/components/PublicReservationToast';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,
@@ -38,7 +40,6 @@ interface RoomInfoDialogState {
   room: RoomInfoRoom;
 }
 
-const completionToastDurationMs = 6_000;
 const defaultCompletionMessage = '예약 신청이 완료되었습니다. 관리자 승인 후 예약이 확정됩니다.';
 const publicStatusLabels = {
   REQUESTED: statusLabels.REQUESTED,
@@ -110,15 +111,6 @@ export function PublicReservationPage() {
   useEffect(() => {
     searchParamsRef.current = new URLSearchParams(searchParams);
   }, [searchParams]);
-
-  useEffect(() => {
-    if (!completionToast) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => setCompletionToast(null), completionToastDurationMs);
-    return () => window.clearTimeout(timeoutId);
-  }, [completionToast]);
 
   const viewMode = isPublicTimetableViewMode(searchParams.get('view')) ? searchParams.get('view') : 'date';
   const selectedDate = searchParams.get('date') || todayInputValue();
@@ -210,7 +202,9 @@ export function PublicReservationPage() {
   }
 
   function handleReservationClick(reservation: TimetableReservation) {
-    navigate(`/reservations/${reservation.id}`);
+    navigate(`/reservations/${reservation.id}`, {
+      state: { timetableReturn: publicTimetableReturn(searchParams.toString()) },
+    });
   }
 
   function openRoomInfo(room: TimetableRoom) {
@@ -435,18 +429,7 @@ export function PublicReservationPage() {
         onClose={() => setRoomInfoDialog(null)}
       />
 
-      {completionToast ? (
-        <div
-          className="public-reservation-success-toast"
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="public-reservation-success-toast"
-        >
-          <Check size={20} strokeWidth={2.5} aria-hidden="true" data-testid="public-reservation-success-icon" />
-          <span>{completionToast.message}</span>
-        </div>
-      ) : null}
+      <PublicReservationToast toast={completionToast} onClose={setCompletionToast} />
 
     </div>
   );
