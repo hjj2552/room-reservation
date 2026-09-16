@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { publicRequestInputStorageKey } from '../../shared/utils/publicRequestInput';
+import type { PublicReservationUpdatePayload } from '../../shared/api/types';
 
 const fixedInstant = new Date('2026-07-13T15:45:00Z'); // 2026-07-14 00:45 Asia/Seoul
 const expectedStart = '2026-07-14T09:00';
@@ -878,6 +879,139 @@ test('public general reservation submission does not show an extra confirmation'
   await expect(page.getByTestId('public-reservation-exception-dialog')).toHaveCount(0);
 });
 
+for (const view of ['date', 'room'] as const) {
+  for (const finish of ['cancel', 'unchanged', 'save'] as const) {
+    test(`public edit navigation returns once from ${view} view after ${finish}`, async ({ page }, testInfo) => {
+      const width = view === 'date' ? 1440 : 390;
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      const flow = await mockPublicEditNavigation(page);
+      const timetablePath = `/timetable?view=${view}&date=2026-07-13&weekStart=2026-07-13&roomViewRoomId=${room.id}`;
+      await page.goto('/');
+      await page.goto(timetablePath);
+      await page.getByText(flow.current().purpose, { exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+      const detailIndex = await page.evaluate(() => history.state.idx);
+      await openPublicEditFromDetail(page);
+      await expect.poll(() => page.evaluate(() => history.state.usr)).toEqual({
+        timetableReturn: { url: timetablePath, index: detailIndex - 1 },
+      });
+      expect(await page.evaluate(() => history.state.idx)).toBe(detailIndex);
+
+      if (finish === 'save') await page.getByTestId('public-edit-purpose-input').fill('testing-reservation-navigation-updated');
+      if (finish === 'cancel') await page.getByRole('button', { name: '취소', exact: true }).click();
+      else await page.getByTestId('public-edit-save-button').click();
+      await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+      expect(await page.evaluate(() => history.state.idx)).toBe(detailIndex);
+      expect(flow.updates()).toBe(finish === 'save' ? 1 : 0);
+      const toast = page.getByTestId('public-edit-success-toast');
+      if (finish === 'save') {
+        await expect(page.locator('.reservation-detail-main')).toContainText('testing-reservation-navigation-updated');
+        await expect(page.locator('.status-badge')).toHaveText('승인 대기');
+        await expect(toast).toHaveText('수정 완료. 승인 대기 상태를 유지합니다.');
+        await expect(toast).toHaveAttribute('role', 'status');
+        await expect(toast).toHaveAttribute('aria-live', 'polite');
+        await expect(toast).toHaveAttribute('aria-atomic', 'true');
+        await page.evaluate(() => document.fonts.ready);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await expect(page.getByTestId('public-detail-timetable-link')).toBeInViewport();
+        await expect(toast).toHaveCSS('opacity', '1');
+        const toastBox = await toast.boundingBox();
+        expect(toastBox!.x).toBeGreaterThanOrEqual(0);
+        expect(toastBox!.x + toastBox!.width).toBeLessThanOrEqual(width);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+        await testInfo.attach(`public-edit-complete-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
+        await expect(toast).toBeHidden({ timeout: 8_000 });
+        await page.reload();
+        await expect(page.getByTestId('public-detail-timetable-link')).toBeVisible();
+      }
+      await expect(toast).toHaveCount(0);
+      await page.goBack();
+      await expect(page).toHaveURL(new RegExp(`${timetablePath.replace('?', '\\?')}$`));
+      await page.goForward();
+      await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+      await expect(page.getByTestId('public-detail-timetable-link')).toBeVisible();
+      await expect(toast).toHaveCount(0);
+      await page.getByTestId('public-detail-timetable-link').click();
+      await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(timetablePath);
+      await page.goBack();
+      await expect(page).toHaveURL(/\/$/);
+    });
+  }
+}
+
+for (const entry of ['detail', 'edit'] as const) {
+  for (const finish of ['cancel', 'save'] as const) {
+    test(`public edit navigation safely replaces direct ${entry} entry after ${finish}`, async ({ page }) => {
+      const flow = await mockPublicEditNavigation(page);
+      await page.goto('/');
+      await page.goto(`${flow.detailPath}${entry === 'edit' ? '/edit' : ''}`);
+      if (entry === 'detail') await page.getByTestId('public-reservation-edit-link').click();
+      await verifyPublicEditPassword(page);
+      const index = await page.evaluate(() => history.state.idx);
+      if (finish === 'cancel') await page.getByRole('button', { name: '취소', exact: true }).click();
+      else {
+        await page.getByTestId('public-edit-purpose-input').fill('testing-reservation-direct-updated');
+        await page.getByTestId('public-edit-save-button').click();
+      }
+      await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+      expect(await page.evaluate(() => history.state.idx)).toBe(index);
+      if (finish === 'save') await expect(page.getByTestId('public-edit-success-toast')).toBeVisible();
+      else await expect(page.getByTestId('public-edit-success-toast')).toHaveCount(0);
+      await page.getByTestId('public-detail-timetable-link').click();
+      await expect(page.getByTestId('public-timetable-room-select')).toHaveValue(room.id);
+      const params = new URL(page.url()).searchParams;
+      expect(params.get('date')).toBe('2026-07-13');
+      expect(params.get('view')).toBe('room');
+      expect(params.get('roomViewRoomId')).toBe(room.id);
+      await page.goBack();
+      await expect(page).toHaveURL(/\/$/);
+      await page.goForward();
+      await expect(page.getByTestId('public-timetable-room-select')).toBeVisible();
+      await expect(page.getByTestId('public-edit-success-toast')).toHaveCount(0);
+    });
+  }
+}
+
+test('public edit navigation preserves return context across reload and failed saves', async ({ page }) => {
+  const flow = await mockPublicEditNavigation(page);
+  const timetablePath = `/timetable?view=room&date=2026-07-13&weekStart=2026-07-13&roomViewRoomId=${room.id}`;
+  await page.goto(timetablePath);
+  await page.getByText(flow.current().purpose, { exact: true }).click();
+  await openPublicEditFromDetail(page);
+  await expect.poll(() => page.evaluate(() => history.state.usr?.reservationPassword)).toBeUndefined();
+  await page.reload();
+  await expect(page.getByTestId('public-edit-password-input')).toHaveValue('');
+  await verifyPublicEditPassword(page);
+  await page.getByTestId('public-edit-purpose-input').fill('testing-reservation-failed-edit');
+  await page.route(`**/api/public/reservations/${flow.current().id}`, (route) => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 409, json: { code: 'TIME_SLOT_CONFLICT', message: 'testing-edit-conflict' } })
+    : route.fallback());
+  await page.getByTestId('public-edit-save-button').click();
+  await expect(page.getByRole('alert')).toHaveText('같은 공간의 동일 시간대에 이미 예약이 있습니다.');
+  await expect(page).toHaveURL(new RegExp(`${flow.detailPath}/edit$`));
+  await expect(page.getByTestId('public-edit-purpose-input')).toHaveValue('testing-reservation-failed-edit');
+  await expect(page.getByTestId('public-edit-success-toast')).toHaveCount(0);
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+  await page.getByTestId('public-detail-timetable-link').click();
+  await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search).toBe(timetablePath);
+});
+
+test('public edit navigation password cancellation and cancelled detail have safe destinations', async ({ page }) => {
+  const flow = await mockPublicEditNavigation(page);
+  await page.goto(`${flow.detailPath}/edit`);
+  await page.getByRole('button', { name: '돌아가기', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${flow.detailPath}$`));
+  await expect(page.getByTestId('public-edit-success-toast')).toHaveCount(0);
+  await page.route(`**/api/public/reservations/${flow.current().id}`, (route) => route.fulfill({
+    json: { ...flow.current(), status: 'CANCELLED', editable: false, cancellable: false },
+  }));
+  await page.reload();
+  await expect(page.locator('.status-badge')).toHaveText('취소');
+  await page.getByTestId('public-detail-timetable-link').click();
+  await expect(page.getByTestId('public-timetable-room-select')).toHaveValue(room.id);
+});
+
 test('public edit saves special approval times without an extra confirmation', async ({ page }) => {
   const reservationId = '00000000-0000-4000-8000-000000000302';
   await page.clock.setFixedTime(new Date('2026-07-13T00:00:00Z')); // 09:00 Asia/Seoul
@@ -921,6 +1055,10 @@ test('public edit saves special approval times without an extra confirmation', a
   await expect.poll(() => updateRequests).toBe(1);
   await expect(page.getByTestId('public-edit-exception-dialog')).toHaveCount(0);
 
+  await expect(page).toHaveURL(new RegExp(`/reservations/${reservationId}$`));
+  await page.getByTestId('public-reservation-edit-link').click();
+  await page.getByTestId('public-edit-password-input').fill('Aa1!');
+  await page.getByTestId('public-edit-verify-button').click();
   await page.getByTestId('public-edit-purpose-input').fill('testing-reservation-edit-purpose-only');
   await page.getByTestId('public-edit-save-button').click();
   await expect.poll(() => updateRequests).toBe(2);
@@ -1179,4 +1317,35 @@ function mockedPublicReservation(id: string) {
     cancellable: true,
     editable: true,
   };
+}
+
+async function mockPublicEditNavigation(page: Page) {
+  await page.clock.setFixedTime(new Date('2026-07-13T00:00:00Z'));
+  await mockReservationApis(page, '2026-07-31');
+  let current = mockedPublicReservation('00000000-0000-4000-8000-000000000303');
+  let updates = 0;
+  await page.route(`**/api/public/reservations/${current.id}**`, (route) => {
+    if (route.request().method() === 'PUT') {
+      const { cancelPassword: _password, roomId: _roomId, ...fields } = route.request().postDataJSON() as PublicReservationUpdatePayload;
+      updates += 1;
+      current = { ...current, ...fields, status: 'REQUESTED' };
+    }
+    return route.fulfill({ json: current });
+  });
+  await page.route('**/api/public/rooms/*/weekly**', (route) => route.fulfill({
+    json: { room: current.room, weekStart: '2026-07-13', weekEnd: '2026-07-19',
+      reservations: [{ ...current, roomId: room.id, roomName: room.name }] },
+  }));
+  return { detailPath: `/reservations/${current.id}`, current: () => current, updates: () => updates };
+}
+
+async function verifyPublicEditPassword(page: Page) {
+  await page.getByTestId('public-edit-password-input').fill('Aa1!');
+  await page.getByTestId('public-edit-verify-button').click();
+  await expect(page.getByTestId('public-edit-purpose-input')).toBeVisible();
+}
+
+async function openPublicEditFromDetail(page: Page) {
+  await page.getByTestId('public-reservation-edit-link').click();
+  await verifyPublicEditPassword(page);
 }

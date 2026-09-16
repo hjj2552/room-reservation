@@ -15,7 +15,8 @@ import {
   useVerifyPublicReservationForEdit,
 } from '../../shared/hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
-import { applicantPhoneError, normalizeApplicantPhoneInput } from '../../shared/utils/applicantPhone';
+import { applicantPhoneError } from '../../shared/utils/applicantPhone';
+import type { PublicReservationNavigationState } from '../../shared/utils/publicReservationNavigation';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 import {
@@ -39,7 +40,7 @@ interface PublicReservationEditValues {
   endAt: string;
 }
 
-interface PublicReservationEditRouteState {
+interface PublicReservationEditRouteState extends PublicReservationNavigationState {
   verifiedReservation?: PublicReservationEditDetail;
   reservationPassword?: string;
 }
@@ -71,7 +72,6 @@ export function PublicReservationEditPage() {
     routeState?.verifiedReservation || null,
   );
   const [showPasswordDialog, setShowPasswordDialog] = useState(!routeState?.verifiedReservation);
-  const [successMessage, setSuccessMessage] = useState('');
   const [submissionPolicyError, setSubmissionPolicyError] = useState('');
   const {
     register,
@@ -116,12 +116,18 @@ export function PublicReservationEditPage() {
   }, [reset, verifiedReservation]);
 
   useEffect(() => {
-    if (!routeState?.verifiedReservation) return;
-    navigate(location.pathname, { replace: true, state: null });
-  }, [location.pathname, navigate, routeState?.verifiedReservation]);
+    if (!routeState?.verifiedReservation && !routeState?.reservationPassword) return;
+    navigate(location.pathname, { replace: true, state: { timetableReturn: routeState.timetableReturn } });
+  }, [location.pathname, navigate, routeState]);
+
+  function returnToDetail(editSuccess?: 'REQUESTED' | 'CONFIRMED') {
+    navigate(`/reservations/${reservationId}`, {
+      replace: true,
+      state: { timetableReturn: routeState?.timetableReturn, editSuccess },
+    });
+  }
 
   function verifyReservationPassword() {
-    setSuccessMessage('');
     verify.mutate(reservationPassword, {
       onSuccess: (reservation) => {
         setVerifiedReservation(reservation);
@@ -131,31 +137,13 @@ export function PublicReservationEditPage() {
   }
 
   function performUpdate(
-    values: PublicReservationEditValues,
     payload: PublicReservationUpdatePayload,
     previousStatus: PublicReservationEditDetail['status'],
   ) {
     update.mutate(
       payload,
       {
-        onSuccess: (updated) => {
-          setSuccessMessage(
-            previousStatus === 'CONFIRMED'
-              ? '수정 완료. 다시 승인 대기로 변경되었습니다.'
-              : '수정 완료. 승인 대기 상태를 유지합니다.',
-          );
-          setVerifiedReservation((current) => current ? {
-            ...current,
-            room: updated.room,
-            applicantName: values.applicantName,
-            applicantEmail: values.applicantEmail,
-            applicantPhone: normalizeApplicantPhoneInput(values.applicantPhone),
-            purpose: values.purpose,
-            startAt: updated.startAt,
-            endAt: updated.endAt,
-            status: updated.status,
-          } : current);
-        },
+        onSuccess: () => returnToDetail(previousStatus === 'CONFIRMED' ? 'CONFIRMED' : 'REQUESTED'),
       },
     );
   }
@@ -198,10 +186,10 @@ export function PublicReservationEditPage() {
         payload,
       )
     ) {
-      navigate(`/reservations/${verifiedReservation.id}`);
+      returnToDetail();
       return;
     }
-    performUpdate(values, payload, previousStatus);
+    performUpdate(payload, previousStatus);
   }
 
   if (detail.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
@@ -212,7 +200,6 @@ export function PublicReservationEditPage() {
 
   const reservation = detail.data;
   const isEditable = reservation.editable;
-  const reservationDetailPath = `/reservations/${reservation.id}`;
 
   return (
     <main className="public-shell" aria-labelledby="public-reservation-edit-title">
@@ -257,7 +244,7 @@ export function PublicReservationEditPage() {
         inputTestId="public-edit-password-input"
         submitTestId="public-edit-verify-button"
         onPasswordChange={setReservationPassword}
-        onClose={() => navigate(reservationDetailPath)}
+        onClose={() => returnToDetail()}
         onSubmit={verifyReservationPassword}
       />
 
@@ -345,9 +332,8 @@ export function PublicReservationEditPage() {
           ) : update.isError ? (
             <div className="inline-error full-span" role="alert">{errorMessage(update.error)}</div>
           ) : null}
-          {successMessage ? <div className="success-box full-span" role="status">{successMessage}</div> : null}
           <div className="button-row full-span">
-            <button type="button" className="ghost-button" onClick={() => navigate(reservationDetailPath)}>
+            <button type="button" className="ghost-button" onClick={() => returnToDetail()}>
               취소
             </button>
             <button

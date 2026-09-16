@@ -1,6 +1,6 @@
 import { PenLine, X } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLayoutEffect, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ModalDialog } from '../../shared/components/ModalDialog';
@@ -13,12 +13,16 @@ import {
 } from '../../shared/hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
+import { PublicReservationToast } from '../../shared/components/PublicReservationToast';
+import { canReturnToPublicTimetable, publicReservationTimetableUrl, type PublicReservationNavigationState } from '../../shared/utils/publicReservationNavigation';
 
 type PasswordAction = 'edit' | 'cancel';
 
 export function PublicReservationDetailPage() {
   const { reservationId = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = location.state as PublicReservationNavigationState | null;
   const detail = usePublicReservationDetail(reservationId);
   const cancel = useCancelPublicReservation(reservationId);
   const verify = useVerifyPublicReservationForEdit(reservationId);
@@ -26,6 +30,16 @@ export function PublicReservationDetailPage() {
   const [passwordAction, setPasswordAction] = useState<PasswordAction | null>(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [cancelSuccess, setCancelSuccess] = useState(false);
+  const [completionToast, setCompletionToast] = useState<{ message: string } | null>(null);
+
+  useLayoutEffect(() => {
+    if (routeState?.editSuccess !== 'REQUESTED' && routeState?.editSuccess !== 'CONFIRMED') return;
+    setCompletionToast({ message: routeState.editSuccess === 'CONFIRMED'
+      ? '수정 완료. 다시 승인 대기로 변경되었습니다.'
+      : '수정 완료. 승인 대기 상태를 유지합니다.' });
+    // Consume the one-time feedback before another visit or reload can replay it.
+    navigate(location.pathname, { replace: true, state: { timetableReturn: routeState.timetableReturn } });
+  }, [location.pathname, navigate, routeState]);
 
   function openPasswordDialog(action: PasswordAction) {
     verify.reset();
@@ -47,7 +61,9 @@ export function PublicReservationDetailPage() {
       onSuccess: (verifiedReservation) => {
         if (passwordAction === 'edit') {
           navigate(`/reservations/${verifiedReservation.id}/edit`, {
-            state: { verifiedReservation, reservationPassword },
+            // Detail and edit occupy one history entry throughout the edit flow.
+            replace: true,
+            state: { verifiedReservation, reservationPassword, timetableReturn: routeState?.timetableReturn },
           });
           return;
         }
@@ -74,6 +90,18 @@ export function PublicReservationDetailPage() {
     setReservationPassword('');
   }
 
+  function returnToTimetable() {
+    if (!detail.data) return;
+    const context = routeState?.timetableReturn;
+    if (canReturnToPublicTimetable(context)) {
+      navigate(-1);
+      return;
+    }
+    const url = context?.url === '/timetable' || context?.url.startsWith('/timetable?')
+      ? context.url : publicReservationTimetableUrl(detail.data);
+    navigate(url, { replace: true });
+  }
+
   if (detail.isLoading) return <LoadingState />;
   if (detail.isError) return <ErrorState error={detail.error} />;
   if (!detail.data) return null;
@@ -87,6 +115,14 @@ export function PublicReservationDetailPage() {
           <h1 id="public-reservation-detail-title">{reservation.room.name}</h1>
           <p className="muted">{formatDateTime(reservation.startAt)} 예약</p>
         </div>
+        <button
+          type="button"
+          className="secondary-button"
+          data-testid="public-detail-timetable-link"
+          onClick={returnToTimetable}
+        >
+          시간표로 돌아가기
+        </button>
       </div>
 
       <div className="detail-grid public-detail-grid">
@@ -128,6 +164,8 @@ export function PublicReservationDetailPage() {
           {cancelSuccess ? <div className="success-box" role="status">예약을 취소했습니다.</div> : null}
         </section>
       </div>
+
+      <PublicReservationToast toast={completionToast} onClose={setCompletionToast} testId="public-edit-success-toast" />
 
       <ReservationPasswordDialog
         open={passwordAction !== null}
