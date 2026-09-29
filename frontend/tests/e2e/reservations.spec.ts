@@ -224,7 +224,7 @@ test('reservation list and detail expose timetable links with reservation date a
 
     await page.goto(`/admin/reservations/${reservation.id}`);
     await expect(page.getByRole('button', { name: '목록으로', exact: true })).toHaveCount(0);
-    await expect(page.locator('.reservation-detail-page-header .muted')).toContainText(/\([월화수목금토일]\)/);
+    await expect(page.locator('.reservation-detail-page-header .muted')).toHaveCount(0);
     const adminDateTime = await page.locator('.reservation-detail-main dt', { hasText: '날짜/시간' })
       .locator('xpath=following-sibling::dd').innerText();
     expect(adminDateTime.match(/\([월화수목금토일]\)/g)).toHaveLength(2);
@@ -532,7 +532,7 @@ test('reservation duplicate pre-fills fields and handles unavailable operating d
   await page.goto(`/admin/reservations/${duplicatedReservationId}`);
   await expect(page).toHaveURL(new RegExp(`/admin/reservations/${duplicatedReservationId}$`));
   await expect(page.getByTestId('reservation-purpose')).toHaveText(source.purpose);
-  await expect(page.getByRole('heading', { name: source.room.name })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '예약 상세', exact: true })).toBeVisible();
 
   await page.goto(`/admin/reservations?keyword=${encodeURIComponent(source.purpose)}`);
   await expect(page.getByTestId('reservations-table')).toContainText(source.purpose);
@@ -642,7 +642,7 @@ test('admin can request a reservation from the timetable and see it on detail an
     await page.getByText(purpose).click();
     await expect(page).toHaveURL(new RegExp(`/admin/reservations/${createdReservationId}$`));
     await expect(page.getByTestId('reservation-purpose')).toHaveText(purpose);
-    await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '예약 상세', exact: true })).toBeVisible();
     await expect(page.locator('.reservation-detail-main dt')).toHaveCount(6);
     await expect(page.locator('.reservation-detail-main .status-badge')).toBeVisible();
     await expect(page.getByTestId('reservation-detail-applicant-name')).toContainText('(공개)');

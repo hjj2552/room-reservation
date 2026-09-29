@@ -11,7 +11,6 @@ import {
   usePublicReservationDetail,
   useVerifyPublicReservationForEdit,
 } from '../../shared/hooks/usePublicReservation';
-import { formatDateTime } from '../../shared/utils/date';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 import { PublicReservationToast } from '../../shared/components/PublicReservationToast';
 import { canReturnToPublicTimetable, publicReservationTimetableUrl, type PublicReservationNavigationState } from '../../shared/utils/publicReservationNavigation';
@@ -112,8 +111,7 @@ export function PublicReservationDetailPage() {
     <main className="public-shell" aria-labelledby="public-reservation-detail-title">
       <div className="page-header">
         <div>
-          <h1 id="public-reservation-detail-title">{reservation.room.name}</h1>
-          <p className="muted">{formatDateTime(reservation.startAt)} 예약</p>
+          <h1 id="public-reservation-detail-title">예약 상세</h1>
         </div>
         <button
           type="button"

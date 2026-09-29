@@ -394,7 +394,7 @@ test('public timetable supports slot-based request, masked detail page, and pass
     const detailPanel = page.locator('.reservation-detail-main');
     await expect(page).toHaveURL(new RegExp(`/reservations/${created.id}$`));
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: room.name })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '예약 상세', exact: true })).toBeVisible();
     await expect(detailPanel.locator('dt')).toHaveCount(6);
     await expect(detailPanel.locator('.status-badge')).toContainText('승인 대기');
     await expect(detailPanel).toContainText('예약 정보');
