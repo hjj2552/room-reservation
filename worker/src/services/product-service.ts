@@ -980,7 +980,7 @@ export class ProductService {
     const filter = this.reservationFilter(query);
     const count = await this.database.query(`SELECT count(*) AS total FROM reservations r ${filter.where}`, filter.values);
     const rows = await this.database.query(
-      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC
+      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC, r.start_at DESC, r.id DESC
        LIMIT $${filter.values.length + 1} OFFSET $${filter.values.length + 2}`,
       [...filter.values, size, offset],
     );
