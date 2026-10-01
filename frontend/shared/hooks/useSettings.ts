@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSettings, updateSettings } from '../api/settings';
+import { publicReservationKeys } from './usePublicReservation';
 
 export const settingsKeys = {
   current: ['settings', 'current'] as const,
@@ -19,6 +20,7 @@ export function useUpdateSettings() {
     onSuccess: (settings) => {
       queryClient.setQueryData(settingsKeys.current, settings);
       queryClient.invalidateQueries({ queryKey: settingsKeys.current });
+      queryClient.invalidateQueries({ queryKey: publicReservationKeys.settings });
     },
   });
 }

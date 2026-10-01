@@ -15,6 +15,9 @@ import type { ReservationFilters, ReservationPayload, ReservationTimetableFilter
 
 export const reservationKeys = {
   all: ['reservations'] as const,
+  lists: ['reservations', 'list'] as const,
+  details: ['reservations', 'detail'] as const,
+  timetables: ['reservations', 'timetable'] as const,
   list: (filters: ReservationFilters) => ['reservations', 'list', filters] as const,
   timetable: (filters: ReservationTimetableFilters) => ['reservations', 'timetable', filters] as const,
   detail: (id: string) => ['reservations', 'detail', id] as const,
