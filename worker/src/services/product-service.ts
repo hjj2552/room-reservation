@@ -1077,8 +1077,9 @@ export class ProductService {
     actorType: "PUBLIC_USER" | "ADMIN" | "SYSTEM",
     actorId: string | null,
     deleted = false,
+    roomNameSnapshot?: string,
   ): Promise<void> {
-    const roomName = await this.historyRoomName(client, current);
+    const roomName = await this.historyRoomName(client, current, roomNameSnapshot);
     const beforeRoomName = before ? await this.historyRoomName(client, before) : null;
     await client.query(
       `INSERT INTO reservation_histories (
@@ -1108,12 +1109,13 @@ export class ProductService {
     );
   }
 
-  private async historyRoomName(client: Queryable, reservation: Row): Promise<string> {
+  private async historyRoomName(client: Queryable, reservation: Row, roomNameSnapshot?: string): Promise<string> {
     const preservedName = nullableText(reservation, "original_room_name");
     if (preservedName) return preservedName;
 
     const selectedName = nullableText(reservation, "current_room_name")
-      || nullableText(reservation, "room_name");
+      || nullableText(reservation, "room_name")
+      || roomNameSnapshot;
     if (selectedName) return selectedName;
 
     const roomId = nullableText(reservation, "room_id");
@@ -1316,6 +1318,8 @@ export class ProductService {
             input.endTime, input.conflictPolicy, adminUsername, input.showApplicantName],
         );
         const recurrence = recurrenceResult.rows[0]!;
+        // Keep one name snapshot for this creation transaction, including cancelled occurrences.
+        const roomNameSnapshot = await this.historyRoomName(client, recurrence);
         const resultItems: Array<{ date: string; status: "CREATED" | "CANCELLED" | "SKIPPED"; reason: string | null }> = [];
         let createdCount = 0;
         let cancelledCount = 0;
@@ -1335,7 +1339,7 @@ export class ProductService {
               input.applicantPhone, input.purpose, item.startAt, item.endAt, status, adminUsername,
               input.showApplicantName],
           );
-          await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, memo, "ADMIN", adminUsername);
+          await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, memo, "ADMIN", adminUsername, false, roomNameSnapshot);
         };
         const recordTimeSlotConflict = async (item: (typeof preview.items)[number]) => {
           await insertGeneratedReservation(
@@ -1358,15 +1362,17 @@ export class ProductService {
             continue;
           }
           const savepoint = `recurrence_candidate_${index}`;
-          await client.query(`SAVEPOINT ${savepoint}`);
+          const skipConflicts = input.conflictPolicy === "SKIP_CONFLICTS";
+          if (skipConflicts) await client.query(`SAVEPOINT ${savepoint}`);
           try {
             await insertGeneratedReservation(item, "CONFIRMED", null);
-            await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+            if (skipConflicts) await client.query(`RELEASE SAVEPOINT ${savepoint}`);
             createdCount += 1;
             resultItems.push({ date: item.date, status: "CREATED", reason: null });
           } catch (error) {
+            if (!skipConflicts) throw error;
             await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-            if (input.conflictPolicy === "SKIP_CONFLICTS" && isDatabaseCode(error, "23P01")) {
+            if (isDatabaseCode(error, "23P01")) {
               await recordTimeSlotConflict(item);
               await client.query(`RELEASE SAVEPOINT ${savepoint}`);
               continue;
