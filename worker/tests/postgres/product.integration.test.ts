@@ -1161,8 +1161,10 @@ async function insertReservation(input: {
   source?: string;
   createdAt?: string;
   recurrenceException?: boolean;
+  startAt?: string;
+  endAt?: string;
 }) {
-  const startAt = futureWeekday(55, input.hour ?? 10);
+  const startAt = input.startAt ?? futureWeekday(55, input.hour ?? 10);
   const result = await database.query(
     `INSERT INTO reservations(
        room_id,recurrence_id,applicant_name,applicant_email,applicant_phone,purpose,
@@ -1171,7 +1173,7 @@ async function insertReservation(input: {
     [input.roomId, input.recurrenceId ?? null, input.applicantName ?? "ordinary applicant",
       input.applicantEmail ?? "ordinary@example.test",
       input.applicantPhone === undefined ? "01000000000" : input.applicantPhone,
-      input.purpose, startAt, addHour(startAt),
+      input.purpose, startAt, input.endAt ?? addHour(startAt),
       input.status ?? "CONFIRMED", input.source ?? "ADMIN_MANUAL", input.createdAt ?? new Date().toISOString(),
       input.recurrenceException ?? false],
   );
@@ -3182,5 +3184,88 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: { "content-type": "application/json", cookie } })).status).toBe(403);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: writeHeaders })).status).toBe(204);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);
+  });
+});
+
+describe("admin timetable range query", () => {
+  it("returns every matching reservation, preserving overlap, filter, privacy and access contracts", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-timetable-range");
+    const otherRoom = await insertRoom("testing-room-timetable-other");
+    const date = "2026-07-13";
+    const ids: string[] = [];
+    for (let index = 0; index < 120; index += 1) {
+      const start = new Date(`${date}T09:00:00+09:00`).getTime();
+      ids.push(await insertReservation({
+        roomId, purpose: `testing-range-${index}`, applicantName: 'testing-range-applicant',
+        applicantEmail: 'testing-range@example.test', applicantPhone: '01012345678',
+        startAt: new Date(start).toISOString(), endAt: new Date(start + 1_800_000).toISOString(),
+        status: 'CANCELLED',
+      }));
+    }
+    await insertReservationHistory(ids[0]!, 'testing-unique-range-memo');
+    const seed = (purpose: string, startAt: string, endAt: string, status = 'CANCELLED', selectedRoom = roomId) =>
+      insertReservation({ roomId: selectedRoom, purpose: `testing-${purpose}`, startAt, endAt, status });
+    const requested = await seed('requested-at-midnight', '2026-07-13T00:00:00+09:00', '2026-07-13T00:30:00+09:00', 'REQUESTED');
+    const confirmed = await seed('confirmed-until-midnight', '2026-07-13T23:30:00+09:00', '2026-07-14T00:00:00+09:00', 'CONFIRMED');
+    const crossingStart = await seed('crossing-start', '2026-07-12T23:30:00+09:00', '2026-07-13T00:30:00+09:00');
+    const crossingEnd = await seed('crossing-end', '2026-07-13T23:30:00+09:00', '2026-07-14T00:30:00+09:00');
+    const outside = [
+      await seed('ends-at-start', '2026-07-12T23:30:00+09:00', '2026-07-13T00:00:00+09:00'),
+      await seed('starts-next-day', '2026-07-14T00:00:00+09:00', '2026-07-14T00:30:00+09:00'),
+    ];
+    const otherId = await seed('other-room', '2026-07-13T10:00:00+09:00', '2026-07-13T11:00:00+09:00', 'CONFIRMED', otherRoom);
+    const lastWeekDay = await seed('last-week-day', '2026-07-19T23:00:00+09:00', '2026-07-19T23:30:00+09:00', 'CONFIRMED');
+    const nextWeek = await seed('next-week', '2026-07-20T00:00:00+09:00', '2026-07-20T00:30:00+09:00', 'CONFIRMED');
+    const { app, cookie } = await authenticatedApp();
+    const path = '/api/admin/timetable/reservations';
+    const base = { view: 'date', date, roomId, excludeCancelled: 'false', keyword: 'testing-range' };
+    const read = async (params: Record<string, string> = {}) => {
+      const response = await app.request(`${path}?${new URLSearchParams({ ...base, ...params })}`, { headers: { cookie } });
+      expect(response.status).toBe(200);
+      return await response.json() as Array<Record<string, unknown>>;
+    };
+    const all = await read({ page: '100', size: '1' });
+    expect(all).toHaveLength(120);
+    expect(new Set(all.map(item => item.id))).toEqual(new Set(ids));
+    expect(Object.keys(all[0]!).sort()).toEqual([
+      'id', 'roomId', 'roomName', 'applicantName', 'purpose', 'startAt', 'endAt', 'status', 'seriesLabel', 'seriesColor',
+    ].sort());
+    expect(await read({ status: 'REQUESTED' })).toHaveLength(0);
+    expect(await read({ excludeCancelled: 'true' })).toEqual([]);
+    expect((await read({ keyword: '', status: 'REQUESTED' })).map(item => item.id)).toEqual([requested]);
+    expect((await read({ keyword: '', status: 'CONFIRMED' })).map(item => item.id)).toEqual([confirmed]);
+    expect(await read({ keyword: '', excludeCancelled: 'true' })).toHaveLength(2);
+    expect(await read({ keyword: 'TESTING-RANGE-APPLICANT' })).toHaveLength(120);
+    expect(await read({ keyword: 'testing-range@example.test' })).toHaveLength(120);
+    expect(await read({ keyword: '010-1234-5678' })).toHaveLength(120);
+    expect((await read({ keyword: 'testing-unique-range-memo' })).map(item => item.id)).toEqual([ids[0]]);
+    expect(await read({ source: 'PUBLIC_FORM' })).toEqual([]);
+    expect(await read({ status: 'CANCELLED', excludeCancelled: 'true' })).toHaveLength(120);
+    const withCancelled = await read({ keyword: '' });
+    expect(withCancelled.map(item => item.id)).toEqual(expect.arrayContaining([crossingStart, crossingEnd]));
+    expect(withCancelled).toHaveLength(124);
+    for (const id of outside) expect(withCancelled.map(item => item.id)).not.toContain(id);
+    expect((await read({ roomId: '', keyword: '' })).map(item => item.id)).toContain(otherId);
+    expect((await read({ roomId: otherRoom, keyword: '' })).map(item => item.id)).toEqual([otherId]);
+    const week = await read({ view: 'room', keyword: '' });
+    expect(week).toHaveLength(126);
+    expect(week.map(item => item.id)).toContain(lastWeekDay);
+    expect(week.map(item => item.id)).not.toContain(nextWeek);
+    expect(week.map(item => item.id)).not.toContain(otherId);
+    const listing = await app.request(`/api/admin/reservations?roomId=${roomId}&size=500&keyword=testing-range`, { headers: { cookie } });
+    const list = await listing.json() as { items: unknown[]; size: number; totalItems: number };
+    expect(list.size).toBe(100);
+    expect(list.items).toHaveLength(100);
+    expect(list.totalItems).toBe(120);
+    expect((await app.request(`${path}?view=date&date=${date}`)).status).toBe(401);
+    const anonymousSession = await app.request('/api/auth/csrf');
+    const anonymousCookie = /ROOM-SESSION=([^;,]+)/.exec(anonymousSession.headers.get('set-cookie') || '')?.[1];
+    expect((await app.request(`${path}?view=date&date=${date}`, {
+      headers: { cookie: `ROOM-SESSION=${anonymousCookie}` },
+    })).status).toBe(401);
+    for (const query of ['view=room&date=2026-07-13', 'view=date', 'view=date&date=2026-02-30', 'view=all&date=2026-07-13']) {
+      expect((await app.request(`${path}?${query}`, { headers: { cookie } })).status).toBe(400);
+    }
   });
 });

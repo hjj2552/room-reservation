@@ -29,6 +29,7 @@ import type {
   RecurrencePreviewCommand,
   ReservationFilterQuery,
   ReservationListQuery,
+  ReservationTimetableQuery,
   RoomListQuery,
   SaveRoomCommand,
   SaveRoomOrderCommand,
@@ -984,6 +985,23 @@ export class ProductService {
       [...filter.values, size, offset],
     );
     return paged(rows.rows.map((row) => this.mapReservationList(row)), page, size, Number(count.rows[0]?.total ?? 0));
+  }
+
+  async getTimetableReservations(query: ReservationTimetableQuery) {
+    const filter = this.reservationFilter(query);
+    const result = await this.database.query(
+      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC, r.id`,
+      filter.values,
+    );
+    return result.rows.map((row) => {
+      const item = this.mapReservationList(row);
+      return {
+        id: item.id, roomId: item.roomId, roomName: item.roomName,
+        applicantName: item.applicantName, purpose: item.purpose,
+        startAt: item.startAt, endAt: item.endAt, status: item.status,
+        seriesLabel: item.seriesLabel, seriesColor: item.seriesColor,
+      };
+    });
   }
 
   async getWeeklyReservations(roomId: string, weekStart: string) {

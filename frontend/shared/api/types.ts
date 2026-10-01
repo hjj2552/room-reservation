@@ -316,6 +316,14 @@ export interface ReservationFilters {
   size?: number;
 }
 
+export type ReservationTimetableFilters = Pick<ReservationFilters, 'status' | 'roomId' | 'keyword' | 'excludeCancelled'> & {
+  view: 'date' | 'room';
+  date: string;
+};
+
+export type ReservationTimetableItem = Pick<ReservationListItem,
+  'id' | 'roomId' | 'roomName' | 'applicantName' | 'purpose' | 'startAt' | 'endAt' | 'status' | 'seriesLabel' | 'seriesColor'>;
+
 export interface ReservationPayload {
   roomId: string;
   applicantName: string;

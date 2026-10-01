@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { ReservationFilters, ReservationStatus, RoomOrderItem } from '../../shared/api/types';
+import type { ReservationTimetableFilters, ReservationStatus, RoomOrderItem } from '../../shared/api/types';
 import { ReservationDateTimetable } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
 import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
@@ -14,7 +14,7 @@ import {
   type ReservationRequestValues,
   type TimetableSlotSelection,
 } from '../../shared/components/TimetableQuickAddPanel';
-import { useCreateReservation, useReservation, useReservations } from '../../shared/hooks/useReservations';
+import { useCreateReservation, useReservation, useTimetableReservations } from '../../shared/hooks/useReservations';
 import { useRoomOptions } from '../../shared/hooks/useRooms';
 import { useSettings } from '../../shared/hooks/useSettings';
 import {
@@ -22,12 +22,9 @@ import {
   newRequestSelection,
   serviceDateInputValue,
   slotToReservationSelection,
-  toServiceEndOfDayOffset,
-  toServiceStartOfDayOffset,
 } from '../../shared/utils/reservationTime';
 import { optionalContact } from '../utils/optionalContact';
 
-const timetablePageSize = 500;
 const timetableViewModes = ['date', 'room'] as const;
 
 type TimetableViewMode = (typeof timetableViewModes)[number];
@@ -93,20 +90,18 @@ export function TimetablePage() {
   const duplicateReservationId = searchParams.get('duplicateReservationId') || '';
   const duplicateReservation = useReservation(duplicateReservationId);
 
-  const dateTimetableFilters = useMemo<ReservationFilters>(
+  const dateTimetableFilters = useMemo<ReservationTimetableFilters>(
     () => ({
       status,
       roomId,
       keyword,
       excludeCancelled: true,
-      from: toServiceStartOfDayOffset(selectedDate),
-      to: toServiceEndOfDayOffset(selectedDate),
-      page: 0,
-      size: timetablePageSize,
+      view: 'date',
+      date: selectedDate,
     }),
     [status, roomId, keyword, selectedDate],
   );
-  const dateTimetableReservations = useReservations(dateTimetableFilters, { enabled: viewMode === 'date' });
+  const dateTimetableReservations = useTimetableReservations(dateTimetableFilters, { enabled: viewMode === 'date' });
   const dateTimetableRooms = useMemo(() => activeRooms(rooms.data, roomId), [rooms.data, roomId]);
 
   const roomViewRooms = useMemo(() => enabledActiveRooms(rooms.data), [rooms.data]);
@@ -138,20 +133,18 @@ export function TimetablePage() {
     setSearchParams(next, { replace: true });
   }, [roomId, roomViewRoomIdParam, roomViewRooms, rooms.isSuccess, setSearchParams]);
 
-  const roomTimetableFilters = useMemo<ReservationFilters>(
+  const roomTimetableFilters = useMemo<ReservationTimetableFilters>(
     () => ({
       status,
       roomId: selectedRoomViewRoomId,
       keyword,
       excludeCancelled: true,
-      from: toServiceStartOfDayOffset(selectedWeekStart),
-      to: toServiceEndOfDayOffset(addDaysInputValue(selectedWeekStart, 6)),
-      page: 0,
-      size: timetablePageSize,
+      view: 'room',
+      date: selectedWeekStart,
     }),
     [status, selectedRoomViewRoomId, keyword, selectedWeekStart],
   );
-  const roomTimetableReservations = useReservations(roomTimetableFilters, {
+  const roomTimetableReservations = useTimetableReservations(roomTimetableFilters, {
     enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
   });
   const duplicateQuickAddInitialValues = useMemo(() => {
@@ -344,10 +337,10 @@ export function TimetablePage() {
           {rooms.isError ? <ErrorState error={rooms.error} /> : null}
           {settings.isError ? <ErrorState error={settings.error} /> : null}
           {dateTimetableReservations.isError ? <ErrorState error={dateTimetableReservations.error} /> : null}
-          {rooms.data && settings.data && dateTimetableReservations.data ? (
+          {rooms.isSuccess && settings.isSuccess && dateTimetableReservations.isSuccess ? (
             <ReservationDateTimetable
               rooms={dateTimetableRooms}
-              reservations={dateTimetableReservations.data.items}
+              reservations={dateTimetableReservations.data}
               selectedDate={selectedDate}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
@@ -357,11 +350,6 @@ export function TimetablePage() {
               onEmptySlotClick={handleEmptySlotClick}
               onRoomInfoClick={(room) => setRoomInfoDialog(room)}
             />
-          ) : null}
-          {dateTimetableReservations.data && dateTimetableReservations.data.totalPages > 1 ? (
-            <p className="compact-note muted">
-              이 날짜의 예약이 많아 일부만 표시될 수 있습니다. 공간을 선택해 범위를 좁혀 확인하세요.
-            </p>
           ) : null}
         </section>
       ) : null}
@@ -425,10 +413,10 @@ export function TimetablePage() {
           {settings.isError ? <ErrorState error={settings.error} /> : null}
           {roomTimetableReservations.isError ? <ErrorState error={roomTimetableReservations.error} /> : null}
           {rooms.data && roomViewRooms.length === 0 ? <EmptyState message="표시할 활성 공간이 없습니다." /> : null}
-          {settings.data && selectedRoomViewRoom && roomTimetableReservations.data ? (
+          {rooms.isSuccess && settings.isSuccess && selectedRoomViewRoom && roomTimetableReservations.isSuccess ? (
             <ReservationRoomTimetable
               room={selectedRoomViewRoom}
-              reservations={roomTimetableReservations.data.items}
+              reservations={roomTimetableReservations.data}
               weekStart={selectedWeekStart}
               openTime={settings.data.openTime}
               closeTime={settings.data.closeTime}
@@ -440,11 +428,6 @@ export function TimetablePage() {
                 ? () => setRoomInfoDialog(selectedRoomViewRoom)
                 : undefined}
             />
-          ) : null}
-          {roomTimetableReservations.data && roomTimetableReservations.data.totalPages > 1 ? (
-            <p className="compact-note muted">
-              이 주의 예약이 많아 일부만 표시될 수 있습니다. 공간 또는 주를 조정해 확인하세요.
-            </p>
           ) : null}
         </section>
       ) : null}

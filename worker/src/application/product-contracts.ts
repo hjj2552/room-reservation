@@ -86,6 +86,11 @@ export interface ReservationFilterQuery {
 
 export interface ReservationListQuery extends ReservationFilterQuery, PageQuery {}
 
+export interface ReservationTimetableQuery extends ReservationFilterQuery {
+  from: string;
+  to: string;
+}
+
 export interface AvailabilityQuery {
   roomId: string;
   startAt: string;

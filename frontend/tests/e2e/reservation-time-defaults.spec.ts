@@ -1190,6 +1190,7 @@ async function mockReservationApis(
     json: { ...emptyPage, items: [room], totalItems: 1, totalPages: 1 },
   }));
   await page.route('**/api/admin/reservations**', (route) => route.fulfill({ json: emptyPage }));
+  await page.route('**/api/admin/timetable/reservations?**', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/public/rooms', (route) => route.fulfill({
     json: [{
       id: room.id,
