@@ -584,7 +584,7 @@ export class ProductService {
   ): Promise<void> {
     const result = await client.query(
       `SELECT 1 FROM reservations
-       WHERE room_id=$1 AND status IN ('REQUESTED','CONFIRMED')
+       WHERE room_id=$1 AND room_system_reserved=false AND status IN ('REQUESTED','CONFIRMED')
          AND start_at < $3::timestamptz AND end_at > $2::timestamptz
          AND ($4::uuid IS NULL OR id <> $4::uuid)
        LIMIT 1`,
@@ -1050,7 +1050,7 @@ export class ProductService {
       const { room, settings } = await this.roomAndSettings(roomId);
       validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
       const conflictResult = await this.database.query(
-        `SELECT 1 FROM reservations WHERE room_id=$1 AND status IN ('REQUESTED','CONFIRMED')
+        `SELECT 1 FROM reservations WHERE room_id=$1 AND room_system_reserved=false AND status IN ('REQUESTED','CONFIRMED')
          AND start_at < $3::timestamptz AND end_at > $2::timestamptz LIMIT 1`,
         [roomId, startAt, endAt],
       );
@@ -1259,6 +1259,7 @@ export class ProductService {
          WHERE EXISTS (
            SELECT 1 FROM reservations reservation
            WHERE reservation.room_id=$1
+             AND reservation.room_system_reserved=false
              AND reservation.status IN ('REQUESTED','CONFIRMED')
              AND reservation.start_at < candidate.end_at
              AND reservation.end_at > candidate.start_at

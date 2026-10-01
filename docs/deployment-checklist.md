@@ -68,6 +68,14 @@ Migration identity, ledger 또는 schema 검증이 실패하면 Worker를 배포
 
 GitHub Actions가 checkout한 immutable event commit SHA를 배포 소스 식별자로 사용하고, `npm ci`와 committed lockfile을 의존성 기준으로 사용합니다. 실제 배포 결과는 Cloudflare의 Worker version과 deployment 기록에서 확인하되 실제 운영 식별자는 Git이나 Actions log에 출력하지 않습니다.
 
+## V9 삭제 공간 보관 예약 중복 제약
+
+- `009_deleted_room_storage_overlap_v9`를 새 Worker 코드보다 먼저 적용합니다. 새 중복 조회는 `reservations.room_system_reserved`를 사용합니다. 운영 DB 적용은 승인된 기존 배포 절차에서만 수행합니다.
+- 기존 `rooms.system_reserved`를 예약 행에 반영합니다. 공간 변경 시 트리거가 값을 갱신하고, `(room_id, room_system_reserved)` 복합 외래 키가 실제 공간 정보와의 불일치를 차단합니다. 공간 식별값 변경도 `ON UPDATE CASCADE`로 반영됩니다. UUID나 `original_room_name`은 제외 기준으로 사용하지 않습니다.
+- 기존 예약의 상태·시간·공간 이름, 반복 예약 연결, 감사 이력은 변경하지 않습니다. 실제 공간의 활성 예약은 기존 GiST exclusion constraint로 동시 중복 요청까지 차단하며, 보관용 공간의 예약만 제외합니다.
+- 마이그레이션은 한 트랜잭션에서 `rooms`, `reservations`에 `ACCESS EXCLUSIVE` 잠금을 잡습니다. 기존 행 반영, 복합 외래 키 검증, GiST 인덱스 재생성 동안 해당 테이블의 조회·쓰기가 대기합니다. 트래픽이 적은 유지보수 시간에 적용하고, 장기 트랜잭션과 데이터 규모에 따른 잠금 대기·실행 시간을 사전에 확인합니다. 예약 수에 따른 운영 소요 시간은 로컬 기능 테스트로 추정하지 않습니다.
+- 보관용 공간에 겹치는 활성 예약이 생긴 뒤에는 이전 제약으로 되돌릴 수 없습니다. down migration은 이 경우 트랜잭션 전체가 실패하며 예약을 삭제하거나 취소하지 않습니다. 자동 rollback 대신 forward-fix 원칙을 따릅니다.
+
 ## 운영 배포 전 검증
 
 1. 일회용 Neon과 명시적으로 격리된 UAT Worker에서 정적 자산 결합 배포를 수행합니다.

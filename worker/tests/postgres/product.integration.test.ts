@@ -173,6 +173,7 @@ describe("Worker migrations", () => {
       "006_public_reservation_schedule_v6",
       "007_applicant_phone_normalization_v7",
       "008_special_approval_schedule_v8",
+      "009_deleted_room_storage_overlap_v9",
     ]);
     const settings = await database.query(
       `SELECT open_time::text, close_time::text, available_days_of_week,
@@ -3184,6 +3185,90 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: { "content-type": "application/json", cookie } })).status).toBe(403);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: writeHeaders })).status).toBe(204);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);
+  });
+});
+
+describe("deleted room storage overlap", () => {
+  it.each([
+    ["REQUESTED", "CONFIRMED"], ["CONFIRMED", "REQUESTED"],
+    ["REQUESTED", "REQUESTED"], ["CONFIRMED", "CONFIRMED"],
+  ])("preserves overlapping %s and %s reservations when both rooms are deleted", async (firstStatus, secondStatus) => {
+    await resetProductData();
+    const snapshot = [];
+    for (const [index, status] of [firstStatus, secondStatus].entries()) {
+      const name = `testing-room-storage-${index}`;
+      const roomId = await insertRoom(name);
+      const recurrenceId = await insertRecurrence({ roomId, purpose: `testing-recurring-storage-${index}` });
+      const reservationId = await insertReservation({ roomId, recurrenceId, status,
+        source: "RECURRING_GENERATED", purpose: `testing-reservation-storage-${index}` });
+      await insertReservationHistory(reservationId, `testing-storage-history-${index}`);
+      snapshot.push({ name, roomId, reservationId, recurrenceId,
+        reservation: (await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0],
+        recurrence: (await database.query("SELECT * FROM reservation_recurrences WHERE id=$1", [recurrenceId])).rows[0],
+      });
+      const check = await products.getRoomDeletionCheck(roomId);
+      expect(check).toMatchObject({ deletable: true, blockers: [] });
+      expect(check.checks.map(item => ({ passed: item.passed, count: item.count })))
+        .toEqual([{ passed: true, count: 1 }, { passed: true, count: 1 }]);
+    }
+    const histories = (await database.query("SELECT * FROM reservation_histories ORDER BY id")).rows;
+    for (const item of snapshot) await products.deleteRoom(item.roomId);
+    const storageId = (await database.query("SELECT id FROM rooms WHERE system_reserved=true")).rows[0]!.id;
+    for (const item of snapshot) {
+      expect((await database.query("SELECT * FROM reservations WHERE id=$1", [item.reservationId])).rows[0])
+        .toEqual({ ...item.reservation, room_id: storageId, original_room_name: item.name, room_system_reserved: true });
+      expect((await database.query("SELECT * FROM reservation_recurrences WHERE id=$1", [item.recurrenceId])).rows[0])
+        .toEqual({ ...item.recurrence, room_id: storageId, original_room_name: item.name });
+      expect((await database.query("SELECT 1 FROM rooms WHERE id=$1", [item.roomId])).rows).toHaveLength(0);
+    }
+    expect((await database.query("SELECT * FROM reservation_histories ORDER BY id")).rows).toEqual(histories);
+    // The server-side conflict check must use the same storage exemption as PostgreSQL.
+    await expect(products.changeReservationStatus(snapshot[0]!.reservationId, "APPROVED", "testing-storage-approval", "admin"))
+      .resolves.toBeDefined();
+  });
+
+  it("enforces real-room exclusion concurrently and rejects a forged storage flag", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-storage-concurrency");
+    const attempts = await Promise.allSettled(["REQUESTED", "CONFIRMED"].map(status =>
+      insertReservation({ roomId, status, purpose: `testing-reservation-storage-race-${status}` })));
+    expect(attempts.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.find(result => result.status === "rejected"))
+      .toMatchObject({ status: "rejected", reason: { code: "23P01", constraint: "ex_reservations_no_time_overlap" } });
+    await expect(database.query("UPDATE reservations SET room_system_reserved=true WHERE room_id=$1", [roomId]))
+      .rejects.toMatchObject({ code: "23503", constraint: "fk_reservations_room_system_reserved" });
+  });
+
+  it("reapplies conflict checks on existing admin moves even with an original room name", async () => {
+    await resetProductData();
+    const oldRoom = await insertRoom("testing-room-storage-original");
+    const targetRoom = await insertRoom("testing-room-storage-target");
+    const startAt = futureWeekday(35, 10);
+    const reservationId = await insertReservation({ roomId: oldRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-move" });
+    const blocker = await insertReservation({ roomId: targetRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-blocker" });
+    await products.deleteRoom(oldRoom);
+    const stored = (await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0]!;
+    const command = parseAdminReservation({
+      roomId: targetRoom, applicantName: "testing-storage-move", applicantEmail: null, applicantPhone: null,
+      purpose: "testing-reservation-storage-move", startAt, endAt: addHour(startAt), status: "CONFIRMED",
+    });
+    await expect(products.updateAdminReservation(reservationId, command, "admin"))
+      .rejects.toMatchObject({ code: "TIME_SLOT_CONFLICT" });
+    await expect(database.query("UPDATE reservations SET room_id=$2 WHERE id=$1", [reservationId, targetRoom]))
+      .rejects.toMatchObject({ code: "23P01" });
+    expect((await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0]).toEqual(stored);
+    await products.changeReservationStatus(blocker, "CANCELLED", "testing-free-target", "admin");
+    await products.updateAdminReservation(reservationId, command, "admin");
+    expect((await database.query("SELECT room_id,room_system_reserved,original_room_name FROM reservations WHERE id=$1", [reservationId])).rows[0])
+      .toEqual({ room_id: targetRoom, room_system_reserved: false, original_room_name: "testing-room-storage-original" });
+    await expect(insertReservation({ roomId: targetRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-restored-conflict" })).rejects.toMatchObject({ code: "23P01" });
+    await expect(products.createAdminReservation({ ...command, reservation: { ...command.reservation, roomId: String(stored.room_id) } }, "admin"))
+      .rejects.toMatchObject({ code: "ROOM_DISABLED" });
+    await expect(products.createPublicReservation(parsePublicReservation(publicPayload(String(stored.room_id), "Test1!", "testing-storage-public"))))
+      .rejects.toMatchObject({ code: "ROOM_DISABLED" });
   });
 });
 

@@ -11,6 +11,7 @@ import {
   verifyProductionV6Schema,
   verifyProductionV7Schema,
   verifyProductionV8Schema,
+  verifyProductionV9Schema,
   type ProductionMigrationConfig,
   type SqlClient,
 } from "../../scripts/production-migration-lib";
@@ -155,6 +156,9 @@ describe("production migration schema verification", () => {
     v6?: boolean;
     v7?: boolean;
     v8?: boolean;
+    v9?: boolean;
+    storageSchema?: Record<string, unknown>;
+    storageValues?: Record<string, unknown>;
     v5Migrations?: Array<Record<string, unknown>>;
     publicScheduleSchema?: Record<string, unknown>;
     publicScheduleValues?: Record<string, unknown>;
@@ -163,6 +167,7 @@ describe("production migration schema verification", () => {
     specialApprovalSchema?: Record<string, unknown>;
     specialApprovalValues?: Record<string, unknown>;
   } = {}): SqlClient {
+    if (overrides.v9) overrides = { ...overrides, v8: true };
     const commonRows: Array<Array<Record<string, unknown>>> = [
       [{ database_name: "production_db", role_name: "migration_role", schema_name: "public" }],
       [{ exists: true }],
@@ -175,7 +180,8 @@ describe("production migration schema verification", () => {
         { name: "006_public_reservation_schedule_v6" },
         { name: "007_applicant_phone_normalization_v7" },
         { name: "008_special_approval_schedule_v8" },
-      ].slice(0, overrides.v8 ? 8 : overrides.v7 ? 7 : overrides.v6 ? 6 : overrides.v5 ? 5 : (overrides.version ?? 4)),
+        { name: "009_deleted_room_storage_overlap_v9" },
+      ].slice(0, overrides.v9 ? 9 : overrides.v8 ? 8 : overrides.v7 ? 7 : overrides.v6 ? 6 : overrides.v5 ? 5 : (overrides.version ?? 4)),
       [{ count: 1 }],
       [{
         state_table_exists: true,
@@ -261,6 +267,11 @@ describe("production migration schema verification", () => {
           [{ invalid_count: 0, ...overrides.specialApprovalValues }],
         );
       }
+      if (overrides.v9) rows.push(
+        [{ storage_column_exists: true, room_key_exists: true, room_fk_exists: true,
+          sync_trigger_exists: true, exclusion_exists: true, ...overrides.storageSchema }],
+        [{ invalid_count: 0, ...overrides.storageValues }],
+      );
       return clientForRows(rows);
     }
     return clientForRows([...commonRows, [{ count: 1 }], ...visibilityRows]);
@@ -292,6 +303,16 @@ describe("production migration schema verification", () => {
 
   it("accepts V8 special approval fields while retaining legacy public columns", async () => {
     await expect(verifyProductionV8Schema(validSchemaClient({ v8: true }), config)).resolves.toBeUndefined();
+  });
+
+  it("accepts V9 storage metadata and rejects missing guards or inconsistent values", async () => {
+    await expect(verifyProductionV9Schema(validSchemaClient({ v9: true }), config)).resolves.toBeUndefined();
+    for (const field of ["storage_column_exists", "room_key_exists", "room_fk_exists", "sync_trigger_exists", "exclusion_exists"]) {
+      await expect(verifyProductionV9Schema(validSchemaClient({ v9: true, storageSchema: { [field]: false } }), config))
+        .rejects.toMatchObject({ stage: "schema" });
+    }
+    await expect(verifyProductionV9Schema(validSchemaClient({ v9: true, storageValues: { invalid_count: 1 } }), config))
+      .rejects.toMatchObject({ stage: "schema" });
   });
 
   it("rejects incomplete V8 special approval schema and values", async () => {
