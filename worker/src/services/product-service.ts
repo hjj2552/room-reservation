@@ -1515,10 +1515,11 @@ export class ProductService {
       policy("CSV_EXPORT_TOO_LARGE", "Too many reservations to export. Narrow the filters and try again.");
     }
     const header = ["reservationId", "roomName", "applicantName", "applicantEmail", "applicantPhone", "purpose", "startAt", "endAt", "status", "source", "recurrenceId", "createdAt"];
-    const formatKst = (input: unknown) => new Intl.DateTimeFormat("sv-SE", {
+    const kstFormatter = new Intl.DateTimeFormat("sv-SE", {
       timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-    }).format(new Date(input instanceof Date ? input : String(input)));
+    });
+    const formatKst = (input: unknown) => kstFormatter.format(new Date(input instanceof Date ? input : String(input)));
     const escape = (input: unknown) => {
       let string = input === null || input === undefined ? "" : String(input);
       if (/^\s*[=+\-@]/u.test(string)) string = `'${string}`;
