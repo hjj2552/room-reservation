@@ -121,12 +121,13 @@ export function PublicReservationPage() {
     ? roomViewRoomIdParam
     : activeRooms[0]?.id || '';
   const selectedRoom = activeRooms.find((room) => room.id === roomViewRoomId);
-  const selectedWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || selectedDate);
-  const roomWeekly = usePublicWeeklyReservations(roomViewRoomId, selectedWeekStart);
+  const dateWeekStart = startOfWeekInputValue(selectedDate);
+  const roomWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || selectedDate);
+  const roomWeekly = usePublicWeeklyReservations(roomViewRoomId, roomWeekStart);
   const dateWeeklyQueries = useQueries({
     queries: activeRooms.map((room) => ({
-      queryKey: publicReservationKeys.weekly(room.id, selectedWeekStart),
-      queryFn: () => getPublicWeeklyReservations(room.id, selectedWeekStart),
+      queryKey: publicReservationKeys.weekly(room.id, dateWeekStart),
+      queryFn: () => getPublicWeeklyReservations(room.id, dateWeekStart),
       enabled: viewMode === 'date',
     })),
   });
@@ -357,7 +358,7 @@ export function PublicReservationPage() {
                   <button
                     type="button"
                     className="secondary-button icon-button"
-                    onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, -7))}
+                    onClick={() => setWeekStart(addDaysInputValue(roomWeekStart, -7))}
                     aria-label="이전 주"
                   >
                     <ChevronLeft size={16} aria-hidden="true" />
@@ -366,7 +367,7 @@ export function PublicReservationPage() {
                     주 시작일
                     <input
                       type="date"
-                      value={selectedWeekStart}
+                      value={roomWeekStart}
                       onChange={(event) => setWeekStart(event.target.value)}
                       data-testid="public-timetable-week-input"
                     />
@@ -374,7 +375,7 @@ export function PublicReservationPage() {
                   <button
                     type="button"
                     className="secondary-button icon-button"
-                    onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, 7))}
+                    onClick={() => setWeekStart(addDaysInputValue(roomWeekStart, 7))}
                     aria-label="다음 주"
                   >
                     <ChevronRight size={16} aria-hidden="true" />
@@ -386,7 +387,7 @@ export function PublicReservationPage() {
               <ReservationRoomTimetable
                 room={selectedRoom}
                 reservations={roomReservations}
-                weekStart={selectedWeekStart}
+                weekStart={roomWeekStart}
                 openTime={settings.data.openTime}
                 closeTime={settings.data.closeTime}
                 minReservationMinutes={settings.data.minReservationMinutes}
