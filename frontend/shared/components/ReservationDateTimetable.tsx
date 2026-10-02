@@ -90,7 +90,6 @@ export function formatClock(totalMinutes: number) {
 export function timetableHoursSummary(
   openTime: string,
   closeTime: string,
-  _availability?: TimetableAvailability,
 ) {
   const normalizedOpenTime = openTime.slice(0, 5);
   const normalizedCloseTime = closeTime.slice(0, 5);
@@ -144,7 +143,6 @@ export function timetableSlotAvailability(
 
 export function isTimetableSlotSelectable(
   state: TimetableAvailabilityState,
-  _context?: TimetableAvailability['context'],
 ) {
   return state !== 'operating-unavailable';
 }
@@ -229,7 +227,7 @@ export function ReservationDateTimetable({
         <span className="timetable-summary-details">
           {availability ? <TimetableAvailabilityLegend context={availability.context} /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
-          <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
+          <span>{timetableHoursSummary(openTime, closeTime)}</span>
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${selectedDate} 날짜별 예약 시간표`}>
@@ -286,7 +284,7 @@ export function ReservationDateTimetable({
                 const endMinutes = slot + suggestedDurationMinutes;
                 if (endMinutes > closeMinutes) return null;
                 const state = timetableSlotAvailability(selectedDate, slot, endMinutes, availability);
-                const selectable = isTimetableSlotSelectable(state, availability?.context);
+                const selectable = isTimetableSlotSelectable(state);
                 const selection = {
                   date: selectedDate,
                   startMinutes: slot,

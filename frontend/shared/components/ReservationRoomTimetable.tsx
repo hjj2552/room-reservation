@@ -126,7 +126,7 @@ export function ReservationRoomTimetable({
         <span className="timetable-summary-details">
           {availability ? <TimetableAvailabilityLegend context={availability.context} /> : null}
           {availability ? <span className="timetable-summary-separator" aria-hidden="true">|</span> : null}
-          <span>{timetableHoursSummary(openTime, closeTime, availability)}</span>
+          <span>{timetableHoursSummary(openTime, closeTime)}</span>
         </span>
       </div>
       <div className="timetable-scroll" role="region" aria-label={`${room.name} 주간 예약 시간표`}>
@@ -164,7 +164,7 @@ export function ReservationRoomTimetable({
                 const endMinutes = slot + suggestedDurationMinutes;
                 if (endMinutes > closeMinutes) return null;
                 const state = timetableSlotAvailability(day.date, slot, endMinutes, availability);
-                const selectable = isTimetableSlotSelectable(state, availability?.context);
+                const selectable = isTimetableSlotSelectable(state);
                 const selection = {
                   date: day.date,
                   startMinutes: slot,

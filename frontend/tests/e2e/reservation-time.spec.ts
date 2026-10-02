@@ -76,9 +76,9 @@ test('shows special approval only to administrators and keeps operating limits u
   expect(timetableSlotAvailability('2026-07-13', 9 * 60 + 30, 10 * 60, adminAvailability)).toBe('available');
   expect(timetableSlotAvailability('2026-07-13', 9 * 60 + 30, 10 * 60 + 30, adminAvailability)).toBe('special-approval');
   expect(timetableSlotAvailability('2026-07-13', 17 * 60, 17 * 60 + 30, adminAvailability)).toBe('available');
-  expect(isTimetableSlotSelectable('special-approval', 'ADMIN')).toBe(true);
-  expect(isTimetableSlotSelectable('operating-unavailable', 'PUBLIC')).toBe(false);
-  expect(isTimetableSlotSelectable('operating-unavailable', 'ADMIN')).toBe(false);
+  expect(isTimetableSlotSelectable('special-approval')).toBe(true);
+  expect(isTimetableSlotSelectable('operating-unavailable')).toBe(false);
+  expect(isTimetableSlotSelectable('operating-unavailable')).toBe(false);
 });
 
 test('classifies general, special approval and operating-unavailable reservation times', () => {
