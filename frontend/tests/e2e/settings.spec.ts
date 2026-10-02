@@ -7,6 +7,11 @@ const settingsPath = '/api/admin/settings';
 async function visit(page: Page, path: '/admin/rooms' | '/admin/settings') {
   await page.locator(`a[href="${path}"]`).first().click();
   await expect(page).toHaveURL(path);
+  if (path === '/admin/rooms') {
+    // The URL can change before the lazy page replaces the settings editor.
+    await expect(page.getByRole('heading', { name: '공간 관리', exact: true })).toBeVisible();
+    await expect(page.getByTestId('settings-form')).toHaveCount(0);
+  }
 }
 
 test('settings entry waits for a fresh response even with valid cache, and retries without exposing cached inputs', async ({ page, request }) => {
@@ -17,6 +22,12 @@ test('settings entry waits for a fresh response even with valid cache, and retri
   let pending: Promise<void> | undefined;
   let release!: () => void;
   await page.clock.setFixedTime(new Date()); // Keep the existing 30-second cache fresh.
+  // Exercise the lazy-route race even on a fast local Vite server.
+  await page.route('**/admin/pages/RoomsPage.tsx*', async route => {
+    const response = await route.fetch();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await route.fulfill({ response });
+  });
   await page.route(`**${settingsPath}`, async route => {
     reads += 1;
     await pending;
