@@ -268,11 +268,11 @@ test('settings smoke: settings load and can be saved with feedback', async ({ pa
 test('settings canonicalize weekday selection and mixed API order before saving', async ({ page, request }) => {
   await loginByApi(request);
   const originalSettings = await getSettingsByApi(request);
-  let mixedResponseServed = false;
+  let saveRequested = false;
 
   await page.route('**/api/admin/settings', async (route) => {
-    if (route.request().method() === 'GET' && !mixedResponseServed) {
-      mixedResponseServed = true;
+    if (route.request().method() === 'PUT') saveRequested = true;
+    if (route.request().method() === 'GET' && !saveRequested) {
       await route.fulfill({
         json: {
           ...originalSettings,

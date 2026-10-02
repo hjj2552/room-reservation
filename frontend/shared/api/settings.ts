@@ -1,8 +1,8 @@
 import { apiRequest } from './http';
 import type { OperationSettings } from './types';
 
-export function getSettings() {
-  return apiRequest<OperationSettings>('/api/admin/settings');
+export function getSettings(signal?: AbortSignal) {
+  return apiRequest<OperationSettings>('/api/admin/settings', { signal });
 }
 
 export function updateSettings(payload: OperationSettings) {

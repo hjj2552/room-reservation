@@ -6,10 +6,11 @@ export const settingsKeys = {
   current: ['settings', 'current'] as const,
 };
 
-export function useSettings() {
+export function useSettings(options: { refetchOnMount?: boolean | 'always' } = {}) {
   return useQuery({
     queryKey: settingsKeys.current,
-    queryFn: getSettings,
+    queryFn: ({ signal }) => getSettings(signal),
+    refetchOnMount: options.refetchOnMount,
   });
 }
 
