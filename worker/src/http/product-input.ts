@@ -10,6 +10,7 @@ import type {
   RecurrencePreviewCommand,
   ReservationFilterQuery,
   ReservationListQuery,
+  ReservationTimetableQuery,
   RoomListQuery,
   SaveRoomCommand,
   SaveRoomOrderCommand,
@@ -31,6 +32,7 @@ import {
   parsePublicReservationInput,
   parseTime,
   parseUuid,
+  serviceOffsetDateTime,
   requireBoolean,
   requireEmail,
   requireInteger,
@@ -275,6 +277,24 @@ export function parseReservationFilter(params: URLSearchParams): ReservationFilt
 
 export function parseReservationList(params: URLSearchParams): ReservationListQuery {
   return { ...pageQuery(params), ...parseReservationFilter(params) };
+}
+
+export function parseReservationTimetable(params: URLSearchParams): ReservationTimetableQuery {
+  const view = parseEnumParameter(params.get("view"), "view", ["date", "room"] as const);
+  if (!view) validation("Timetable view is required.", "view");
+  const date = parseDate(params.get("date"), "date");
+  const filter = parseReservationFilter(params);
+  if (view === "room" && !filter.roomId) validation("Room is required for a weekly timetable.", "roomId");
+  const lastDate = new Date(`${date}T00:00:00Z`);
+  if (view === "room") lastDate.setUTCDate(lastDate.getUTCDate() + 6);
+  const endDate = parseDate(lastDate.toISOString().slice(0, 10), "date");
+  return {
+    ...filter,
+    // Preserve the existing Seoul day bounds and strict overlap predicate.
+    // Client-supplied from/to or pagination never expand or truncate this range.
+    from: serviceOffsetDateTime(date, "00:00"),
+    to: serviceOffsetDateTime(endDate, "23:59:59.999999"),
+  };
 }
 
 export function parseAvailability(params: URLSearchParams): AvailabilityQuery {

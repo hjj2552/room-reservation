@@ -8,6 +8,8 @@ import {
   parseRecurrenceCreate,
   parseRecurrencePreview,
   parseReservationFilter,
+  parseReservationList,
+  parseReservationTimetable,
   parseRoomList,
   parseSaveRoom,
   parseSaveRoomOrder,
@@ -31,6 +33,35 @@ function publicBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("typed HTTP product input", () => {
+  it("bounds timetable queries to one Seoul day or one room's seven days without pagination", () => {
+    expect(parseReservationTimetable(new URLSearchParams({ view: "date", date: "2026-12-31", size: "1", page: "9" })))
+      .toMatchObject({ from: "2026-12-31T00:00:00+09:00", to: "2026-12-31T23:59:59.999999+09:00" });
+    const week = parseReservationTimetable(new URLSearchParams({
+      view: "room", date: "2026-12-28", roomId: ROOM_ID,
+      from: "2000-01-01T00:00:00Z", to: "2099-01-01T00:00:00Z",
+      status: "CANCELLED", excludeCancelled: "true", keyword: "010-1234",
+    }));
+    expect(week).toMatchObject({
+      from: "2026-12-28T00:00:00+09:00", to: "2027-01-03T23:59:59.999999+09:00",
+      roomId: ROOM_ID, status: "CANCELLED", excludeCancelled: true, phoneKeyword: "0101234",
+    });
+    expect(week).not.toHaveProperty("size");
+    expect(week).not.toHaveProperty("offset");
+    expect(parseReservationList(new URLSearchParams("size=500&page=1")))
+      .toMatchObject({ size: 100, page: 1, offset: 100 });
+  });
+
+  it.each([
+    "", "view=date", "date=2026-07-13", "view=all&date=2026-07-13",
+    "view=date&date=2026-02-30", "view=date&date=2026-07-13T00:00:00Z",
+    "view=room&date=2026-07-13", "view=room&date=2026-07-13&roomId=bad",
+    "view=date&date=2026-07-13&status=BAD", "view=date&date=2026-07-13&excludeCancelled=maybe",
+    "view=room&date=9999-12-31&roomId=11111111-1111-4111-8111-111111111111",
+  ])("rejects invalid or unbounded timetable query %s", (query) => {
+    expect(() => parseReservationTimetable(new URLSearchParams(query)))
+      .toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+  });
+
   it("normalizes room names while preserving internal whitespace and validation", () => {
     const room = {
       location: "Building A",

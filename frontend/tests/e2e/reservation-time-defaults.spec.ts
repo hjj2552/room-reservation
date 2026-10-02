@@ -1138,6 +1138,113 @@ test('admin approval inside the general reservation schedule proceeds without co
   await expect(page.getByTestId('reservation-approve-modal')).toHaveCount(0);
 });
 
+test('public timetable date queries follow the selected date across view switches and history', async ({ page }) => {
+  const weeks = await mockPublicTimetableWeeks(page);
+  const dateInput = page.getByTestId('public-timetable-date-input');
+  const dateBlocks = page.getByTestId('reservation-timetable-block');
+  const roomBlocks = page.getByTestId('reservation-room-timetable-block');
+  await page.goto('/timetable?view=date&date=2026-07-14');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-13/);
+  expect(weeks.requests).toEqual(['2026-07-13']);
+  await page.getByTestId('public-timetable-view-room').click();
+  await expect(page.getByTestId('public-timetable-week-input')).toHaveValue('2026-07-13');
+  await page.getByTestId('public-timetable-view-date').click();
+  await dateInput.fill('2026-07-21');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-20/);
+  expect(weeks.requests).toContain('2026-07-20');
+  await expect(page).toHaveURL(/weekStart=2026-07-13/);
+  await dateInput.fill('2026-07-07');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-06/);
+  expect(weeks.requests).toContain('2026-07-06');
+  await page.goBack();
+  await expect(dateInput).toHaveValue('2026-07-21');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-20/);
+  await page.goForward();
+  await expect(dateInput).toHaveValue('2026-07-07');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-06/);
+  await page.getByTestId('public-timetable-view-room').click();
+  await expect(page.getByTestId('public-timetable-week-input')).toHaveValue('2026-07-13');
+  await expect(roomBlocks).toHaveText(/testing-reservation-week-2026-07-13/);
+  await page.getByRole('button', { name: '다음 주', exact: true }).click();
+  await expect(page.getByTestId('public-timetable-week-input')).toHaveValue('2026-07-20');
+  await expect(roomBlocks).toHaveText(/testing-reservation-week-2026-07-20/);
+  await page.getByRole('button', { name: '이전 주', exact: true }).click();
+  await expect(roomBlocks).toHaveText(/testing-reservation-week-2026-07-13/);
+  await page.getByTestId('public-timetable-week-input').fill('2026-07-07');
+  await expect(page.getByTestId('public-timetable-week-input')).toHaveValue('2026-07-06');
+  await expect(roomBlocks).toHaveText(/testing-reservation-week-2026-07-06/);
+  expect(weeks.requests).toEqual(['2026-07-13', '2026-07-20', '2026-07-06']);
+});
+
+test('public timetable direct date URL and reload ignore the preserved room week', async ({ page }) => {
+  const weeks = await mockPublicTimetableWeeks(page);
+  const url = `/timetable?view=date&date=2026-07-21&weekStart=2026-07-13&roomViewRoomId=${room.id}`;
+  for (const reload of [false, true]) {
+    weeks.requests.length = 0;
+    if (reload) await page.reload();
+    else await page.goto(url);
+    await expect(page.getByTestId('reservation-timetable-block')).toHaveText(/testing-reservation-week-2026-07-20/);
+    await expect(page).toHaveURL(url);
+    expect(weeks.requests).toContain('2026-07-20');
+  }
+  await page.getByTestId('public-timetable-view-room').click();
+  await expect(page.getByTestId('public-timetable-week-input')).toHaveValue('2026-07-13');
+  await expect(page.getByTestId('reservation-room-timetable-block')).toHaveText(/testing-reservation-week-2026-07-13/);
+  expect(weeks.requests).toContain('2026-07-13');
+});
+
+test('public timetable late weekly responses stay isolated during rapid date and view switches', async ({ page }) => {
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  const weeks = await mockPublicTimetableWeeks(page, async week => {
+    if (week === '2026-07-20') await delayed;
+  });
+  await page.goto(`/timetable?view=date&date=2026-07-14&weekStart=2026-07-13&roomViewRoomId=${room.id}`);
+  const dateInput = page.getByTestId('public-timetable-date-input');
+  const dateBlocks = page.getByTestId('reservation-timetable-block');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-13/);
+  await dateInput.fill('2026-07-21');
+  await expect.poll(() => weeks.requests).toContain('2026-07-20');
+  await expect(dateBlocks).toHaveCount(0);
+  await dateInput.fill('2026-07-07');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-06/);
+  await page.getByTestId('public-timetable-view-room').click();
+  const response = page.waitForResponse(value => value.url().includes('/weekly-reservations?weekStart=2026-07-20'));
+  release();
+  await (await response).finished();
+  await expect(page.getByTestId('reservation-room-timetable-block')).toHaveText(/testing-reservation-week-2026-07-13/);
+  await page.getByTestId('public-timetable-view-date').click();
+  await expect(dateInput).toHaveValue('2026-07-07');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-06/);
+  await dateInput.fill('2026-07-21');
+  await expect(dateBlocks).toHaveText(/testing-reservation-week-2026-07-20/);
+  await expect(page).toHaveURL(/weekStart=2026-07-13/);
+  expect(weeks.requests).toEqual(['2026-07-13', '2026-07-20', '2026-07-06']);
+});
+
+async function mockPublicTimetableWeeks(page: Page, beforeResponse?: (week: string) => Promise<void>) {
+  await page.clock.setFixedTime(fixedInstant);
+  await mockReservationApis(page, '2026-07-31');
+  const requests: string[] = [];
+  const dates: Record<string, string> = { '2026-07-06': '2026-07-07', '2026-07-13': '2026-07-14', '2026-07-20': '2026-07-21' };
+  await page.route('**/api/public/rooms/*/weekly-reservations?**', async route => {
+    const weekStart = new URL(route.request().url()).searchParams.get('weekStart') || '';
+    requests.push(weekStart);
+    await beforeResponse?.(weekStart);
+    const date = dates[weekStart];
+    return route.fulfill({ json: {
+      room, weekStart,
+      weekEnd: new Date(Date.parse(`${weekStart}T00:00:00Z`) + 6 * 86_400_000).toISOString().slice(0, 10),
+      reservations: date ? [{
+        id: `testing-reservation-${weekStart}`, roomId: room.id, roomName: room.name,
+        purpose: `testing-reservation-week-${weekStart}`, applicantName: 'testing-applicant', status: 'CONFIRMED',
+        startAt: `${date}T10:00:00+09:00`, endAt: `${date}T11:00:00+09:00`,
+      }] : [],
+    } });
+  });
+  return { requests };
+}
+
 async function mockReservationApis(
   page: Page,
   semesterEndDate: string,
@@ -1190,6 +1297,7 @@ async function mockReservationApis(
     json: { ...emptyPage, items: [room], totalItems: 1, totalPages: 1 },
   }));
   await page.route('**/api/admin/reservations**', (route) => route.fulfill({ json: emptyPage }));
+  await page.route('**/api/admin/timetable/reservations?**', (route) => route.fulfill({ json: [] }));
   await page.route('**/api/public/rooms', (route) => route.fulfill({
     json: [{
       id: room.id,

@@ -2,10 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ReservationFilterQuery } from "../../src/application/product-contracts";
 import { AppError } from "../../src/core/errors";
 import { mapApplicationError } from "../../src/http/errors";
-import type { Database, Queryable, QueryResult } from "../../src/infra/database";
+import { CsvDatabase, reservationRow } from "../helpers/csv";
 import { ProductService } from "../../src/services/product-service";
-
-type Row = Record<string, unknown>;
 
 const filter: ReservationFilterQuery = {
   status: "CONFIRMED",
@@ -13,44 +11,53 @@ const filter: ReservationFilterQuery = {
   excludeCancelled: false,
 };
 
-function reservationRow(overrides: Row = {}): Row {
-  return {
-    id: "00000000-0000-4000-8000-000000000001",
-    room_id: "00000000-0000-4000-8000-000000000002",
-    current_room_name: "Normal room",
-    original_room_name: null,
-    applicant_name: "Normal applicant",
-    applicant_email: "normal@example.test",
-    applicant_phone: "010-0000-0000",
-    show_applicant_name: true,
-    purpose: "Normal purpose",
-    recurrence_id: null,
-    tag_name: null,
-    tag_color: null,
-    recurrence_exception: false,
-    start_at: "2026-01-01T00:00:00Z",
-    end_at: "2026-01-01T01:00:00Z",
-    status: "CONFIRMED",
-    source: "ADMIN_MANUAL",
-    created_at: "2026-01-01T02:00:00Z",
-    ...overrides,
-  };
-}
+describe("reservation CSV date and empty output", () => {
+  const header = "\uFEFFreservationId,roomName,applicantName,applicantEmail,applicantPhone,purpose,startAt,endAt,status,source,recurrenceId,createdAt\r\n";
 
-class CsvDatabase implements Database {
-  readonly calls: Array<{ text: string; values: unknown[] }> = [];
+  it("preserves complete CSV output at KST midnight, year boundaries and second precision", async () => {
+    const rows = [reservationRow({
+      start_at: "2026-12-31T14:59:59Z", end_at: new Date("2026-12-31T15:00:00Z"),
+      created_at: "2025-12-31T15:00:07Z",
+    }), reservationRow({
+      start_at: new Date("2026-06-30T14:59:58.999Z"), end_at: "2026-06-30T15:00:09Z",
+      created_at: new Date("2026-01-01T00:00:01+09:00"),
+    })];
+    const csv = await new ProductService(new CsvDatabase(rows), () => new Date()).exportReservationsCsv(filter);
+    const prefix = "00000000-0000-4000-8000-000000000001,Normal room,Normal applicant,normal@example.test,010-0000-0000,Normal purpose,";
+    expect(csv).toBe(header
+      + prefix + "2026-12-31 23:59:59,2027-01-01 00:00:00,CONFIRMED,ADMIN_MANUAL,,2026-01-01 00:00:07\r\n"
+      + prefix + "2026-06-30 23:59:58,2026-07-01 00:00:09,CONFIRMED,ADMIN_MANUAL,,2026-01-01 00:00:01\r\n");
+  });
 
-  constructor(private readonly rows: Row[]) {}
+  it("keeps the BOM, header and single CRLF for an empty result", async () => {
+    expect(await new ProductService(new CsvDatabase([]), () => new Date()).exportReservationsCsv(filter)).toBe(header);
+  });
 
-  async query<ResultRow extends Row>(text: string, values: unknown[] = []): Promise<QueryResult<ResultRow>> {
-    this.calls.push({ text, values });
-    return { rows: this.rows as ResultRow[], rowCount: this.rows.length };
-  }
+  it("creates one formatter per export and does not share it across calls", async () => {
+    const original = Intl.DateTimeFormat;
+    let constructions = 0;
+    Intl.DateTimeFormat = new Proxy(original, { construct(target, args) {
+      constructions += 1;
+      return Reflect.construct(target, args);
+    } });
+    try {
+      const service = new ProductService(new CsvDatabase(Array(3).fill(reservationRow())), () => new Date());
+      const first = await service.exportReservationsCsv(filter);
+      expect(constructions).toBe(1);
+      expect(await service.exportReservationsCsv(filter)).toBe(first);
+      expect(constructions).toBe(2);
+    } finally {
+      Intl.DateTimeFormat = original;
+    }
+  });
 
-  async transaction<T>(_work: (client: Queryable) => Promise<T>): Promise<T> {
-    throw new Error("CSV export does not use transactions.");
-  }
-}
+  it.each(["start_at", "end_at", "created_at"])("preserves invalid %s rejection for string and Date input", async field => {
+    for (const input of ["invalid-date", new Date(NaN)]) {
+      await expect(new ProductService(new CsvDatabase([reservationRow({ [field]: input })]), () => new Date())
+        .exportReservationsCsv(filter)).rejects.toThrow(RangeError);
+    }
+  });
+});
 
 describe("reservation CSV export bounds", () => {
   it("exports 10,000 rows with the existing filter and ordering contract", async () => {

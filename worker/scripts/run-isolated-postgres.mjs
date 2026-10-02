@@ -287,7 +287,7 @@ try {
     `SELECT jsonb_build_object(
        'recurrences', (SELECT jsonb_agg(to_jsonb(r) - 'deleted_at' - 'applicant_phone' ORDER BY id)
                        FROM reservation_recurrences r),
-       'reservations', (SELECT jsonb_agg(to_jsonb(v) - 'applicant_phone' ORDER BY id) FROM reservations v),
+       'reservations', (SELECT jsonb_agg(to_jsonb(v) - 'applicant_phone' - 'room_system_reserved' ORDER BY id) FROM reservations v),
        'histories', (SELECT jsonb_agg(
          to_jsonb(h) - 'reservation_applicant_phone' - 'before_reservation_applicant_phone' ORDER BY id
        ) FROM reservation_histories h)
@@ -525,6 +525,65 @@ try {
   ]).trim();
   if (v7UpgradeState !== "t") throw new Error("V7 to V8 standalone migration contract failed");
 
+  run("docker", ["exec", containerName, "createdb", "-U", "worker_test", "worker_v8_upgrade"]);
+  const v8UpgradeUrl = `${baseUrl}/worker_v8_upgrade`;
+  runMigration("scripts/migrate-v8-for-test.ts", v8UpgradeUrl);
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v8_upgrade",
+    "-v", "ON_ERROR_STOP=1", "-c",
+    `INSERT INTO reservation_recurrences (
+       room_id,applicant_name,purpose,start_date,end_date,days_of_week,start_time,end_time,
+       conflict_policy,original_room_name
+     ) SELECT id,'testing-v9-applicant','testing-recurring-v9',DATE '2035-01-08',DATE '2035-01-08',
+       'MON','10:00','11:00','FAIL_ALL','testing-room-v9-original' FROM rooms WHERE system_reserved;
+     INSERT INTO reservations (
+       room_id,recurrence_id,applicant_name,purpose,start_at,end_at,status,source,
+       created_by_actor_type,original_room_name
+     ) SELECT room_id,id,applicant_name,'testing-reservation-v9',
+       TIMESTAMPTZ '2035-01-08 10:00:00+09',TIMESTAMPTZ '2035-01-08 11:00:00+09',
+       'CONFIRMED','RECURRING_GENERATED','ADMIN',original_room_name FROM reservation_recurrences;
+     INSERT INTO reservation_histories(reservation_id,action,actor_type,memo)
+       SELECT id,'RECURRENCE_GENERATED','ADMIN','testing-v9-history' FROM reservations;`,
+  ]);
+  const overlappingStorageSql = `INSERT INTO reservations(
+    room_id,applicant_name,purpose,start_at,end_at,status,source,created_by_actor_type
+  ) SELECT room_id,'testing-v9-new','testing-reservation-v9-overlap',start_at,end_at,'REQUESTED','ADMIN_MANUAL','ADMIN'
+    FROM reservations WHERE purpose='testing-reservation-v9'`;
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v8_upgrade",
+    "-v", "ON_ERROR_STOP=1", "-c",
+    `DO $check$ BEGIN
+      BEGIN
+        ${overlappingStorageSql};
+        RAISE EXCEPTION 'V8 unexpectedly allowed overlapping storage reservations';
+      EXCEPTION WHEN exclusion_violation THEN NULL;
+      END;
+    END $check$;`,
+  ]);
+  const storageSnapshot = () => run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v8_upgrade",
+    "--tuples-only", "--no-align", "-c",
+    `SELECT jsonb_build_object(
+       'reservations',(SELECT jsonb_agg(to_jsonb(r) - 'room_system_reserved' ORDER BY id) FROM reservations r),
+       'recurrences',(SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM reservation_recurrences r),
+       'histories',(SELECT jsonb_agg(to_jsonb(h) ORDER BY id) FROM reservation_histories h))`,
+  ]);
+  const beforeStorageMigration = storageSnapshot();
+  runMigration("scripts/migrate.ts", v8UpgradeUrl);
+  runMigration("scripts/migrate.ts", v8UpgradeUrl);
+  if (storageSnapshot() !== beforeStorageMigration) throw new Error("V9 changed preserved reservation records");
+  const storageFlag = run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v8_upgrade",
+    "--tuples-only", "--no-align", "-c",
+    "SELECT bool_and(room_system_reserved) FROM reservations",
+  ]);
+  if (storageFlag !== "t") throw new Error("V9 failed to backfill the existing storage reservation");
+  run("docker", [
+    "exec", containerName, "psql", "-U", "worker_test", "-d", "worker_v8_upgrade",
+    "-v", "ON_ERROR_STOP=1", "-c",
+    overlappingStorageSql,
+  ]);
+
   const dump = (database) => run("docker", [
     "exec", containerName, "pg_dump", "--schema-only", "--no-owner", "--no-privileges",
     "-U", "worker_test", database,
@@ -540,6 +599,7 @@ try {
   if (primarySchema !== v6UpgradeSchema) throw new Error("V6 to V8 standalone upgrade schema differs");
   const v7UpgradeSchema = dump("worker_v7_upgrade");
   if (primarySchema !== v7UpgradeSchema) throw new Error("V7 to V8 standalone upgrade schema differs");
+  if (primarySchema !== dump("worker_v8_upgrade")) throw new Error("V8 to V9 standalone upgrade schema differs");
   const schemaSha256 = createHash("sha256").update(primarySchema).digest("hex");
   process.stdout.write(`isolated_postgres=passed schema_sha256=${schemaSha256}\n`);
 } finally {

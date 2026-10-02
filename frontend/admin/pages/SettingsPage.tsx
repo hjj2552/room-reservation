@@ -7,26 +7,33 @@ import { dayLabels } from '../../shared/utils/labels';
 import { operatingTimeOptions } from '../../shared/utils/timeOptions';
 import { canonicalizeWeekdayCodes, toggleWeekday, WEEKDAY_ORDER } from '../../shared/utils/weekdays';
 
+function settingsForm(settings: OperationSettings): OperationSettings {
+  return {
+    ...settings,
+    availableDaysOfWeek: canonicalizeWeekdayCodes(settings.availableDaysOfWeek),
+    specialApprovalDaysOfWeek: canonicalizeWeekdayCodes(settings.specialApprovalDaysOfWeek),
+    slotMinutes: 5,
+    openTime: settings.openTime.slice(0, 5),
+    closeTime: settings.closeTime.slice(0, 5),
+    specialApprovalStartTime: settings.specialApprovalStartTime.slice(0, 5),
+    specialApprovalEndTime: settings.specialApprovalEndTime.slice(0, 5),
+  };
+}
+
 export function SettingsPage() {
-  const settings = useSettings();
+  const settings = useSettings({ refetchOnMount: 'always' });
   const updateSettings = useUpdateSettings();
   const [form, setForm] = useState<OperationSettings | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
+  const hasFreshSettings = settings.isFetchedAfterMount && settings.isSuccess && !settings.isFetching;
+
   useEffect(() => {
-    if (settings.data) {
-      setForm({
-        ...settings.data,
-        availableDaysOfWeek: canonicalizeWeekdayCodes(settings.data.availableDaysOfWeek),
-        specialApprovalDaysOfWeek: canonicalizeWeekdayCodes(settings.data.specialApprovalDaysOfWeek),
-        slotMinutes: 5,
-        openTime: settings.data.openTime.slice(0, 5),
-        closeTime: settings.data.closeTime.slice(0, 5),
-        specialApprovalStartTime: settings.data.specialApprovalStartTime.slice(0, 5),
-        specialApprovalEndTime: settings.data.specialApprovalEndTime.slice(0, 5),
-      });
-    }
-  }, [settings.data]);
+    if (!settings.data || !hasFreshSettings) return;
+    // Keep the edited values and their version together until a successful save.
+    const initial = settingsForm(settings.data);
+    setForm((current) => current ?? initial);
+  }, [hasFreshSettings, settings.data]);
 
   function updateField<K extends keyof OperationSettings>(key: K, value: OperationSettings[K]) {
     setValidationErrors({});
@@ -54,7 +61,7 @@ export function SettingsPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form) return;
+    if (!form || updateSettings.isPending) return;
     const errors: Record<string, string> = {};
     if (form.specialApprovalStartTime < form.openTime || form.specialApprovalEndTime > form.closeTime || form.specialApprovalStartTime >= form.specialApprovalEndTime) {
       errors.specialApprovalTime = '특별 허가 시간은 운영 시간 안에서 시작 시간이 종료 시간보다 빨라야 합니다.';
@@ -80,12 +87,18 @@ export function SettingsPage() {
       adminContactEmail: form.adminContactEmail || null,
       adminContactPhone: form.adminContactPhone || null,
       completionMessage: form.completionMessage || null,
-    });
+    }, { onSuccess: (saved) => setForm(settingsForm(saved)) });
   }
 
-  if (settings.isLoading) return <LoadingState />;
-  if (settings.isError) return <ErrorState error={settings.error} />;
-  if (!form) return null;
+  if (!form) {
+    if (settings.isError && !settings.isFetching) return (
+      <>
+        <ErrorState error={settings.error} />
+        <button type="button" className="secondary-button" onClick={() => void settings.refetch()}>다시 시도</button>
+      </>
+    );
+    return <LoadingState />;
+  }
 
   return (
     <section className="page-section settings-page" aria-labelledby="settings-title">
@@ -100,6 +113,7 @@ export function SettingsPage() {
         <label>
           기관명
           <input
+            disabled={updateSettings.isPending}
             data-testid="settings-organization-input"
             value={form.organizationName}
             onChange={(event) => updateField('organizationName', event.target.value)}
@@ -108,6 +122,7 @@ export function SettingsPage() {
         </label>
         <label className="toggle-label settings-toggle">
           <input
+            disabled={updateSettings.isPending}
             type="checkbox"
             checked={form.reservationEnabled}
             onChange={(event) => updateField('reservationEnabled', event.target.checked)}
@@ -117,6 +132,7 @@ export function SettingsPage() {
         <label className="full-span">
           공개 안내
           <textarea
+            disabled={updateSettings.isPending}
             data-testid="settings-public-notice-input"
             rows={3}
             value={form.publicNotice || ''}
@@ -126,6 +142,7 @@ export function SettingsPage() {
         <label className="full-span">
           접수 중지 안내
           <textarea
+            disabled={updateSettings.isPending}
             rows={2}
             value={form.reservationDisabledMessage || ''}
             onChange={(event) => updateField('reservationDisabledMessage', event.target.value)}
@@ -135,6 +152,7 @@ export function SettingsPage() {
           <label>
             예약 가능 시작일
             <input
+              disabled={updateSettings.isPending}
               type="date"
               value={form.semesterStartDate}
               onChange={(event) => updateField('semesterStartDate', event.target.value)}
@@ -144,6 +162,7 @@ export function SettingsPage() {
           <label>
             예약 가능 종료일
             <input
+              disabled={updateSettings.isPending}
               type="date"
               value={form.semesterEndDate}
               onChange={(event) => updateField('semesterEndDate', event.target.value)}
@@ -155,6 +174,7 @@ export function SettingsPage() {
           <label>
             운영 시작 시간
             <select
+              disabled={updateSettings.isPending}
               data-testid="settings-open-time-input"
               value={form.openTime}
               onChange={(event) => updateField('openTime', event.target.value)}
@@ -168,6 +188,7 @@ export function SettingsPage() {
           <label>
             운영 종료 시간
             <select
+              disabled={updateSettings.isPending}
               data-testid="settings-close-time-input"
               value={form.closeTime}
               onChange={(event) => updateField('closeTime', event.target.value)}
@@ -183,6 +204,7 @@ export function SettingsPage() {
           <label>
             특별 허가 시작 시간
             <select
+              disabled={updateSettings.isPending}
               data-testid="settings-special-approval-start-time-input"
               value={form.specialApprovalStartTime}
               onChange={(event) => updateField('specialApprovalStartTime', event.target.value)}
@@ -196,6 +218,7 @@ export function SettingsPage() {
           <label>
             특별 허가 종료 시간
             <select
+              disabled={updateSettings.isPending}
               data-testid="settings-special-approval-end-time-input"
               value={form.specialApprovalEndTime}
               onChange={(event) => updateField('specialApprovalEndTime', event.target.value)}
@@ -217,6 +240,7 @@ export function SettingsPage() {
           <label>
             최소 예약 시간(분)
             <input
+              disabled={updateSettings.isPending}
               type="number"
               min={30}
               step={5}
@@ -229,6 +253,7 @@ export function SettingsPage() {
           <label>
             최대 예약 시간(분)
             <input
+              disabled={updateSettings.isPending}
               type="number"
               min={form.minReservationMinutes}
               step={5}
@@ -247,6 +272,7 @@ export function SettingsPage() {
           {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input
+                disabled={updateSettings.isPending}
                 data-testid={`settings-day-${day}`}
                 type="checkbox"
                 checked={form.availableDaysOfWeek.includes(day)}
@@ -264,6 +290,7 @@ export function SettingsPage() {
           {WEEKDAY_ORDER.map((day) => (
             <label key={day}>
               <input
+                disabled={updateSettings.isPending}
                 data-testid={`settings-special-approval-day-${day}`}
                 type="checkbox"
                 checked={form.specialApprovalDaysOfWeek.includes(day)}
@@ -279,6 +306,7 @@ export function SettingsPage() {
         <label>
           문의 이메일
           <input
+            disabled={updateSettings.isPending}
             type="email"
             value={form.adminContactEmail || ''}
             onChange={(event) => updateField('adminContactEmail', event.target.value)}
@@ -287,6 +315,7 @@ export function SettingsPage() {
         <label>
           문의 전화번호
           <input
+            disabled={updateSettings.isPending}
             value={form.adminContactPhone || ''}
             onChange={(event) => updateField('adminContactPhone', event.target.value)}
           />
@@ -294,6 +323,7 @@ export function SettingsPage() {
         <label className="full-span">
           예약 완료 안내
           <textarea
+            disabled={updateSettings.isPending}
             rows={2}
             value={form.completionMessage || ''}
             onChange={(event) => updateField('completionMessage', event.target.value)}

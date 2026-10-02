@@ -7,6 +7,8 @@ import type {
   ReservationHistory,
   ReservationListItem,
   ReservationPayload,
+  ReservationTimetableFilters,
+  ReservationTimetableItem,
 } from './types';
 
 export function listReservations(filters: ReservationFilters = {}) {
@@ -17,6 +19,10 @@ export function listReservations(filters: ReservationFilters = {}) {
       page: filters.page ?? 0,
     })}`,
   );
+}
+
+export function getTimetableReservations(filters: ReservationTimetableFilters) {
+  return apiRequest<ReservationTimetableItem[]>(`/api/admin/timetable/reservations${buildQuery(filters)}`);
 }
 
 export function getReservation(reservationId: string) {

@@ -29,6 +29,7 @@ import type {
   RecurrencePreviewCommand,
   ReservationFilterQuery,
   ReservationListQuery,
+  ReservationTimetableQuery,
   RoomListQuery,
   SaveRoomCommand,
   SaveRoomOrderCommand,
@@ -583,7 +584,7 @@ export class ProductService {
   ): Promise<void> {
     const result = await client.query(
       `SELECT 1 FROM reservations
-       WHERE room_id=$1 AND status IN ('REQUESTED','CONFIRMED')
+       WHERE room_id=$1 AND room_system_reserved=false AND status IN ('REQUESTED','CONFIRMED')
          AND start_at < $3::timestamptz AND end_at > $2::timestamptz
          AND ($4::uuid IS NULL OR id <> $4::uuid)
        LIMIT 1`,
@@ -979,11 +980,28 @@ export class ProductService {
     const filter = this.reservationFilter(query);
     const count = await this.database.query(`SELECT count(*) AS total FROM reservations r ${filter.where}`, filter.values);
     const rows = await this.database.query(
-      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC
+      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC, r.start_at DESC, r.id DESC
        LIMIT $${filter.values.length + 1} OFFSET $${filter.values.length + 2}`,
       [...filter.values, size, offset],
     );
     return paged(rows.rows.map((row) => this.mapReservationList(row)), page, size, Number(count.rows[0]?.total ?? 0));
+  }
+
+  async getTimetableReservations(query: ReservationTimetableQuery) {
+    const filter = this.reservationFilter(query);
+    const result = await this.database.query(
+      `${this.reservationSelect} ${filter.where} ORDER BY r.created_at DESC, r.id`,
+      filter.values,
+    );
+    return result.rows.map((row) => {
+      const item = this.mapReservationList(row);
+      return {
+        id: item.id, roomId: item.roomId, roomName: item.roomName,
+        applicantName: item.applicantName, purpose: item.purpose,
+        startAt: item.startAt, endAt: item.endAt, status: item.status,
+        seriesLabel: item.seriesLabel, seriesColor: item.seriesColor,
+      };
+    });
   }
 
   async getWeeklyReservations(roomId: string, weekStart: string) {
@@ -1032,7 +1050,7 @@ export class ProductService {
       const { room, settings } = await this.roomAndSettings(roomId);
       validateReservationPolicy(bool(room, "enabled") && !bool(room, "system_reserved"), settings, input, "PUBLIC", this.now());
       const conflictResult = await this.database.query(
-        `SELECT 1 FROM reservations WHERE room_id=$1 AND status IN ('REQUESTED','CONFIRMED')
+        `SELECT 1 FROM reservations WHERE room_id=$1 AND room_system_reserved=false AND status IN ('REQUESTED','CONFIRMED')
          AND start_at < $3::timestamptz AND end_at > $2::timestamptz LIMIT 1`,
         [roomId, startAt, endAt],
       );
@@ -1059,8 +1077,9 @@ export class ProductService {
     actorType: "PUBLIC_USER" | "ADMIN" | "SYSTEM",
     actorId: string | null,
     deleted = false,
+    roomNameSnapshot?: string,
   ): Promise<void> {
-    const roomName = await this.historyRoomName(client, current);
+    const roomName = await this.historyRoomName(client, current, roomNameSnapshot);
     const beforeRoomName = before ? await this.historyRoomName(client, before) : null;
     await client.query(
       `INSERT INTO reservation_histories (
@@ -1090,12 +1109,13 @@ export class ProductService {
     );
   }
 
-  private async historyRoomName(client: Queryable, reservation: Row): Promise<string> {
+  private async historyRoomName(client: Queryable, reservation: Row, roomNameSnapshot?: string): Promise<string> {
     const preservedName = nullableText(reservation, "original_room_name");
     if (preservedName) return preservedName;
 
     const selectedName = nullableText(reservation, "current_room_name")
-      || nullableText(reservation, "room_name");
+      || nullableText(reservation, "room_name")
+      || roomNameSnapshot;
     if (selectedName) return selectedName;
 
     const roomId = nullableText(reservation, "room_id");
@@ -1241,6 +1261,7 @@ export class ProductService {
          WHERE EXISTS (
            SELECT 1 FROM reservations reservation
            WHERE reservation.room_id=$1
+             AND reservation.room_system_reserved=false
              AND reservation.status IN ('REQUESTED','CONFIRMED')
              AND reservation.start_at < candidate.end_at
              AND reservation.end_at > candidate.start_at
@@ -1297,6 +1318,8 @@ export class ProductService {
             input.endTime, input.conflictPolicy, adminUsername, input.showApplicantName],
         );
         const recurrence = recurrenceResult.rows[0]!;
+        // Keep one name snapshot for this creation transaction, including cancelled occurrences.
+        const roomNameSnapshot = await this.historyRoomName(client, recurrence);
         const resultItems: Array<{ date: string; status: "CREATED" | "CANCELLED" | "SKIPPED"; reason: string | null }> = [];
         let createdCount = 0;
         let cancelledCount = 0;
@@ -1316,7 +1339,7 @@ export class ProductService {
               input.applicantPhone, input.purpose, item.startAt, item.endAt, status, adminUsername,
               input.showApplicantName],
           );
-          await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, memo, "ADMIN", adminUsername);
+          await this.insertHistory(client, inserted.rows[0]!, "RECURRENCE_GENERATED", null, memo, "ADMIN", adminUsername, false, roomNameSnapshot);
         };
         const recordTimeSlotConflict = async (item: (typeof preview.items)[number]) => {
           await insertGeneratedReservation(
@@ -1339,15 +1362,17 @@ export class ProductService {
             continue;
           }
           const savepoint = `recurrence_candidate_${index}`;
-          await client.query(`SAVEPOINT ${savepoint}`);
+          const skipConflicts = input.conflictPolicy === "SKIP_CONFLICTS";
+          if (skipConflicts) await client.query(`SAVEPOINT ${savepoint}`);
           try {
             await insertGeneratedReservation(item, "CONFIRMED", null);
-            await client.query(`RELEASE SAVEPOINT ${savepoint}`);
+            if (skipConflicts) await client.query(`RELEASE SAVEPOINT ${savepoint}`);
             createdCount += 1;
             resultItems.push({ date: item.date, status: "CREATED", reason: null });
           } catch (error) {
+            if (!skipConflicts) throw error;
             await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-            if (input.conflictPolicy === "SKIP_CONFLICTS" && isDatabaseCode(error, "23P01")) {
+            if (isDatabaseCode(error, "23P01")) {
               await recordTimeSlotConflict(item);
               await client.query(`RELEASE SAVEPOINT ${savepoint}`);
               continue;
@@ -1490,10 +1515,11 @@ export class ProductService {
       policy("CSV_EXPORT_TOO_LARGE", "Too many reservations to export. Narrow the filters and try again.");
     }
     const header = ["reservationId", "roomName", "applicantName", "applicantEmail", "applicantPhone", "purpose", "startAt", "endAt", "status", "source", "recurrenceId", "createdAt"];
-    const formatKst = (input: unknown) => new Intl.DateTimeFormat("sv-SE", {
+    const kstFormatter = new Intl.DateTimeFormat("sv-SE", {
       timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
       hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-    }).format(new Date(input instanceof Date ? input : String(input)));
+    });
+    const formatKst = (input: unknown) => kstFormatter.format(new Date(input instanceof Date ? input : String(input)));
     const escape = (input: unknown) => {
       let string = input === null || input === undefined ? "" : String(input);
       if (/^\s*[=+\-@]/u.test(string)) string = `'${string}`;

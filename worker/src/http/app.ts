@@ -21,6 +21,7 @@ import {
   parseRecurrencePreview,
   parseReservationFilter,
   parseReservationList,
+  parseReservationTimetable,
   parseRoomEnabled,
   parseRoomList,
   parseSaveRoom,
@@ -366,6 +367,9 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
   app.get("/api/admin/reservations", async (context) => context.json(
     await dependencies.products.listReservations(parseReservationList(queryParams(context))),
+  ));
+  app.get("/api/admin/timetable/reservations", async (context) => context.json(
+    await dependencies.products.getTimetableReservations(parseReservationTimetable(queryParams(context))),
   ));
   app.post("/api/admin/reservations", async (context) => {
     const result = await dependencies.products.createAdminReservation(

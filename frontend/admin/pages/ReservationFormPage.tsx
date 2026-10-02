@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -50,13 +50,14 @@ export function ReservationFormPage() {
   const settings = useSettings();
   const reservation = useReservation(reservationId);
   const update = useUpdateReservation(reservationId);
+  const initializedReservationId = useRef('');
   const {
     register,
     handleSubmit,
     reset,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<ReservationFormValues>({
     defaultValues: defaultReservationFormValues,
   });
@@ -81,6 +82,7 @@ export function ReservationFormPage() {
 
   useLayoutEffect(() => {
     if (!reservation.data) return;
+    if (isDirty && initializedReservationId.current === reservation.data.id) return;
     reset({
       roomId: reservation.data.room.id,
       applicantName: reservation.data.applicantName,
@@ -95,7 +97,8 @@ export function ReservationFormPage() {
         ? false
         : reservation.data.showApplicantName,
     });
-  }, [reservation.data, reset]);
+    initializedReservationId.current = reservation.data.id;
+  }, [reservation.data, reset, isDirty]);
 
   function toPayload(values: ReservationFormValues): ReservationPayload {
     return {

@@ -15,6 +15,7 @@ const V5_MIGRATION = "005_recurrence_hard_delete_v5";
 const V6_MIGRATION = "006_public_reservation_schedule_v6";
 const V7_MIGRATION = "007_applicant_phone_normalization_v7";
 const V8_MIGRATION = "008_special_approval_schedule_v8";
+const V9_MIGRATION = "009_deleted_room_storage_overlap_v9";
 const PRODUCT_TABLES = [
   "admin_sessions",
   "operation_settings",
@@ -760,8 +761,9 @@ export async function verifyProductionV7Schema(
 export async function verifyProductionV8Schema(
   client: SqlClient,
   config: ProductionMigrationConfig,
+  expectedLatestMigration = V8_MIGRATION,
 ): Promise<void> {
-  await verifyProductionV7Schema(client, config, V8_MIGRATION, false);
+  await verifyProductionV7Schema(client, config, expectedLatestMigration, false);
 
   try {
     const migration = await client.query(
@@ -826,6 +828,38 @@ export async function verifyProductionV8Schema(
   }
 }
 
+export async function verifyProductionV9Schema(client: SqlClient, config: ProductionMigrationConfig): Promise<void> {
+  await verifyProductionV8Schema(client, config, V9_MIGRATION);
+  try {
+    const schema = await client.query(`SELECT
+      EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+        AND table_name='reservations' AND column_name='room_system_reserved'
+        AND data_type='boolean' AND is_nullable='NO') AS storage_column_exists,
+      EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.rooms'::regclass
+        AND conname='uq_rooms_id_system_reserved' AND contype='u') AS room_key_exists,
+      EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.reservations'::regclass
+        AND conname='fk_reservations_room_system_reserved' AND contype='f'
+        AND convalidated AND confupdtype='c') AS room_fk_exists,
+      EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid='public.reservations'::regclass
+        AND tgname='trg_reservations_room_system_reserved' AND tgenabled='O') AS sync_trigger_exists,
+      EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.reservations'::regclass
+        AND conname='ex_reservations_no_time_overlap' AND contype='x'
+        AND pg_get_constraintdef(oid) LIKE '%room_system_reserved = false%') AS exclusion_exists`);
+    const values = await client.query(`SELECT count(*)::integer AS invalid_count
+      FROM reservations r JOIN rooms rm ON rm.id=r.room_id
+      WHERE r.room_system_reserved IS DISTINCT FROM rm.system_reserved`);
+    const state = schema.rows[0];
+    if (!state || state.storage_column_exists !== true || state.room_key_exists !== true
+      || state.room_fk_exists !== true || state.sync_trigger_exists !== true || state.exclusion_exists !== true
+      || values.rows[0]?.invalid_count !== 0) {
+      throw new ProductionMigrationError("schema", "Production V9 deleted room storage schema is incomplete.");
+    }
+  } catch (error) {
+    if (error instanceof ProductionMigrationError) throw error;
+    throw new ProductionMigrationError("schema", "Production V9 deleted room storage schema could not be verified.");
+  }
+}
+
 export async function verifyProductionMigration(
   env: NodeJS.ProcessEnv = process.env,
   dependencies: Partial<ProductionMigrationDependencies> = {},
@@ -833,6 +867,6 @@ export async function verifyProductionMigration(
   const config = productionMigrationConfigFromEnv(env);
   const resolved = { ...defaultDependencies, ...dependencies };
   await withProductionClient(config, resolved, async (client) => {
-    await verifyProductionV8Schema(client, config);
+    await verifyProductionV9Schema(client, config);
   });
 }

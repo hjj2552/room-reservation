@@ -173,6 +173,7 @@ describe("Worker migrations", () => {
       "006_public_reservation_schedule_v6",
       "007_applicant_phone_normalization_v7",
       "008_special_approval_schedule_v8",
+      "009_deleted_room_storage_overlap_v9",
     ]);
     const settings = await database.query(
       `SELECT open_time::text, close_time::text, available_days_of_week,
@@ -1161,8 +1162,10 @@ async function insertReservation(input: {
   source?: string;
   createdAt?: string;
   recurrenceException?: boolean;
+  startAt?: string;
+  endAt?: string;
 }) {
-  const startAt = futureWeekday(55, input.hour ?? 10);
+  const startAt = input.startAt ?? futureWeekday(55, input.hour ?? 10);
   const result = await database.query(
     `INSERT INTO reservations(
        room_id,recurrence_id,applicant_name,applicant_email,applicant_phone,purpose,
@@ -1171,7 +1174,7 @@ async function insertReservation(input: {
     [input.roomId, input.recurrenceId ?? null, input.applicantName ?? "ordinary applicant",
       input.applicantEmail ?? "ordinary@example.test",
       input.applicantPhone === undefined ? "01000000000" : input.applicantPhone,
-      input.purpose, startAt, addHour(startAt),
+      input.purpose, startAt, input.endAt ?? addHour(startAt),
       input.status ?? "CONFIRMED", input.source ?? "ADMIN_MANUAL", input.createdAt ?? new Date().toISOString(),
       input.recurrenceException ?? false],
   );
@@ -1379,6 +1382,88 @@ describe("applicant phone normalization HTTP contract", () => {
 });
 
 describe("reservation search contract", () => {
+  it("pages same-created November and December occurrences by latest start while prioritizing newer creations", async () => {
+    const roomId = await insertRoom("testing-room-reservation-sort-months");
+    const recurrenceId = await insertRecurrence({ roomId, purpose: "testing-recurring-sort-months" });
+    try {
+      const occurrences: string[] = [];
+      for (let index = 0; index < 61; index += 1) {
+        const date = new Date(Date.UTC(2030, 10, 1 + index)).toISOString().slice(0, 10);
+        occurrences.push(await insertReservation({
+          roomId, recurrenceId, purpose: "testing-reservation-sort-months",
+          source: "RECURRING_GENERATED", createdAt: "2030-10-01T00:00:00Z",
+          startAt: `${date}T10:00:00+09:00`,
+        }));
+      }
+      const newer = await insertReservation({
+        roomId, purpose: "testing-reservation-sort-newer", createdAt: "2030-10-02T00:00:00Z",
+        startAt: "2030-10-15T10:00:00+09:00",
+      });
+      const older = await insertReservation({
+        roomId, purpose: "testing-reservation-sort-older", createdAt: "2030-09-30T00:00:00Z",
+        startAt: "2031-01-01T10:00:00+09:00",
+      });
+      const expected = [newer, ...[...occurrences].reverse(), older];
+      for (let pass = 0; pass < 2; pass += 1) {
+        const actual: string[] = [];
+        for (let page = 0; page < 4; page += 1) {
+          const result = await products.listReservations({ roomId, excludeCancelled: false, page, size: 20, offset: page * 20 });
+          expect(result).toMatchObject({ page, size: 20, totalItems: 63, totalPages: 4 });
+          const ids = result.items.map(item => item.id);
+          expect(ids).toEqual(expected.slice(page * 20, (page + 1) * 20));
+          actual.push(...ids);
+        }
+        expect(actual).toEqual(expected);
+        expect(new Set(actual).size).toBe(63);
+      }
+    } finally {
+      await database.query("DELETE FROM reservations WHERE room_id=$1 AND purpose LIKE 'testing-reservation-sort-%'", [roomId]);
+      await database.query("DELETE FROM reservation_recurrences WHERE id=$1 AND purpose LIKE 'testing-recurring-%'", [recurrenceId]);
+      await database.query("DELETE FROM rooms WHERE id=$1 AND name LIKE 'testing-room-%'", [roomId]);
+    }
+  });
+
+  it("breaks identical creation and start times by descending ID across filtered pages", async () => {
+    const roomId = await insertRoom("testing-room-reservation-sort-ids");
+    const otherRoomId = await insertRoom("testing-room-reservation-sort-excluded");
+    const input = {
+      purpose: "testing-reservation-sort-tie", createdAt: "2030-10-01T00:00:00Z",
+      startAt: "2030-12-31T10:00:00+09:00", status: "CANCELLED",
+    };
+    try {
+      const ids: string[] = [];
+      for (let index = 0; index < 25; index += 1) ids.push(await insertReservation({ ...input, roomId }));
+      await insertReservation({ ...input, roomId: otherRoomId });
+      await insertReservation({ ...input, roomId, status: "CONFIRMED" });
+      await insertReservation({ ...input, roomId, source: "PUBLIC_FORM" });
+      await insertReservation({ ...input, roomId, purpose: "testing-reservation-sort-other-keyword" });
+      await insertReservation({ ...input, roomId, startAt: "2031-01-01T10:00:00+09:00" });
+      const filters = parseReservationFilter(new URLSearchParams({
+        roomId, status: "CANCELLED", source: "ADMIN_MANUAL", keyword: input.purpose,
+        from: "2030-12-31T00:00:00+09:00", to: "2031-01-01T00:00:00+09:00",
+      }));
+      // UUIDs have no chronological meaning; only their order breaks an exact time tie.
+      const expected = [...ids].sort().reverse();
+      for (let pass = 0; pass < 2; pass += 1) {
+        const actual: string[] = [];
+        for (let page = 0; page < 4; page += 1) {
+          const result = await products.listReservations({ ...filters, page, size: 7, offset: page * 7 });
+          expect(result).toMatchObject({ page, size: 7, totalItems: 25, totalPages: 4 });
+          expect(result.items.map(item => item.id)).toEqual(expected.slice(page * 7, (page + 1) * 7));
+          actual.push(...result.items.map(item => item.id));
+        }
+        expect(actual).toEqual(expected);
+        expect(new Set(actual).size).toBe(25);
+      }
+      const active = await products.listReservations({ roomId, excludeCancelled: true, page: 0, size: 7, offset: 0 });
+      expect(active.totalItems).toBe(1);
+      expect(active.items[0]?.status).toBe("CONFIRMED");
+    } finally {
+      await database.query("DELETE FROM reservations WHERE room_id=ANY($1::uuid[]) AND purpose LIKE 'testing-reservation-sort-%'", [[roomId, otherRoomId]]);
+      await database.query("DELETE FROM rooms WHERE id=ANY($1::uuid[]) AND name LIKE 'testing-room-%'", [[roomId, otherRoomId]]);
+    }
+  });
+
   it("searches admin reservations by applicant text, phone and processing memo without changing shared CSV filters", async () => {
     await resetProductData();
     const roomId = await insertRoom("testing-room-search-primary");
@@ -3182,5 +3267,172 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: { "content-type": "application/json", cookie } })).status).toBe(403);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: writeHeaders })).status).toBe(204);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);
+  });
+});
+
+describe("deleted room storage overlap", () => {
+  it.each([
+    ["REQUESTED", "CONFIRMED"], ["CONFIRMED", "REQUESTED"],
+    ["REQUESTED", "REQUESTED"], ["CONFIRMED", "CONFIRMED"],
+  ])("preserves overlapping %s and %s reservations when both rooms are deleted", async (firstStatus, secondStatus) => {
+    await resetProductData();
+    const snapshot = [];
+    for (const [index, status] of [firstStatus, secondStatus].entries()) {
+      const name = `testing-room-storage-${index}`;
+      const roomId = await insertRoom(name);
+      const recurrenceId = await insertRecurrence({ roomId, purpose: `testing-recurring-storage-${index}` });
+      const reservationId = await insertReservation({ roomId, recurrenceId, status,
+        source: "RECURRING_GENERATED", purpose: `testing-reservation-storage-${index}` });
+      await insertReservationHistory(reservationId, `testing-storage-history-${index}`);
+      snapshot.push({ name, roomId, reservationId, recurrenceId,
+        reservation: (await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0],
+        recurrence: (await database.query("SELECT * FROM reservation_recurrences WHERE id=$1", [recurrenceId])).rows[0],
+      });
+      const check = await products.getRoomDeletionCheck(roomId);
+      expect(check).toMatchObject({ deletable: true, blockers: [] });
+      expect(check.checks.map(item => ({ passed: item.passed, count: item.count })))
+        .toEqual([{ passed: true, count: 1 }, { passed: true, count: 1 }]);
+    }
+    const histories = (await database.query("SELECT * FROM reservation_histories ORDER BY id")).rows;
+    for (const item of snapshot) await products.deleteRoom(item.roomId);
+    const storageId = (await database.query("SELECT id FROM rooms WHERE system_reserved=true")).rows[0]!.id;
+    for (const item of snapshot) {
+      expect((await database.query("SELECT * FROM reservations WHERE id=$1", [item.reservationId])).rows[0])
+        .toEqual({ ...item.reservation, room_id: storageId, original_room_name: item.name, room_system_reserved: true });
+      expect((await database.query("SELECT * FROM reservation_recurrences WHERE id=$1", [item.recurrenceId])).rows[0])
+        .toEqual({ ...item.recurrence, room_id: storageId, original_room_name: item.name });
+      expect((await database.query("SELECT 1 FROM rooms WHERE id=$1", [item.roomId])).rows).toHaveLength(0);
+    }
+    expect((await database.query("SELECT * FROM reservation_histories ORDER BY id")).rows).toEqual(histories);
+    // The server-side conflict check must use the same storage exemption as PostgreSQL.
+    await expect(products.changeReservationStatus(snapshot[0]!.reservationId, "APPROVED", "testing-storage-approval", "admin"))
+      .resolves.toBeDefined();
+  });
+
+  it("enforces real-room exclusion concurrently and rejects a forged storage flag", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-storage-concurrency");
+    const attempts = await Promise.allSettled(["REQUESTED", "CONFIRMED"].map(status =>
+      insertReservation({ roomId, status, purpose: `testing-reservation-storage-race-${status}` })));
+    expect(attempts.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(attempts.find(result => result.status === "rejected"))
+      .toMatchObject({ status: "rejected", reason: { code: "23P01", constraint: "ex_reservations_no_time_overlap" } });
+    await expect(database.query("UPDATE reservations SET room_system_reserved=true WHERE room_id=$1", [roomId]))
+      .rejects.toMatchObject({ code: "23503", constraint: "fk_reservations_room_system_reserved" });
+  });
+
+  it("reapplies conflict checks on existing admin moves even with an original room name", async () => {
+    await resetProductData();
+    const oldRoom = await insertRoom("testing-room-storage-original");
+    const targetRoom = await insertRoom("testing-room-storage-target");
+    const startAt = futureWeekday(35, 10);
+    const reservationId = await insertReservation({ roomId: oldRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-move" });
+    const blocker = await insertReservation({ roomId: targetRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-blocker" });
+    await products.deleteRoom(oldRoom);
+    const stored = (await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0]!;
+    const command = parseAdminReservation({
+      roomId: targetRoom, applicantName: "testing-storage-move", applicantEmail: null, applicantPhone: null,
+      purpose: "testing-reservation-storage-move", startAt, endAt: addHour(startAt), status: "CONFIRMED",
+    });
+    await expect(products.updateAdminReservation(reservationId, command, "admin"))
+      .rejects.toMatchObject({ code: "TIME_SLOT_CONFLICT" });
+    await expect(database.query("UPDATE reservations SET room_id=$2 WHERE id=$1", [reservationId, targetRoom]))
+      .rejects.toMatchObject({ code: "23P01" });
+    expect((await database.query("SELECT * FROM reservations WHERE id=$1", [reservationId])).rows[0]).toEqual(stored);
+    await products.changeReservationStatus(blocker, "CANCELLED", "testing-free-target", "admin");
+    await products.updateAdminReservation(reservationId, command, "admin");
+    expect((await database.query("SELECT room_id,room_system_reserved,original_room_name FROM reservations WHERE id=$1", [reservationId])).rows[0])
+      .toEqual({ room_id: targetRoom, room_system_reserved: false, original_room_name: "testing-room-storage-original" });
+    await expect(insertReservation({ roomId: targetRoom, startAt, endAt: addHour(startAt),
+      purpose: "testing-reservation-storage-restored-conflict" })).rejects.toMatchObject({ code: "23P01" });
+    await expect(products.createAdminReservation({ ...command, reservation: { ...command.reservation, roomId: String(stored.room_id) } }, "admin"))
+      .rejects.toMatchObject({ code: "ROOM_DISABLED" });
+    await expect(products.createPublicReservation(parsePublicReservation(publicPayload(String(stored.room_id), "Test1!", "testing-storage-public"))))
+      .rejects.toMatchObject({ code: "ROOM_DISABLED" });
+  });
+});
+
+describe("admin timetable range query", () => {
+  it("returns every matching reservation, preserving overlap, filter, privacy and access contracts", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-timetable-range");
+    const otherRoom = await insertRoom("testing-room-timetable-other");
+    const date = "2026-07-13";
+    const ids: string[] = [];
+    for (let index = 0; index < 120; index += 1) {
+      const start = new Date(`${date}T09:00:00+09:00`).getTime();
+      ids.push(await insertReservation({
+        roomId, purpose: `testing-range-${index}`, applicantName: 'testing-range-applicant',
+        applicantEmail: 'testing-range@example.test', applicantPhone: '01012345678',
+        startAt: new Date(start).toISOString(), endAt: new Date(start + 1_800_000).toISOString(),
+        status: 'CANCELLED',
+      }));
+    }
+    await insertReservationHistory(ids[0]!, 'testing-unique-range-memo');
+    const seed = (purpose: string, startAt: string, endAt: string, status = 'CANCELLED', selectedRoom = roomId) =>
+      insertReservation({ roomId: selectedRoom, purpose: `testing-${purpose}`, startAt, endAt, status });
+    const requested = await seed('requested-at-midnight', '2026-07-13T00:00:00+09:00', '2026-07-13T00:30:00+09:00', 'REQUESTED');
+    const confirmed = await seed('confirmed-until-midnight', '2026-07-13T23:30:00+09:00', '2026-07-14T00:00:00+09:00', 'CONFIRMED');
+    const crossingStart = await seed('crossing-start', '2026-07-12T23:30:00+09:00', '2026-07-13T00:30:00+09:00');
+    const crossingEnd = await seed('crossing-end', '2026-07-13T23:30:00+09:00', '2026-07-14T00:30:00+09:00');
+    const outside = [
+      await seed('ends-at-start', '2026-07-12T23:30:00+09:00', '2026-07-13T00:00:00+09:00'),
+      await seed('starts-next-day', '2026-07-14T00:00:00+09:00', '2026-07-14T00:30:00+09:00'),
+    ];
+    const otherId = await seed('other-room', '2026-07-13T10:00:00+09:00', '2026-07-13T11:00:00+09:00', 'CONFIRMED', otherRoom);
+    const lastWeekDay = await seed('last-week-day', '2026-07-19T23:00:00+09:00', '2026-07-19T23:30:00+09:00', 'CONFIRMED');
+    const nextWeek = await seed('next-week', '2026-07-20T00:00:00+09:00', '2026-07-20T00:30:00+09:00', 'CONFIRMED');
+    const { app, cookie } = await authenticatedApp();
+    const path = '/api/admin/timetable/reservations';
+    const base = { view: 'date', date, roomId, excludeCancelled: 'false', keyword: 'testing-range' };
+    const read = async (params: Record<string, string> = {}) => {
+      const response = await app.request(`${path}?${new URLSearchParams({ ...base, ...params })}`, { headers: { cookie } });
+      expect(response.status).toBe(200);
+      return await response.json() as Array<Record<string, unknown>>;
+    };
+    const all = await read({ page: '100', size: '1' });
+    expect(all).toHaveLength(120);
+    expect(new Set(all.map(item => item.id))).toEqual(new Set(ids));
+    expect(Object.keys(all[0]!).sort()).toEqual([
+      'id', 'roomId', 'roomName', 'applicantName', 'purpose', 'startAt', 'endAt', 'status', 'seriesLabel', 'seriesColor',
+    ].sort());
+    expect(await read({ status: 'REQUESTED' })).toHaveLength(0);
+    expect(await read({ excludeCancelled: 'true' })).toEqual([]);
+    expect((await read({ keyword: '', status: 'REQUESTED' })).map(item => item.id)).toEqual([requested]);
+    expect((await read({ keyword: '', status: 'CONFIRMED' })).map(item => item.id)).toEqual([confirmed]);
+    expect(await read({ keyword: '', excludeCancelled: 'true' })).toHaveLength(2);
+    expect(await read({ keyword: 'TESTING-RANGE-APPLICANT' })).toHaveLength(120);
+    expect(await read({ keyword: 'testing-range@example.test' })).toHaveLength(120);
+    expect(await read({ keyword: '010-1234-5678' })).toHaveLength(120);
+    expect((await read({ keyword: 'testing-unique-range-memo' })).map(item => item.id)).toEqual([ids[0]]);
+    expect(await read({ source: 'PUBLIC_FORM' })).toEqual([]);
+    expect(await read({ status: 'CANCELLED', excludeCancelled: 'true' })).toHaveLength(120);
+    const withCancelled = await read({ keyword: '' });
+    expect(withCancelled.map(item => item.id)).toEqual(expect.arrayContaining([crossingStart, crossingEnd]));
+    expect(withCancelled).toHaveLength(124);
+    for (const id of outside) expect(withCancelled.map(item => item.id)).not.toContain(id);
+    expect((await read({ roomId: '', keyword: '' })).map(item => item.id)).toContain(otherId);
+    expect((await read({ roomId: otherRoom, keyword: '' })).map(item => item.id)).toEqual([otherId]);
+    const week = await read({ view: 'room', keyword: '' });
+    expect(week).toHaveLength(126);
+    expect(week.map(item => item.id)).toContain(lastWeekDay);
+    expect(week.map(item => item.id)).not.toContain(nextWeek);
+    expect(week.map(item => item.id)).not.toContain(otherId);
+    const listing = await app.request(`/api/admin/reservations?roomId=${roomId}&size=500&keyword=testing-range`, { headers: { cookie } });
+    const list = await listing.json() as { items: unknown[]; size: number; totalItems: number };
+    expect(list.size).toBe(100);
+    expect(list.items).toHaveLength(100);
+    expect(list.totalItems).toBe(120);
+    expect((await app.request(`${path}?view=date&date=${date}`)).status).toBe(401);
+    const anonymousSession = await app.request('/api/auth/csrf');
+    const anonymousCookie = /ROOM-SESSION=([^;,]+)/.exec(anonymousSession.headers.get('set-cookie') || '')?.[1];
+    expect((await app.request(`${path}?view=date&date=${date}`, {
+      headers: { cookie: `ROOM-SESSION=${anonymousCookie}` },
+    })).status).toBe(401);
+    for (const query of ['view=room&date=2026-07-13', 'view=date', 'view=date&date=2026-02-30', 'view=all&date=2026-07-13']) {
+      expect((await app.request(`${path}?${query}`, { headers: { cookie } })).status).toBe(400);
+    }
   });
 });
