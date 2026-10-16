@@ -1039,9 +1039,13 @@ describe("public reservation privacy contracts", () => {
 
 describe("HTTP session, CSRF, admin contracts and cleanup", () => {
   it("supports the existing cookie/header flow and guarded product routes", async () => {
+    const issuedAt = new Date("2026-10-16T00:00:00Z");
+    let now = issuedAt;
+    const timedSessions = new SessionService(database, () => now);
+    const expectedExpiry = new Date("2026-10-16T12:00:00Z");
     const app = createHttpApp(parseRuntimeConfig({ APP_ENV: "uat", E2E_CLEANUP_ENABLED: "true" }), {
       products,
-      sessions,
+      sessions: timedSessions,
       rateLimiter: allowAllRateLimiter,
       resolveClientIp: fixedClientIpResolver,
       adminUsername: "admin",
@@ -1055,6 +1059,11 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
     const csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(setCookie)?.[1];
     expect(sessionId).toBeTruthy();
     expect(csrfCookie).toBe(csrf.token);
+    expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
+    expect(setCookie.match(/Expires=[^;]+/g)).toEqual([
+      `Expires=${expectedExpiry.toUTCString()}`,
+      `Expires=${expectedExpiry.toUTCString()}`,
+    ]);
     const cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
     const writeHeaders = { "content-type": "application/json", "cookie": cookie, "X-XSRF-TOKEN": csrf.token };
 
@@ -1062,11 +1071,17 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: "admin", password: "admin1234" }),
     })).status).toBe(403);
+    now = new Date(issuedAt.getTime() + 60 * 60 * 1000);
     const loginResponse = await app.request("http://worker.test/api/auth/admin/login", {
       method: "POST", headers: writeHeaders, body: JSON.stringify({ username: "admin", password: "admin1234" }),
     });
     expect(loginResponse.status).toBe(200);
     expect(loginResponse.headers.get("set-cookie")).toContain("ROOM-SESSION=");
+    expect(loginResponse.headers.get("set-cookie")?.match(/Expires=[^;]+/g)).toEqual([
+      `Expires=${expectedExpiry.toUTCString()}`,
+      `Expires=${expectedExpiry.toUTCString()}`,
+    ]);
+    expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(200);
 
     const roomResponse = await app.request("http://worker.test/api/admin/rooms", {
@@ -1086,6 +1101,13 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
     expect(preview.status).toBe(200);
     const cleanup = await app.request("http://worker.test/api/admin/test-data/e2e", { method: "DELETE", headers: writeHeaders });
     expect(cleanup.status).toBe(200);
+
+    now = new Date(expectedExpiry.getTime() - 1);
+    expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(200);
+    expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
+    now = expectedExpiry;
+    expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);
+    expect(await timedSessions.find(sessionId)).toBeNull();
   });
 });
 
