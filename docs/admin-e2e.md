@@ -27,16 +27,29 @@ npm.cmd run test:local-e2e
 
 실행기는 종료 시 자신이 만든 컨테이너와 프로세스만 정확히 정리합니다. 프런트엔드 실행기인 `frontend/scripts/run-e2e.mjs`는 Worker가 이미 준비된 경우에만 직접 사용할 수 있습니다.
 
+CI와 동일한 Playwright 기본 분할은 다음 명령으로 확인합니다. 인자가 없는 기존 명령은 전체 테스트를 실행합니다.
+
+```powershell
+npm.cmd run test:local-e2e -- --shard=1/2
+npm.cmd run test:local-e2e -- --shard=2/2
+```
+
+인자는 `worker/scripts/run-local-e2e.mjs` → `frontend/scripts/run-e2e.mjs` → Playwright로 그대로 전달됩니다. 각 실행은 별도 DB와 서버를 준비하며 필요한 인증 setup도 실행합니다. 같은 로컬 checkout에서는 인증 저장 파일과 보고서 경로를 공유하므로 두 명령을 순차 실행하고, 결과물을 보존하려면 다음 실행 전에 복사합니다.
+
 ## GitHub Actions
 
-`.github/workflows/ci.yml`의 `worker-frontend-e2e` 작업은 다음을 수행합니다.
+`.github/workflows/ci.yml`의 `worker-frontend-e2e-shard` matrix는 Worker 검증 성공 후 두 작업(`1/2`, `2/2`)을 병렬 실행합니다. 각 작업은 독립된 GitHub 러너·checkout·임시 PostgreSQL·Worker·프런트 서버에서 다음을 수행합니다.
 
 - Worker와 프런트엔드 의존성 재설치
 - 프런트엔드 운영 빌드와 정적 자산 결합 Worker 사전 빌드
 - Playwright Chromium 설치
-- 일회용 Worker PostgreSQL 기반 전체 E2E
+- 일회용 Worker PostgreSQL 기반 E2E shard (두 shard를 합쳐 전체 본 테스트 실행)
 
-실패 여부와 관계없이 `worker-playwright-report`와 `worker-e2e-test-results` 결과물을 7일 보관합니다.
+각 shard 내부의 `workers: 1`, `fullyParallel: false`와 기존 테스트 전후 정리를 유지합니다. `fail-fast: false`로 한 shard의 실패가 다른 shard의 진단을 중단하지 않습니다.
+
+실패 여부와 관계없이 `worker-playwright-report-1`, `worker-playwright-report-2`, `worker-e2e-test-results-1`, `worker-e2e-test-results-2` 결과물을 7일 보관합니다.
+
+집계 작업 `worker-frontend-e2e`는 기존 검사 이름 `Frontend E2E against Worker`를 유지합니다. Worker 검증과 두 shard 모두 성공해야 통과하며, 실패·취소·건너뜀은 성공으로 처리하지 않습니다. main의 기존 `production-deploy`는 이 집계 작업의 성공 이후에만 실행합니다.
 
 ## 환경 변수
 
