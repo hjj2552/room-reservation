@@ -54,7 +54,7 @@ export class SessionService {
     );
     const sessionId = createOpaqueToken();
     const csrfToken = createOpaqueToken();
-    const expiresAt = new Date(this.now().getTime() + 8 * 60 * 60 * 1000);
+    const expiresAt = new Date(this.now().getTime() + 12 * 60 * 60 * 1000);
     const record = {
       sessionIdHash: await sha256(sessionId),
       csrfTokenHash: await sha256(csrfToken),

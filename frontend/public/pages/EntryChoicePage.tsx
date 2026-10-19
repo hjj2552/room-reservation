@@ -1,9 +1,9 @@
 import { Link } from 'react-router';
-import { usePublicSettings } from '../../shared/hooks/usePublicReservation';
+import { usePublicSettings } from '../hooks/usePublicReservation';
 
 export function EntryChoicePage() {
   const settings = usePublicSettings();
-  const organizationName = settings.data?.organizationName || '공간 예약';
+  const organizationName = settings.data?.organizationName || '공간 관리 시스템';
 
   return (
     <main className="entry-page">

@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import type { PublicReservationEditDetail, PublicReservationUpdatePayload } from '../../shared/api/types';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
-import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
+import { ReservationPasswordDialog } from '../components/ReservationPasswordDialog';
 import { ReservationTimeRangeInput } from '../../shared/components/ReservationTimeRangeInput';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
@@ -13,10 +13,10 @@ import {
   usePublicRooms,
   useUpdatePublicReservation,
   useVerifyPublicReservationForEdit,
-} from '../../shared/hooks/usePublicReservation';
+} from '../hooks/usePublicReservation';
 import { formatDateTime } from '../../shared/utils/date';
 import { applicantPhoneError } from '../../shared/utils/applicantPhone';
-import type { PublicReservationNavigationState } from '../../shared/utils/publicReservationNavigation';
+import type { PublicReservationNavigationState } from '../utils/publicReservationNavigation';
 import { statusLabels } from '../../shared/utils/labels';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
 import {

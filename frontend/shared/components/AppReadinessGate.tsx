@@ -6,7 +6,7 @@ import {
   isRetryableReadinessError,
   readinessRetryDelay,
 } from '../api/readiness';
-import { publicReservationKeys } from '../hooks/usePublicReservation';
+import { publicReservationKeys } from '../hooks/publicReservationKeys';
 
 const loadingMessage = '데이터를 불러오는 중입니다. 최대 3분 정도 걸릴 수 있습니다.';
 const failureMessage = '데이터를 불러오지 못했습니다. 새로고침하거나 잠시 후 다시 시도해주세요.';
@@ -46,7 +46,7 @@ export function AppReadinessGate({ children }: { children: ReactNode }) {
     const finishReady = (settings: Awaited<ReturnType<typeof fetchReadinessSettings>>) => {
       if (!active || lifecycleController.signal.aborted) return;
       const organizationName = settings.organizationName.trim();
-      document.title = organizationName || '공간 예약 시스템';
+      document.title = organizationName || '공간 관리 시스템';
       queryClient.setQueryData(publicReservationKeys.settings, settings);
       finish('ready');
     };

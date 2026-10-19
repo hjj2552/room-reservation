@@ -1,0 +1,71 @@
+import { Link, useNavigate } from 'react-router';
+import type { ReservationListItem } from '../../shared/api/types';
+import { formatDateTime } from '../../shared/utils/date';
+import { sourceLabels } from '../../shared/utils/labels';
+import { timetableReservationUrl } from '../utils/timetable';
+import { StatusBadge } from '../../shared/components/StatusBadge';
+
+interface ReservationTableProps {
+  reservations: ReservationListItem[];
+}
+
+export function ReservationTable({ reservations }: ReservationTableProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="table-wrap reservations-table-wrap">
+      <table className="data-table reservations-table" data-testid="reservations-table">
+        <caption className="sr-only">예약 목록</caption>
+        <thead>
+          <tr>
+            <th scope="col">예약 시간</th>
+            <th scope="col">공간</th>
+            <th scope="col">상태</th>
+            <th scope="col">신청자</th>
+            <th scope="col">목적</th>
+            <th scope="col">신청 경로</th>
+            <th scope="col">시간표</th>
+          </tr>
+        </thead>
+        <tbody>
+          {reservations.map((reservation) => (
+            <tr
+              key={reservation.id}
+              tabIndex={0}
+              className="clickable-row"
+              onClick={() => navigate(`/admin/reservations/${reservation.id}`)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter') navigate(`/admin/reservations/${reservation.id}`);
+              }}
+            >
+              <td className="reservation-time-cell">
+                <span className="table-cell-stack nowrap-cell">
+                  <strong>{formatDateTime(reservation.startAt)}</strong>
+                  <span className="muted">~ {formatDateTime(reservation.endAt)}</span>
+                </span>
+              </td>
+              <td className="reservation-room-cell table-text-cell"><strong>{reservation.roomName}</strong></td>
+              <td>
+                <StatusBadge status={reservation.status} />
+              </td>
+              <td className="table-text-cell">{reservation.applicantName}</td>
+              <td className="table-text-cell">{reservation.purpose}</td>
+              <td className="nowrap-cell">{sourceLabels[reservation.source]}</td>
+              <td className="nowrap-cell">
+                <Link
+                  className="text-link"
+                  to={timetableReservationUrl({ startAt: reservation.startAt, roomId: reservation.roomId })}
+                  onClick={(event) => event.stopPropagation()}
+                  data-testid="reservation-row-timetable-link"
+                >
+                  시간표에서 보기
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

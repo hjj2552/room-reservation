@@ -23,7 +23,7 @@ test('settings entry waits for a fresh response even with valid cache, and retri
   let release!: () => void;
   await page.clock.setFixedTime(new Date()); // Keep the existing 30-second cache fresh.
   // Exercise the lazy-route race even on a fast local Vite server.
-  await page.route('**/admin/pages/RoomsPage.tsx*', async route => {
+  await page.route('**/admin/pages/AdminRoomsPage.tsx*', async route => {
     const response = await route.fetch();
     await new Promise(resolve => setTimeout(resolve, 250));
     await route.fulfill({ response });

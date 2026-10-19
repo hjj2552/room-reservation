@@ -17,38 +17,38 @@ const PublicReservationDetailPage = lazy(() => import('../public/pages/PublicRes
 const PublicReservationEditPage = lazy(() => import('../public/pages/PublicReservationEditPage').then((module) => ({
   default: module.PublicReservationEditPage,
 })));
-const LoginPage = lazy(() => import('../admin/pages/LoginPage').then((module) => ({
-  default: module.LoginPage,
+const AdminLoginPage = lazy(() => import('../admin/pages/AdminLoginPage').then((module) => ({
+  default: module.AdminLoginPage,
 })));
-const ReservationsPage = lazy(() => import('../admin/pages/ReservationsPage').then((module) => ({
-  default: module.ReservationsPage,
+const AdminReservationsPage = lazy(() => import('../admin/pages/AdminReservationsPage').then((module) => ({
+  default: module.AdminReservationsPage,
 })));
-const TimetablePage = lazy(() => import('../admin/pages/TimetablePage').then((module) => ({
-  default: module.TimetablePage,
+const AdminTimetablePage = lazy(() => import('../admin/pages/AdminTimetablePage').then((module) => ({
+  default: module.AdminTimetablePage,
 })));
-const ReservationDetailPage = lazy(() => import('../admin/pages/ReservationDetailPage').then((module) => ({
-  default: module.ReservationDetailPage,
+const AdminReservationDetailPage = lazy(() => import('../admin/pages/AdminReservationDetailPage').then((module) => ({
+  default: module.AdminReservationDetailPage,
 })));
-const ReservationFormPage = lazy(() => import('../admin/pages/ReservationFormPage').then((module) => ({
-  default: module.ReservationFormPage,
+const AdminReservationFormPage = lazy(() => import('../admin/pages/AdminReservationFormPage').then((module) => ({
+  default: module.AdminReservationFormPage,
 })));
-const RecurrencesPage = lazy(() => import('../admin/pages/RecurrencesPage').then((module) => ({
-  default: module.RecurrencesPage,
+const AdminRecurrencesPage = lazy(() => import('../admin/pages/AdminRecurrencesPage').then((module) => ({
+  default: module.AdminRecurrencesPage,
 })));
-const RecurrenceDetailPage = lazy(() => import('../admin/pages/RecurrenceDetailPage').then((module) => ({
-  default: module.RecurrenceDetailPage,
+const AdminRecurrenceDetailPage = lazy(() => import('../admin/pages/AdminRecurrenceDetailPage').then((module) => ({
+  default: module.AdminRecurrenceDetailPage,
 })));
-const RoomsPage = lazy(() => import('../admin/pages/RoomsPage').then((module) => ({
-  default: module.RoomsPage,
+const AdminRoomsPage = lazy(() => import('../admin/pages/AdminRoomsPage').then((module) => ({
+  default: module.AdminRoomsPage,
 })));
-const SettingsPage = lazy(() => import('../admin/pages/SettingsPage').then((module) => ({
-  default: module.SettingsPage,
+const AdminSettingsPage = lazy(() => import('../admin/pages/AdminSettingsPage').then((module) => ({
+  default: module.AdminSettingsPage,
 })));
-const TagSettingsPage = lazy(() => import('../admin/pages/TagSettingsPage').then((module) => ({
-  default: module.TagSettingsPage,
+const AdminTagSettingsPage = lazy(() => import('../admin/pages/AdminTagSettingsPage').then((module) => ({
+  default: module.AdminTagSettingsPage,
 })));
-const AuditPage = lazy(() => import('../admin/pages/AuditPage').then((module) => ({
-  default: module.AuditPage,
+const AdminAuditPage = lazy(() => import('../admin/pages/AdminAuditPage').then((module) => ({
+  default: module.AdminAuditPage,
 })));
 
 type RouteSurface = 'entry' | 'public' | 'login' | 'admin';
@@ -99,23 +99,23 @@ export const router = createBrowserRouter([
       { path: '/reservations/:reservationId/edit', ...routePage(<PublicReservationEditPage />, 'public') },
     ],
   },
-  { path: '/admin/login', ...routePage(<LoginPage />, 'login') },
+  { path: '/admin/login', ...routePage(<AdminLoginPage />, 'login') },
   {
     element: <ProtectedRoute />,
     children: [
       {
         element: <AdminLayout />,
         children: [
-          { path: '/admin/reservations', ...routePage(<ReservationsPage />, 'admin') },
-          { path: '/admin/timetable', ...routePage(<TimetablePage />, 'admin') },
-          { path: '/admin/reservations/:reservationId', ...routePage(<ReservationDetailPage />, 'admin') },
-          { path: '/admin/reservations/:reservationId/edit', ...routePage(<ReservationFormPage />, 'admin') },
-          { path: '/admin/recurrences', ...routePage(<RecurrencesPage />, 'admin') },
-          { path: '/admin/recurrences/:recurrenceId', ...routePage(<RecurrenceDetailPage />, 'admin') },
-          { path: '/admin/rooms', ...routePage(<RoomsPage />, 'admin') },
-          { path: '/admin/settings', ...routePage(<SettingsPage />, 'admin') },
-          { path: '/admin/settings/tags', ...routePage(<TagSettingsPage />, 'admin') },
-          { path: '/admin/audit', ...routePage(<AuditPage />, 'admin') },
+          { path: '/admin/reservations', ...routePage(<AdminReservationsPage />, 'admin') },
+          { path: '/admin/timetable', ...routePage(<AdminTimetablePage />, 'admin') },
+          { path: '/admin/reservations/:reservationId', ...routePage(<AdminReservationDetailPage />, 'admin') },
+          { path: '/admin/reservations/:reservationId/edit', ...routePage(<AdminReservationFormPage />, 'admin') },
+          { path: '/admin/recurrences', ...routePage(<AdminRecurrencesPage />, 'admin') },
+          { path: '/admin/recurrences/:recurrenceId', ...routePage(<AdminRecurrenceDetailPage />, 'admin') },
+          { path: '/admin/rooms', ...routePage(<AdminRoomsPage />, 'admin') },
+          { path: '/admin/settings', ...routePage(<AdminSettingsPage />, 'admin') },
+          { path: '/admin/settings/tags', ...routePage(<AdminTagSettingsPage />, 'admin') },
+          { path: '/admin/audit', ...routePage(<AdminAuditPage />, 'admin') },
         ],
       },
     ],

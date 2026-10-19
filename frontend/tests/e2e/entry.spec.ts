@@ -52,6 +52,7 @@ test('immediate readiness success shows the entry choices and reuses the setting
   await expect(page.getByTestId('entry-public-link')).toContainText('시간표 확인 및 예약 신청');
   await expect(page.getByTestId('entry-public-link')).not.toContainText('일반 사용자');
   await expect(page.locator('.entry-organization-name')).toHaveText(publicSettings.organizationName);
+  await expect(page).toHaveTitle(publicSettings.organizationName);
   await expect(page.locator('.entry-organization-name')).toHaveCSS('font-size', '34px');
   await expect(page.getByText(loadingMessage)).toHaveCount(0);
   await expect.poll(() => settingsRequests).toBe(1);
@@ -64,6 +65,15 @@ test('immediate readiness success shows the entry choices and reuses the setting
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)).toBe('rgb(248, 248, 245)');
   expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(248, 248, 245)');
+
+  await page.route('**/api/public/settings', (route) => route.fulfill({
+    json: { ...publicSettings, organizationName: '' },
+  }));
+  await page.reload();
+  await expect(page.locator('.entry-organization-name')).toHaveText('공간 관리 시스템');
+  await expect(page).toHaveTitle('공간 관리 시스템');
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', '공간 관리 시스템');
+  await expect(page.getByTestId('entry-public-link')).toContainText('공간 예약');
 });
 
 test('readiness shows the loading message only after 300ms', async ({ page }) => {
@@ -481,11 +491,11 @@ test('root shows public and admin entry choices', async ({ page }) => {
 test('public routes defer admin page modules until an admin route is opened', async ({ page }) => {
   const productionAssets = process.env.E2E_PRODUCTION_ASSETS === 'true';
   const isAdminPageModule = (pathname: string) => productionAssets
-    ? /\/assets\/(?:LoginPage|ReservationsPage|ReservationDetailPage|ReservationFormPage|RecurrencesPage|RecurrenceDetailPage|RoomsPage|SettingsPage|TagSettingsPage|AuditPage)-[^/]+\.js$/.test(pathname)
+    ? /\/assets\/(?:AdminLoginPage|AdminReservationsPage|AdminReservationDetailPage|AdminReservationFormPage|AdminRecurrencesPage|AdminRecurrenceDetailPage|AdminRoomsPage|AdminSettingsPage|AdminTagSettingsPage|AdminAuditPage)-[^/]+\.js$/.test(pathname)
     : pathname.includes('/admin/pages/');
   const isLoginPageModule = (pathname: string) => productionAssets
-    ? /\/assets\/LoginPage-[^/]+\.js$/.test(pathname)
-    : pathname.endsWith('/admin/pages/LoginPage.tsx');
+    ? /\/assets\/AdminLoginPage-[^/]+\.js$/.test(pathname)
+    : pathname.endsWith('/admin/pages/AdminLoginPage.tsx');
   const adminPageRequests: string[] = [];
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname;
@@ -503,7 +513,7 @@ test('public routes defer admin page modules until an admin route is opened', as
   expect(adminPageRequests).toEqual([]);
 
   await page.goto('/admin/login');
-  await expect(page.getByRole('heading', { name: '공간 예약 운영 로그인' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '관리자 로그인' })).toBeVisible();
   expect(adminPageRequests.some(isLoginPageModule)).toBe(true);
 });
 

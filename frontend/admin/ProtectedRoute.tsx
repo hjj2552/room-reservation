@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { LoadingState } from '../shared/components/StateViews';
-import { isUnauthorized, useAdminSession } from '../shared/hooks/useAuth';
+import { isUnauthorized, useAdminSession } from './hooks/useAuth';
 
 export function ProtectedRoute() {
   const location = useLocation();

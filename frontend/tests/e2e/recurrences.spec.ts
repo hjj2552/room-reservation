@@ -1,8 +1,8 @@
 import { expect, test } from './fixtures';
 import type { Page } from '@playwright/test';
-import { listAllTags } from '../../shared/api/tags';
+import { listAllTags } from '../../admin/api/tags';
 import type { Tag } from '../../shared/api/types';
-import { tagKeys } from '../../shared/hooks/useTags';
+import { tagKeys } from '../../admin/hooks/useTags';
 import {
   cancelReservationByApi,
   deleteRecurrenceByApi,
