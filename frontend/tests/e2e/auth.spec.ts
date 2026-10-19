@@ -52,7 +52,7 @@ test('잘못된 자격 증명은 로그인 실패로만 안내한다', async ({ 
 test('비로그인 상태에서 보호 라우트 접근 시 로그인 화면으로 이동한다', async ({ page }) => {
   await page.goto('/admin/rooms');
   await expect(page).toHaveURL(/\/admin\/login/);
-  await expect(page.getByRole('heading', { name: '공간 예약 운영 로그인' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '관리자 로그인' })).toBeVisible();
   await expect(page.getByText('아이디 또는 비밀번호가 잘못되었습니다.')).toHaveCount(0);
 });
 
