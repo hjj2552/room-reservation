@@ -1,5 +1,5 @@
 import { Mail, Phone } from 'lucide-react';
-import { usePublicSettings } from '../shared/hooks/usePublicReservation';
+import { usePublicSettings } from './hooks/usePublicReservation';
 
 function telephoneHref(value: string) {
   return `tel:${value.trim().replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')}`;

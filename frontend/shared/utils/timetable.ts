@@ -8,19 +8,3 @@ export function timetableDateValue(value: string) {
   const part = (type: string) => parts.find((item) => item.type === type)?.value || '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
-
-export function timetableReservationUrl({ startAt, roomId }: { startAt: string; roomId: string }) {
-  const params = new URLSearchParams({
-    view: 'date',
-    date: timetableDateValue(startAt),
-    roomId,
-  });
-  return `/admin/timetable?${params.toString()}`;
-}
-
-export function timetableDuplicateReservationUrl(reservationId: string) {
-  const params = new URLSearchParams({
-    duplicateReservationId: reservationId,
-  });
-  return `/admin/timetable?${params.toString()}`;
-}

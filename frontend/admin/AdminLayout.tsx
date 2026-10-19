@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import { useAdminSession, useLogout } from '../shared/hooks/useAuth';
-import { usePendingReservationCount } from '../shared/hooks/useReservations';
+import { useAdminSession, useLogout } from './hooks/useAuth';
+import { usePendingReservationCount } from './hooks/useReservations';
 import {
   adminListContextForPath,
   adminListContexts,

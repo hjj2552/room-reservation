@@ -1,0 +1,454 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import type { ReservationTimetableFilters, ReservationStatus, RoomOrderItem } from '../../shared/api/types';
+import { ReservationDateTimetable } from '../../shared/components/ReservationDateTimetable';
+import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
+import { hasRoomDescription, RoomInfoModal, type RoomInfoRoom } from '../../shared/components/RoomInfoModal';
+import { EmptyState, ErrorState, LoadingState } from '../../shared/components/StateViews';
+import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
+import {
+  ReservationRequestPanel,
+  duplicateReservationRequestValues,
+  initialReservationRequestValues,
+  type ReservationRequestValues,
+  type TimetableSlotSelection,
+} from '../../shared/components/TimetableQuickAddPanel';
+import { useCreateReservation, useReservation, useTimetableReservations } from '../hooks/useReservations';
+import { useRoomOptions } from '../hooks/useRooms';
+import { useSettings } from '../hooks/useSettings';
+import {
+  fromServiceDateTimeLocal,
+  newRequestSelection,
+  serviceDateInputValue,
+  slotToReservationSelection,
+} from '../../shared/utils/reservationTime';
+import { optionalContact } from '../utils/optionalContact';
+
+const timetableViewModes = ['date', 'room'] as const;
+
+type TimetableViewMode = (typeof timetableViewModes)[number];
+
+function todayInputValue() {
+  return serviceDateInputValue();
+}
+
+function isDateInputValue(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function addDaysInputValue(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfWeekInputValue(value: string) {
+  const base = isDateInputValue(value) ? value : todayInputValue();
+  const date = new Date(`${base}T00:00:00Z`);
+  const day = date.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  date.setUTCDate(date.getUTCDate() + diff);
+  return date.toISOString().slice(0, 10);
+}
+
+function isTimetableViewMode(value: string | null): value is TimetableViewMode {
+  return timetableViewModes.includes(value as TimetableViewMode);
+}
+
+function enabledActiveRooms(rooms: RoomOrderItem[] = []) {
+  return rooms.filter((room) => room.enabled);
+}
+
+function activeRooms(rooms: RoomOrderItem[] = [], selectedRoomId: string) {
+  const active = enabledActiveRooms(rooms);
+  return selectedRoomId ? active.filter((room) => room.id === selectedRoomId) : active;
+}
+
+export function AdminTimetablePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
+  const [quickAddSelection, setQuickAddSelection] = useState<TimetableSlotSelection | null>(null);
+  const [quickAddUnavailableMessage, setQuickAddUnavailableMessage] = useState<string>();
+  const [highlightedReservationId, setHighlightedReservationId] = useState<string | null>(null);
+  const [roomInfoDialog, setRoomInfoDialog] = useState<RoomInfoRoom | null>(null);
+  const duplicateQuickAddAppliedRef = useRef<string | null>(null);
+  const rooms = useRoomOptions();
+  const settings = useSettings();
+  const createReservation = useCreateReservation();
+
+  useEffect(() => {
+    searchParamsRef.current = new URLSearchParams(searchParams);
+  }, [searchParams]);
+
+  const viewMode = isTimetableViewMode(searchParams.get('view')) ? searchParams.get('view') : 'date';
+  const status = (searchParams.get('status') || '') as '' | ReservationStatus;
+  const roomId = searchParams.get('roomId') || '';
+  const selectedDate = searchParams.get('date') || todayInputValue();
+  const selectedWeekStart = startOfWeekInputValue(searchParams.get('weekStart') || todayInputValue());
+  const keyword = searchParams.get('keyword') || '';
+  const duplicateReservationId = searchParams.get('duplicateReservationId') || '';
+  const duplicateReservation = useReservation(duplicateReservationId);
+
+  const dateTimetableFilters = useMemo<ReservationTimetableFilters>(
+    () => ({
+      status,
+      roomId,
+      keyword,
+      excludeCancelled: true,
+      view: 'date',
+      date: selectedDate,
+    }),
+    [status, roomId, keyword, selectedDate],
+  );
+  const dateTimetableReservations = useTimetableReservations(dateTimetableFilters, { enabled: viewMode === 'date' });
+  const dateTimetableRooms = useMemo(() => activeRooms(rooms.data, roomId), [rooms.data, roomId]);
+
+  const roomViewRooms = useMemo(() => enabledActiveRooms(rooms.data), [rooms.data]);
+  const roomViewRoomIdParam = searchParams.get('roomViewRoomId') || '';
+  const selectedRoomViewRoomId = roomViewRooms.some((room) => room.id === roomViewRoomIdParam)
+    ? roomViewRoomIdParam
+    : roomViewRooms[0]?.id || '';
+  const selectedRoomViewRoom = roomViewRooms.find((room) => room.id === selectedRoomViewRoomId);
+
+  useEffect(() => {
+    if (!rooms.isSuccess) return;
+
+    const activeRoomIds = new Set(roomViewRooms.map((room) => room.id));
+    const next = new URLSearchParams(searchParamsRef.current);
+    let changed = false;
+
+    if (roomId && !activeRoomIds.has(roomId)) {
+      next.delete('roomId');
+      changed = true;
+    }
+    if (roomViewRoomIdParam && !activeRoomIds.has(roomViewRoomIdParam)) {
+      if (roomViewRooms[0]) next.set('roomViewRoomId', roomViewRooms[0].id);
+      else next.delete('roomViewRoomId');
+      changed = true;
+    }
+    if (!changed) return;
+
+    searchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  }, [roomId, roomViewRoomIdParam, roomViewRooms, rooms.isSuccess, setSearchParams]);
+
+  const roomTimetableFilters = useMemo<ReservationTimetableFilters>(
+    () => ({
+      status,
+      roomId: selectedRoomViewRoomId,
+      keyword,
+      excludeCancelled: true,
+      view: 'room',
+      date: selectedWeekStart,
+    }),
+    [status, selectedRoomViewRoomId, keyword, selectedWeekStart],
+  );
+  const roomTimetableReservations = useTimetableReservations(roomTimetableFilters, {
+    enabled: viewMode === 'room' && Boolean(selectedRoomViewRoomId),
+  });
+  const duplicateQuickAddInitialValues = useMemo(() => {
+    if (!duplicateReservationId || !quickAddSelection || !duplicateReservation.data) {
+      return undefined;
+    }
+    return duplicateReservationRequestValues(
+      initialReservationRequestValues(quickAddSelection, 'admin'),
+      duplicateReservation.data,
+    );
+  }, [duplicateReservation.data, duplicateReservationId, quickAddSelection]);
+
+  useEffect(() => {
+    if (!highlightedReservationId) return;
+    const timer = window.setTimeout(() => setHighlightedReservationId(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedReservationId]);
+
+  useEffect(() => {
+    if (!duplicateReservationId) {
+      duplicateQuickAddAppliedRef.current = null;
+      return;
+    }
+    if (duplicateQuickAddAppliedRef.current === duplicateReservationId) {
+      return;
+    }
+    if (!settings.data || !duplicateReservation.data) {
+      return;
+    }
+
+    const nextSelection = newRequestSelection(settings.data);
+    setQuickAddSelection(nextSelection.selection);
+    setQuickAddUnavailableMessage(undefined);
+    duplicateQuickAddAppliedRef.current = duplicateReservationId;
+  }, [duplicateReservation.data, duplicateReservationId, settings.data]);
+
+  function updateSearchParams(updater: (next: URLSearchParams) => void) {
+    const next = new URLSearchParams(searchParamsRef.current);
+    updater(next);
+    searchParamsRef.current = next;
+    setSearchParams(new URLSearchParams(next));
+  }
+
+  function setParam(name: string, value: string) {
+    updateSearchParams((next) => {
+      if (value) next.set(name, value);
+      else next.delete(name);
+    });
+  }
+
+  function setViewMode(nextMode: TimetableViewMode) {
+    updateSearchParams((next) => {
+      next.set('view', nextMode);
+      if (nextMode === 'room') {
+        if (!next.get('weekStart')) next.set('weekStart', selectedWeekStart);
+        if (!next.get('roomViewRoomId') && roomViewRooms[0]) next.set('roomViewRoomId', roomViewRooms[0].id);
+      }
+    });
+  }
+
+  function setRoomViewRoomId(nextRoomId: string) {
+    updateSearchParams((next) => {
+      next.set('view', 'room');
+      if (nextRoomId) next.set('roomViewRoomId', nextRoomId);
+      else next.delete('roomViewRoomId');
+    });
+  }
+
+  function setWeekStart(nextDate: string) {
+    updateSearchParams((next) => {
+      next.set('view', 'room');
+      next.set('weekStart', startOfWeekInputValue(nextDate));
+    });
+  }
+
+  function clearDuplicateReservationParam() {
+    updateSearchParams((next) => {
+      next.delete('duplicateReservationId');
+    });
+  }
+
+  function handleEmptySlotClick(slot: { date: string; startMinutes: number; endMinutes: number; roomId: string }) {
+    clearDuplicateReservationParam();
+    setQuickAddUnavailableMessage(undefined);
+    setQuickAddSelection(slotToReservationSelection(slot));
+  }
+
+  function handleNewRequestClick() {
+    clearDuplicateReservationParam();
+    if (!settings.data) return;
+    const nextSelection = newRequestSelection(settings.data);
+    setQuickAddSelection(nextSelection.selection);
+    setQuickAddUnavailableMessage(undefined);
+  }
+
+  function handleQuickAddCreated(reservationId: string) {
+    setHighlightedReservationId(reservationId);
+    setQuickAddSelection(null);
+    setQuickAddUnavailableMessage(undefined);
+    clearDuplicateReservationParam();
+  }
+
+  function handleQuickAddClose() {
+    setQuickAddSelection(null);
+    setQuickAddUnavailableMessage(undefined);
+    clearDuplicateReservationParam();
+  }
+
+  function handleReservationRequest(values: ReservationRequestValues) {
+    createReservation.mutate(
+      {
+        roomId: values.roomId,
+        applicantName: values.applicantName,
+        applicantEmail: optionalContact(values.applicantEmail),
+        applicantPhone: optionalContact(values.applicantPhone),
+        showApplicantName: values.showApplicantName,
+        purpose: values.purpose,
+        startAt: fromServiceDateTimeLocal(values.startAt),
+        endAt: fromServiceDateTimeLocal(values.endAt),
+        status: values.status,
+        memo: values.memo || undefined,
+      },
+      {
+        onSuccess: (created) => handleQuickAddCreated(created.id),
+      },
+    );
+  }
+
+  return (
+    <section className="page-section timetable-page" aria-labelledby="timetable-title">
+      <TimetablePageHeader
+        helperText={timetableCopy.adminHelper}
+        buttonTestId="timetable-new-request-button"
+        buttonDisabled={!settings.data}
+        onNewRequest={handleNewRequestClick}
+      />
+
+      <div className="view-mode-bar" role="tablist" aria-label="시간표 보기 방식">
+        {timetableViewModes.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === mode}
+            className={viewMode === mode ? 'view-mode-tab active' : 'view-mode-tab'}
+            onClick={() => setViewMode(mode)}
+            data-testid={`timetable-view-${mode}`}
+          >
+            {mode === 'date' ? '날짜별' : '공간별'}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === 'date' ? (
+        <section className="panel timetable-panel" aria-labelledby="date-timetable-title">
+          <div className="panel-header">
+            <div>
+              <h2 id="date-timetable-title">{timetableCopy.dateTitle}</h2>
+              <p className="muted">{timetableCopy.dateDescription}</p>
+            </div>
+            <div className="room-week-controls">
+              <label className="compact-room-picker">
+                공간
+                <select
+                  value={roomId}
+                  onChange={(event) => setParam('roomId', event.target.value)}
+                  data-testid="timetable-date-room-select"
+                >
+                  <option value="">전체</option>
+                  {rooms.data?.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="compact-date-picker">
+                날짜
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setParam('date', event.target.value)}
+                  data-testid="timetable-date-input"
+                />
+              </label>
+            </div>
+          </div>
+
+          {rooms.isLoading || settings.isLoading || dateTimetableReservations.isLoading ? <LoadingState /> : null}
+          {rooms.isError ? <ErrorState error={rooms.error} /> : null}
+          {settings.isError ? <ErrorState error={settings.error} /> : null}
+          {dateTimetableReservations.isError ? <ErrorState error={dateTimetableReservations.error} /> : null}
+          {rooms.isSuccess && settings.isSuccess && dateTimetableReservations.isSuccess ? (
+            <ReservationDateTimetable
+              rooms={dateTimetableRooms}
+              reservations={dateTimetableReservations.data}
+              selectedDate={selectedDate}
+              openTime={settings.data.openTime}
+              closeTime={settings.data.closeTime}
+              minReservationMinutes={settings.data.minReservationMinutes}
+              availability={{ ...settings.data, context: 'ADMIN' }}
+              highlightedReservationId={highlightedReservationId}
+              onEmptySlotClick={handleEmptySlotClick}
+              onRoomInfoClick={(room) => setRoomInfoDialog(room)}
+            />
+          ) : null}
+        </section>
+      ) : null}
+
+      {viewMode === 'room' ? (
+        <section className="panel timetable-panel" aria-labelledby="room-timetable-title">
+          <div className="panel-header">
+            <div>
+              <h2 id="room-timetable-title">{timetableCopy.roomTitle}</h2>
+              <p className="muted">{timetableCopy.roomDescription}</p>
+            </div>
+            <div className="room-week-controls">
+              <label className="compact-room-picker">
+                공간
+                <select
+                  value={selectedRoomViewRoomId}
+                  onChange={(event) => setRoomViewRoomId(event.target.value)}
+                  data-testid="timetable-room-select"
+                >
+                  {roomViewRooms.map((room) => (
+                    <option key={room.id} value={room.id}>
+                      {room.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="week-navigation">
+                <button
+                  type="button"
+                  className="secondary-button icon-button"
+                  onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, -7))}
+                  aria-label="이전 주"
+                  data-testid="timetable-prev-week"
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                </button>
+                <label className="compact-date-picker">
+                  주 시작일
+                  <input
+                    type="date"
+                    value={selectedWeekStart}
+                    onChange={(event) => setWeekStart(event.target.value)}
+                    data-testid="timetable-week-input"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary-button icon-button"
+                  onClick={() => setWeekStart(addDaysInputValue(selectedWeekStart, 7))}
+                  aria-label="다음 주"
+                  data-testid="timetable-next-week"
+                >
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {rooms.isLoading || settings.isLoading || roomTimetableReservations.isLoading ? <LoadingState /> : null}
+          {rooms.isError ? <ErrorState error={rooms.error} /> : null}
+          {settings.isError ? <ErrorState error={settings.error} /> : null}
+          {roomTimetableReservations.isError ? <ErrorState error={roomTimetableReservations.error} /> : null}
+          {rooms.data && roomViewRooms.length === 0 ? <EmptyState message="표시할 활성 공간이 없습니다." /> : null}
+          {rooms.isSuccess && settings.isSuccess && selectedRoomViewRoom && roomTimetableReservations.isSuccess ? (
+            <ReservationRoomTimetable
+              room={selectedRoomViewRoom}
+              reservations={roomTimetableReservations.data}
+              weekStart={selectedWeekStart}
+              openTime={settings.data.openTime}
+              closeTime={settings.data.closeTime}
+              minReservationMinutes={settings.data.minReservationMinutes}
+              availability={{ ...settings.data, context: 'ADMIN' }}
+              highlightedReservationId={highlightedReservationId}
+              onEmptySlotClick={handleEmptySlotClick}
+              onRoomInfoClick={hasRoomDescription(selectedRoomViewRoom.description)
+                ? () => setRoomInfoDialog(selectedRoomViewRoom)
+                : undefined}
+            />
+          ) : null}
+        </section>
+      ) : null}
+      {quickAddSelection ? (
+        <ReservationRequestPanel
+          variant="admin"
+          rooms={roomViewRooms}
+          selection={quickAddSelection}
+          openTime={settings.data?.openTime || '09:00'}
+          closeTime={settings.data?.closeTime || '18:00'}
+          minReservationMinutes={settings.data?.minReservationMinutes || 30}
+          maxReservationMinutes={settings.data?.maxReservationMinutes || 240}
+          unavailableMessage={quickAddUnavailableMessage}
+          initialValues={duplicateQuickAddInitialValues}
+          onClose={handleQuickAddClose}
+          onSubmit={handleReservationRequest}
+          submitError={createReservation.error}
+          isPending={createReservation.isPending}
+        />
+      ) : null}
+      <RoomInfoModal room={roomInfoDialog} onClose={() => setRoomInfoDialog(null)} />
+    </section>
+  );
+}

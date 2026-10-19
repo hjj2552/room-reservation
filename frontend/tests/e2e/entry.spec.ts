@@ -491,11 +491,11 @@ test('root shows public and admin entry choices', async ({ page }) => {
 test('public routes defer admin page modules until an admin route is opened', async ({ page }) => {
   const productionAssets = process.env.E2E_PRODUCTION_ASSETS === 'true';
   const isAdminPageModule = (pathname: string) => productionAssets
-    ? /\/assets\/(?:LoginPage|ReservationsPage|ReservationDetailPage|ReservationFormPage|RecurrencesPage|RecurrenceDetailPage|RoomsPage|SettingsPage|TagSettingsPage|AuditPage)-[^/]+\.js$/.test(pathname)
+    ? /\/assets\/(?:AdminLoginPage|AdminReservationsPage|AdminReservationDetailPage|AdminReservationFormPage|AdminRecurrencesPage|AdminRecurrenceDetailPage|AdminRoomsPage|AdminSettingsPage|AdminTagSettingsPage|AdminAuditPage)-[^/]+\.js$/.test(pathname)
     : pathname.includes('/admin/pages/');
   const isLoginPageModule = (pathname: string) => productionAssets
-    ? /\/assets\/LoginPage-[^/]+\.js$/.test(pathname)
-    : pathname.endsWith('/admin/pages/LoginPage.tsx');
+    ? /\/assets\/AdminLoginPage-[^/]+\.js$/.test(pathname)
+    : pathname.endsWith('/admin/pages/AdminLoginPage.tsx');
   const adminPageRequests: string[] = [];
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname;

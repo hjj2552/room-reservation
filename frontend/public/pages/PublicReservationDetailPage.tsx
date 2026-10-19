@@ -4,16 +4,16 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ModalDialog } from '../../shared/components/ModalDialog';
-import { ReservationPasswordDialog } from '../../shared/components/ReservationPasswordDialog';
+import { ReservationPasswordDialog } from '../components/ReservationPasswordDialog';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
   useCancelPublicReservation,
   usePublicReservationDetail,
   useVerifyPublicReservationForEdit,
-} from '../../shared/hooks/usePublicReservation';
+} from '../hooks/usePublicReservation';
 import { maskEmail, maskPhone } from '../../shared/utils/privacyMasking';
-import { PublicReservationToast } from '../../shared/components/PublicReservationToast';
-import { canReturnToPublicTimetable, publicReservationTimetableUrl, type PublicReservationNavigationState } from '../../shared/utils/publicReservationNavigation';
+import { PublicReservationToast } from '../components/PublicReservationToast';
+import { canReturnToPublicTimetable, publicReservationTimetableUrl, type PublicReservationNavigationState } from '../utils/publicReservationNavigation';
 
 type PasswordAction = 'edit' | 'cancel';
 

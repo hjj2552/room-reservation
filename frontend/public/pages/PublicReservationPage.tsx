@@ -2,7 +2,7 @@ import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { getPublicWeeklyReservations } from '../../shared/api/public';
+import { getPublicWeeklyReservations } from '../api/public';
 import type { PublicReservationBlock } from '../../shared/api/types';
 import { ReservationDateTimetable, type TimetableReservation, type TimetableRoom } from '../../shared/components/ReservationDateTimetable';
 import { ReservationRoomTimetable } from '../../shared/components/ReservationRoomTimetable';
@@ -15,16 +15,16 @@ import {
 import { TimetablePageHeader, timetableCopy } from '../../shared/components/TimetablePageHeader';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
 import {
-  publicReservationKeys,
   useCreatePublicReservation,
   usePublicRooms,
   usePublicSettings,
   usePublicWeeklyReservations,
-} from '../../shared/hooks/usePublicReservation';
+} from '../hooks/usePublicReservation';
+import { publicReservationKeys } from '../../shared/hooks/publicReservationKeys';
 import { statusLabels } from '../../shared/utils/labels';
 import { savePublicRequestInput } from '../../shared/utils/publicRequestInput';
-import { publicTimetableReturn } from '../../shared/utils/publicReservationNavigation';
-import { PublicReservationToast } from '../../shared/components/PublicReservationToast';
+import { publicTimetableReturn } from '../utils/publicReservationNavigation';
+import { PublicReservationToast } from '../components/PublicReservationToast';
 import {
   fromServiceDateTimeLocal,
   isPastServiceReservationTime,

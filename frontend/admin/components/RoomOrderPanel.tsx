@@ -24,7 +24,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import { errorMessage } from '../../shared/api/http';
 import type { RoomOrderItem } from '../../shared/api/types';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
-import { useRoomOrder, useSaveRoomOrder } from '../../shared/hooks/useRooms';
+import { useRoomOrder, useSaveRoomOrder } from '../hooks/useRooms';
 
 interface RoomOrderPanelContentProps {
   onClose: () => void;

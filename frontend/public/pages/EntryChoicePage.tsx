@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { usePublicSettings } from '../../shared/hooks/usePublicReservation';
+import { usePublicSettings } from '../hooks/usePublicReservation';
 
 export function EntryChoicePage() {
   const settings = usePublicSettings();
