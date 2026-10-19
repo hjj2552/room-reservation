@@ -88,12 +88,13 @@ E2E가 만든 데이터는 `testing-` 표식을 사용하며 테스트 전후 ID
 
 ## GitHub Actions 검증 범위
 
-`.github/workflows/ci.yml`은 다음 두 검증 작업을 배포 전에 요구합니다.
+`.github/workflows/ci.yml`은 다음 검증 작업과 성공 집계를 배포 전에 요구합니다.
 
 - `worker-validation`: Worker 검사, 단위·계약 테스트, 격리 PostgreSQL 테스트와 의존성 감사
-- `worker-frontend-e2e`: 프런트엔드 빌드, 정적 자산 결합 Worker 사전 빌드와 Worker 기반 전체 Playwright E2E
+- `worker-frontend-e2e-shard`: 독립 러너·DB·서버 2개에서 프런트엔드 빌드, 정적 자산 결합 Worker 사전 빌드와 Playwright E2E 분할 실행
+- `worker-frontend-e2e`: Worker 검증 및 두 E2E shard 성공 집계 (기존 검사 이름 유지)
 
-`main` push의 production 배포는 두 검증 중 Worker E2E 경로가 성공한 뒤에만 실행됩니다.
+`main` push의 production 배포는 Worker 검증과 두 E2E shard의 성공 집계가 통과한 뒤에만 실행됩니다.
 
 ## 트러블슈팅
 
