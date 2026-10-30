@@ -1055,17 +1055,17 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
     expect(csrfResponse.status).toBe(200);
     const csrf = await csrfResponse.json() as { token: string };
     const setCookie = csrfResponse.headers.get("set-cookie") || "";
-    const sessionId = /ROOM-SESSION=([^;,]+)/.exec(setCookie)?.[1];
-    const csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(setCookie)?.[1];
+    let sessionId = /ROOM-SESSION=([^;,]+)/.exec(setCookie)?.[1];
+    let csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(setCookie)?.[1];
     expect(sessionId).toBeTruthy();
-    expect(csrfCookie).toBe(csrf.token);
+    expect(csrfCookie === csrf.token).toBe(true);
     expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
     expect(setCookie.match(/Expires=[^;]+/g)).toEqual([
       `Expires=${expectedExpiry.toUTCString()}`,
       `Expires=${expectedExpiry.toUTCString()}`,
     ]);
-    const cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
-    const writeHeaders = { "content-type": "application/json", "cookie": cookie, "X-XSRF-TOKEN": csrf.token };
+    let cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
+    let writeHeaders = { "content-type": "application/json", "cookie": cookie, "X-XSRF-TOKEN": csrf.token };
 
     expect((await app.request("http://worker.test/api/auth/admin/login", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -1076,11 +1076,16 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
       method: "POST", headers: writeHeaders, body: JSON.stringify({ username: "admin", password: "admin1234" }),
     });
     expect(loginResponse.status).toBe(200);
-    expect(loginResponse.headers.get("set-cookie")).toContain("ROOM-SESSION=");
+    expect(loginResponse.headers.get("set-cookie")?.includes("ROOM-SESSION=")).toBe(true);
     expect(loginResponse.headers.get("set-cookie")?.match(/Expires=[^;]+/g)).toEqual([
       `Expires=${expectedExpiry.toUTCString()}`,
       `Expires=${expectedExpiry.toUTCString()}`,
     ]);
+    expect(await timedSessions.find(sessionId)).toBeNull();
+    sessionId = /ROOM-SESSION=([^;,]+)/.exec(loginResponse.headers.get("set-cookie") || "")?.[1];
+    csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(loginResponse.headers.get("set-cookie") || "")?.[1];
+    cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
+    writeHeaders = { "content-type": "application/json", cookie, "X-XSRF-TOKEN": csrfCookie! };
     expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(200);
 
@@ -1231,7 +1236,13 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
     method: "POST", headers: writeHeaders, body: JSON.stringify({ username: "admin", password: "admin1234" }),
   });
   expect(login.status).toBe(200);
-  return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
+  const authenticatedCookies = login.headers.get("set-cookie") || "";
+  const authenticatedId = /ROOM-SESSION=([^;,]+)/.exec(authenticatedCookies)?.[1];
+  const authenticatedCsrf = /XSRF-TOKEN=([^;,]+)/.exec(authenticatedCookies)?.[1];
+  if (!authenticatedId || !authenticatedCsrf) throw new Error("Authenticated cookies were not issued");
+  const authenticatedCookie = `ROOM-SESSION=${authenticatedId}; XSRF-TOKEN=${authenticatedCsrf}`;
+  return { app, cookie: authenticatedCookie, csrf: authenticatedCsrf,
+    writeHeaders: { ...writeHeaders, cookie: authenticatedCookie, "X-XSRF-TOKEN": authenticatedCsrf }, csrfResponse, login };
 }
 
 describe("applicant phone normalization HTTP contract", () => {
@@ -3278,14 +3289,14 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     const issuedCookies = csrfResponse.headers.get("set-cookie") || "";
     const loginCookies = login.headers.get("set-cookie") || "";
     for (const cookies of [issuedCookies, loginCookies]) {
-      expect(cookies).toContain("Secure");
-      expect(cookies).toContain("SameSite=Lax");
-      expect(cookies).toContain("Path=/");
+      expect(cookies.includes("Secure")).toBe(true);
+      expect(cookies.includes("SameSite=Lax")).toBe(true);
+      expect(cookies.includes("Path=/")).toBe(true);
     }
     const sessionSegment = issuedCookies.slice(issuedCookies.indexOf("ROOM-SESSION="), issuedCookies.indexOf("XSRF-TOKEN="));
     const csrfSegment = issuedCookies.slice(issuedCookies.indexOf("XSRF-TOKEN="));
-    expect(sessionSegment).toContain("HttpOnly");
-    expect(csrfSegment).not.toContain("HttpOnly");
+    expect(sessionSegment.includes("HttpOnly")).toBe(true);
+    expect(csrfSegment.includes("HttpOnly")).toBe(false);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: { "content-type": "application/json", cookie } })).status).toBe(403);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: writeHeaders })).status).toBe(204);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);

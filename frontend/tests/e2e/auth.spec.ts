@@ -88,8 +88,15 @@ test('직접 관리자 로그인 후 기본 예약 목록에 진입할 수 있�
   await expect(page.getByRole('link', { name: '예약 목록' })).toBeVisible();
 });
 
-test('관리자 로그아웃 후 로그인 화면으로 이동한다', async ({ page }) => {
+test('로그인 직후 설정 저장과 로그아웃·재로그인이 정상 동작한다', async ({ page }) => {
   await loginByUi(page);
+  await page.goto('/admin/settings');
+  await expect(page.getByTestId('settings-form')).toBeVisible();
+  const saved = page.waitForResponse(response => response.url().endsWith('/api/admin/settings')
+    && response.request().method() === 'PUT');
+  await page.getByTestId('settings-save-button').click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('status')).toBeVisible();
   await page.goto('/admin/timetable?view=date&date=2026-09-15');
   await expect(page.getByTestId('timetable-date-input')).toHaveValue('2026-09-15');
   const contextKeys = [

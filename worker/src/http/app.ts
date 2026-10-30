@@ -235,6 +235,10 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
     if (existingSession && existingToken && existingSession.csrfTokenHash === await sha256(existingToken)) {
       return context.json({ headerName: CSRF_HEADER, parameterName: "_csrf", token: existingToken });
     }
+    // A stale session request must not overwrite cookies from a completed login.
+    if (getCookie(context, SESSION_COOKIE)) {
+      throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+    }
     const issued = await dependencies.sessions.issue();
     setSessionCookies(context, config, issued.sessionId, issued.csrfToken, issued.record.expiresAt);
     return context.json({ headerName: CSRF_HEADER, parameterName: "_csrf", token: issued.csrfToken });
@@ -253,11 +257,9 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
     if (!usernameMatches || !passwordMatches) throw new HttpError(401, "ADMIN_UNAUTHORIZED", "Admin login is required.");
     const session = context.get("session");
     if (!session) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
-    await dependencies.sessions.authenticate(session, dependencies.adminUsername);
-    const sessionId = getCookie(context, SESSION_COOKIE);
-    const csrfToken = getCookie(context, CSRF_COOKIE);
-    if (!sessionId || !csrfToken) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
-    setSessionCookies(context, config, sessionId, csrfToken, session.expiresAt);
+    const authenticated = await dependencies.sessions.authenticate(session, dependencies.adminUsername);
+    if (!authenticated) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+    setSessionCookies(context, config, authenticated.sessionId, authenticated.csrfToken, authenticated.record.expiresAt);
     return context.json({ id: dependencies.adminUsername, username: dependencies.adminUsername, role: "OPERATOR" });
   });
 
@@ -267,9 +269,10 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
   });
 
   app.post("/api/auth/admin/logout", adminGuard(), async (context) => {
-    await dependencies.sessions.delete(context.get("session"));
-    deleteCookie(context, SESSION_COOKIE, { path: "/", secure: config.secureCookies });
-    deleteCookie(context, CSRF_COOKIE, { path: "/", secure: config.secureCookies });
+    if (await dependencies.sessions.delete(context.get("session"))) {
+      deleteCookie(context, SESSION_COOKIE, { path: "/", secure: config.secureCookies });
+      deleteCookie(context, CSRF_COOKIE, { path: "/", secure: config.secureCookies });
+    }
     return context.body(null, 204);
   });
 

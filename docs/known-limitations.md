@@ -74,6 +74,8 @@ Worker는 `ADMIN_USERNAME`, `ADMIN_PASSWORD`가 없으면 요청 처리를 거�
 
 관리자 인증은 서버 세션 쿠키를 사용합니다. 상태 변경 요청은 공개 예약 등록·수정·취소를 포함해 CSRF 검증을 거치며, SPA는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 전송합니다.
 
+로그인 성공 시 세션 ID와 CSRF 토큰을 교체하고 이전 세션을 같은 트랜잭션에서 폐기합니다. 새 세션은 이전 만료 시각을 그대로 사용하며 로그인이나 사용 중 만료 시간을 연장하지 않습니다. 폐기되거나 불일치한 세션 쿠키가 남아 있는 CSRF 조회는 새 쿠키를 발급하지 않고 `403`을 반환합니다. 정상 만료 시 브라우저가 쿠키를 제거하면 기존처럼 새 익명 세션을 발급하며, 비정상적으로 남은 쿠키는 해당 사이트의 쿠키를 지운 뒤 다시 진입해야 합니다.
+
 모든 API 요청에는 Cloudflare location-local INGRESS 제한이 적용되고, 비로그인 요청에는 READ/WRITE 제한이 추가로 적용됩니다. 이 제한은 abuse mitigation이며 전역 정밀 집계를 보장하지 않습니다. 로컬 adapter와 unit/E2E test는 외부 namespace를 호출하지 않습니다.
 
 세션 쿠키는 `SameSite=Lax`, `HttpOnly=true`를 사용합니다. UAT/production에서는 `Secure=true`이고 local/test의 HTTP 실행에서는 `Secure=false`입니다.

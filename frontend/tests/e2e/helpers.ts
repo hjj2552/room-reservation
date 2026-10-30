@@ -160,7 +160,8 @@ export async function loginByUi(page: Page) {
 
 export async function loginByApi(request: APIRequestContext) {
   const response = await request.post('/api/auth/admin/login', {
-    headers: await csrfHeaders(request),
+    // Do not revoke the setup session copied into other browser/request contexts.
+    headers: await csrfHeaders(request, true),
     data: adminCredentials,
   });
   await expectApiOk(response, 'admin login');
@@ -444,8 +445,8 @@ export async function updateSettingsByApi(request: APIRequestContext, settings: 
   return response.json() as Promise<E2eSettings>;
 }
 
-export async function csrfHeaders(request: APIRequestContext) {
-  const response = await request.get('/api/auth/csrf');
+export async function csrfHeaders(request: APIRequestContext, freshSession = false) {
+  const response = await request.get('/api/auth/csrf', freshSession ? { headers: { Cookie: '' } } : undefined);
   await expectApiOk(response, 'get csrf token');
   const csrf = await response.json() as { headerName?: string; token?: string };
   const token = csrf.token || '';
