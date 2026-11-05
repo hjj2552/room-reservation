@@ -276,10 +276,16 @@ export class ProductService {
     if (!query.includeDeleted) conditions.push("deleted_at IS NULL");
     if (query.enabled !== undefined) add("enabled = ?", query.enabled);
     if (query.keyword) {
-      const pattern = `%${query.keyword}%`;
-      values.push(pattern, pattern, pattern);
-      const base = values.length - 2;
-      conditions.push(`(lower(name) LIKE $${base} OR lower(coalesce(location, '')) LIKE $${base + 1} OR lower(coalesce(description, '')) LIKE $${base + 2})`);
+      values.push(`%${query.keyword}%`);
+      const pattern = `$${values.length}`;
+      const fields = {
+        name: `lower(name) LIKE ${pattern}`,
+        location: `lower(coalesce(location, '')) LIKE ${pattern}`,
+        description: `lower(coalesce(description, '')) LIKE ${pattern}`,
+      };
+      const selected = query.searchField && query.searchField !== "all"
+        ? [fields[query.searchField]] : Object.values(fields);
+      conditions.push(`(${selected.join(" OR ")})`);
     }
     const where = conditions.join(" AND ");
     const count = await this.database.query(`SELECT count(*) AS total FROM rooms WHERE ${where}`, values);
@@ -955,22 +961,25 @@ export class ProductService {
       add("r.source = ?::reservation_source", query.source);
     }
     if (query.keyword) {
-      values.push(`%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`, `%${query.keyword}%`);
-      const base = values.length - 3;
-      const keywordConditions = [
-        `lower(r.applicant_name) LIKE $${base}`,
-        `lower(coalesce(r.applicant_email,'')) LIKE $${base + 1}`,
-        `lower(r.purpose) LIKE $${base + 2}`,
-        `EXISTS (
+      const pattern = `$${values.length + 1}`;
+      if (query.searchField !== "applicantPhone") values.push(`%${query.keyword}%`);
+      const fields = {
+        applicantName: `lower(r.applicant_name) LIKE ${pattern}`,
+        applicantEmail: `lower(coalesce(r.applicant_email,'')) LIKE ${pattern}`,
+        purpose: `lower(r.purpose) LIKE ${pattern}`,
+        memo: `EXISTS (
           SELECT 1 FROM reservation_histories h
-          WHERE h.reservation_id = r.id AND lower(coalesce(h.memo,'')) LIKE $${base + 3}
+          WHERE h.reservation_id = r.id AND lower(coalesce(h.memo,'')) LIKE ${pattern}
         )`,
-      ];
-      if (query.phoneKeyword) {
+        applicantPhone: "FALSE",
+      };
+      if (query.phoneKeyword && (!query.searchField || query.searchField === "all" || query.searchField === "applicantPhone")) {
         values.push(`%${query.phoneKeyword}%`);
-        keywordConditions.push(`coalesce(r.applicant_phone,'') LIKE $${values.length}`);
+        fields.applicantPhone = `coalesce(r.applicant_phone,'') LIKE $${values.length}`;
       }
-      conditions.push(`(${keywordConditions.join(" OR ")})`);
+      const selected = query.searchField && query.searchField !== "all"
+        ? [fields[query.searchField]] : Object.values(fields);
+      conditions.push(`(${selected.join(" OR ")})`);
     }
     return { where: conditions.length ? `WHERE ${conditions.join(" AND ")}` : "", values };
   }
@@ -1188,29 +1197,40 @@ export class ProductService {
     if (query.from) add("created_at>=?::timestamptz", query.from);
     if (query.to) add("created_at<=?::timestamptz", query.to);
     if (query.keyword) {
-      values.push(`%${query.keyword}%`);
-      const pattern = `$${values.length}`;
-      const keywordConditions = [
-        `lower(coalesce(reservation_room_name,'')) LIKE ${pattern}`,
-        `lower(coalesce(before_reservation_room_name,'')) LIKE ${pattern}`,
-        `lower(coalesce(reservation_applicant_name,'')) LIKE ${pattern}`,
-        `lower(coalesce(before_reservation_applicant_name,'')) LIKE ${pattern}`,
-        `lower(coalesce(reservation_applicant_email,'')) LIKE ${pattern}`,
-        `lower(coalesce(before_reservation_applicant_email,'')) LIKE ${pattern}`,
-        `lower(coalesce(reservation_purpose,'')) LIKE ${pattern}`,
-        `lower(coalesce(before_reservation_purpose,'')) LIKE ${pattern}`,
-        `lower(coalesce(actor_id,'')) LIKE ${pattern}`,
-        `lower(coalesce(memo,'')) LIKE ${pattern}`,
-      ];
-      if (query.phoneKeyword) {
+      const pattern = `$${values.length + 1}`;
+      if (query.searchField !== "applicantPhone") values.push(`%${query.keyword}%`);
+      const fields = {
+        roomName: [
+          `lower(coalesce(reservation_room_name,'')) LIKE ${pattern}`,
+          `lower(coalesce(before_reservation_room_name,'')) LIKE ${pattern}`,
+        ],
+        applicantName: [
+          `lower(coalesce(reservation_applicant_name,'')) LIKE ${pattern}`,
+          `lower(coalesce(before_reservation_applicant_name,'')) LIKE ${pattern}`,
+        ],
+        applicantEmail: [
+          `lower(coalesce(reservation_applicant_email,'')) LIKE ${pattern}`,
+          `lower(coalesce(before_reservation_applicant_email,'')) LIKE ${pattern}`,
+        ],
+        purpose: [
+          `lower(coalesce(reservation_purpose,'')) LIKE ${pattern}`,
+          `lower(coalesce(before_reservation_purpose,'')) LIKE ${pattern}`,
+        ],
+        actor: [`lower(coalesce(actor_id,'')) LIKE ${pattern}`],
+        memo: [`lower(coalesce(memo,'')) LIKE ${pattern}`],
+        applicantPhone: ["FALSE"],
+      };
+      if (query.phoneKeyword && (!query.searchField || query.searchField === "all" || query.searchField === "applicantPhone")) {
         values.push(`%${query.phoneKeyword}%`);
         const phonePattern = `$${values.length}`;
-        keywordConditions.push(
+        fields.applicantPhone = [
           `coalesce(reservation_applicant_phone,'') LIKE ${phonePattern}`,
           `coalesce(before_reservation_applicant_phone,'') LIKE ${phonePattern}`,
-        );
+        ];
       }
-      conditions.push(`(${keywordConditions.join(" OR ")})`);
+      const selected = query.searchField && query.searchField !== "all"
+        ? fields[query.searchField] : Object.values(fields).flat();
+      conditions.push(`(${selected.join(" OR ")})`);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const count = await this.database.query(`SELECT count(*) AS total FROM reservation_histories ${where}`, values);
@@ -1437,8 +1457,16 @@ export class ProductService {
     if (query.toDate) add("rr.start_date<=?::date", query.toDate);
     if (query.keyword) {
       values.push(`%${query.keyword}%`);
-      const parameter = values.length;
-      conditions.push(`(lower(rr.purpose) LIKE $${parameter} OR lower(rr.applicant_name) LIKE $${parameter} OR lower(rm.name) LIKE $${parameter} OR lower(coalesce(t.name,'')) LIKE $${parameter})`);
+      const pattern = `$${values.length}`;
+      const fields = {
+        purpose: `lower(rr.purpose) LIKE ${pattern}`,
+        applicantName: `lower(rr.applicant_name) LIKE ${pattern}`,
+        roomName: `lower(rm.name) LIKE ${pattern}`,
+        tagName: `lower(coalesce(t.name,'')) LIKE ${pattern}`,
+      };
+      const selected = query.searchField && query.searchField !== "all"
+        ? [fields[query.searchField]] : Object.values(fields);
+      conditions.push(`(${selected.join(" OR ")})`);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const recurrenceFrom = "FROM reservation_recurrences rr JOIN rooms rm ON rm.id=rr.room_id LEFT JOIN tags t ON t.id=rr.tag_id";

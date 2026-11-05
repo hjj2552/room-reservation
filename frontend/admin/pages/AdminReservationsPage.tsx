@@ -1,3 +1,5 @@
+import { SearchFields } from '../components/SearchFields';
+import { reservationSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -24,6 +26,7 @@ interface ReservationFilterDraft {
   fromDate: string;
   toDate: string;
   keyword: string;
+  searchField: typeof reservationSearchOptions[number]['value'];
 }
 
 function filterDraftFromParams(searchParams: URLSearchParams): ReservationFilterDraft {
@@ -33,6 +36,7 @@ function filterDraftFromParams(searchParams: URLSearchParams): ReservationFilter
     fromDate: searchParams.get('fromDate') || '',
     toDate: searchParams.get('toDate') || '',
     keyword: searchParams.get('keyword') || '',
+    searchField: normalizeSearchField(searchParams.get('searchField'), reservationSearchOptions),
   };
 }
 
@@ -41,6 +45,7 @@ function sameFilterDraft(first: ReservationFilterDraft, second: ReservationFilte
     && first.roomId === second.roomId
     && first.fromDate === second.fromDate
     && first.toDate === second.toDate
+    && first.searchField === second.searchField
     && first.keyword === second.keyword;
 }
 
@@ -66,7 +71,7 @@ export function AdminReservationsPage() {
     }
   }, [appliedFilters]);
 
-  const { status, roomId, fromDate, toDate, keyword } = appliedFilters;
+  const { status, roomId, fromDate, toDate, keyword, searchField } = appliedFilters;
   const pageParam = searchParams.get('page');
   const page = parsePageParam(pageParam);
 
@@ -75,12 +80,13 @@ export function AdminReservationsPage() {
       status,
       roomId,
       keyword,
+      searchField,
       from: toServiceStartOfDayOffset(fromDate),
       to: toServiceEndOfDayOffset(toDate),
       page,
       size: pageSize,
     }),
-    [status, roomId, keyword, fromDate, toDate, page],
+    [status, roomId, keyword, fromDate, toDate, page, searchField],
   );
   const reservations = useReservations(filters, { keepPreviousData: true });
 
@@ -149,7 +155,7 @@ export function AdminReservationsPage() {
         </div>
       </div>
 
-      <form className="filter-bar" onSubmit={filterSubmission.handleSubmit}>
+      <form className="filter-bar search-filter-bar" onSubmit={filterSubmission.handleSubmit}>
         <label>
           상태
           <select
@@ -201,17 +207,16 @@ export function AdminReservationsPage() {
             onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
           />
         </label>
-        <label>
-          검색어
-          <input
-            data-testid="reservation-keyword-filter"
-            type="search"
-            placeholder="이름, 연락처, 목적, 메모"
-            value={draftFilters.keyword}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
-            {...filterSubmission.searchInputProps}
-          />
-        </label>
+        <SearchFields
+          options={reservationSearchOptions}
+          searchField={draftFilters.searchField}
+          keyword={draftFilters.keyword}
+          onFieldChange={(searchField) => setDraftFilters((current) => ({ ...current, searchField }))}
+          onKeywordChange={(keyword) => setDraftFilters((current) => ({ ...current, keyword }))}
+          inputTestId="reservation-keyword-filter"
+          allPlaceholder="이름, 연락처, 목적, 메모"
+          inputProps={filterSubmission.searchInputProps}
+        />
         <button type="submit" className="secondary-button" data-testid="reservation-search-button">
           조회
         </button>

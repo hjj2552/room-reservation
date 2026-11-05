@@ -1,6 +1,7 @@
 import { apiRequest, buildQuery } from '../../shared/api/http';
 import type {
   AdminRoom,
+  RoomSearchField,
   PagedResponse,
   RoomDeletionCheck,
   RoomOrderPayload,
@@ -9,6 +10,7 @@ import type {
 } from '../../shared/api/types';
 
 export interface RoomListFilters {
+  searchField?: RoomSearchField;
   enabled?: boolean;
   includeDeleted?: boolean;
   keyword?: string;
@@ -22,6 +24,7 @@ export function listRooms(filters: RoomListFilters = { enabled: true, includeDel
       enabled: filters.enabled,
       includeDeleted: filters.includeDeleted ?? false,
       keyword: filters.keyword,
+      searchField: filters.searchField,
       page: filters.page ?? 0,
       size: filters.size ?? 100,
     })}`,

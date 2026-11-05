@@ -1,3 +1,5 @@
+import { SearchFields } from '../components/SearchFields';
+import { roomSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { errorMessage } from '../../shared/api/http';
@@ -41,6 +43,9 @@ const RoomOrderPanelContent = lazy(() => import('../components/RoomOrderPanel').
 export function AdminRoomsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const appliedKeyword = searchParams.get('keyword') || '';
+  const appliedSearchField = normalizeSearchField(searchParams.get('searchField'), roomSearchOptions);
+  const [searchField, setSearchField] = useState(appliedSearchField);
+  const previousAppliedSearchFieldRef = useRef(appliedSearchField);
   const pageParam = searchParams.get('page');
   const page = parsePageParam(pageParam);
   const [keyword, setKeyword] = useState(appliedKeyword);
@@ -54,6 +59,7 @@ export function AdminRoomsPage() {
   const rooms = useRooms({
     includeDeleted: false,
     keyword: appliedKeyword,
+    searchField: appliedSearchField,
     page,
     size: pageSize,
   });
@@ -65,11 +71,14 @@ export function AdminRoomsPage() {
 
   useEffect(() => {
     const previousAppliedKeyword = previousAppliedKeywordRef.current;
+    const previousAppliedSearchField = previousAppliedSearchFieldRef.current;
+    previousAppliedSearchFieldRef.current = appliedSearchField;
     previousAppliedKeywordRef.current = appliedKeyword;
-    setKeyword((currentKeyword) => (
-      currentKeyword === previousAppliedKeyword ? appliedKeyword : currentKeyword
-    ));
-  }, [appliedKeyword]);
+    if (previousAppliedKeyword !== appliedKeyword || previousAppliedSearchField !== appliedSearchField) {
+      setKeyword(appliedKeyword);
+      setSearchField(appliedSearchField);
+    }
+  }, [appliedKeyword, appliedSearchField]);
 
   useEffect(() => {
     const invalidPage = pageParam !== null && pageParam !== String(page);
@@ -141,11 +150,12 @@ export function AdminRoomsPage() {
     updateRoom.reset();
   }
 
-  function applySearch(nextKeyword: string) {
+  function applySearch(nextKeyword: string, nextSearchField = searchField) {
     const next = new URLSearchParams(searchParams);
     const normalized = nextKeyword.trim();
     if (normalized) next.set('keyword', normalized);
     else next.delete('keyword');
+    next.set('searchField', nextSearchField);
     next.set('page', '0');
     setSearchParams(next);
   }
@@ -237,16 +247,15 @@ export function AdminRoomsPage() {
               applySearch(keyword);
             }}
           >
-            <label>
-              검색어
-              <input
-                data-testid="room-keyword-input"
-                type="search"
-                value={keyword}
-                placeholder="공간명 또는 위치"
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-            </label>
+            <SearchFields
+              options={roomSearchOptions}
+              searchField={searchField}
+              keyword={keyword}
+              onFieldChange={setSearchField}
+              onKeywordChange={setKeyword}
+              inputTestId="room-keyword-input"
+              allPlaceholder="공간명, 위치, 설명"
+            />
             <button type="submit" className="secondary-button" data-testid="room-search-button">조회</button>
             <button
               type="button"
@@ -254,7 +263,8 @@ export function AdminRoomsPage() {
               data-testid="room-search-reset"
               onClick={() => {
                 setKeyword('');
-                applySearch('');
+                setSearchField('all');
+                applySearch('', 'all');
               }}
             >
               초기화

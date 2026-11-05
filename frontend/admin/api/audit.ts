@@ -1,7 +1,8 @@
 import { apiRequest, buildQuery } from '../../shared/api/http';
-import type { PagedResponse, ReservationHistory } from '../../shared/api/types';
+import type { AuditSearchField, PagedResponse, ReservationHistory } from '../../shared/api/types';
 
 export interface AuditFilters {
+  searchField?: AuditSearchField;
   reservationId?: string;
   roomId?: string;
   action?: string;
@@ -21,6 +22,7 @@ export function listReservationHistories(filters: AuditFilters = {}) {
       from: filters.from,
       to: filters.to,
       keyword: filters.keyword,
+      searchField: filters.searchField,
       page: filters.page ?? 0,
       size: filters.size ?? 20,
     })}`,

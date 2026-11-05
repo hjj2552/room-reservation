@@ -7,6 +7,7 @@ import {
   parsePublicReservation,
   parseRecurrenceCreate,
   parseRecurrencePreview,
+  parseRecurrenceList,
   parseReservationFilter,
   parseReservationList,
   parseReservationTimetable,
@@ -17,6 +18,27 @@ import {
 } from "../../src/http/product-input";
 
 const ROOM_ID = "11111111-1111-4111-8111-111111111111";
+
+describe("search field validation", () => {
+  const cases = [
+    { parse: parseRoomList, fields: ["name", "location", "description"], unsupported: "purpose" },
+    { parse: parseReservationList, fields: ["purpose", "applicantName", "applicantEmail", "applicantPhone", "memo"], unsupported: "roomName" },
+    { parse: parseHistoryList, fields: ["purpose", "applicantName", "applicantEmail", "applicantPhone", "roomName", "actor", "memo"], unsupported: "tagName" },
+    { parse: parseRecurrenceList, fields: ["purpose", "applicantName", "roomName", "tagName"], unsupported: "applicantEmail" },
+  ];
+  for (const { parse, fields, unsupported } of cases) {
+    it(`validates fields for ${parse.name} even with an empty keyword`, () => {
+      expect(parse(new URLSearchParams()).searchField).toBeUndefined();
+      for (const searchField of ["all", ...fields]) {
+        expect(parse(new URLSearchParams({ searchField, keyword: "   " }))).toMatchObject({ searchField, keyword: undefined });
+      }
+      for (const searchField of [unsupported, "ALL", "purpose) OR TRUE --"]) {
+        expect(() => parse(new URLSearchParams({ searchField })))
+          .toThrowError(expect.objectContaining({ code: "VALIDATION_ERROR" }));
+      }
+    });
+  }
+});
 
 function publicBody(overrides: Record<string, unknown> = {}) {
   return {

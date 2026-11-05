@@ -13,6 +13,7 @@ import {
   parseRecurrenceCreate,
   parseRecurrenceList,
   parseReservationFilter,
+  parseRoomList,
   parseTagList,
   parseUpdateSettings,
 } from "../../src/http/product-input";
@@ -1652,7 +1653,28 @@ describe("audit history search contract", () => {
 
     for (const keyword of ["0101234", "010-1234", "010 9876"]) {
       expect(await historyIds({ keyword, action: "UPDATED" })).toEqual([updatedHistoryId]);
+      expect(await historyIds({ keyword, action: "UPDATED", searchField: "applicantPhone" })).toEqual([updatedHistoryId]);
     }
+
+    for (const [searchField, keywords] of [
+      ["roomName", ["testing-audit-before-room", "testing-audit-after-room"]],
+      ["applicantName", ["testing-audit-before-applicant", "testing-audit-after-applicant"]],
+      ["applicantEmail", ["TESTING-AUDIT-BEFORE@EXAMPLE.TEST", "testing-audit-after@example.test"]],
+      ["purpose", ["testing-audit-before-purpose", "testing-audit-after-purpose"]],
+      ["actor", ["TESTING-ADMIN-ACTOR"]],
+      ["memo", ["testing-audit-processing-memo"]],
+    ] as const) {
+      for (const keyword of keywords) {
+        const params = { keyword, action: "UPDATED", roomId: beforeRoomId };
+        expect(await historyIds({ ...params, searchField })).toEqual([updatedHistoryId]);
+        expect(await historyIds({ ...params, searchField: "all" })).toEqual(await historyIds(params));
+        expect(await historyIds({ ...params, searchField: searchField === "purpose" ? "applicantName" : "purpose" })).toEqual([]);
+      }
+    }
+    expect(await historyIds({ reservationId, searchField: "applicantPhone", keyword: "not-a-phone" })).toEqual([]);
+    expect(await historyIds({ reservationId, searchField: "applicantPhone", keyword: " " }))
+      .toEqual(await historyIds({ reservationId }));
+    expect(await historyIds({ reservationId: deletedReservationId, searchField: "purpose", keyword: "testing-audit-deleted-purpose" })).toHaveLength(1);
 
     expect(await historyIds({ keyword: publicInput.applicantEmail, action: "CREATED" })).toEqual([publicHistoryId]);
     expect(await historyIds({ keyword: "PUBLIC_USER" })).toEqual([]);
@@ -3466,6 +3488,108 @@ describe("admin timetable range query", () => {
     })).status).toBe(401);
     for (const query of ['view=room&date=2026-07-13', 'view=date', 'view=date&date=2026-02-30', 'view=all&date=2026-07-13']) {
       expect((await app.request(`${path}?${query}`, { headers: { cookie } })).status).toBe(400);
+    }
+  });
+});
+
+describe("field-selected searches", () => {
+  it("isolates reservation fields with the same keyword and shares filters with counts and CSV", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-search-fields");
+    const fields = ["purpose", "applicantName", "applicantEmail", "applicantPhone", "memo"] as const;
+    const ids: string[] = [];
+    for (const [index, field] of fields.entries()) {
+      const id = await insertReservation({
+        roomId, purpose: field === "purpose" ? "testing-0101234-purpose" : "testing-reservation-field",
+        applicantName: field === "applicantName" ? "testing-0101234-name" : "testing-applicant",
+        applicantEmail: field === "applicantEmail" ? "testing-0101234@example.test" : "testing@example.test",
+        applicantPhone: field === "applicantPhone" ? "01012345678" : "01099999999", hour: 10 + index,
+      });
+      ids.push(id);
+      if (field === "memo") await insertReservationHistory(id, "testing-0101234-memo");
+    }
+    const read = (params: Record<string, string>) => products.listReservations({
+      ...parseReservationFilter(new URLSearchParams(params)), page: 0, size: 2, offset: 0,
+    });
+    const base = { roomId, keyword: "0101234", status: "CONFIRMED", from: futureWeekday(55, 9), to: futureWeekday(55, 18) };
+    expect(await read({ ...base, searchField: "all" })).toEqual(await read(base));
+    expect((await read(base)).totalItems).toBe(5);
+    for (const [index, searchField] of fields.entries()) {
+      const params = { ...base, searchField };
+      const result = await read(params);
+      expect(result.totalItems).toBe(1);
+      expect(result.items.map((item) => item.id)).toEqual([ids[index]]);
+      const csv = await products.exportReservationsCsv(parseReservationFilter(new URLSearchParams(params)));
+      for (const id of ids) expect(csv.includes(id)).toBe(id === ids[index]);
+      expect((await read({ ...params, keyword: " " })).totalItems).toBe(5);
+      expect((await read({ ...params, status: "REQUESTED" })).totalItems).toBe(0);
+    }
+    for (const keyword of ["010-1234", "010 1234"]) {
+      expect((await read({ ...base, keyword, searchField: "applicantPhone" })).items.map(item => item.id)).toEqual([ids[3]]);
+    }
+    expect((await read({ ...base, keyword: "invalid", searchField: "applicantPhone" })).totalItems).toBe(0);
+  });
+
+  it("isolates room names, locations and descriptions without changing filters or tag-name search", async () => {
+    await resetProductData();
+    const ids: string[] = [];
+    const fields = ["name", "location", "description"] as const;
+    for (const field of fields) {
+      ids.push((await products.createRoom({
+        name: field === "name" ? "testing-room-sharedneedle" : `testing-room-${field}`,
+        location: field === "location" ? "testing-sharedneedle" : null,
+        description: field === "description" ? "testing-sharedneedle" : null,
+        capacity: 10, enabled: field !== "description",
+      })).id);
+    }
+    const read = (params: Record<string, string>) => products.listRooms(parseRoomList(new URLSearchParams(params)));
+    expect(await read({ keyword: "SharedNeedle", searchField: "all" })).toEqual(await read({ keyword: "SharedNeedle" }));
+    for (const [index, searchField] of fields.entries()) {
+      const result = await read({ keyword: "SharedNeedle", searchField, size: "1" });
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]?.id).toBe(ids[index]);
+      expect((await read({ keyword: " ", searchField })).totalItems).toBe(3);
+    }
+    expect((await read({ keyword: "SharedNeedle", searchField: "description", enabled: "true" })).totalItems).toBe(0);
+    const tagId = await insertTag("testing-tag-sharedneedle");
+    expect((await products.listTags(parseTagList(new URLSearchParams({ keyword: "SHAREDNEEDLE" })))).items.map(item => item.id)).toEqual([tagId]);
+  });
+
+  it("isolates recurrence fields without expanding email or original-room-name search", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-normal");
+    const namedRoomId = await insertRoom("testing-room-sharedneedle");
+    const tagId = await insertTag("testing-tag-sharedneedle");
+    const fields = ["purpose", "applicantName", "roomName", "tagName"] as const;
+    const ids: string[] = [];
+    for (const field of fields) {
+      ids.push(await insertRecurrence({
+        roomId: field === "roomName" ? namedRoomId : roomId,
+        purpose: field === "purpose" ? "testing-recurring-sharedneedle" : "testing-recurring-normal",
+        applicantName: field === "applicantName" ? "testing-sharedneedle" : "testing-applicant",
+        tagId: field === "tagName" ? tagId : null,
+      }));
+    }
+    await database.query("UPDATE reservation_recurrences SET original_room_name='testing-old-room' WHERE id=$1", [ids[2]]);
+    const read = (params: Record<string, string>) => products.listRecurrences(parseRecurrenceList(new URLSearchParams(params)));
+    expect(await read({ keyword: "SharedNeedle", searchField: "all" })).toEqual(await read({ keyword: "SharedNeedle" }));
+    for (const [index, searchField] of fields.entries()) {
+      const result = await read({ keyword: "SharedNeedle", searchField, size: "1" });
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]?.id).toBe(ids[index]);
+      expect((await read({ keyword: " ", searchField })).totalItems).toBe(4);
+    }
+    expect((await read({ keyword: "testing-old-room", searchField: "roomName" })).totalItems).toBe(0);
+    expect((await read({ keyword: "SharedNeedle", searchField: "roomName", roomId })).totalItems).toBe(0);
+  });
+
+  it("rejects unsupported search fields through each authenticated API and CSV", async () => {
+    await resetProductData();
+    const { app, cookie } = await authenticatedApp();
+    for (const path of ["rooms", "reservations", "recurrences", "audit/reservation-histories", "exports/reservations.csv"]) {
+      const response = await app.request(`/api/admin/${path}?searchField=invalid`, { headers: { cookie } });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "VALIDATION_ERROR" });
     }
   });
 });

@@ -2,22 +2,22 @@ export const adminListContexts = {
   reservations: {
     path: '/admin/reservations',
     storageKey: 'admin-reservations-context',
-    params: ['status', 'roomId', 'fromDate', 'toDate', 'keyword', 'page'],
+    params: ['status', 'roomId', 'fromDate', 'toDate', 'keyword', 'searchField', 'page'],
   },
   recurrences: {
     path: '/admin/recurrences',
     storageKey: 'admin-recurrences-context',
-    params: ['roomId', 'fromDate', 'toDate', 'keyword', 'page'],
+    params: ['roomId', 'fromDate', 'toDate', 'keyword', 'searchField', 'page'],
   },
   rooms: {
     path: '/admin/rooms',
     storageKey: 'admin-rooms-context',
-    params: ['keyword', 'page'],
+    params: ['keyword', 'searchField', 'page'],
   },
   audit: {
     path: '/admin/audit',
     storageKey: 'admin-audit-context',
-    params: ['reservationId', 'roomId', 'action', 'fromDate', 'toDate', 'keyword', 'page'],
+    params: ['reservationId', 'roomId', 'action', 'fromDate', 'toDate', 'keyword', 'searchField', 'page'],
   },
 } as const;
 
