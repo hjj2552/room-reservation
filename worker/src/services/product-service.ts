@@ -896,7 +896,13 @@ export class ProductService {
     const status: ReservationStatus = action === "APPROVED" ? "CONFIRMED" : "CANCELLED";
     try {
       await this.database.transaction(async (client) => {
-        const before = await this.getReservationRow(reservationId, client);
+        const locked = await client.query(
+          `${this.reservationSelect} WHERE r.id=$1 FOR UPDATE OF r`,
+          [reservationId],
+        );
+        const before = locked.rows[0];
+        if (!before) notFound("Reservation");
+        if (text(before, "status") === status) return;
         if (status === "CONFIRMED") {
           await this.assertNoConflict(client, text(before, "room_id"), iso(value(before, "start_at")), iso(value(before, "end_at")), reservationId);
         }

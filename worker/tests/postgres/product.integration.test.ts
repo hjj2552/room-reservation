@@ -62,7 +62,7 @@ function publicPayload(roomId: string, password: string, purpose: string, hour =
   };
 }
 
-async function waitForPublicMutationWaiters(expected: number) {
+async function waitForReservationMutationWaiters(expected: number, queryPattern: string) {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
     const result = await database.query(
@@ -70,19 +70,21 @@ async function waitForPublicMutationWaiters(expected: number) {
        FROM pg_stat_activity
        WHERE datname=current_database() AND pid <> pg_backend_pid()
          AND state='active' AND wait_event_type='Lock'
-         AND query LIKE '%cancel_password_hash = crypt%'
+         AND query LIKE $1
          AND query LIKE '%FOR UPDATE OF r%'`,
+      [queryPattern],
     );
     if (Number(result.rows[0]?.count) >= expected) return;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  throw new Error(`Timed out waiting for ${expected} public reservation mutation lock waiter(s).`);
+  throw new Error(`Timed out waiting for ${expected} reservation mutation lock waiter(s).`);
 }
 
-async function runQueuedPublicMutations(
+async function runQueuedReservationMutations(
   reservationId: string,
   first: () => Promise<unknown>,
   second: () => Promise<unknown>,
+  queryPattern = "%cancel_password_hash = crypt%",
 ) {
   const blocker = await database.pool.connect();
   const pending: Promise<unknown>[] = [];
@@ -92,9 +94,9 @@ async function runQueuedPublicMutations(
     transactionOpen = true;
     await blocker.query("SELECT id FROM reservations WHERE id=$1 FOR UPDATE", [reservationId]);
     pending.push(first());
-    await waitForPublicMutationWaiters(1);
+    await waitForReservationMutationWaiters(1, queryPattern);
     pending.push(second());
-    await waitForPublicMutationWaiters(2);
+    await waitForReservationMutationWaiters(2, queryPattern);
     await blocker.query("COMMIT");
     transactionOpen = false;
     return await Promise.allSettled(pending);
@@ -566,7 +568,7 @@ describe("public reservation mutation serialization", () => {
       purpose: "testing-public-should-not-update",
     };
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.cancelPublicReservation(created.id, password),
       () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
@@ -610,7 +612,7 @@ describe("public reservation mutation serialization", () => {
       purpose: "testing-public-updated-first",
     };
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
       () => products.cancelPublicReservation(created.id, password),
@@ -662,7 +664,7 @@ describe("public reservation mutation serialization", () => {
     const payload = publicPayload(roomId, password, "testing-public-double-cancel", 12);
     const created = await products.createPublicReservation(parsePublicReservation(payload));
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.cancelPublicReservation(created.id, password),
       () => products.cancelPublicReservation(created.id, password),
@@ -3591,5 +3593,136 @@ describe("field-selected searches", () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "VALIDATION_ERROR" });
     }
+  });
+});
+
+describe("idempotent administrator status changes", () => {
+  const cases = [
+    { initial: "REQUESTED", action: "APPROVED", target: "CONFIRMED", endpoint: "approve" },
+    { initial: "REQUESTED", action: "CANCELLED", target: "CANCELLED", endpoint: "cancel" },
+    { initial: "CONFIRMED", action: "CANCELLED", target: "CANCELLED", endpoint: "cancel" },
+  ] as const;
+  const snapshot = async (id: string) => (await database.query(
+    `SELECT status, updated_at::text, updated_by_actor_type, updated_by_actor_id, xmin::text AS row_version
+     FROM reservations WHERE id=$1`, [id],
+  )).rows[0];
+  const histories = async (id: string) => (await database.query(
+    `SELECT id, action, before_status, after_status, memo, actor_type, actor_id, created_at::text
+     FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at, id`, [id],
+  )).rows;
+
+  for (const { initial, action, target, endpoint } of cases) {
+    it(`${initial} -> ${target} keeps duplicate calls read-only, including their memo and actor`, async () => {
+      await resetProductData();
+      const roomId = await insertRoom("testing-room-status-sequential");
+      const id = await insertReservation({ roomId, purpose: "testing-reservation-status-sequential", status: initial });
+      const first = await products.changeReservationStatus(id, action, "testing-first-memo", "testing-first-admin");
+      expect(first).toMatchObject({ id, roomId, status: target });
+      const saved = await snapshot(id);
+      const savedHistories = await histories(id);
+      expect(savedHistories).toHaveLength(1);
+      expect(savedHistories[0]).toMatchObject({ action, before_status: initial, after_status: target, memo: "testing-first-memo", actor_id: "testing-first-admin" });
+      for (const memo of [null, "testing-duplicate-memo"]) {
+        expect(await products.changeReservationStatus(id, action, memo, "testing-second-admin")).toEqual(first);
+      }
+      const { app, writeHeaders } = await authenticatedApp();
+      const response = await app.request(`/api/admin/reservations/${id}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({ memo: "testing-api-duplicate" }),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(first);
+      // xmin also detects an UPDATE that happens to write unchanged values.
+      expect(await snapshot(id)).toEqual(saved);
+      expect(await histories(id)).toEqual(savedHistories);
+    });
+
+    it(`${initial} -> ${target} serializes two overlapping HTTP requests into one update and history`, async () => {
+      await resetProductData();
+      const roomId = await insertRoom("testing-room-status-concurrent");
+      const id = await insertReservation({ roomId, purpose: "testing-reservation-status-concurrent", status: initial });
+      const { app, writeHeaders } = await authenticatedApp();
+      const send = async (memo: string) => app.request(`/api/admin/reservations/${id}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({ memo }),
+      });
+      const results = await runQueuedReservationMutations(
+        id, () => send("testing-first-memo"), () => send("testing-second-memo"),
+        "%WHERE r.id=$1 FOR UPDATE OF r%",
+      );
+      const bodies = [];
+      for (const result of results) {
+        if (result.status === "rejected") throw result.reason;
+        const response = result.value as Response;
+        expect(response.status).toBe(200);
+        bodies.push(await response.json());
+      }
+      expect(bodies[0]).toMatchObject({ id, roomId, status: target });
+      expect(bodies[1]).toEqual(bodies[0]);
+      const savedHistories = await histories(id);
+      expect(savedHistories).toHaveLength(1);
+      expect(savedHistories[0]).toMatchObject({ action, before_status: initial, after_status: target, memo: "testing-first-memo", actor_type: "ADMIN", actor_id: "admin" });
+      expect(await snapshot(id)).toMatchObject({ status: target, updated_by_actor_type: "ADMIN", updated_by_actor_id: "admin" });
+      expect((await database.query(
+        `SELECT r.updated_at = h.created_at AS same_transaction_time
+         FROM reservations r JOIN reservation_histories h ON h.reservation_id=r.id WHERE r.id=$1`, [id],
+      )).rows).toEqual([{ same_transaction_time: true }]);
+    });
+  }
+
+  it("records new transitions after an intervening state change instead of permanently deduplicating actions", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-cycle");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-cycle", status: "REQUESTED" });
+    for (const action of ["APPROVED", "CANCELLED", "APPROVED", "CANCELLED"] as const) {
+      await products.changeReservationStatus(id, action, "testing-cycle-memo", "testing-admin");
+      await products.changeReservationStatus(id, action, "testing-duplicate-memo", "testing-other-admin");
+    }
+    expect((await histories(id)).map(row => [row.action, row.before_status, row.after_status])).toEqual([
+      ["APPROVED", "REQUESTED", "CONFIRMED"], ["CANCELLED", "CONFIRMED", "CANCELLED"],
+      ["APPROVED", "CANCELLED", "CONFIRMED"], ["CANCELLED", "CONFIRMED", "CANCELLED"],
+    ]);
+  });
+
+  it("preserves approval conflicts and missing-reservation HTTP errors without partial updates", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-conflict");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-cancelled", status: "CANCELLED" });
+    await insertReservation({ roomId, purpose: "testing-reservation-status-blocker", status: "CONFIRMED" });
+    const saved = await snapshot(id);
+    const { app, writeHeaders } = await authenticatedApp();
+    const conflict = await app.request(`/api/admin/reservations/${id}/approve`, {
+      method: "POST", headers: writeHeaders, body: JSON.stringify({ memo: "testing-conflict" }),
+    });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: "TIME_SLOT_CONFLICT" });
+    expect(await snapshot(id)).toEqual(saved);
+    expect(await histories(id)).toEqual([]);
+    for (const endpoint of ["approve", "cancel"]) {
+      const response = await app.request(`/api/admin/reservations/${crypto.randomUUID()}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "NOT_FOUND" });
+    }
+  });
+
+  it("rolls the status update and history back together on a database failure", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-rollback");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-rollback", status: "REQUESTED" });
+    const saved = await snapshot(id);
+    const failingDatabase: Database = {
+      query: (sql, values) => database.query(sql, values),
+      transaction: work => database.transaction(client => work({
+        query: async <Row extends Record<string, unknown>>(sql: string, values?: unknown[]) => {
+          const result = await client.query<Row>(sql, values);
+          if (sql.includes("INSERT INTO reservation_histories")) await client.query("SELECT 1/0");
+          return result;
+        },
+      })),
+    };
+    await expect(new ProductService(failingDatabase, () => new Date())
+      .changeReservationStatus(id, "APPROVED", "testing-rollback-memo", "testing-admin")).rejects.toThrow();
+    expect(await snapshot(id)).toEqual(saved);
+    expect(await histories(id)).toEqual([]);
   });
 });
