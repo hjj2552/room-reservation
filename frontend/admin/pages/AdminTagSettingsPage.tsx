@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -131,7 +132,7 @@ export function AdminTagSettingsPage() {
     <section className="page-section" aria-labelledby="tag-settings-title">
       <div className="page-header">
         <div>
-          <h1 id="tag-settings-title">태그 설정</h1>
+          <AdminPageTitle id="tag-settings-title">태그 설정</AdminPageTitle>
           <p className="muted">반복 예약에 사용할 태그 이름과 색상을 관리합니다.</p>
         </div>
         <div className="header-actions">

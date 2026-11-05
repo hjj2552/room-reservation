@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -276,6 +277,7 @@ export function AdminTimetablePage() {
   return (
     <section className="page-section timetable-page" aria-labelledby="timetable-title">
       <TimetablePageHeader
+        title={<AdminPageTitle id="timetable-title">{timetableCopy.title}</AdminPageTitle>}
         helperText={timetableCopy.adminHelper}
         buttonTestId="timetable-new-request-button"
         buttonDisabled={!settings.data}

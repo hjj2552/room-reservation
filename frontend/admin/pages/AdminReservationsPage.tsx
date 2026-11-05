@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { SearchFields } from '../components/SearchFields';
 import { reservationSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -145,7 +146,7 @@ export function AdminReservationsPage() {
     <section className="page-section" aria-labelledby="reservation-list-title">
       <div className="page-header">
         <div>
-          <h1 id="reservation-list-title">예약 목록</h1>
+          <AdminPageTitle id="reservation-list-title">예약 목록</AdminPageTitle>
           <p className="muted">예약을 검색하고 상세 화면에서 승인, 취소, 수정을 처리합니다.</p>
         </div>
         <div className="header-actions">

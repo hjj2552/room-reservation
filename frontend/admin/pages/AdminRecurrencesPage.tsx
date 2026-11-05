@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { SearchFields } from '../components/SearchFields';
 import { recurrenceSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { RefreshCw, Search } from 'lucide-react';
@@ -303,7 +304,7 @@ export function AdminRecurrencesPage() {
     <section className="page-section" aria-labelledby="recurrences-title">
       <div className="page-header">
         <div>
-          <h1 id="recurrences-title">반복 예약</h1>
+          <AdminPageTitle id="recurrences-title">반복 예약</AdminPageTitle>
           <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 충돌 정책을 선택합니다.</p>
         </div>
       </div>

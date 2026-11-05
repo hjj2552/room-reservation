@@ -5,6 +5,7 @@ import {
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { restoreOverlayTriggerFocus } from './overlayFocus';
 
@@ -19,6 +20,10 @@ interface SidePanelProps {
   backdropTestId?: string;
   closeTestId?: string;
   closeButtonLabel?: string;
+  id?: string;
+  closeOnBackdrop?: boolean;
+  shouldRestoreFocus?: () => boolean;
+  returnFocusTarget?: RefObject<HTMLElement | null>;
 }
 
 interface DocumentScrollLock {
@@ -106,12 +111,18 @@ export function SidePanel({
   backdropTestId,
   closeTestId,
   closeButtonLabel = '패널 닫기',
+  id,
+  closeOnBackdrop = false,
+  shouldRestoreFocus,
+  returnFocusTarget,
 }: SidePanelProps) {
   const generatedTitleId = useId();
   const resolvedTitleId = titleId || generatedTitleId;
   const panelRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
+  const shouldRestoreFocusRef = useRef(shouldRestoreFocus);
+  shouldRestoreFocusRef.current = shouldRestoreFocus;
   const returnFocusRef = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
@@ -132,7 +143,12 @@ export function SidePanel({
     return () => {
       document.removeEventListener('keydown', handleDocumentKeyDown);
       releaseScrollLock();
-      restoreOverlayTriggerFocus(returnFocusRef.current, returnFocusWasVisibleRef.current);
+      if (shouldRestoreFocusRef.current?.() !== false) {
+        restoreOverlayTriggerFocus(
+          returnFocusTarget?.current ?? returnFocusRef.current,
+          returnFocusWasVisibleRef.current,
+        );
+      }
     };
   }, []);
 
@@ -160,9 +176,13 @@ export function SidePanel({
       className="side-panel-backdrop"
       role="presentation"
       data-testid={backdropTestId}
+      onClick={(event) => {
+        if (closeOnBackdrop && event.target === event.currentTarget) onClose();
+      }}
     >
       <aside
         ref={panelRef}
+        id={id}
         className={`side-panel${className ? ` ${className}` : ''}`}
         role="dialog"
         aria-modal="true"

@@ -1,4 +1,7 @@
+import type { ReactNode } from 'react';
+
 interface TimetablePageHeaderProps {
+  title?: ReactNode;
   eyebrow?: string;
   helperText?: string;
   buttonTestId: string;
@@ -17,6 +20,7 @@ export const timetableCopy = {
 };
 
 export function TimetablePageHeader({
+  title,
   eyebrow,
   helperText,
   buttonTestId,
@@ -27,7 +31,7 @@ export function TimetablePageHeader({
     <div className="page-header timetable-entry-header">
       <div>
         {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-        <h1 id="timetable-title">{timetableCopy.title}</h1>
+        {title ?? <h1 id="timetable-title">{timetableCopy.title}</h1>}
         <p className="muted">{timetableCopy.description}</p>
         {helperText ? <p className="muted timetable-helper-text">{helperText}</p> : null}
       </div>

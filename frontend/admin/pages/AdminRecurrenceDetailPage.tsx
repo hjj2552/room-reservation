@@ -1,3 +1,4 @@
+import { AdminPageState, AdminPageTitle } from '../components/AdminPageTitle';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -38,8 +39,8 @@ export function AdminRecurrenceDetailPage() {
     setShowDeleteModal(true);
   }
 
-  if (recurrence.isLoading) return <LoadingState />;
-  if (recurrence.isError) return <ErrorState error={recurrence.error} />;
+  if (recurrence.isLoading) return <AdminPageState title="반복 예약 상세"><LoadingState /></AdminPageState>;
+  if (recurrence.isError) return <AdminPageState title="반복 예약 상세"><ErrorState error={recurrence.error} /></AdminPageState>;
   if (!recurrence.data) return null;
 
   const detail = recurrence.data;
@@ -56,7 +57,7 @@ export function AdminRecurrenceDetailPage() {
     <section className="page-section" aria-labelledby="recurrence-detail-title">
       <div className="page-header">
         <div>
-          <h1 id="recurrence-detail-title">{detail.room.name}</h1>
+          <AdminPageTitle id="recurrence-detail-title">{detail.room.name}</AdminPageTitle>
           <p className="muted" data-testid="recurrence-detail-purpose">{detail.purpose}</p>
         </div>
         <div className="header-actions">

@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { SearchFields } from '../components/SearchFields';
 import { auditSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -189,7 +190,7 @@ export function AdminAuditPage() {
     <section className="page-section" aria-labelledby="audit-title">
       <div className="page-header">
         <div>
-          <h1 id="audit-title">감사 이력</h1>
+          <AdminPageTitle id="audit-title">감사 이력</AdminPageTitle>
           <p className="muted">예약 신청, 수정, 승인, 취소 이력을 조건별로 조회합니다.</p>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { AdminPageState, AdminPageTitle } from '../components/AdminPageTitle';
 import { CalendarDays, Check, Copy, PenLine, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -51,11 +52,11 @@ export function AdminReservationDetailPage() {
     });
   }
 
-  if (reservation.isLoading) return <LoadingState />;
+  if (reservation.isLoading) return <AdminPageState title="예약 상세"><LoadingState /></AdminPageState>;
   if (reservation.isError && isReservationNotFound(reservation.error)) {
     return <DeletedReservationState reservationId={reservationId} />;
   }
-  if (reservation.isError) return <ErrorState error={reservation.error} />;
+  if (reservation.isError) return <AdminPageState title="예약 상세"><ErrorState error={reservation.error} /></AdminPageState>;
   if (!reservation.data) return null;
 
   const detail = reservation.data;
@@ -121,7 +122,7 @@ export function AdminReservationDetailPage() {
     <section className="page-section" aria-labelledby="reservation-detail-title">
       <div className="page-header reservation-detail-page-header">
         <div>
-          <h1 id="reservation-detail-title">예약 상세</h1>
+          <AdminPageTitle id="reservation-detail-title">예약 상세</AdminPageTitle>
         </div>
         <div className="header-actions reservation-navigation-actions" aria-label="예약 상세 이동">
           <Link
@@ -406,7 +407,7 @@ function DeletedReservationState({ reservationId }: { reservationId: string }) {
   return (
     <section className="page-section narrow" aria-labelledby="deleted-reservation-title">
       <div className="state-box error">
-        <h1 id="deleted-reservation-title">삭제된 예약입니다</h1>
+        <AdminPageTitle id="deleted-reservation-title">삭제된 예약입니다</AdminPageTitle>
         <p>이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다. 감사 로그에서 삭제 기록은 계속 확인할 수 있습니다.</p>
         <div className="button-row">
           <button type="button" className="ghost-button" onClick={() => navigate(-1)}>

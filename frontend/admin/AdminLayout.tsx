@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAdminSession, useLogout } from './hooks/useAuth';
 import { usePendingReservationCount } from './hooks/useReservations';
@@ -10,6 +10,10 @@ import {
   saveAdminListSearch,
 } from './utils/listContext';
 
+import { SidePanel } from '../shared/components/SidePanel';
+import { AdminMenuContext } from './components/AdminPageTitle';
+
+const mobileMenuQuery = '(max-width: 980px)';
 const timetablePath = '/admin/timetable';
 const timetableContextKey = 'admin-timetable-context';
 const timetableContextParams = ['view', 'date', 'weekStart', 'roomId', 'roomViewRoomId'] as const;
@@ -84,6 +88,34 @@ export function AdminLayout() {
   const pendingReservationCount = pendingReservations.isSuccess ? pendingReservations.data : 0;
   const [savedTimetableSearch, setSavedTimetableSearch] = useState(readTimetableSearch);
   const [savedListSearches, setSavedListSearches] = useState(readAdminListSearches);
+  const [mobile, setMobile] = useState(() => window.matchMedia(mobileMenuQuery).matches);
+  const [menuLocationKey, setMenuLocationKey] = useState<string | null>(null);
+  const restoreMenuFocus = useRef(true);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const currentLocationKey = useRef(location.key);
+  currentLocationKey.current = location.key;
+  const menuOpen = mobile && menuLocationKey === location.key;
+
+  function closeForNavigation() {
+    restoreMenuFocus.current = false;
+    setMenuLocationKey(null);
+  }
+
+  useEffect(() => {
+    const query = window.matchMedia(mobileMenuQuery);
+    const update = () => {
+      restoreMenuFocus.current = false;
+      setMenuLocationKey(null);
+      setMobile(query.matches);
+    };
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    setMenuLocationKey(null);
+  }, [location.key]);
+
   const normalizedSearch = location.pathname === timetablePath
     ? normalizedTimetableSearch(location.search)
     : null;
@@ -107,14 +139,11 @@ export function AdminLayout() {
     return <Navigate to={{ pathname: timetablePath, search: normalizedSearch, hash: location.hash }} replace />;
   }
 
-  return (
-    <div className="app-shell">
-      <aside className="sidebar" aria-label="관리자 메뉴">
-        <div className="brand">
-          <strong>공간 예약</strong>
-          <span>관리자</span>
-        </div>
-        <nav className="nav-list">
+  const menu = (
+    <>
+        <nav className="nav-list" onClick={(event) => {
+          if ((event.target as HTMLElement).closest('a')) closeForNavigation();
+        }}>
           <div className="nav-item-with-badge">
             <NavLink
               className="nav-item-label"
@@ -172,6 +201,7 @@ export function AdminLayout() {
                   clearAdminListSearches();
                   setSavedTimetableSearch('');
                   setSavedListSearches(readAdminListSearches());
+                  closeForNavigation();
                   navigate('/admin/login', { replace: true });
                 },
               })
@@ -180,10 +210,47 @@ export function AdminLayout() {
             로그아웃
           </button>
         </div>
-      </aside>
-      <main className="content" id="main-content">
-        <Outlet />
-      </main>
-    </div>
+    </>
+  );
+
+  return (
+    <AdminMenuContext.Provider value={{
+      open: menuOpen,
+      pendingCount: pendingReservationCount,
+      triggerRef: menuTriggerRef,
+      openMenu: () => {
+        restoreMenuFocus.current = true;
+        setMenuLocationKey(location.key);
+      },
+    }}>
+      <div className="app-shell">
+        {!mobile ? (
+          <aside className="sidebar" aria-label="관리자 메뉴">
+            <div className="brand"><strong>관리자 메뉴</strong></div>
+            {menu}
+          </aside>
+        ) : null}
+        <main className="content" id="main-content" inert={menuOpen}>
+          <Outlet />
+        </main>
+        {menuOpen ? (
+          <SidePanel
+            id="admin-mobile-menu"
+            title="관리자 메뉴"
+            className="admin-menu-drawer"
+            closeButtonLabel="관리자 메뉴 닫기"
+            backdropTestId="admin-menu-backdrop"
+            closeOnBackdrop
+            returnFocusTarget={menuTriggerRef}
+            onClose={() => setMenuLocationKey(null)}
+            shouldRestoreFocus={() => restoreMenuFocus.current
+              && currentLocationKey.current === menuLocationKey
+              && window.matchMedia(mobileMenuQuery).matches}
+          >
+            {menu}
+          </SidePanel>
+        ) : null}
+      </div>
+    </AdminMenuContext.Provider>
   );
 }

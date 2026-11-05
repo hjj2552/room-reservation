@@ -1,3 +1,4 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
 import { SearchFields } from '../components/SearchFields';
 import { roomSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react';
@@ -215,7 +216,7 @@ export function AdminRoomsPage() {
     <section className="page-section rooms-page" aria-labelledby="rooms-title">
       <div className="page-header">
         <div>
-          <h1 id="rooms-title">공간 관리</h1>
+          <AdminPageTitle id="rooms-title">공간 관리</AdminPageTitle>
           <p className="muted">예약에 사용할 공간을 등록하고, 삭제된 공간의 예약 기록은 보존합니다.</p>
         </div>
         <div className="header-actions">
