@@ -53,6 +53,96 @@ async function login(app: ReturnType<typeof appWith>, tokens: Parameters<typeof 
   });
 }
 
+async function prepareLogin(app = appWith(), stale?: Parameters<typeof headers>[0]) {
+  const response = await app.request('/api/auth/admin/login-session', stale ? { headers: headers(stale) } : {});
+  expect(response.status).toBe(200);
+  expect(response.headers.has('set-cookie')).toBe(false);
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  const tokens = await response.json() as { sessionId: string; csrfToken: string };
+  const record = await sessions.find(tokens.sessionId);
+  expect(record !== null && record.adminUsername === null).toBe(true);
+  ownedHashes.push(record!.sessionIdHash);
+  return tokens;
+}
+
+async function recoveryLogin(app: ReturnType<typeof appWith>, prepared: Parameters<typeof headers>[0],
+  stale: Parameters<typeof headers>[0], loginPassword = password) {
+  return app.request('/api/auth/admin/login', {
+    method: 'POST',
+    headers: { ...headers(stale), 'X-Login-Session': prepared.sessionId, 'X-XSRF-TOKEN': prepared.csrfToken },
+    body: JSON.stringify({ username, password: loginPassword }),
+  });
+}
+
+it('recovers lost login cookies without reviving the old session or bypassing credentials and CSRF', async () => {
+  const app = appWith();
+  const stale = await anonymous();
+  expect((await login(app, stale)).status).toBe(200); // Discard the successful Set-Cookie.
+  expect((await login(app, stale)).status).toBe(403);
+  const prepared = await prepareLogin(app, stale);
+  const invalidCsrf = await recoveryLogin(app, { ...prepared, csrfToken: stale.csrfToken }, stale);
+  expect(invalidCsrf.status).toBe(403);
+  expect(invalidCsrf.headers.has('set-cookie')).toBe(false);
+  const rejected = await recoveryLogin(app, prepared, stale, 'testing-wrong-password');
+  expect(rejected.status).toBe(401);
+  expect(rejected.headers.has('set-cookie')).toBe(false);
+  expect((await sessions.find(prepared.sessionId))?.adminUsername).toBeNull();
+  const expiry = (await sessions.find(prepared.sessionId))!.expiresAt;
+  now = new Date(now.getTime() + 60_000);
+  const recovered = await recoveryLogin(app, prepared, stale);
+  expect(recovered.status).toBe(200);
+  const next = cookies(recovered);
+  expect((await sessions.find(next.sessionId))?.expiresAt).toEqual(expiry);
+  expect(await sessions.find(stale.sessionId)).toBeNull();
+  expect(await sessions.find(prepared.sessionId)).toBeNull();
+  expect((await app.request('/api/auth/admin/me', { headers: headers(stale) })).status).toBe(401);
+  expect((await app.request('/api/auth/admin/me', { headers: headers(next) })).status).toBe(200);
+  expect((await recoveryLogin(app, next, stale)).status).toBe(403); // No authenticated bearer-session channel.
+  expect((await app.request('/api/auth/admin/me', {
+    headers: { ...headers(stale), 'X-Login-Session': next.sessionId },
+  })).status).toBe(401);
+  const duplicate = await recoveryLogin(app, prepared, next);
+  expect(duplicate.status).toBe(403);
+  expect(duplicate.headers.has('set-cookie')).toBe(false);
+  expect((await app.request('/api/auth/admin/logout', { method: 'POST', headers: headers(next) })).status).toBe(204);
+});
+
+it('a delayed duplicate preparation neither sets cookies nor consumes a normal login session', async () => {
+  const old = await anonymous();
+  let release!: () => void;
+  let reached!: () => void;
+  const paused = new Promise<void>(resolve => { reached = resolve; });
+  const resume = new Promise<void>(resolve => { release = resolve; });
+  let issuedCount = 0;
+  class PausedIssueService extends SessionService {
+    override async issue() {
+      const issued = await super.issue();
+      ownedHashes.push(issued.record.sessionIdHash);
+      if (++issuedCount === 2) reached();
+      await resume;
+      return issued;
+    }
+  }
+  const delayedApp = appWith(new PausedIssueService(database, () => now));
+  const pending = [prepareLogin(delayedApp, old), prepareLogin(delayedApp, old)];
+  try {
+    await paused;
+    const normal = cookies(await login(appWith(), old));
+    release();
+    const prepared = await Promise.all(pending);
+    expect(prepared[0]!.sessionId !== prepared[1]!.sessionId).toBe(true);
+    // Even a recovery submitted after normal login consumes only its own anonymous session.
+    const recovered = await recoveryLogin(appWith(), prepared[0]!, normal);
+    expect(recovered.status).toBe(200);
+    for (const tokens of [normal, cookies(recovered)]) {
+      expect((await appWith().request('/api/auth/admin/me', { headers: headers(tokens) })).status).toBe(200);
+    }
+  } finally {
+    release();
+    await Promise.allSettled(pending);
+  }
+});
+
 it("rotates both tokens, revokes old access and preserves the original expiry and cookie policy", async () => {
   const app = appWith();
   const old = await anonymous();
@@ -138,6 +228,34 @@ it.each([false, true])("serializes concurrent logins and rechecks expiry after t
     if (!expire) expect(await sessions.authenticate(old.record, username)).toBeNull();
   } finally {
     await blocker.query("ROLLBACK");
+    await Promise.allSettled(pending);
+    blocker.release();
+  }
+});
+
+it.each([false, true])('atomically consumes recovery sessions and rechecks expiry (expire=%s)', async expire => {
+  const app = appWith();
+  const stale = await anonymous();
+  await login(app, stale);
+  const prepared = await prepareLogin(app, stale);
+  const record = (await sessions.find(prepared.sessionId))!;
+  const blocker = await database.pool.connect();
+  const pending: Promise<Response>[] = [];
+  try {
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT 1 FROM admin_sessions WHERE session_id_hash=$1 FOR UPDATE', [record.sessionIdHash]);
+    pending.push(recoveryLogin(app, prepared, stale), recoveryLogin(app, prepared, stale));
+    await waitForLocks(2);
+    if (expire) now = record.expiresAt;
+    await blocker.query('COMMIT');
+    const results = await Promise.all(pending);
+    expect(results.map(result => result.status).sort()).toEqual(expire ? [403, 403] : [200, 403]);
+    for (const response of results) {
+      if (response.status === 403) expect(response.headers.has('set-cookie')).toBe(false);
+      else expect((await app.request('/api/auth/admin/me', { headers: headers(cookies(response)) })).status).toBe(200);
+    }
+  } finally {
+    await blocker.query('ROLLBACK');
     await Promise.allSettled(pending);
     blocker.release();
   }

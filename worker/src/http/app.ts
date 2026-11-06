@@ -35,6 +35,7 @@ import {
 const SESSION_COOKIE = "ROOM-SESSION";
 const CSRF_COOKIE = "XSRF-TOKEN";
 const CSRF_HEADER = "X-XSRF-TOKEN";
+const LOGIN_SESSION_HEADER = "X-Login-Session";
 const MAX_JSON_BODY_BYTES = 65_536;
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
 
@@ -170,7 +171,11 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
 
     await enforceRateLimit(context, "INGRESS", clientIp);
 
-    const sessionCookie = getCookie(context, SESSION_COOKIE);
+    // Only login accepts an explicitly prepared anonymous session. It never grants API access.
+    const loginSession = context.req.method === "POST" && context.req.path === "/api/auth/admin/login"
+      ? context.req.header(LOGIN_SESSION_HEADER)
+      : undefined;
+    const sessionCookie = loginSession ?? getCookie(context, SESSION_COOKIE);
     const session = isValidOpaqueToken(sessionCookie)
       ? await dependencies.sessions.find(sessionCookie)
       : null;
@@ -181,9 +186,13 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
       await enforceRateLimit(context, policy, clientIp);
     }
     if (!safeMethods.has(context.req.method.toUpperCase())) {
+      if (loginSession !== undefined && (!session || session.adminUsername !== null)) {
+        throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
+      }
       const valid = await dependencies.sessions.validateCsrf(
         session,
-        getCookie(context, CSRF_COOKIE),
+        // Recovery uses the server-stored synchronizer token, supplied in a same-origin custom header.
+        loginSession !== undefined ? context.req.header(CSRF_HEADER) : getCookie(context, CSRF_COOKIE),
         context.req.header(CSRF_HEADER),
       );
       if (!valid) throw new HttpError(403, "INVALID_CSRF_TOKEN", "Invalid CSRF token.");
@@ -242,6 +251,15 @@ export function createHttpApp(config: RuntimeConfig, dependencies: Dependencies)
     const issued = await dependencies.sessions.issue();
     setSessionCookies(context, config, issued.sessionId, issued.csrfToken, issued.record.expiresAt);
     return context.json({ headerName: CSRF_HEADER, parameterName: "_csrf", token: issued.csrfToken });
+  });
+
+  app.get("/api/auth/admin/login-session", async (context) => {
+    // Never set cookies here: a delayed/duplicate preparation must not replace a completed login.
+    // These anonymous credentials are held only for the next login, which still verifies the password
+    // and atomically consumes the session before issuing the authenticated cookies.
+    const issued = await dependencies.sessions.issue();
+    context.header("Cache-Control", "no-store");
+    return context.json({ sessionId: issued.sessionId, csrfToken: issued.csrfToken });
   });
 
   app.post("/api/auth/admin/login", async (context) => {
