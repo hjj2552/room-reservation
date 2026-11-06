@@ -51,7 +51,8 @@ jobs:
 
   worker-frontend-e2e-shard:
     name: Frontend E2E shard ${{ matrix.shard }}/2
-    runs-on: ubuntu-latest
+    # Keep the browser host on a platform supported by the pinned Playwright version.
+    runs-on: ubuntu-24.04
     needs: worker-validation
     strategy:
       fail-fast: false
