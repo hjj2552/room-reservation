@@ -1536,6 +1536,19 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.8fr);
 }
 
+.reservation-detail-grid.admin-reservation-detail-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-reservation-detail-stack > .panel {
+  border-bottom: 0;
+}
+
+.admin-reservation-detail-stack .reservation-action-panel h3,
+.admin-reservation-detail-stack .reservation-action-panel p {
+  margin: 0;
+}
+
 .public-detail-actions {
   display: grid;
   gap: 24px;

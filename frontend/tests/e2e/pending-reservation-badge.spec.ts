@@ -175,10 +175,12 @@ test('approving and cancelling reservations refresh the pending count', async ({
   expect(initialCount).toBeGreaterThanOrEqual(2);
 
   await page.getByRole('button', { name: '승인', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect(badge).toHaveAttribute('aria-label', pendingBadgeName(initialCount - 1));
 
   await page.goto(`/admin/reservations/${secondReservation.id}`);
-  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '예약 취소', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   const remainingCount = initialCount - 2;
   if (remainingCount > 0) {
     await expect(badge).toHaveAttribute('aria-label', pendingBadgeName(remainingCount));

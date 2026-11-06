@@ -1,0 +1,112 @@
+import { expect, test } from './fixtures';
+
+for (const width of [1440, 390]) {
+  test(`reservation status reasons stay separate and update status and history at ${width}px`, async ({ page, request, e2eData }, testInfo) => {
+    const room = await e2eData.createTestRoom('status-reasons');
+    const reservation = await e2eData.createTestPublicReservation(room.id, 'status-reasons');
+    const writes: string[] = [];
+    page.on('request', request => {
+      if (request.method() === 'POST' && /\/(approve|cancel)$/.test(request.url())) writes.push(request.url());
+    });
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto(`/admin/reservations/${reservation.id}`);
+    const approve = page.getByRole('button', { name: '승인', exact: true });
+    const cancel = page.getByRole('button', { name: '예약 취소', exact: true });
+    const form = page.getByTestId('reservation-status-form');
+    const history = page.getByRole('region', { name: '감사 이력' });
+    const status = page.locator('.reservation-detail-main .status-badge');
+    await expect(approve).toBeEnabled();
+    await expect(cancel).toBeEnabled();
+    await expect(form).toHaveCount(0);
+    const infoBox = (await page.locator('.reservation-detail-main').boundingBox())!;
+    const actionsBox = (await page.getByRole('region', { name: '상태 처리' }).boundingBox())!;
+    const historyBox = (await history.boundingBox())!;
+    expect(infoBox.y + infoBox.height).toBeLessThanOrEqual(actionsBox.y);
+    expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(historyBox.y);
+    await approve.click();
+    await expect(form.getByRole('heading', { name: '예약 승인' })).toBeVisible();
+    await expect(page.getByTestId('reservation-status-transition')).toHaveText('승인 대기 → 승인');
+    await expect(page.getByTestId('reservation-purpose')).toHaveCount(1);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(form.getByLabel('승인 사유')).not.toHaveAttribute('required');
+    await expect(form.getByLabel('승인 사유')).toHaveAttribute('maxlength', '1000');
+    await form.getByLabel('승인 사유').fill('testing-approval-reason');
+    await form.getByRole('button', { name: '돌아가기' }).click();
+    await expect(status).toHaveText('승인 대기');
+    expect(writes).toHaveLength(0);
+    await cancel.click();
+    await expect(form.getByLabel('취소 사유')).toHaveValue('');
+    await form.getByLabel('취소 사유').fill('testing-cancellation-reason');
+    await form.getByRole('button', { name: '돌아가기' }).click();
+    expect(writes).toHaveLength(0);
+    await approve.click();
+    await expect(form.getByLabel('승인 사유')).toHaveValue('testing-approval-reason');
+    await page.screenshot({ path: testInfo.outputPath(`approval-${width}.png`), fullPage: true });
+    await form.getByRole('button', { name: '확인' }).click();
+    await expect(form).toHaveCount(0);
+    await expect(status).toHaveText('승인');
+    await expect(approve).toBeDisabled();
+    await expect(cancel).toBeEnabled();
+    await expect(history).toContainText('testing-approval-reason');
+    await expect(page.getByTestId('admin-reservation-success-toast')).toHaveText('예약이 승인되었습니다.');
+    await expect(page.getByTestId('admin-reservation-success-toast')).toBeHidden({ timeout: 8_000 });
+    await cancel.click();
+    await expect(form.getByRole('heading', { name: '예약 취소' })).toBeVisible();
+    await expect(page.getByTestId('reservation-status-transition')).toHaveText('승인 → 취소');
+    await expect(form.getByLabel('취소 사유')).toHaveValue('testing-cancellation-reason');
+    await page.screenshot({ path: testInfo.outputPath(`cancellation-${width}.png`), fullPage: true });
+    await form.getByRole('button', { name: '확인' }).click();
+    await expect(form).toHaveCount(0);
+    await expect(status).toHaveText('취소');
+    await expect(approve).toBeDisabled();
+    await expect(cancel).toBeDisabled();
+    await expect(history).toContainText('testing-cancellation-reason');
+    expect(writes).toHaveLength(2);
+    const response = await request.get(`/api/admin/reservations/${reservation.id}/histories`);
+    expect(response.ok()).toBe(true);
+    const histories = await response.json() as Array<{ action: string; memo: string }>;
+    expect(histories.filter(item => item.action === 'APPROVED').map(item => item.memo)).toEqual(['testing-approval-reason']);
+    expect(histories.filter(item => item.action === 'CANCELLED').map(item => item.memo)).toEqual(['testing-cancellation-reason']);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
+
+for (const action of ['approve', 'cancel'] as const) {
+  test(`${action} failure preserves reason and pending confirmation cannot submit twice or go back`, async ({ page, e2eData }) => {
+    const room = await e2eData.createTestRoom(`status-${action}-failure`);
+    const reservation = await e2eData.createTestPublicReservation(room.id, `status-${action}-failure`);
+    let calls = 0;
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    await page.route(`**/api/admin/reservations/${reservation.id}/${action}`, async route => {
+      calls += 1;
+      expect(route.request().postDataJSON()).toEqual({ memo: 'testing-retained-reason' });
+      if (calls === 1) return route.fulfill({ status: 503, json: { message: 'testing-status-error' } });
+      await gate;
+      await route.continue();
+    });
+    await page.goto(`/admin/reservations/${reservation.id}`);
+    await page.getByRole('button', { name: action === 'approve' ? '승인' : '예약 취소', exact: true }).click();
+    const form = page.getByTestId('reservation-status-form');
+    const reason = form.getByRole('textbox');
+    await reason.fill('testing-retained-reason');
+    await form.getByRole('button', { name: '확인' }).click();
+    await expect(form.getByRole('alert')).toBeVisible();
+    await expect(reason).toHaveValue('testing-retained-reason');
+    await expect(page.locator('.reservation-detail-main .status-badge')).toHaveText('승인 대기');
+    await expect(page.getByTestId('admin-reservation-success-toast')).toHaveCount(0);
+    await form.getByRole('button', { name: '확인' }).click();
+    await expect.poll(() => calls).toBe(2);
+    await expect(reason).toBeDisabled();
+    await expect(form.getByRole('button', { name: '확인' })).toBeDisabled();
+    await expect(form.getByRole('button', { name: '돌아가기' })).toBeDisabled();
+    await form.dispatchEvent('submit');
+    expect(calls).toBe(2);
+    finish();
+    await expect(form).toHaveCount(0);
+    await expect(page.locator('.reservation-detail-main .status-badge')).toHaveText(action === 'approve' ? '승인' : '취소');
+    await expect(page.getByTestId('admin-reservation-success-toast')).toBeVisible();
+    await expect(page.getByRole('region', { name: '감사 이력' })).toContainText('testing-retained-reason');
+    expect(calls).toBe(2);
+  });
+}
