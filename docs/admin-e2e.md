@@ -38,7 +38,7 @@ npm.cmd run test:local-e2e -- --shard=2/2
 
 ## GitHub Actions
 
-`.github/workflows/ci.yml`의 `worker-frontend-e2e-shard` matrix는 Worker 검증 성공 후 두 작업(`1/2`, `2/2`)을 병렬 실행합니다. 각 작업은 독립된 GitHub 러너·checkout·임시 PostgreSQL·Worker·프런트 서버에서 다음을 수행합니다.
+`.github/workflows/ci.yml`의 `worker-frontend-e2e-shard` matrix는 Worker 검증 성공 후 두 작업(`1/2`, `2/2`)을 병렬 실행합니다. 브라우저 러너는 현재 Playwright가 지원하는 `ubuntu-24.04`로 고정합니다. 각 작업은 독립된 GitHub 러너·checkout·임시 PostgreSQL·Worker·프런트 서버에서 다음을 수행합니다.
 
 - Worker와 프런트엔드 의존성 재설치
 - 프런트엔드 운영 빌드와 정적 자산 결합 Worker 사전 빌드
