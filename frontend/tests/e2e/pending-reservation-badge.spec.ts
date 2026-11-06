@@ -101,6 +101,7 @@ test('pending reservation badge uses the count query and stable accessible bound
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '관리자 메뉴 열기' }).click();
   const [labelBox, badgeLinkBox] = await Promise.all([
     reservationLabel.boundingBox(),
     pendingBadgeLink(page).boundingBox(),
@@ -137,7 +138,8 @@ test('pending badge and reservation label keep their separate navigation contrac
     url.pathname === '/admin/reservations' && url.search === '?status=REQUESTED&page=0'
   ));
   const listUrl = new URL((await requestedList).url());
-  expect([...listUrl.searchParams.keys()]).toEqual(['status', 'page', 'size']);
+  expect([...listUrl.searchParams.keys()]).toEqual(['status', 'searchField', 'page', 'size']);
+  expect(listUrl.searchParams.get('searchField')).toBe('all');
   await expect(page.getByTestId('reservation-status-filter')).toHaveValue('REQUESTED');
   expect(listRequests.some((url) => (
     url.searchParams.get('status') === 'REQUESTED'
@@ -173,10 +175,12 @@ test('approving and cancelling reservations refresh the pending count', async ({
   expect(initialCount).toBeGreaterThanOrEqual(2);
 
   await page.getByRole('button', { name: '승인', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect(badge).toHaveAttribute('aria-label', pendingBadgeName(initialCount - 1));
 
   await page.goto(`/admin/reservations/${secondReservation.id}`);
-  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '예약 취소', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   const remainingCount = initialCount - 2;
   if (remainingCount > 0) {
     await expect(badge).toHaveAttribute('aria-label', pendingBadgeName(remainingCount));

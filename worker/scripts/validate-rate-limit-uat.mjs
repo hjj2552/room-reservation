@@ -40,7 +40,9 @@ async function loginAdmin() {
     body: JSON.stringify({ username: adminUsername, password: adminPassword }),
   });
   if (loginResponse.status !== 200) throw new Error(`Admin login failed: ${loginResponse.status}`);
-  return cookie;
+  const authenticatedCookie = cookieHeader(loginResponse);
+  if (!authenticatedCookie) throw new Error("Admin login session cookies are missing");
+  return authenticatedCookie;
 }
 
 async function verifyStaticAssetsRemainAvailable() {

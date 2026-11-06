@@ -231,7 +231,7 @@ test('reservation list and detail expose timetable links with reservation date a
     const detailActions = page.getByTestId('reservation-primary-actions').locator('button, a');
     await expect(detailActions).toHaveText([
       '승인',
-      '취소',
+      '예약 취소',
       '수정',
       '복제',
     ]);
@@ -261,7 +261,7 @@ test('reservation detail action groups remain distinct without horizontal overfl
     await page.goto(`/admin/reservations/${reservation.id}`);
 
     const actions = page.getByTestId('reservation-primary-actions');
-    await expect(actions.locator('button, a')).toHaveText(['승인', '취소', '수정', '복제']);
+    await expect(actions.locator('button, a')).toHaveText(['승인', '예약 취소', '수정', '복제']);
     await expect(page.getByTestId('reservation-edit-link')).toBeVisible();
     await expect(page.getByTestId('reservation-duplicate-link')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -547,6 +547,7 @@ test('deleted reservation audit row is read-only and detail URL shows domain gui
     await page.goto(`/admin/reservations/${reservation.id}`);
     await page.getByTestId('reservation-delete-button').click();
     await expect(page.getByTestId('reservation-delete-modal')).toBeVisible();
+    await page.getByTestId('reservation-delete-modal').getByLabel('처리 메모').fill('testing-delete-reason');
     await page.getByTestId('reservation-delete-confirm-button').click();
 
     await expect(page).toHaveURL(new RegExp(`/admin/audit\\?reservationId=${reservation.id}&action=DELETED`));
@@ -554,6 +555,7 @@ test('deleted reservation audit row is read-only and detail URL shows domain gui
     await expect(page.getByTestId('audit-action-select')).toHaveValue('DELETED');
     const table = page.getByTestId('audit-table');
     await expect(table.locator('.audit-snapshot-room')).toHaveText(room.name);
+    await expect(table).toContainText('testing-delete-reason');
     await expect(table.locator('.audit-snapshot-time')).not.toHaveText('-');
     await expect(table).not.toContainText(reservation.purpose || '');
     await expect(table.locator(`a[href="/admin/reservations/${reservation.id}"]`)).toHaveCount(0);

@@ -118,6 +118,37 @@ textarea[aria-invalid='true']:focus-visible {
   font-size: 20px;
 }
 
+.admin-page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-page-title h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+button.admin-menu-toggle {
+  display: none;
+  position: relative;
+  flex: 0 0 44px;
+  width: 44px;
+  min-height: 44px;
+  padding: 8px;
+}
+
+.admin-menu-pending-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8a6100;
+}
+
 .brand span,
 .session-name {
   color: #c8cbc4;
@@ -308,6 +339,10 @@ textarea[aria-invalid='true']:focus-visible {
   padding: 14px 0;
 }
 
+.filter-bar.search-filter-bar {
+  grid-template-columns: repeat(4, minmax(128px, 1fr)) minmax(280px, 2fr) auto;
+}
+
 .series-color-input {
   min-height: 42px;
   padding: 4px;
@@ -315,6 +350,19 @@ textarea[aria-invalid='true']:focus-visible {
 
 .recurrence-list-panel .filter-bar {
   margin-top: 14px;
+  grid-template-columns: repeat(3, minmax(128px, 1fr)) minmax(280px, 2fr) auto;
+}
+
+.search-fields {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.search-fields label {
+  min-width: 0;
 }
 
 .recurrence-list-panel .table-wrap,
@@ -1488,6 +1536,19 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) minmax(420px, 0.8fr);
 }
 
+.reservation-detail-grid.admin-reservation-detail-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-reservation-detail-stack > .panel {
+  border-bottom: 0;
+}
+
+.admin-reservation-detail-stack .reservation-action-panel h3,
+.admin-reservation-detail-stack .reservation-action-panel p {
+  margin: 0;
+}
+
 .public-detail-actions {
   display: grid;
   gap: 24px;
@@ -2023,11 +2084,11 @@ button:disabled {
   justify-content: flex-end;
 }
 
-.audit-filter {
+.filter-bar.audit-filter {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.audit-keyword-filter {
+.audit-filter .search-fields {
   grid-column: span 2;
 }
 
@@ -2524,6 +2585,13 @@ button:disabled {
 }
 
 @media (max-width: 1180px) {
+  .filter-bar.search-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-bar.search-filter-bar .search-fields {
+    grid-column: span 2;
+  }
   .reservation-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -2534,21 +2602,50 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    position: static;
-    padding: 16px;
+  button.admin-menu-toggle {
+    display: inline-flex;
   }
 
-  .nav-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .side-panel.admin-menu-drawer {
+    inset: 0 auto 0 0;
+    width: min(320px, calc(100vw - 48px));
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    padding: 18px;
+    background: #292d29;
+    color: #f5f4ef;
   }
 
-  .sidebar-footer {
-    grid-template-columns: 1fr auto;
+  .admin-menu-drawer .side-panel-header {
     align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    padding-bottom: 12px;
+  }
+
+  .admin-menu-drawer .side-panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0;
+  }
+
+  .admin-menu-drawer .nav-list {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-menu-drawer .nav-list a {
+    min-height: 44px;
+  }
+
+  .admin-menu-drawer .ghost-button {
+    color: #f5f4ef;
+    border-color: rgba(255, 255, 255, 0.18);
   }
 
   .filter-bar,
+  .filter-bar.search-filter-bar,
+  .recurrence-list-panel .filter-bar,
   .audit-filter,
   .inline-filter,
   .detail-grid,
@@ -2557,7 +2654,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .audit-keyword-filter {
+  .filter-bar.search-filter-bar .search-fields {
     grid-column: auto;
   }
 
@@ -2577,10 +2674,6 @@ button:disabled {
 }
 
 @media (max-width: 680px) {
-  .nav-item-with-badge {
-    grid-column: span 2;
-  }
-
   .pagination {
     display: block;
     width: 100%;
@@ -2708,10 +2801,6 @@ button:disabled {
     border-left: 0;
     padding-top: 14px;
     padding-left: 0;
-  }
-
-  .nav-list {
-    grid-template-columns: 1fr 1fr;
   }
 
   .description-list div {

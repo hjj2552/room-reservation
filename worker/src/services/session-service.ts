@@ -74,15 +74,36 @@ export class SessionService {
     return record.csrfTokenHash === await sha256(headerToken);
   }
 
-  async authenticate(record: SessionRecord, username: string): Promise<void> {
-    await this.database.query(
-      "UPDATE admin_sessions SET admin_username=$2,updated_at=now() WHERE session_id_hash=$1",
-      [record.sessionIdHash, username],
-    );
-    record.adminUsername = username;
+  async authenticate(record: SessionRecord, username: string) {
+    const sessionId = createOpaqueToken();
+    const csrfToken = createOpaqueToken();
+    const sessionIdHash = await sha256(sessionId);
+    const csrfTokenHash = await sha256(csrfToken);
+    return this.database.transaction(async (client) => {
+      const result = await client.query(
+        "SELECT expires_at FROM admin_sessions WHERE session_id_hash=$1 FOR UPDATE",
+        [record.sessionIdHash],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      const expiresAt = row.expires_at instanceof Date ? row.expires_at : new Date(String(row.expires_at));
+      // Check after acquiring the lock: another login may have consumed or outlived this session.
+      if (expiresAt.getTime() <= this.now().getTime()) return null;
+      await client.query("DELETE FROM admin_sessions WHERE session_id_hash=$1", [record.sessionIdHash]);
+      await client.query(
+        `INSERT INTO admin_sessions(session_id_hash,csrf_token_hash,admin_username,expires_at)
+         VALUES($1,$2,$3,$4)`,
+        [sessionIdHash, csrfTokenHash, username, expiresAt],
+      );
+      return { sessionId, csrfToken, record: { sessionIdHash, csrfTokenHash, adminUsername: username, expiresAt } };
+    });
   }
 
-  async delete(record: SessionRecord | null): Promise<void> {
-    if (record) await this.database.query("DELETE FROM admin_sessions WHERE session_id_hash=$1", [record.sessionIdHash]);
+  async delete(record: SessionRecord | null): Promise<boolean> {
+    if (!record) return false;
+    const result = await this.database.query(
+      "DELETE FROM admin_sessions WHERE session_id_hash=$1 RETURNING session_id_hash", [record.sessionIdHash],
+    );
+    return result.rows.length === 1;
   }
 }

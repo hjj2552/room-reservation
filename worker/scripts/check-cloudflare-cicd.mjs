@@ -39,7 +39,7 @@ function job(id) {
 const shards = job("worker-frontend-e2e-shard");
 for (const fragment of [
   "needs: worker-validation",
-  "runs-on: ubuntu-latest",
+  "runs-on: ubuntu-24.04",
   "fail-fast: false",
   "shard: [1, 2]",
   "run: npm run test:local-e2e -- --shard=${{ matrix.shard }}/2",

@@ -38,7 +38,7 @@ npm.cmd run test:local-e2e -- --shard=2/2
 
 ## GitHub Actions
 
-`.github/workflows/ci.yml`의 `worker-frontend-e2e-shard` matrix는 Worker 검증 성공 후 두 작업(`1/2`, `2/2`)을 병렬 실행합니다. 각 작업은 독립된 GitHub 러너·checkout·임시 PostgreSQL·Worker·프런트 서버에서 다음을 수행합니다.
+`.github/workflows/ci.yml`의 `worker-frontend-e2e-shard` matrix는 Worker 검증 성공 후 두 작업(`1/2`, `2/2`)을 병렬 실행합니다. 브라우저 러너는 현재 Playwright가 지원하는 `ubuntu-24.04`로 고정합니다. 각 작업은 독립된 GitHub 러너·checkout·임시 PostgreSQL·Worker·프런트 서버에서 다음을 수행합니다.
 
 - Worker와 프런트엔드 의존성 재설치
 - 프런트엔드 운영 빌드와 정적 자산 결합 Worker 사전 빌드
@@ -67,6 +67,7 @@ npm.cmd run test:local-e2e -- --shard=2/2
 ## 테스트 데이터와 정리
 
 - 모든 생성 데이터는 `frontend/tests/e2e/fixtures.ts`의 공유 팩토리를 우선 사용합니다.
+- API 로그인 helper는 별도의 익명 세션에서 로그인합니다. 로그인 시 세션이 교체되므로 setup의 저장된 세션을 다른 테스트 컨텍스트에서 폐기하지 않도록 합니다.
 - 공간은 `testing-room-*`, 예약은 `testing-reservation-*`, 반복 예약과 신청자 식별자는 `testing-*` 규칙을 사용합니다.
 - 생성된 ID는 픽스처 등록부에 등록하고 종료 처리에서 ID 기반 정리를 먼저 시도합니다.
 - 반복 예약 ID 정리는 그룹 DELETE API를 사용하며, 연결된 개별 예약도 같은 트랜잭션에서 정리됩니다.

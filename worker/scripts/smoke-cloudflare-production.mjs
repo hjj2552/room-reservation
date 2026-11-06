@@ -65,7 +65,10 @@ async function authenticatedCleanupHeaders() {
     body: JSON.stringify({ username, password }),
   });
   if (loginResponse.status !== 200) throw new Error("Production cleanup route smoke authentication failed.");
-  return { cookie, "X-XSRF-TOKEN": csrf.token };
+  const authenticatedCookie = cookieHeader(loginResponse);
+  const authenticatedCsrf = /(?:^|;\s*)XSRF-TOKEN=([^;]+)/.exec(authenticatedCookie)?.[1];
+  if (!authenticatedCsrf) throw new Error("Production cleanup route smoke session cookies are missing.");
+  return { cookie: authenticatedCookie, "X-XSRF-TOKEN": authenticatedCsrf };
 }
 
 async function expectHtml(path) {

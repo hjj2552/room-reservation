@@ -1,3 +1,6 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
+import { SearchFields } from '../components/SearchFields';
+import { auditSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Pagination } from '../../shared/components/Pagination';
@@ -44,6 +47,7 @@ interface AuditFilterDraft {
   fromDate: string;
   toDate: string;
   keyword: string;
+  searchField: typeof auditSearchOptions[number]['value'];
   reservationId: string;
 }
 
@@ -54,6 +58,7 @@ function filterDraftFromParams(searchParams: URLSearchParams): AuditFilterDraft 
     fromDate: searchParams.get('fromDate') || '',
     toDate: searchParams.get('toDate') || '',
     keyword: searchParams.get('keyword') || '',
+    searchField: normalizeSearchField(searchParams.get('searchField'), auditSearchOptions),
     reservationId: searchParams.get('reservationId') || '',
   };
 }
@@ -63,6 +68,7 @@ function sameFilterDraft(first: AuditFilterDraft, second: AuditFilterDraft) {
     && first.roomId === second.roomId
     && first.fromDate === second.fromDate
     && first.toDate === second.toDate
+    && first.searchField === second.searchField
     && first.keyword === second.keyword
     && first.reservationId === second.reservationId;
 }
@@ -118,7 +124,7 @@ export function AdminAuditPage() {
     }
   }, [appliedFilters]);
 
-  const { action, roomId, fromDate, toDate, keyword, reservationId } = appliedFilters;
+  const { action, roomId, fromDate, toDate, keyword, reservationId, searchField } = appliedFilters;
   const pageParam = searchParams.get('page');
   const page = parsePageParam(pageParam);
 
@@ -130,10 +136,11 @@ export function AdminAuditPage() {
       from: toServiceStartOfDayOffset(fromDate),
       to: toServiceEndOfDayOffset(toDate),
       keyword,
+      searchField,
       page,
       size: pageSize,
     }),
-    [reservationId, roomId, action, fromDate, toDate, keyword, page],
+    [reservationId, roomId, action, fromDate, toDate, keyword, page, searchField],
   );
   const audit = useReservationHistoryAudit(filters);
 
@@ -183,12 +190,12 @@ export function AdminAuditPage() {
     <section className="page-section" aria-labelledby="audit-title">
       <div className="page-header">
         <div>
-          <h1 id="audit-title">감사 이력</h1>
+          <AdminPageTitle id="audit-title">감사 이력</AdminPageTitle>
           <p className="muted">예약 신청, 수정, 승인, 취소 이력을 조건별로 조회합니다.</p>
         </div>
       </div>
 
-      <form className="filter-bar audit-filter" onSubmit={filterSubmission.handleSubmit}>
+      <form className="filter-bar search-filter-bar audit-filter" onSubmit={filterSubmission.handleSubmit}>
         <label>
           처리 유형
           <select
@@ -237,17 +244,16 @@ export function AdminAuditPage() {
             onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
           />
         </label>
-        <label className="audit-keyword-filter">
-          검색어
-          <input
-            data-testid="audit-keyword-input"
-            type="search"
-            placeholder="공간, 신청자, 연락처, 목적, 처리자, 메모"
-            value={draftFilters.keyword}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
-            {...filterSubmission.searchInputProps}
-          />
-        </label>
+        <SearchFields
+          options={auditSearchOptions}
+          searchField={draftFilters.searchField}
+          keyword={draftFilters.keyword}
+          onFieldChange={(searchField) => setDraftFilters((current) => ({ ...current, searchField }))}
+          onKeywordChange={(keyword) => setDraftFilters((current) => ({ ...current, keyword }))}
+          inputTestId="audit-keyword-input"
+          allPlaceholder="공간, 신청자, 연락처, 목적, 처리자, 메모"
+          inputProps={filterSubmission.searchInputProps}
+        />
         <label>
           예약 ID
           <input

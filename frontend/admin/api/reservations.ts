@@ -76,6 +76,7 @@ export async function exportReservationsCsv(filters: ReservationFilters = {}) {
       from: filters.from,
       to: filters.to,
       keyword: filters.keyword,
+      searchField: filters.searchField,
     })}`,
     { credentials: 'include' },
   );

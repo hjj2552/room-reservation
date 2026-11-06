@@ -1,8 +1,10 @@
+import { AdminPageState, AdminPageTitle } from '../components/AdminPageTitle';
 import { CalendarDays, Check, Copy, PenLine, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import type { ReservationHistory } from '../../shared/api/types';
 import { ApiError, errorMessage } from '../../shared/api/http';
+import { ReservationToast } from '../../shared/components/ReservationToast';
 import { ModalDialog } from '../../shared/components/ModalDialog';
 import { ReservationDetailView, reservationCoreSections } from '../../shared/components/ReservationDetailView';
 import { ErrorState, LoadingState } from '../../shared/components/StateViews';
@@ -20,6 +22,10 @@ import { reservationScheduleState, toServiceDateTimeLocal } from '../../shared/u
 
 export function AdminReservationDetailPage() {
   const { reservationId = '' } = useParams();
+  return <ReservationDetail key={reservationId} reservationId={reservationId} />;
+}
+
+function ReservationDetail({ reservationId }: { reservationId: string }) {
   const navigate = useNavigate();
   const reservation = useReservation(reservationId);
   const histories = useReservationHistories(reservationId, { enabled: Boolean(reservation.data) });
@@ -29,16 +35,28 @@ export function AdminReservationDetailPage() {
   const settings = useSettings();
   const [memo, setMemo] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<'approve' | 'cancel' | null>(null);
+  const [reasons, setReasons] = useState({ approve: '', cancel: '' });
+  const [checkingApproval, setCheckingApproval] = useState(false);
+  const [specialApproval, setSpecialApproval] = useState(false);
+  const [completionToast, setCompletionToast] = useState<{ message: string } | null>(null);
+  const submitting = useRef(false);
+  const actionPending = checkingApproval || approve.isPending || cancel.isPending;
   const [approvalPolicyError, setApprovalPolicyError] = useState('');
 
   function performAction(action: 'approve' | 'cancel') {
+    if (submitting.current || actionPending || approvalPolicyError) return;
+    if (!reservation.data || reservation.data.status === 'CANCELLED'
+      || (action === 'approve' && reservation.data.status === 'CONFIRMED')) return;
+    submitting.current = true;
     const mutation = action === 'approve' ? approve : cancel;
-    mutation.mutate(memo || undefined, {
+    mutation.mutate(reasons[action] || undefined, {
       onSuccess: () => {
-        setMemo('');
-        if (action === 'approve') setShowApproveModal(false);
+        setReasons(current => ({ ...current, [action]: '' }));
+        setSelectedAction(null);
+        setCompletionToast({ message: action === 'approve' ? '예약이 승인되었습니다.' : '예약이 취소되었습니다.' });
       },
+      onSettled: () => { submitting.current = false; },
     });
   }
 
@@ -51,31 +69,38 @@ export function AdminReservationDetailPage() {
     });
   }
 
-  if (reservation.isLoading) return <LoadingState />;
+  if (reservation.isLoading) return <AdminPageState title="예약 상세"><LoadingState /></AdminPageState>;
   if (reservation.isError && isReservationNotFound(reservation.error)) {
     return <DeletedReservationState reservationId={reservationId} />;
   }
-  if (reservation.isError) return <ErrorState error={reservation.error} />;
+  if (reservation.isError) return <AdminPageState title="예약 상세"><ErrorState error={reservation.error} /></AdminPageState>;
   if (!reservation.data) return null;
 
   const detail = reservation.data;
   const isCancelled = detail.status === 'CANCELLED';
-  async function requestApproval() {
+  async function selectAction(action: 'approve' | 'cancel') {
+    if (actionPending) return;
+    approve.reset();
+    cancel.reset();
     setApprovalPolicyError('');
-    const latestSettings = await settings.refetch();
-    if (!latestSettings.data || latestSettings.error) {
-      setApprovalPolicyError('최신 운영 설정을 불러오지 못했습니다. 다시 시도해 주세요.');
-      return;
+    setSpecialApproval(false);
+    setSelectedAction(action);
+    if (action !== 'approve') return;
+    setCheckingApproval(true);
+    try {
+      const latestSettings = await settings.refetch();
+      if (!latestSettings.data || latestSettings.error) {
+        setApprovalPolicyError('최신 운영 설정을 불러오지 못했습니다. 다시 시도해 주세요.');
+        return;
+      }
+      setSpecialApproval(reservationScheduleState(
+        toServiceDateTimeLocal(detail.startAt),
+        toServiceDateTimeLocal(detail.endAt),
+        latestSettings.data,
+      ) === 'special-approval');
+    } finally {
+      setCheckingApproval(false);
     }
-    if (reservationScheduleState(
-      toServiceDateTimeLocal(detail.startAt),
-      toServiceDateTimeLocal(detail.endAt),
-      latestSettings.data,
-    ) === 'special-approval') {
-      setShowApproveModal(true);
-      return;
-    }
-    performAction('approve');
   }
   const coreSections = reservationCoreSections({
     room: detail.room,
@@ -121,7 +146,7 @@ export function AdminReservationDetailPage() {
     <section className="page-section" aria-labelledby="reservation-detail-title">
       <div className="page-header reservation-detail-page-header">
         <div>
-          <h1 id="reservation-detail-title">예약 상세</h1>
+          <AdminPageTitle id="reservation-detail-title">예약 상세</AdminPageTitle>
         </div>
         <div className="header-actions reservation-navigation-actions" aria-label="예약 상세 이동">
           <Link
@@ -135,7 +160,7 @@ export function AdminReservationDetailPage() {
         </div>
       </div>
 
-      <div className="detail-grid reservation-detail-grid">
+      <div className="detail-grid reservation-detail-grid admin-reservation-detail-stack">
         <ReservationDetailView
           status={detail.status}
           sections={coreSections}
@@ -145,26 +170,46 @@ export function AdminReservationDetailPage() {
           <div>
             <h2 id="actions-title">상태 처리</h2>
           </div>
-          <form
-            className="form-stack"
-            onSubmit={(event) => {
+          {selectedAction ? (
+            <form className="form-stack" data-testid="reservation-status-form" onSubmit={(event) => {
               event.preventDefault();
-              void requestApproval();
-            }}
-          >
-            <label>
-              처리 메모
-              <textarea
-                value={memo}
-                onChange={(event) => setMemo(event.target.value)}
-                rows={4}
-                placeholder="승인 또는 취소 사유를 남깁니다."
-              />
-            </label>
+              performAction(selectedAction);
+            }}>
+              <h3>{selectedAction === 'approve' ? '예약 승인' : '예약 취소'}</h3>
+              <p data-testid="reservation-status-transition">
+                {statusLabels[detail.status]} → {selectedAction === 'approve' ? '승인' : '취소'}
+              </p>
+              {specialApproval ? <p className="muted">이 예약은 특별 허가 시간 또는 요일에 해당합니다. 이용 가능 여부를 확인한 뒤 승인해 주세요.</p> : null}
+              <label>
+                {selectedAction === 'approve' ? '승인 사유' : '취소 사유'}
+                <textarea
+                  key={selectedAction}
+                  autoFocus
+                  value={reasons[selectedAction]}
+                  onChange={(event) => setReasons(current => ({ ...current, [selectedAction]: event.target.value }))}
+                  disabled={actionPending}
+                  maxLength={1000}
+                  rows={4}
+                />
+              </label>
+              {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
+              {approvalPolicyError ? <div className="inline-error" role="alert">{approvalPolicyError}</div> : null}
+              {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
+              <div className="button-row">
+                <button type="button" className="secondary-button" disabled={actionPending} onClick={() => setSelectedAction(null)}>돌아가기</button>
+                <button type="submit" className={selectedAction === 'approve' ? 'primary-button' : 'danger-button'}
+                  disabled={actionPending || Boolean(approvalPolicyError)
+                    || isCancelled || (selectedAction === 'approve' && detail.status === 'CONFIRMED')}>
+                  확인
+                </button>
+              </div>
+            </form>
+          ) : (
             <div className="reservation-primary-actions" data-testid="reservation-primary-actions">
               <div className="button-row" aria-label="주요 상태 처리">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => void selectAction('approve')}
                   className="primary-button"
                   disabled={approve.isPending || settings.isFetching || detail.status === 'CONFIRMED' || isCancelled}
                 >
@@ -175,10 +220,10 @@ export function AdminReservationDetailPage() {
                   type="button"
                   className="danger-button"
                   disabled={cancel.isPending || isCancelled}
-                  onClick={() => performAction('cancel')}
+                  onClick={() => void selectAction('cancel')}
                 >
                   <X size={16} aria-hidden="true" />
-                  취소
+                  예약 취소
                 </button>
               </div>
               <div className="button-row reservation-management-actions" aria-label="예약 관리">
@@ -200,10 +245,7 @@ export function AdminReservationDetailPage() {
                 </Link>
               </div>
             </div>
-            {approve.isError ? <div className="inline-error" role="alert">{errorMessage(approve.error)}</div> : null}
-            {approvalPolicyError ? <div className="inline-error" role="alert">{approvalPolicyError}</div> : null}
-            {cancel.isError ? <div className="inline-error" role="alert">{errorMessage(cancel.error)}</div> : null}
-          </form>
+          )}
         </section>
       </div>
 
@@ -277,6 +319,10 @@ export function AdminReservationDetailPage() {
           <p id="reservation-delete-modal-description" className="danger-copy">
             삭제하면 이 예약의 상세 정보는 더 이상 조회할 수 없습니다. 감사 로그에는 삭제 기록과 처리 메모가 남습니다.
           </p>
+          <label>
+            처리 메모
+            <textarea value={memo} onChange={(event) => setMemo(event.target.value)} rows={4} disabled={deleteReservation.isPending} />
+          </label>
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={() => setShowDeleteModal(false)} autoFocus>
               돌아가기
@@ -294,40 +340,7 @@ export function AdminReservationDetailPage() {
           </div>
         </ModalDialog>
       ) : null}
-      {showApproveModal ? (
-        <ModalDialog
-          title="승인 확인"
-          titleId="reservation-approve-modal-title"
-          ariaDescribedBy="reservation-approve-modal-description"
-          onClose={() => setShowApproveModal(false)}
-          closeDisabled={approve.isPending}
-          testId="reservation-approve-modal"
-        >
-          <p id="reservation-approve-modal-description">
-            이 예약은 특별 허가 시간 또는 요일에 해당합니다. 이용 가능 여부를 확인한 뒤 승인해 주세요. 정말 승인하시겠습니까?
-          </p>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setShowApproveModal(false)}
-              disabled={approve.isPending}
-              autoFocus
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => performAction('approve')}
-              disabled={approve.isPending}
-              data-testid="reservation-approve-confirm-button"
-            >
-              {approve.isPending ? '승인 중...' : '확인'}
-            </button>
-          </div>
-        </ModalDialog>
-      ) : null}
+      <ReservationToast toast={completionToast} onClose={setCompletionToast} testId="admin-reservation-success-toast" />
     </section>
   );
 }
@@ -406,7 +419,7 @@ function DeletedReservationState({ reservationId }: { reservationId: string }) {
   return (
     <section className="page-section narrow" aria-labelledby="deleted-reservation-title">
       <div className="state-box error">
-        <h1 id="deleted-reservation-title">삭제된 예약입니다</h1>
+        <AdminPageTitle id="deleted-reservation-title">삭제된 예약입니다</AdminPageTitle>
         <p>이 예약은 이미 삭제되어 상세 정보를 볼 수 없습니다. 감사 로그에서 삭제 기록은 계속 확인할 수 있습니다.</p>
         <div className="button-row">
           <button type="button" className="ghost-button" onClick={() => navigate(-1)}>

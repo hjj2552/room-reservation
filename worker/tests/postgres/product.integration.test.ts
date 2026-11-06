@@ -13,6 +13,7 @@ import {
   parseRecurrenceCreate,
   parseRecurrenceList,
   parseReservationFilter,
+  parseRoomList,
   parseTagList,
   parseUpdateSettings,
 } from "../../src/http/product-input";
@@ -61,7 +62,7 @@ function publicPayload(roomId: string, password: string, purpose: string, hour =
   };
 }
 
-async function waitForPublicMutationWaiters(expected: number) {
+async function waitForReservationMutationWaiters(expected: number, queryPattern: string) {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
     const result = await database.query(
@@ -69,19 +70,21 @@ async function waitForPublicMutationWaiters(expected: number) {
        FROM pg_stat_activity
        WHERE datname=current_database() AND pid <> pg_backend_pid()
          AND state='active' AND wait_event_type='Lock'
-         AND query LIKE '%cancel_password_hash = crypt%'
+         AND query LIKE $1
          AND query LIKE '%FOR UPDATE OF r%'`,
+      [queryPattern],
     );
     if (Number(result.rows[0]?.count) >= expected) return;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
-  throw new Error(`Timed out waiting for ${expected} public reservation mutation lock waiter(s).`);
+  throw new Error(`Timed out waiting for ${expected} reservation mutation lock waiter(s).`);
 }
 
-async function runQueuedPublicMutations(
+async function runQueuedReservationMutations(
   reservationId: string,
   first: () => Promise<unknown>,
   second: () => Promise<unknown>,
+  queryPattern = "%cancel_password_hash = crypt%",
 ) {
   const blocker = await database.pool.connect();
   const pending: Promise<unknown>[] = [];
@@ -91,9 +94,9 @@ async function runQueuedPublicMutations(
     transactionOpen = true;
     await blocker.query("SELECT id FROM reservations WHERE id=$1 FOR UPDATE", [reservationId]);
     pending.push(first());
-    await waitForPublicMutationWaiters(1);
+    await waitForReservationMutationWaiters(1, queryPattern);
     pending.push(second());
-    await waitForPublicMutationWaiters(2);
+    await waitForReservationMutationWaiters(2, queryPattern);
     await blocker.query("COMMIT");
     transactionOpen = false;
     return await Promise.allSettled(pending);
@@ -565,7 +568,7 @@ describe("public reservation mutation serialization", () => {
       purpose: "testing-public-should-not-update",
     };
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.cancelPublicReservation(created.id, password),
       () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
@@ -609,7 +612,7 @@ describe("public reservation mutation serialization", () => {
       purpose: "testing-public-updated-first",
     };
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.updatePublicReservation(created.id, parsePublicReservation(updated)),
       () => products.cancelPublicReservation(created.id, password),
@@ -661,7 +664,7 @@ describe("public reservation mutation serialization", () => {
     const payload = publicPayload(roomId, password, "testing-public-double-cancel", 12);
     const created = await products.createPublicReservation(parsePublicReservation(payload));
 
-    const results = await runQueuedPublicMutations(
+    const results = await runQueuedReservationMutations(
       created.id,
       () => products.cancelPublicReservation(created.id, password),
       () => products.cancelPublicReservation(created.id, password),
@@ -1055,17 +1058,17 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
     expect(csrfResponse.status).toBe(200);
     const csrf = await csrfResponse.json() as { token: string };
     const setCookie = csrfResponse.headers.get("set-cookie") || "";
-    const sessionId = /ROOM-SESSION=([^;,]+)/.exec(setCookie)?.[1];
-    const csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(setCookie)?.[1];
+    let sessionId = /ROOM-SESSION=([^;,]+)/.exec(setCookie)?.[1];
+    let csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(setCookie)?.[1];
     expect(sessionId).toBeTruthy();
-    expect(csrfCookie).toBe(csrf.token);
+    expect(csrfCookie === csrf.token).toBe(true);
     expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
     expect(setCookie.match(/Expires=[^;]+/g)).toEqual([
       `Expires=${expectedExpiry.toUTCString()}`,
       `Expires=${expectedExpiry.toUTCString()}`,
     ]);
-    const cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
-    const writeHeaders = { "content-type": "application/json", "cookie": cookie, "X-XSRF-TOKEN": csrf.token };
+    let cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
+    let writeHeaders = { "content-type": "application/json", "cookie": cookie, "X-XSRF-TOKEN": csrf.token };
 
     expect((await app.request("http://worker.test/api/auth/admin/login", {
       method: "POST", headers: { "content-type": "application/json" },
@@ -1076,11 +1079,16 @@ describe("HTTP session, CSRF, admin contracts and cleanup", () => {
       method: "POST", headers: writeHeaders, body: JSON.stringify({ username: "admin", password: "admin1234" }),
     });
     expect(loginResponse.status).toBe(200);
-    expect(loginResponse.headers.get("set-cookie")).toContain("ROOM-SESSION=");
+    expect(loginResponse.headers.get("set-cookie")?.includes("ROOM-SESSION=")).toBe(true);
     expect(loginResponse.headers.get("set-cookie")?.match(/Expires=[^;]+/g)).toEqual([
       `Expires=${expectedExpiry.toUTCString()}`,
       `Expires=${expectedExpiry.toUTCString()}`,
     ]);
+    expect(await timedSessions.find(sessionId)).toBeNull();
+    sessionId = /ROOM-SESSION=([^;,]+)/.exec(loginResponse.headers.get("set-cookie") || "")?.[1];
+    csrfCookie = /XSRF-TOKEN=([^;,]+)/.exec(loginResponse.headers.get("set-cookie") || "")?.[1];
+    cookie = `ROOM-SESSION=${sessionId}; XSRF-TOKEN=${csrfCookie}`;
+    writeHeaders = { "content-type": "application/json", cookie, "X-XSRF-TOKEN": csrfCookie! };
     expect((await timedSessions.find(sessionId))?.expiresAt).toEqual(expectedExpiry);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(200);
 
@@ -1231,7 +1239,13 @@ async function authenticatedApp(environment: "uat" | "prod" = "uat") {
     method: "POST", headers: writeHeaders, body: JSON.stringify({ username: "admin", password: "admin1234" }),
   });
   expect(login.status).toBe(200);
-  return { app, cookie, csrf: csrf.token, writeHeaders, csrfResponse, login };
+  const authenticatedCookies = login.headers.get("set-cookie") || "";
+  const authenticatedId = /ROOM-SESSION=([^;,]+)/.exec(authenticatedCookies)?.[1];
+  const authenticatedCsrf = /XSRF-TOKEN=([^;,]+)/.exec(authenticatedCookies)?.[1];
+  if (!authenticatedId || !authenticatedCsrf) throw new Error("Authenticated cookies were not issued");
+  const authenticatedCookie = `ROOM-SESSION=${authenticatedId}; XSRF-TOKEN=${authenticatedCsrf}`;
+  return { app, cookie: authenticatedCookie, csrf: authenticatedCsrf,
+    writeHeaders: { ...writeHeaders, cookie: authenticatedCookie, "X-XSRF-TOKEN": authenticatedCsrf }, csrfResponse, login };
 }
 
 describe("applicant phone normalization HTTP contract", () => {
@@ -1641,7 +1655,28 @@ describe("audit history search contract", () => {
 
     for (const keyword of ["0101234", "010-1234", "010 9876"]) {
       expect(await historyIds({ keyword, action: "UPDATED" })).toEqual([updatedHistoryId]);
+      expect(await historyIds({ keyword, action: "UPDATED", searchField: "applicantPhone" })).toEqual([updatedHistoryId]);
     }
+
+    for (const [searchField, keywords] of [
+      ["roomName", ["testing-audit-before-room", "testing-audit-after-room"]],
+      ["applicantName", ["testing-audit-before-applicant", "testing-audit-after-applicant"]],
+      ["applicantEmail", ["TESTING-AUDIT-BEFORE@EXAMPLE.TEST", "testing-audit-after@example.test"]],
+      ["purpose", ["testing-audit-before-purpose", "testing-audit-after-purpose"]],
+      ["actor", ["TESTING-ADMIN-ACTOR"]],
+      ["memo", ["testing-audit-processing-memo"]],
+    ] as const) {
+      for (const keyword of keywords) {
+        const params = { keyword, action: "UPDATED", roomId: beforeRoomId };
+        expect(await historyIds({ ...params, searchField })).toEqual([updatedHistoryId]);
+        expect(await historyIds({ ...params, searchField: "all" })).toEqual(await historyIds(params));
+        expect(await historyIds({ ...params, searchField: searchField === "purpose" ? "applicantName" : "purpose" })).toEqual([]);
+      }
+    }
+    expect(await historyIds({ reservationId, searchField: "applicantPhone", keyword: "not-a-phone" })).toEqual([]);
+    expect(await historyIds({ reservationId, searchField: "applicantPhone", keyword: " " }))
+      .toEqual(await historyIds({ reservationId }));
+    expect(await historyIds({ reservationId: deletedReservationId, searchField: "purpose", keyword: "testing-audit-deleted-purpose" })).toHaveLength(1);
 
     expect(await historyIds({ keyword: publicInput.applicantEmail, action: "CREATED" })).toEqual([publicHistoryId]);
     expect(await historyIds({ keyword: "PUBLIC_USER" })).toEqual([]);
@@ -3278,14 +3313,14 @@ describe("input boundaries, cookies and bounded session cleanup", () => {
     const issuedCookies = csrfResponse.headers.get("set-cookie") || "";
     const loginCookies = login.headers.get("set-cookie") || "";
     for (const cookies of [issuedCookies, loginCookies]) {
-      expect(cookies).toContain("Secure");
-      expect(cookies).toContain("SameSite=Lax");
-      expect(cookies).toContain("Path=/");
+      expect(cookies.includes("Secure")).toBe(true);
+      expect(cookies.includes("SameSite=Lax")).toBe(true);
+      expect(cookies.includes("Path=/")).toBe(true);
     }
     const sessionSegment = issuedCookies.slice(issuedCookies.indexOf("ROOM-SESSION="), issuedCookies.indexOf("XSRF-TOKEN="));
     const csrfSegment = issuedCookies.slice(issuedCookies.indexOf("XSRF-TOKEN="));
-    expect(sessionSegment).toContain("HttpOnly");
-    expect(csrfSegment).not.toContain("HttpOnly");
+    expect(sessionSegment.includes("HttpOnly")).toBe(true);
+    expect(csrfSegment.includes("HttpOnly")).toBe(false);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: { "content-type": "application/json", cookie } })).status).toBe(403);
     expect((await app.request("http://worker.test/api/auth/admin/logout", { method: "POST", headers: writeHeaders })).status).toBe(204);
     expect((await app.request("http://worker.test/api/auth/admin/me", { headers: { cookie } })).status).toBe(401);
@@ -3456,5 +3491,238 @@ describe("admin timetable range query", () => {
     for (const query of ['view=room&date=2026-07-13', 'view=date', 'view=date&date=2026-02-30', 'view=all&date=2026-07-13']) {
       expect((await app.request(`${path}?${query}`, { headers: { cookie } })).status).toBe(400);
     }
+  });
+});
+
+describe("field-selected searches", () => {
+  it("isolates reservation fields with the same keyword and shares filters with counts and CSV", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-search-fields");
+    const fields = ["purpose", "applicantName", "applicantEmail", "applicantPhone", "memo"] as const;
+    const ids: string[] = [];
+    for (const [index, field] of fields.entries()) {
+      const id = await insertReservation({
+        roomId, purpose: field === "purpose" ? "testing-0101234-purpose" : "testing-reservation-field",
+        applicantName: field === "applicantName" ? "testing-0101234-name" : "testing-applicant",
+        applicantEmail: field === "applicantEmail" ? "testing-0101234@example.test" : "testing@example.test",
+        applicantPhone: field === "applicantPhone" ? "01012345678" : "01099999999", hour: 10 + index,
+      });
+      ids.push(id);
+      if (field === "memo") await insertReservationHistory(id, "testing-0101234-memo");
+    }
+    const read = (params: Record<string, string>) => products.listReservations({
+      ...parseReservationFilter(new URLSearchParams(params)), page: 0, size: 2, offset: 0,
+    });
+    const base = { roomId, keyword: "0101234", status: "CONFIRMED", from: futureWeekday(55, 9), to: futureWeekday(55, 18) };
+    expect(await read({ ...base, searchField: "all" })).toEqual(await read(base));
+    expect((await read(base)).totalItems).toBe(5);
+    for (const [index, searchField] of fields.entries()) {
+      const params = { ...base, searchField };
+      const result = await read(params);
+      expect(result.totalItems).toBe(1);
+      expect(result.items.map((item) => item.id)).toEqual([ids[index]]);
+      const csv = await products.exportReservationsCsv(parseReservationFilter(new URLSearchParams(params)));
+      for (const id of ids) expect(csv.includes(id)).toBe(id === ids[index]);
+      expect((await read({ ...params, keyword: " " })).totalItems).toBe(5);
+      expect((await read({ ...params, status: "REQUESTED" })).totalItems).toBe(0);
+    }
+    for (const keyword of ["010-1234", "010 1234"]) {
+      expect((await read({ ...base, keyword, searchField: "applicantPhone" })).items.map(item => item.id)).toEqual([ids[3]]);
+    }
+    expect((await read({ ...base, keyword: "invalid", searchField: "applicantPhone" })).totalItems).toBe(0);
+  });
+
+  it("isolates room names, locations and descriptions without changing filters or tag-name search", async () => {
+    await resetProductData();
+    const ids: string[] = [];
+    const fields = ["name", "location", "description"] as const;
+    for (const field of fields) {
+      ids.push((await products.createRoom({
+        name: field === "name" ? "testing-room-sharedneedle" : `testing-room-${field}`,
+        location: field === "location" ? "testing-sharedneedle" : null,
+        description: field === "description" ? "testing-sharedneedle" : null,
+        capacity: 10, enabled: field !== "description",
+      })).id);
+    }
+    const read = (params: Record<string, string>) => products.listRooms(parseRoomList(new URLSearchParams(params)));
+    expect(await read({ keyword: "SharedNeedle", searchField: "all" })).toEqual(await read({ keyword: "SharedNeedle" }));
+    for (const [index, searchField] of fields.entries()) {
+      const result = await read({ keyword: "SharedNeedle", searchField, size: "1" });
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]?.id).toBe(ids[index]);
+      expect((await read({ keyword: " ", searchField })).totalItems).toBe(3);
+    }
+    expect((await read({ keyword: "SharedNeedle", searchField: "description", enabled: "true" })).totalItems).toBe(0);
+    const tagId = await insertTag("testing-tag-sharedneedle");
+    expect((await products.listTags(parseTagList(new URLSearchParams({ keyword: "SHAREDNEEDLE" })))).items.map(item => item.id)).toEqual([tagId]);
+  });
+
+  it("isolates recurrence fields without expanding email or original-room-name search", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-normal");
+    const namedRoomId = await insertRoom("testing-room-sharedneedle");
+    const tagId = await insertTag("testing-tag-sharedneedle");
+    const fields = ["purpose", "applicantName", "roomName", "tagName"] as const;
+    const ids: string[] = [];
+    for (const field of fields) {
+      ids.push(await insertRecurrence({
+        roomId: field === "roomName" ? namedRoomId : roomId,
+        purpose: field === "purpose" ? "testing-recurring-sharedneedle" : "testing-recurring-normal",
+        applicantName: field === "applicantName" ? "testing-sharedneedle" : "testing-applicant",
+        tagId: field === "tagName" ? tagId : null,
+      }));
+    }
+    await database.query("UPDATE reservation_recurrences SET original_room_name='testing-old-room' WHERE id=$1", [ids[2]]);
+    const read = (params: Record<string, string>) => products.listRecurrences(parseRecurrenceList(new URLSearchParams(params)));
+    expect(await read({ keyword: "SharedNeedle", searchField: "all" })).toEqual(await read({ keyword: "SharedNeedle" }));
+    for (const [index, searchField] of fields.entries()) {
+      const result = await read({ keyword: "SharedNeedle", searchField, size: "1" });
+      expect(result.totalItems).toBe(1);
+      expect(result.items[0]?.id).toBe(ids[index]);
+      expect((await read({ keyword: " ", searchField })).totalItems).toBe(4);
+    }
+    expect((await read({ keyword: "testing-old-room", searchField: "roomName" })).totalItems).toBe(0);
+    expect((await read({ keyword: "SharedNeedle", searchField: "roomName", roomId })).totalItems).toBe(0);
+  });
+
+  it("rejects unsupported search fields through each authenticated API and CSV", async () => {
+    await resetProductData();
+    const { app, cookie } = await authenticatedApp();
+    for (const path of ["rooms", "reservations", "recurrences", "audit/reservation-histories", "exports/reservations.csv"]) {
+      const response = await app.request(`/api/admin/${path}?searchField=invalid`, { headers: { cookie } });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+    }
+  });
+});
+
+describe("idempotent administrator status changes", () => {
+  const cases = [
+    { initial: "REQUESTED", action: "APPROVED", target: "CONFIRMED", endpoint: "approve" },
+    { initial: "REQUESTED", action: "CANCELLED", target: "CANCELLED", endpoint: "cancel" },
+    { initial: "CONFIRMED", action: "CANCELLED", target: "CANCELLED", endpoint: "cancel" },
+  ] as const;
+  const snapshot = async (id: string) => (await database.query(
+    `SELECT status, updated_at::text, updated_by_actor_type, updated_by_actor_id, xmin::text AS row_version
+     FROM reservations WHERE id=$1`, [id],
+  )).rows[0];
+  const histories = async (id: string) => (await database.query(
+    `SELECT id, action, before_status, after_status, memo, actor_type, actor_id, created_at::text
+     FROM reservation_histories WHERE reservation_id=$1 ORDER BY created_at, id`, [id],
+  )).rows;
+
+  for (const { initial, action, target, endpoint } of cases) {
+    it(`${initial} -> ${target} keeps duplicate calls read-only, including their memo and actor`, async () => {
+      await resetProductData();
+      const roomId = await insertRoom("testing-room-status-sequential");
+      const id = await insertReservation({ roomId, purpose: "testing-reservation-status-sequential", status: initial });
+      const first = await products.changeReservationStatus(id, action, "testing-first-memo", "testing-first-admin");
+      expect(first).toMatchObject({ id, roomId, status: target });
+      const saved = await snapshot(id);
+      const savedHistories = await histories(id);
+      expect(savedHistories).toHaveLength(1);
+      expect(savedHistories[0]).toMatchObject({ action, before_status: initial, after_status: target, memo: "testing-first-memo", actor_id: "testing-first-admin" });
+      for (const memo of [null, "testing-duplicate-memo"]) {
+        expect(await products.changeReservationStatus(id, action, memo, "testing-second-admin")).toEqual(first);
+      }
+      const { app, writeHeaders } = await authenticatedApp();
+      const response = await app.request(`/api/admin/reservations/${id}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({ memo: "testing-api-duplicate" }),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(first);
+      // xmin also detects an UPDATE that happens to write unchanged values.
+      expect(await snapshot(id)).toEqual(saved);
+      expect(await histories(id)).toEqual(savedHistories);
+    });
+
+    it(`${initial} -> ${target} serializes two overlapping HTTP requests into one update and history`, async () => {
+      await resetProductData();
+      const roomId = await insertRoom("testing-room-status-concurrent");
+      const id = await insertReservation({ roomId, purpose: "testing-reservation-status-concurrent", status: initial });
+      const { app, writeHeaders } = await authenticatedApp();
+      const send = async (memo: string) => app.request(`/api/admin/reservations/${id}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({ memo }),
+      });
+      const results = await runQueuedReservationMutations(
+        id, () => send("testing-first-memo"), () => send("testing-second-memo"),
+        "%WHERE r.id=$1 FOR UPDATE OF r%",
+      );
+      const bodies = [];
+      for (const result of results) {
+        if (result.status === "rejected") throw result.reason;
+        const response = result.value as Response;
+        expect(response.status).toBe(200);
+        bodies.push(await response.json());
+      }
+      expect(bodies[0]).toMatchObject({ id, roomId, status: target });
+      expect(bodies[1]).toEqual(bodies[0]);
+      const savedHistories = await histories(id);
+      expect(savedHistories).toHaveLength(1);
+      expect(savedHistories[0]).toMatchObject({ action, before_status: initial, after_status: target, memo: "testing-first-memo", actor_type: "ADMIN", actor_id: "admin" });
+      expect(await snapshot(id)).toMatchObject({ status: target, updated_by_actor_type: "ADMIN", updated_by_actor_id: "admin" });
+      expect((await database.query(
+        `SELECT r.updated_at = h.created_at AS same_transaction_time
+         FROM reservations r JOIN reservation_histories h ON h.reservation_id=r.id WHERE r.id=$1`, [id],
+      )).rows).toEqual([{ same_transaction_time: true }]);
+    });
+  }
+
+  it("records new transitions after an intervening state change instead of permanently deduplicating actions", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-cycle");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-cycle", status: "REQUESTED" });
+    for (const action of ["APPROVED", "CANCELLED", "APPROVED", "CANCELLED"] as const) {
+      await products.changeReservationStatus(id, action, "testing-cycle-memo", "testing-admin");
+      await products.changeReservationStatus(id, action, "testing-duplicate-memo", "testing-other-admin");
+    }
+    expect((await histories(id)).map(row => [row.action, row.before_status, row.after_status])).toEqual([
+      ["APPROVED", "REQUESTED", "CONFIRMED"], ["CANCELLED", "CONFIRMED", "CANCELLED"],
+      ["APPROVED", "CANCELLED", "CONFIRMED"], ["CANCELLED", "CONFIRMED", "CANCELLED"],
+    ]);
+  });
+
+  it("preserves approval conflicts and missing-reservation HTTP errors without partial updates", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-conflict");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-cancelled", status: "CANCELLED" });
+    await insertReservation({ roomId, purpose: "testing-reservation-status-blocker", status: "CONFIRMED" });
+    const saved = await snapshot(id);
+    const { app, writeHeaders } = await authenticatedApp();
+    const conflict = await app.request(`/api/admin/reservations/${id}/approve`, {
+      method: "POST", headers: writeHeaders, body: JSON.stringify({ memo: "testing-conflict" }),
+    });
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: "TIME_SLOT_CONFLICT" });
+    expect(await snapshot(id)).toEqual(saved);
+    expect(await histories(id)).toEqual([]);
+    for (const endpoint of ["approve", "cancel"]) {
+      const response = await app.request(`/api/admin/reservations/${crypto.randomUUID()}/${endpoint}`, {
+        method: "POST", headers: writeHeaders, body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "NOT_FOUND" });
+    }
+  });
+
+  it("rolls the status update and history back together on a database failure", async () => {
+    await resetProductData();
+    const roomId = await insertRoom("testing-room-status-rollback");
+    const id = await insertReservation({ roomId, purpose: "testing-reservation-status-rollback", status: "REQUESTED" });
+    const saved = await snapshot(id);
+    const failingDatabase: Database = {
+      query: (sql, values) => database.query(sql, values),
+      transaction: work => database.transaction(client => work({
+        query: async <Row extends Record<string, unknown>>(sql: string, values?: unknown[]) => {
+          const result = await client.query<Row>(sql, values);
+          if (sql.includes("INSERT INTO reservation_histories")) await client.query("SELECT 1/0");
+          return result;
+        },
+      })),
+    };
+    await expect(new ProductService(failingDatabase, () => new Date())
+      .changeReservationStatus(id, "APPROVED", "testing-rollback-memo", "testing-admin")).rejects.toThrow();
+    expect(await snapshot(id)).toEqual(saved);
+    expect(await histories(id)).toEqual([]);
   });
 });

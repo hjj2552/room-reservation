@@ -1,3 +1,4 @@
+import { AdminPageState, AdminPageTitle } from '../components/AdminPageTitle';
 import { FormEvent, useEffect, useState } from 'react';
 import { errorMessage } from '../../shared/api/http';
 import type { OperationSettings } from '../../shared/api/types';
@@ -92,19 +93,19 @@ export function AdminSettingsPage() {
 
   if (!form) {
     if (settings.isError && !settings.isFetching) return (
-      <>
+      <AdminPageState title="운영 설정">
         <ErrorState error={settings.error} />
         <button type="button" className="secondary-button" onClick={() => void settings.refetch()}>다시 시도</button>
-      </>
+      </AdminPageState>
     );
-    return <LoadingState />;
+    return <AdminPageState title="운영 설정"><LoadingState /></AdminPageState>;
   }
 
   return (
     <section className="page-section settings-page" aria-labelledby="settings-title">
       <div className="page-header">
         <div>
-          <h1 id="settings-title">운영 설정</h1>
+          <AdminPageTitle id="settings-title">운영 설정</AdminPageTitle>
           <p className="muted">예약 가능 기간, 시간, 안내 문구를 관리합니다.</p>
         </div>
       </div>

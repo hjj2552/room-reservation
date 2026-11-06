@@ -305,7 +305,13 @@ export interface ReservationHistory {
   createdAt: string;
 }
 
+export type ReservationSearchField = 'all' | 'purpose' | 'applicantName' | 'applicantPhone' | 'applicantEmail' | 'memo';
+export type AuditSearchField = ReservationSearchField | 'roomName' | 'actor';
+export type RecurrenceSearchField = 'all' | 'purpose' | 'applicantName' | 'roomName' | 'tagName';
+export type RoomSearchField = 'all' | 'name' | 'location' | 'description';
+
 export interface ReservationFilters {
+  searchField?: ReservationSearchField;
   status?: ReservationStatus | '';
   roomId?: string;
   from?: string;
@@ -349,6 +355,7 @@ export interface RecurrencePreviewPayload {
 }
 
 export interface RecurrenceFilters {
+  searchField?: RecurrenceSearchField;
   roomId?: string;
   fromDate?: string;
   toDate?: string;

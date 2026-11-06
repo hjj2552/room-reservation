@@ -1,3 +1,4 @@
+import { roomSearchFields, reservationSearchFields, historySearchFields, recurrenceSearchFields } from "../application/product-contracts";
 import type {
   AdminReservationCommand,
   AvailabilityQuery,
@@ -186,6 +187,7 @@ export function parseRoomList(params: URLSearchParams): RoomListQuery {
     enabled: params.has("enabled")
       ? parseBooleanParameter(params.get("enabled"), "enabled", false)
       : undefined,
+    searchField: parseEnumParameter(params.get("searchField"), "searchField", roomSearchFields),
     keyword: keyword(params).keyword,
   };
 }
@@ -270,6 +272,7 @@ export function parseReservationFilter(params: URLSearchParams): ReservationFilt
     status: parseEnumParameter(params.get("status"), "status", reservationStatuses),
     source: parseEnumParameter(params.get("source"), "source", reservationSources),
     excludeCancelled: parseBooleanParameter(params.get("excludeCancelled"), "excludeCancelled", false),
+    searchField: parseEnumParameter(params.get("searchField"), "searchField", reservationSearchFields),
     keyword: search.keyword,
     phoneKeyword: search.phoneKeyword,
   };
@@ -322,6 +325,7 @@ export function parseHistoryList(params: URLSearchParams): HistoryListQuery {
     action: parseEnumParameter(params.get("action"), "action", historyActions) as HistoryAction | undefined,
     from,
     to,
+    searchField: parseEnumParameter(params.get("searchField"), "searchField", historySearchFields),
     keyword: search.keyword,
     phoneKeyword: search.phoneKeyword,
   };
@@ -344,6 +348,7 @@ export function parseRecurrenceList(params: URLSearchParams): RecurrenceListQuer
     roomId: roomId ? parseUuid(roomId, "roomId") : undefined,
     fromDate: fromDate ? parseDate(fromDate, "fromDate") : undefined,
     toDate: toDate ? parseDate(toDate, "toDate") : undefined,
+    searchField: parseEnumParameter(params.get("searchField"), "searchField", recurrenceSearchFields),
     keyword: keyword(params).keyword,
   };
 }

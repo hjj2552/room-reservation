@@ -102,11 +102,11 @@ export function useReservationAction(id: string, action: 'approve' | 'cancel') {
   return useMutation({
     mutationFn: (memo?: string) =>
       action === 'approve' ? approveReservation(id, memo) : cancelReservation(id, memo),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: reservationKeys.all });
-      queryClient.invalidateQueries({ queryKey: reservationKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: reservationKeys.histories(id) });
-    },
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: reservationKeys.all }),
+      queryClient.invalidateQueries({ queryKey: reservationKeys.detail(id) }),
+      queryClient.invalidateQueries({ queryKey: reservationKeys.histories(id) }),
+    ]),
   });
 }
 

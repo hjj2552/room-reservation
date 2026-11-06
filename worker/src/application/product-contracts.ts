@@ -35,6 +35,7 @@ export interface UpdateSettingsCommand {
 }
 
 export interface RoomListQuery extends PageQuery {
+  searchField?: RoomSearchField | undefined;
   includeDeleted: boolean;
   enabled?: boolean | undefined;
   keyword?: string | undefined;
@@ -74,6 +75,7 @@ export interface AdminReservationCommand {
 }
 
 export interface ReservationFilterQuery {
+  searchField?: ReservationSearchField | undefined;
   from?: string | undefined;
   to?: string | undefined;
   roomId?: string | undefined;
@@ -108,6 +110,7 @@ export type HistoryAction =
   | "RECURRENCE_CANCELLED";
 
 export interface HistoryListQuery extends PageQuery {
+  searchField?: HistorySearchField | undefined;
   reservationId?: string | undefined;
   roomId?: string | undefined;
   action?: HistoryAction | undefined;
@@ -137,8 +140,18 @@ export interface RecurrenceCreateCommand extends RecurrencePreviewCommand {
 }
 
 export interface RecurrenceListQuery extends PageQuery {
+  searchField?: RecurrenceSearchField | undefined;
   roomId?: string | undefined;
   fromDate?: string | undefined;
   toDate?: string | undefined;
   keyword?: string | undefined;
 }
+
+export const roomSearchFields = ["all", "name", "location", "description"] as const;
+export const reservationSearchFields = ["all", "purpose", "applicantName", "applicantPhone", "applicantEmail", "memo"] as const;
+export const historySearchFields = ["all", "roomName", "purpose", "applicantName", "applicantPhone", "applicantEmail", "actor", "memo"] as const;
+export const recurrenceSearchFields = ["all", "purpose", "applicantName", "roomName", "tagName"] as const;
+export type RoomSearchField = typeof roomSearchFields[number];
+export type ReservationSearchField = typeof reservationSearchFields[number];
+export type HistorySearchField = typeof historySearchFields[number];
+export type RecurrenceSearchField = typeof recurrenceSearchFields[number];

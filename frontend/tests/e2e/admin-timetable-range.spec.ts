@@ -151,6 +151,7 @@ test('admin timetable refreshes after edit, approval, cancellation and deletion'
   await expect(block).toContainText('승인 대기');
   await block.click();
   await page.getByRole('button', { name: '승인', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect(page.locator('.reservation-detail-main .status-badge')).toHaveText('승인');
   await page.goBack();
   await expect(block).toContainText('승인');
@@ -164,7 +165,8 @@ test('admin timetable refreshes after edit, approval, cancellation and deletion'
   await page.getByTestId('reservation-detail-timetable-link').click();
   await expect(block).toContainText(updatedPurpose);
   await block.click();
-  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await page.getByRole('button', { name: '예약 취소', exact: true }).click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect(page.locator('.reservation-detail-main .status-badge')).toHaveText('취소');
   await page.goBack();
   await expect(block).toHaveCount(0);

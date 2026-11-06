@@ -1,3 +1,4 @@
+import { AdminPageState, AdminPageTitle } from '../components/AdminPageTitle';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router';
@@ -144,11 +145,11 @@ export function AdminReservationFormPage() {
     });
   }
 
-  if (reservation.isLoading || settings.isLoading || rooms.isLoading) return <LoadingState />;
-  if (reservation.isError) return <ErrorState error={reservation.error} />;
-  if (settings.isError) return <ErrorState error={settings.error} />;
-  if (rooms.isError) return <ErrorState error={rooms.error} />;
-  if (!reservation.data || !rooms.data) return <LoadingState />;
+  if (reservation.isLoading || settings.isLoading || rooms.isLoading) return <AdminPageState title="예약 수정"><LoadingState /></AdminPageState>;
+  if (reservation.isError) return <AdminPageState title="예약 수정"><ErrorState error={reservation.error} /></AdminPageState>;
+  if (settings.isError) return <AdminPageState title="예약 수정"><ErrorState error={settings.error} /></AdminPageState>;
+  if (rooms.isError) return <AdminPageState title="예약 수정"><ErrorState error={rooms.error} /></AdminPageState>;
+  if (!reservation.data || !rooms.data) return <AdminPageState title="예약 수정"><LoadingState /></AdminPageState>;
 
   const mutationError = update.error;
   const isPending = update.isPending;
@@ -157,7 +158,7 @@ export function AdminReservationFormPage() {
     <section className="page-section" aria-labelledby="reservation-form-title">
       <div className="page-header">
         <div>
-          <h1 id="reservation-form-title">예약 수정</h1>
+          <AdminPageTitle id="reservation-form-title">예약 수정</AdminPageTitle>
           <p className="muted">
             관리자가 예약 정보를 수정합니다. 예약 시간을 바꾸거나 취소된 예약을 다시 활성화하는 경우에는 시간 충돌을 재검사합니다.
           </p>

@@ -1,3 +1,6 @@
+import { AdminPageTitle } from '../components/AdminPageTitle';
+import { SearchFields } from '../components/SearchFields';
+import { recurrenceSearchOptions, normalizeSearchField } from '../utils/searchFields';
 import { RefreshCw, Search } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -67,6 +70,7 @@ interface RecurrenceFilterDraft {
   fromDate: string;
   toDate: string;
   keyword: string;
+  searchField: typeof recurrenceSearchOptions[number]['value'];
 }
 
 const initialForm: RecurrenceForm = {
@@ -93,6 +97,7 @@ function filterDraftFromParams(searchParams: URLSearchParams): RecurrenceFilterD
     fromDate: searchParams.get('fromDate') || '',
     toDate: searchParams.get('toDate') || '',
     keyword: searchParams.get('keyword') || '',
+    searchField: normalizeSearchField(searchParams.get('searchField'), recurrenceSearchOptions),
   };
 }
 
@@ -100,6 +105,7 @@ function sameFilterDraft(first: RecurrenceFilterDraft, second: RecurrenceFilterD
   return first.roomId === second.roomId
     && first.fromDate === second.fromDate
     && first.toDate === second.toDate
+    && first.searchField === second.searchField
     && first.keyword === second.keyword;
 }
 
@@ -177,7 +183,7 @@ export function AdminRecurrencesPage() {
     defaultTimesAppliedRef.current = true;
   }, [settings.data]);
 
-  const { roomId, fromDate, toDate, keyword } = appliedFilters;
+  const { roomId, fromDate, toDate, keyword, searchField } = appliedFilters;
   const pageParam = searchParams.get('page');
   const page = parsePageParam(pageParam);
 
@@ -187,10 +193,11 @@ export function AdminRecurrencesPage() {
       fromDate,
       toDate,
       keyword,
+      searchField,
       page,
       size: pageSize,
     }),
-    [roomId, fromDate, toDate, keyword, page],
+    [roomId, fromDate, toDate, keyword, page, searchField],
   );
   const recurrences = useRecurrences(filters, { keepPreviousData: true });
 
@@ -297,7 +304,7 @@ export function AdminRecurrencesPage() {
     <section className="page-section" aria-labelledby="recurrences-title">
       <div className="page-header">
         <div>
-          <h1 id="recurrences-title">반복 예약</h1>
+          <AdminPageTitle id="recurrences-title">반복 예약</AdminPageTitle>
           <p className="muted">먼저 미리보기로 충돌 여부를 확인한 뒤 충돌 정책을 선택합니다.</p>
         </div>
       </div>
@@ -573,7 +580,7 @@ export function AdminRecurrencesPage() {
         <div className="panel-header">
           <h2 id="recurrence-list-title">반복 예약 목록</h2>
         </div>
-        <form className="filter-bar" onSubmit={listFilterSubmission.handleSubmit}>
+        <form className="filter-bar search-filter-bar" onSubmit={listFilterSubmission.handleSubmit}>
           <label>
             공간
             <select
@@ -607,17 +614,16 @@ export function AdminRecurrencesPage() {
               onChange={(event) => setDraftFilters((current) => ({ ...current, toDate: event.target.value }))}
             />
           </label>
-          <label>
-            검색어
-            <input
-              data-testid="recurrence-list-keyword-filter"
-              type="search"
-              placeholder="태그, 신청자, 목적"
-              value={draftFilters.keyword}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
-              {...listFilterSubmission.searchInputProps}
-            />
-          </label>
+          <SearchFields
+            options={recurrenceSearchOptions}
+            searchField={draftFilters.searchField}
+            keyword={draftFilters.keyword}
+            onFieldChange={(searchField) => setDraftFilters((current) => ({ ...current, searchField }))}
+            onKeywordChange={(keyword) => setDraftFilters((current) => ({ ...current, keyword }))}
+            inputTestId="recurrence-list-keyword-filter"
+            allPlaceholder="공간, 태그, 신청자, 목적"
+            inputProps={listFilterSubmission.searchInputProps}
+          />
           <button type="submit" className="secondary-button" data-testid="recurrence-list-search-button">
             <Search size={16} aria-hidden="true" />
             조회

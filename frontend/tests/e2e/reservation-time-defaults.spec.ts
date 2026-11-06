@@ -1100,21 +1100,21 @@ test('admin approval rechecks the latest settings before confirming an exception
 
   await page.goto(`/admin/reservations/${reservationId}`);
   await page.getByRole('button', { name: '승인', exact: true }).click();
-  const dialog = page.getByTestId('reservation-approve-modal');
-  await expect(dialog).toContainText('이 예약은 특별 허가 시간 또는 요일에 해당합니다. 이용 가능 여부를 확인한 뒤 승인해 주세요. 정말 승인하시겠습니까?');
+  const dialog = page.getByTestId('reservation-status-form');
+  await expect(dialog).toContainText('이 예약은 특별 허가 시간 또는 요일에 해당합니다. 이용 가능 여부를 확인한 뒤 승인해 주세요.');
   expect(settingsRequests).toBeGreaterThanOrEqual(2);
   expect(approveRequests).toBe(0);
-  await dialog.getByRole('button', { name: '취소' }).click();
+  await dialog.getByRole('button', { name: '돌아가기' }).click();
   await expect(page.getByText('승인 대기', { exact: true }).first()).toBeVisible();
   expect(approveRequests).toBe(0);
 
   await page.getByRole('button', { name: '승인', exact: true }).click();
-  await page.getByTestId('reservation-approve-confirm-button').click();
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect.poll(() => approveRequests).toBe(1);
   await expect(page.locator('.status-badge').first()).toContainText('승인');
 });
 
-test('admin approval inside the general reservation schedule proceeds without confirmation', async ({ page }) => {
+test('admin approval inside the general reservation schedule requires inline confirmation without a special warning', async ({ page }) => {
   const reservationId = '00000000-0000-4000-8000-000000000303';
   await mockReservationApis(page, '2026-07-31');
   let approveRequests = 0;
@@ -1134,6 +1134,10 @@ test('admin approval inside the general reservation schedule proceeds without co
 
   await page.goto(`/admin/reservations/${reservationId}`);
   await page.getByRole('button', { name: '승인', exact: true }).click();
+  expect(approveRequests).toBe(0);
+  await expect(page.getByTestId('reservation-status-form')).toBeVisible();
+  await expect(page.getByText('이 예약은 특별 허가 시간 또는 요일에 해당합니다.', { exact: false })).toHaveCount(0);
+  await page.getByRole('button', { name: '확인', exact: true }).click();
   await expect.poll(() => approveRequests).toBe(1);
   await expect(page.getByTestId('reservation-approve-modal')).toHaveCount(0);
 });

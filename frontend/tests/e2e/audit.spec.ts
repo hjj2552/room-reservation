@@ -210,14 +210,15 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
   await page.goto('/admin/audit?action=DELETED&keyword=testing-audit-layout&page=0');
 
   const auditFilter = page.locator('.audit-filter');
-  const filterControls = auditFilter.locator(':scope > label > select, :scope > label > input, :scope > button');
-  await expect(filterControls).toHaveCount(7);
+  const filterControls = auditFilter.locator('label > select, label > input, :scope > button');
+  await expect(filterControls).toHaveCount(8);
   expect(await filterControls.evaluateAll((controls) => controls.map((control) => control.getAttribute('data-testid'))))
     .toEqual([
       'audit-action-select',
       'audit-room-select',
       'audit-from-date-input',
       'audit-to-date-input',
+      'audit-keyword-input-search-field',
       'audit-keyword-input',
       'audit-reservation-id-input',
       'audit-search-button',
@@ -339,7 +340,12 @@ test('audit rows keep a stable target summary and column geometry', async ({ pag
     return { y: box.y, width: box.width };
   }));
   for (let index = 1; index < mobileFilterBoxes.length; index += 1) {
-    expect(mobileFilterBoxes[index].y).toBeGreaterThan(mobileFilterBoxes[index - 1].y);
+    if (index === 5) {
+      // The target selector and keyword input form one compact search group.
+      expect(Math.abs(mobileFilterBoxes[index].y - mobileFilterBoxes[index - 1].y)).toBeLessThanOrEqual(1);
+    } else {
+      expect(mobileFilterBoxes[index].y).toBeGreaterThan(mobileFilterBoxes[index - 1].y);
+    }
   }
   expect(await auditFilter.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
